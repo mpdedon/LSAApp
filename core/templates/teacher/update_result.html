@@ -1,0 +1,12 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2 class="text-center">Update Non-Academic Skills for {{ student.user.get_full_name }}</h2>
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit" class="btn btn-primary mt-3">Save</button>
+    </form>
+</div>
+{% endblock %}

@@ -1,0 +1,46 @@
+<!-- subject_list.html -->
+
+{% extends 'base.html' %} <!-- Assuming you have a base.html for common layout -->
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Subject List</h2>
+    <a href="{% url 'subject_create' %}" class="btn btn-success mb-3">Add New Subject</a>
+    {% if subjects %}
+        <table class="table table-striped table-bordered">
+            <thead class="thead-dark">
+                <tr>
+                    <th>Subject Name</th>
+                    <th>Description</th>
+                    <th>Weight</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Loop through all subjects and display them -->
+                {% for subject in subjects %}
+                    <tr>
+                        <td>{{ subject.name }}</td>
+                        <td>{{ subject.description|truncatewords:10 }}</td> <!-- Truncate long descriptions -->
+                        <td>{{ subject.subject_weight }}</td>
+                        <td>
+                            <!-- Action buttons for editing, deleting, and viewing more details -->
+                            <a href="{% url 'subject_detail' subject.id %}" class="btn btn-info btn-sm">View</a>
+                            <a href="{% url 'subject_update' subject.id %}" class="btn btn-warning btn-sm">Edit</a>
+                            <a href="{% url 'subject_delete' subject.id %}" class="btn btn-danger btn-sm" 
+                               onclick="return confirm('Are you sure you want to delete this subject?');">
+                               Delete
+                            </a>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <div class="alert alert-warning">
+            No subjects found. Click "Add New Subject" to create one.
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
+

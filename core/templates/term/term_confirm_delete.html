@@ -1,0 +1,17 @@
+<!-- term_confirm_delete.html -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Confirm Delete Term</title>
+</head>
+<body>
+    <h1>Confirm Delete Term</h1>
+    <p>Are you sure you want to delete "{{ term.name }}"?</p>
+    <form method="post">
+        {% csrf_token %}
+        <button type="submit">Delete</button>
+    </form>
+</body>
+</html>

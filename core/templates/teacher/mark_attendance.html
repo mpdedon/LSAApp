@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+
+{% load attendance_filters %}  
+{% load static %}
+
+{% block content %}
+<h2>Mark Attendance for {{ class_instance.name }}</h2>
+
+<!-- Navigation for weeks -->
+<div>
+  {% if current_week > 0 %}
+      <a href="?week={{ current_week|add:"-1" }}" class="btn btn-info">Previous Week</a>
+  {% endif %}
+  <span></span>
+  <span>Week {{ current_week|add:1 }} of {{ total_weeks }}</span>
+  {% if current_week < max_week %}
+  <span></span>
+      <a href="?week={{ current_week|add:"1" }}" class="btn btn-info">Next Week</a>
+  {% endif %}
+</div>
+<br>
+<form method="POST">
+    {% csrf_token %}
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Student Name</th>
+                {% for day in week_days %}
+                    <th>{{ day|date:"D d M" }}</th> <!-- Display the date in a nice format -->
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for student in students %}
+                <tr>
+                    <td>{{ student.user.get_full_name }}</td>
+                    {% for day in week_days %}
+                    <td>
+                      <label>
+                        <input type="radio" name="attendance_{{ student.user.id }}_{{ day|date:'Y-m-d' }}" value="present"
+                        {% if attendance_dict|get_item:student.id|get_item:day %} checked {% endif %}>
+                        Present
+                    </label>
+                    <label>
+                        <input type="radio" name="attendance_{{ student.user.id }}_{{ day|date:'Y-m-d' }}" value="absent"
+                        {% if attendance_dict|get_item:student.id|get_item:day %} checked {% endif %}>
+                        Absent
+                    </label>
+                  </td>
+                    {% endfor %}
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <button type="submit" class="button btn-success">Submit Attendance</button>
+</form>
+<!-- Back Button -->
+<div class="mb-3 text-end">
+    <a href="{% url 'teacher_dashboard' %}" class="btn btn-secondary">Back to Dashboard</a>
+</div>
+{% endblock %}

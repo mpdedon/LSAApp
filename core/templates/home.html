@@ -1,0 +1,134 @@
+{% extends 'base.html' %}
+
+{% block title %}Home{% endblock %}
+
+{% block content %}
+{% load static %}
+<!-- Hero Section -->
+<header class="hero bg-dark text-white position-relative" style="background-image: url('{% static "images/front_image.webp" %}'); background-size: cover; background-position: center; height: 100vh;">
+    <div class="overlay" style="background-color: rgba(0, 0, 0, 0.6); position: absolute; top: 0; left: 0; right: 0; bottom: 0;"></div>
+    <div class="container position-relative text-center h-100 d-flex flex-column justify-content-center align-items-center">
+        <h1 class="display-3 fw-bold mb-3 animate__animated animate__fadeInDown">Welcome to LearnSwift Academia</h1>
+        <p class="lead mb-4 animate__animated animate__fadeInUp">Empowering education with modern technology solutions.</p>
+        {% if user.is_authenticated and user.is_superuser %}
+        <div>
+            <a href="{% url 'student_list' %}" class="btn btn-primary btn-lg me-3 animate__animated animate__zoomIn">View Students</a>
+            <a href="{% url 'teacher_list' %}" class="btn btn-outline-light btn-lg animate__animated animate__zoomIn">View Teachers</a>
+        </div>
+        {% endif %}
+    </div>
+</header>
+
+<!-- About Section -->
+<section class="py-5 bg-light">
+    <div class="container text-center">
+        <h2 class="text-uppercase text-primary mb-4 fw-bold">Why Choose Us?</h2>
+        <p class="text-muted mx-auto" style="max-width: 800px;">LearnSwift Academia provides cutting-edge solutions for schools, ensuring seamless management of students, teachers, classes, and more—all in one place.</p>
+    </div>
+</section>
+
+<!-- Cards Section -->
+<section class="container py-5">
+    <div class="row text-center">
+        <!-- Students -->
+        <div class="col-lg-4 col-md-6 mb-4">
+            <div class="card shadow border-0">
+                <img src="{% static 'images/student.jpg' %}" class="card-img-top" alt="Students">
+                <div class="card-body">
+                    <h5 class="card-title text-primary">Students</h5>
+                    <p class="card-text">Effortlessly manage student profiles, grades, and activities.</p>
+                    <a href="#" class="btn btn-primary">Explore</a>
+                </div>
+            </div>
+        </div>
+        <!-- Teachers -->
+        <div class="col-lg-4 col-md-6 mb-4">
+            <div class="card shadow border-0">
+                <img src="{% static 'images/teacher.jpg' %}" class="card-img-top" alt="Teachers">
+                <div class="card-body">
+                    <h5 class="card-title text-primary">Teachers</h5>
+                    <p class="card-text">Maintain teacher profiles and streamline class management.</p>
+                    <a href="#" class="btn btn-primary">Discover</a>
+                </div>
+            </div>
+        </div>
+        <!-- Classes -->
+        <div class="col-lg-4 col-md-6 mb-4">
+            <div class="card shadow border-0">
+                <img src="{% static 'images/class.jpg' %}" class="card-img-top" alt="Classes">
+                <div class="card-body">
+                    <h5 class="card-title text-primary">Classes</h5>
+                    <p class="card-text">Schedule classes, manage curriculums, and track progress.</p>
+                    <a href="#" class="btn btn-primary">Learn More</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Features Section -->
+<section class="bg-dark text-white py-5">
+    <div class="container text-center">
+        <h2 class="text-uppercase mb-4">Our Features</h2>
+        <div class="row">
+            <div class="col-lg-4 mb-4">
+                <div class="feature-box">
+                    <i class="fas fa-calculator fa-3x text-primary mb-3"></i>
+                    <h5>Accounts Management</h5>
+                    <p>Track student fees, payroll, and other financial transactions seamlessly.</p>
+                </div>
+            </div>
+            <div class="col-lg-4 mb-4">
+                <div class="feature-box">
+                    <i class="fas fa-chart-line fa-3x text-primary mb-3"></i>
+                    <h5>Performance Analytics</h5>
+                    <p>Analyze student performance and generate detailed reports effortlessly.</p>
+                </div>
+            </div>
+            <div class="col-lg-4 mb-4">
+                <div class="feature-box">
+                    <i class="fas fa-calendar-check fa-3x text-primary mb-3"></i>
+                    <h5>Attendance Tracking</h5>
+                    <p>Monitor attendance and notify parents in real-time.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Testimonials Section -->
+<section class="py-5 bg-light">
+    <div class="container text-center">
+        <h2 class="text-uppercase text-primary fw-bold mb-5">What People Say</h2>
+        <div class="row">
+            <div class="col-lg-4">
+                <div class="testimonial p-4 shadow-sm bg-white rounded">
+                    <p class="text-muted">"LearnSwift has revolutionized the way we manage our school. It's efficient and user-friendly!"</p>
+                    <h6 class="fw-bold text-primary">- Principal Johnson</h6>
+                </div>
+            </div>
+            <div class="col-lg-4">
+                <div class="testimonial p-4 shadow-sm bg-white rounded">
+                    <p class="text-muted">"An amazing platform that saves time and helps us focus on what matters most—teaching."</p>
+                    <h6 class="fw-bold text-primary">- Mrs. Smith, Teacher</h6>
+                </div>
+            </div>
+            <div class="col-lg-4">
+                <div class="testimonial p-4 shadow-sm bg-white rounded">
+                    <p class="text-muted">"We love how easy it is to use LearnSwift. It has everything we need in one place."</p>
+                    <h6 class="fw-bold text-primary">- Mr. Brown, Parent</h6>
+                </div>
+            </div>
+        </div>
+    </div>
+</section>
+
+<!-- Call to Action -->
+<section class="bg-primary text-white text-center py-5">
+    <div class="container">
+        <h2 class="text-uppercase mb-4">Ready to Get Started?</h2>
+        <p class="lead mb-4">Join hundreds of schools transforming education with LearnSwift Academia.</p>
+        <a href="#" class="btn btn-light btn-lg">Sign Up Now</a>
+    </div>
+</section>
+{% endblock %}

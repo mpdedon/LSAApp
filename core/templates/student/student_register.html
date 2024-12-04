@@ -1,0 +1,157 @@
+<!-- templates/student/register.html -->
+{% extends 'base.html' %}
+
+{% load add_class %}
+{% block content %}
+<div class="container mt-5">
+    <div class="card shadow">
+        <div class="card-header bg-primary text-white">
+            <h3 class="mb-0">{% if is_update %}Update Student{% else %}Register Student{% endif %}</h3>
+        </div>
+        <div class="card-body">
+            <form method="post" enctype="multipart/form-data" novalidate>
+                {% csrf_token %}
+                
+                <!-- Username -->
+                <div class="mb-3">
+                    {{ form.username.label_tag }}
+                    {{ form.username|add_class:"form-control" }}
+                    {% if form.username.help_text %}
+                        <small class="form-text text-muted">{{ form.username.help_text }}</small>
+                    {% endif %}
+                    {% for error in form.username.errors %}
+                        <div class="text-danger">{{ error }}</div>
+                    {% endfor %}
+                </div>
+
+                <!-- Email -->
+                <div class="mb-3">
+                    {{ form.email.label_tag }}
+                    {{ form.email|add_class:"form-control" }}
+                    {% for error in form.email.errors %}
+                        <div class="text-danger">{{ error }}</div>
+                    {% endfor %}
+                </div>
+
+                <!-- First Name -->
+                <div class="mb-3">
+                    {{ form.first_name.label_tag }}
+                    {{ form.first_name|add_class:"form-control" }}
+                    {% for error in form.first_name.errors %}
+                        <div class="text-danger">{{ error }}</div>
+                    {% endfor %}
+                </div>
+
+                <!-- Last Name -->
+                <div class="mb-3">
+                    {{ form.last_name.label_tag }}
+                    {{ form.last_name|add_class:"form-control" }}
+                    {% for error in form.last_name.errors %}
+                        <div class="text-danger">{{ error }}</div>
+                    {% endfor %}
+                </div>
+
+                {% if not is_update %}
+                    <!-- Password1 -->
+                    <div class="mb-3">
+                        {{ form.password1.label_tag }}
+                        {{ form.password1|add_class:"form-control" }}
+                        {% for error in form.password1.errors %}
+                            <div class="text-danger">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <!-- Password2 -->
+                    <div class="mb-3">
+                        {{ form.password2.label_tag }}
+                        {{ form.password2|add_class:"form-control" }}
+                        {% for error in form.password2.errors %}
+                            <div class="text-danger">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+
+                <!-- Date of Birth -->
+                <div class="mb-3">
+                    {{ form.date_of_birth.label_tag }}
+                    {{ form.date_of_birth|add_class:"form-control" }}
+                    {% for error in form.date_of_birth.errors %}
+                        <div class="text-danger">{{ error }}</div>
+                    {% endfor %}
+                </div>
+
+                <!-- Gender -->
+                <div class="mb-3">
+                    {{ form.gender.label_tag }}
+                    {{ form.gender|add_class:"form-select" }}
+                    {% for error in form.gender.errors %}
+                        <div class="text-danger">{{ error }}</div>
+                    {% endfor %}
+                </div>
+
+                <!-- Profile Image -->
+                <div class="mb-3">
+                    {{ form.profile_image.label_tag }}
+                    {{ form.profile_image|add_class:"form-control" }}
+                    {% for error in form.profile_image.errors %}
+                        <div class="text-danger">{{ error }}</div>
+                    {% endfor %}
+                </div>
+
+                <!-- Student Guardian -->
+                <div class="mb-3">
+                    {{ form.student_guardian.label_tag }}
+                    {{ form.student_guardian|add_class:"form-select" }}
+                    {% for error in form.student_guardian.errors %}
+                        <div class="text-danger">{{ error }}</div>
+                    {% endfor %}
+                </div>
+
+                <!-- Relationship -->
+                <div class="mb-3">
+                    {{ form.relationship.label_tag }}
+                    {{ form.relationship|add_class:"form-control" }}
+                    {% for error in form.relationship.errors %}
+                        <div class="text-danger">{{ error }}</div>
+                    {% endfor %}
+                </div>
+
+                <!-- Current Class -->
+                <div class="mb-3">
+                    {{ form.current_class.label_tag }}
+                    {{ form.current_class|add_class:"form-select" }}
+                    {% for error in form.current_class.errors %}
+                        <div class="text-danger">{{ error }}</div>
+                    {% endfor %}
+                </div>
+
+                <!-- Submit Button -->
+                <div class="d-grid">
+                    <button type="submit" class="btn btn-primary">
+                        {% if is_update %}Update{% else %}Register{% endif %}
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- General Errors -->
+        {% if form.errors %}
+            <div class="card-footer text-danger">
+                <h5>There were some errors with your submission:</h5>
+                <ul>
+                    {% for field, errors in form.errors.items %}
+                        <li><strong>{{ field }}</strong>: {{ errors|join:", " }}</li>
+                    {% endfor %}
+                </ul>
+            </div>
+        {% endif %}
+
+        <!-- Back Link -->
+        {% if is_update %}
+            <div class="card-footer text-end">
+                <a href="{% url 'student_detail' student.id %}" class="btn btn-secondary">Back to Details</a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+
+{% block title %}Student Enrollments{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2 class="text-center mb-4">{{ student.name }}'s Enrollments</h2>
+    <table class="table table-bordered">
+        <thead>
+            <tr>
+                <th>Class</th>
+                <th>Session</th>
+                <th>Term</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for enrollment in enrollments %}
+            <tr>
+                <td>{{ enrollment.assigned_class.name }}</td>
+                <td>{{ enrollment.session.name }}</td>
+                <td>{{ enrollment.term.name }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

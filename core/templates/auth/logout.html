@@ -1,0 +1,40 @@
+{% extends "base_auth.html" %}
+
+{% block content %}
+<div>
+    {% if user.is_authenticated %}
+    <form method="POST" action="{% url 'logout' %}">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger">Logout</button>
+    </form>
+    {% endif %}
+    <div class="logout-message-container">
+        <h1>You have been logged out</h1>
+        <p>Thank you for using our service. We hope to see you again soon!</p>
+        <a href="{% url 'login' %}" class="btn btn-primary">Login Again</a>
+        <a href="{% url 'home' %}" class="btn btn-secondary">Return to Homepage</a>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .logout-message-container {
+        text-align: center;
+        margin-top: 50px;
+    }
+    .logout-message-container h1 {
+        color: #2c3e50;
+        font-size: 2.5rem;
+    }
+    .logout-message-container p {
+        margin-bottom: 20px;
+        font-size: 1.2rem;
+        color: #34495e;
+    }
+    .logout-message-container a {
+        margin: 10px;
+    }
+</style>
+{% endblock %}

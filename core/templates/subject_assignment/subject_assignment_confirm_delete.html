@@ -1,0 +1,14 @@
+<!-- subject_assignment_confirm_delete.html -->
+
+{% extends 'base.html' %}
+
+{% block title %}Confirm Delete Subject Assignment{% endblock %}
+
+{% block content %}
+<h2>Confirm Delete Subject Assignment</h2>
+<p>Are you sure you want to delete the assignment for "{{ subject_assignment.subject }}"?</p>
+<form method="post">
+    {% csrf_token %}
+    <button type="submit">Delete</button>
+</form>
+{% endblock %}

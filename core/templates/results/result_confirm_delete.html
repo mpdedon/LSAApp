@@ -1,0 +1,14 @@
+<!-- result_confirm_delete.html -->
+
+{% extends 'base.html' %}
+
+{% block title %}Confirm Delete Result{% endblock %}
+
+{% block content %}
+<h2>Confirm Delete Result</h2>
+<p>Are you sure you want to delete the result for "{{ result.student.name }}"?</p>
+<form method="post">
+    {% csrf_token %}
+    <button type="submit">Delete</button>
+</form>
+{% endblock %}

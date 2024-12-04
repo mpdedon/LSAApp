@@ -1,0 +1,12 @@
+<!-- result_detail.html -->
+
+{% extends 'base.html' %}
+
+{% block title %}Result Detail{% endblock %}
+
+{% block content %}
+<h2>Result Detail</h2>
+<p>Student: {{ result.student.name }}</p>
+<p>Term: {{ result.term }}</p>
+<!-- Add more details here -->
+{% endblock %}

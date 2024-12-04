@@ -1,0 +1,42 @@
+<!-- teacher_assignment_list.html -->
+
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container my-5">
+
+    <div class="mb-3">
+        <h2>Teacher Assignment List</h2>
+        <a href="{% url 'assign_teacher' %}" class="btn btn-primary">Assign New Teacher</a>
+    </div>
+
+    <table class="table table-bordered table-striped">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Class Assigned</th>
+                <th>Teacher</th>
+                <th>Session</th>
+                <th>Term</th>
+                <th>Form Teacher</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for teacher_assignment in teacher_assignments %}
+                <tr>
+                    <td>{{ forloop.counter }}</td>
+                    <td>{{ teacher_assignment.class_assigned.name }}</td>
+                    <td>{{ teacher_assignment.teacher.user.get_full_name }}</td>
+                    <td>{{ teacher_assignment.session.name }}</td>
+                    <td>{{ teacher_assignment.term.name }}</td>
+                    <td>{{ teacher_assignment.is_form_teacher|yesno:"Yes,No" }}</td>
+                </tr>
+            {% empty %}
+                <tr>
+                    <td colspan="6" class="text-center">No Teacher Assignment found.</td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

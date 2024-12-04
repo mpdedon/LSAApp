@@ -1,0 +1,14 @@
+<!-- result_list.html -->
+
+{% extends 'base.html' %}
+
+{% block title %}Results{% endblock %}
+
+{% block content %}
+<h2>Results</h2>
+<ul>
+    {% for result in results %}
+    <li><a href="{% url 'result_detail' result.pk %}">{{ result.student.name }} - {{ result.term }}</a></li>
+    {% endfor %}
+</ul>
+{% endblock %}

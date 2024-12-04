@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-5">
+    <h1 class="text-center mb-4">Broadsheet for {{ class.name }} : {{ term.name }}</h1>
+
+    <div class="mb-3 text-end">
+        <a href="{% url 'teacher_dashboard' %}" class="btn btn-secondary">Back to Dashboard</a>
+    </div>
+    
+  </div>
+    <div class="table-responsive">
+      <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Student</th>
+                {% for subject in subjects %}
+                  <th>{{ subject.name }}</th>
+                {% endfor %}
+                <th>Total Score</th>
+                <th>Grade</th>
+                <th>GPA</th>
+
+                <!-- Loop through each subject for headers -->
+
+            </tr>
+        </thead>
+        <tbody>
+            {% for data in results_data %}
+            <tr>
+                <td>{{ data.student.user.get_full_name }}</td>
+                    {% for subject_result in data.subject_results %}
+                        <td>{{ subject_result.total_score }}</td>
+                    {% endfor %}
+                <td>{{ data.total_score }}</td>
+                <td>{{ data.subject_results.0.calculate_grade }}</td>  <!-- Assuming all subjects have the same grading scale -->
+                <td>{{ data.gpa }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

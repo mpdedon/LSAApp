@@ -1,0 +1,66 @@
+{% extends 'base.html' %}
+
+{% block title %}Enrollments for {{ student.user.get_full_name }}{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h2 class="m-0">Enrollments for {{ student.user.get_full_name }}</h2>
+            <a href="{% url 'enrol_student' student.user.id %}" class="btn btn-success btn-sm">
+                Enroll Student
+            </a>
+        </div>
+        <div class="card-body">
+            {% if enrollments %}
+            <!-- Enrollment Table -->
+            <div class="table-responsive mt-3">
+                <table class="table table-sm table-bordered table-striped table-hover">
+                    <thead class="thead-dark">
+                        <tr>
+                            <th>#</th>
+                            <th>Class</th>
+                            <th>Term</th>
+                            <th>Start Date</th>
+                            <th>End Date</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for enrollment in enrollments %}
+                        <tr>
+                            <td>{{ forloop.counter }}</td>
+                            <td>{{ enrollment.class_.name }}</td>
+                            <td>{{ enrollment.term.name }}</td>
+                            <td>{{ enrollment.term.start_date|date:"M d, Y" }}</td>
+                            <td>{{ enrollment.term.end_date|date:"M d, Y" }}</td>
+                            <td>
+                                {% if enrollment.is_active %}
+                                <span class="badge bg-success">Active</span>
+                                {% else %}
+                                <span class="badge bg-secondary">Inactive</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <!-- No Enrollments -->
+            <div class="alert alert-warning text-center mt-3">
+                <p class="mb-2">
+                    <strong>No enrollments found for this student.</strong>
+                </p>
+                <a href="{% url 'enrol_student' student.user.id %}" class="btn btn-primary btn-sm">
+                    Enroll Student Now
+                </a>
+            </div>
+            {% endif %}
+        </div>
+        <div class="card-footer text-end">
+            <a href="{% url 'student_list' %}" class="btn btn-secondary btn-sm">Back to Students List</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

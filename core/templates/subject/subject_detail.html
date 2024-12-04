@@ -1,0 +1,44 @@
+<!-- subject_detail.html -->
+
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-header bg-info text-white">
+            <h2>{{ subject.name }} Details</h2>
+        </div>
+        <div class="card-body">
+            <!-- Display the subject details -->
+            <h5 class="card-title">Subject Information</h5>
+            <ul class="list-group mb-3">
+                <!-- Subject Name -->
+                <li class="list-group-item">
+                    <strong>Subject Name: </strong> {{ subject.name }}
+                </li>
+                
+                <!-- Subject Description -->
+                <li class="list-group-item">
+                    <strong>Description: </strong> 
+                    {% if subject.description %}
+                        {{ subject.description }}
+                    {% else %}
+                        <em>No description available</em>
+                    {% endif %}
+                </li>
+                
+                <!-- Subject Weight -->
+                <li class="list-group-item">
+                    <strong>Weight: </strong> {{ subject.weight }}
+                </li>
+            </ul>
+
+            <!-- Buttons for editing and navigating back to the subject list -->
+            <div class="mt-4">
+                <a href="{% url 'subject_update' subject.pk %}" class="btn btn-primary">Edit Subject</a>
+                <a href="{% url 'subject_list' %}" class="btn btn-secondary">Back to Subject List</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

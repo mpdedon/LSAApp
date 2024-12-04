@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container mt-4">
+    <h2 class="text-primary">{{ assignment.title }}</h2>
+    <p class="text-muted">Grading Essay Questions</p>
+
+    <form method="POST">
+        {% csrf_token %}
+        <table class="table table-bordered">
+            <thead>
+                <tr>
+                    <th>Student Name</th>
+                    {% for question in assignment.question_set.filter(question_type='Essay') %}
+                        <th>Q{{ forloop.counter }}</th>
+                    {% endfor %}
+                    <th>Feedback</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for submission in submissions %}
+                    <tr>
+                        <td>{{ submission.student.user.get_full_name }}</td>
+                        {% for question in assignment.question_set.filter(question_type='Essay') %}
+                            <td>
+                                <input type="number" step="0.01" name="score_{{ submission.student.id }}_{{ question.id }}" 
+                                    class="form-control" placeholder="Score">
+                            </td>
+                        {% endfor %}
+                        <td>
+                            <textarea name="feedback_{{ submission.student.id }}" class="form-control" rows="2" placeholder="Feedback"></textarea>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        <div class="text-end">
+            <button type="submit" class="btn btn-success">Submit Grades</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

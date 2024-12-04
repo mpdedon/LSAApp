@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2 class="mb-4">Teacher Details</h2>
+    <div class="card" style="width: 22rem; margin: 0 auto;">
+        {% load static %}
+        <div class="card-header">
+            {% if teacher.profile_image %}
+                <img src="{{ teacher.profile_image.url }}" class="card-img-top" alt="{{ teacher.user.get_full_name }}" style="max-height: 300px; object-fit: cover;">
+            {% else %}
+                <img src="{% static 'images/profile_images/default.jpg' %}" class="card-img-top" alt="Default Profile Image" style="max-height: 300px; object-fit: cover;">
+            {% endif %}
+            <br>
+            <h3>{{ teacher.user.first_name }} {{ teacher.user.last_name }}</h3>
+        </div>
+        <div class="card-body">
+            <p><strong>Username:</strong> {{ teacher.user.username }}</p>
+            <p><strong>Email:</strong> {{ teacher.user.email }}</p>
+            <p><strong>Date of Birth:</strong> {{ teacher.date_of_birth }}</p>
+            <p><strong>Class:</strong> {{ teacher.current_class }}</p>
+            <p><strong>Contact:</strong> {{ teacher.contact }}</p>
+            <p><strong>Address:</strong> {{ teacher.address }}</p>
+        </div>
+        <div class="card-footer">
+            <a href="{% url 'teacher_update' teacher.user.id %}" class="btn btn-warning">Edit</a>
+            <a href="{% url 'teacher_delete' teacher.user.id %}" class="btn btn-danger">Delete</a>
+            <a href="{% url 'teacher_list' %}" class="btn btn-secondary">Back to List</a>
+        </div>
+    </div>
+</div>
+{% endblock %}

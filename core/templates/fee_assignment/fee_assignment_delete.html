@@ -1,0 +1,12 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <h1>Delete Fee Assignment</h1>
+    <p>Are you sure you want to delete this fee assignment?</p>
+    <p><strong>{{ assignment }}</strong></p>
+    <form method="post">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-danger">Confirm</button>
+        <a href="{% url 'fee_assignment_list' %}" class="btn btn-secondary">Cancel</a>
+    </form>
+{% endblock %}

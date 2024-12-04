@@ -1,0 +1,11 @@
+<!-- attendance_detail.html -->
+
+{% extends 'base.html' %}
+
+{% block content %}
+  <h2>Attendance Detail</h2>
+  <p>Student: {{ attendance.student }}</p>
+  <p>Date: {{ attendance.date }}</p>
+  <p>Status: {% if attendance.is_present %}Present{% else %}Absent{% endif %}</p>
+  <!-- Add other attendance details as needed -->
+{% endblock %}

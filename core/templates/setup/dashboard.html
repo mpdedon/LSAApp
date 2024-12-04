@@ -1,0 +1,205 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-5">
+    <!-- Dashboard Header -->
+    <div class="row">
+        <div class="col-md-12">
+            <h2 class="text-center">Admin Dashboard</h2>
+            <hr>
+        </div>
+    </div>
+
+    <!-- Analytics Section -->
+    <div class="row text-center">
+        <div class="col-md-3">
+            <div class="card bg-info text-white mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">Total Students</h5>
+                    <h1>{{ student_count }}</h1>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">Total Teachers</h5>
+                    <h1>{{ teacher_count }}</h1>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">Total Guardians</h5>
+                    <h1>{{ guardian_count }}</h1>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-danger text-white mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">Total Classes</h5>
+                    <h1>{{ class_count }}</h1>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Additional Analytics -->
+    <div class="row text-center">
+        <div class="col-md-3">
+            <div class="card bg-info text-white mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">Total Sessions</h5>
+                    <h1>{{ session_count }}</h1>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-success text-white mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">Total Terms</h5>
+                    <h1>{{ term_count }}</h1>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-warning text-white mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">Total Subjects</h5>
+                    <h1>{{ subject_count }}</h1>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-danger text-white mb-3">
+                <div class="card-body">
+                    <h5 class="card-title">Total Payments</h5>
+                    <h1>{{ payment_count }}</h1>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+
+    <!-- Recent Activities Section -->
+    <div class="row">
+        <div class="col-md-12">
+            <h4 class="mb-3">Recent Enrollments</h4>
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Student</th>
+                        <th>Class</th>
+                        <th>Session</th>
+                        <th>Term</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for enrollment in recent_enrollments %}
+                    <tr>
+                        <td>{{ enrollment.student }}</td>
+                        <td>{{ enrollment.class_enrolled }}</td>
+                        <td>{{ enrollment.session }}</td>
+                        <td>{{ enrollment.term }}</td>
+                        <td>{{ enrollment.created_at|date:"Y-m-d" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center">No recent enrollments found.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Navigation Links to Manage Sections -->
+    <div class="row mt-5">
+        <div class="col-md-3">
+            <a href="{% url 'student_list' %}" class="btn btn-outline-primary btn-block">Students Record</a>
+        </div>
+        <div class="col-md-3">
+            <a href="{% url 'teacher_list' %}" class="btn btn-outline-success btn-block">Teachers Record</a>
+        </div>
+        <div class="col-md-3">
+            <a href="{% url 'guardian_list' %}" class="btn btn-outline-info btn-block">Manage Guardians</a>
+        </div>
+        <div class="col-md-3">
+            <a href="{% url 'class_list' %}" class="btn btn-outline-warning btn-block">Classes Info</a>
+        </div>
+    </div>
+
+    <div class="row mt-3">
+        <div class="col-md-3">
+            <a href="{% url 'session_list' %}" class="btn btn-outline-danger btn-block">Manage Sessions</a>
+        </div>
+        <div class="col-md-3">
+            <a href="{% url 'term_list' %}" class="btn btn-outline-danger btn-block">Manage Terms</a>
+        </div>
+        <div class="col-md-3">
+            <a href="{% url 'subject_list' %}" class="btn btn-outline-dark btn-block">Manage Subjects</a>
+        </div>
+        <div class="col-md-3">
+            <a href="{% url 'fee_assignment_list' %}" class="btn btn-outline-secondary btn-block">Manage Fees</a>
+        </div>
+    </div>
+    
+    <div class="row mt-3">
+        <div class="col-md-3">
+            <a href="{% url 'payment_list' %}" class="btn btn-outline-danger btn-block">Manage Payments</a>
+        </div>
+        <div class="col-md-3">
+            <a href="{% url 'enrol_student' %}" class="btn btn-outline-dark btn-block">Enrol in Class</a>
+        </div>
+        <div class="col-md-3">
+            <a href="{% url 'assign_teacher' %}" class="btn btn-outline-secondary btn-block">Assign Teachers</a>
+        </div>
+        <div class="col-md-3">
+            <a href="{% url 'subject_assignment_list' %}" class="btn btn-outline-dark btn-block">Subject Teachers</a>
+        </div>
+    </div>
+    <div class="row mt-3">
+        <div class="col-md-3">
+            <a href="{% url 'notification_list' %}" class="btn btn-outline-danger btn-block">Notifications</a>
+        </div>
+        <div class="col-md-3">
+            <a href="{% url 'subject_assignment_list' %}" class="btn btn-outline-dark btn-block">Blank</a>
+        </div>
+        <div class="col-md-3">
+            <a href="{% url 'result_list' %}" class="btn btn-outline-secondary btn-block">Approve Results</a>
+        </div>
+        <div class="col-md-3">
+            <a href="{% url 'promote_students' %}" class="btn btn-outline-primary btn-block">Blank</a>
+        </div>
+    </div>
+</div>
+<br>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+var ctx = document.getElementById('studentChart').getContext('2d');
+var studentChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+        labels: ['Class 1', 'Class 2', 'Class 3'], // Replace with dynamic class names
+        datasets: [{
+            label: '# of Students',
+            data: [12, 19, 3], // Replace with dynamic student count data
+            backgroundColor: 'rgba(54, 162, 235, 0.2)',
+            borderColor: 'rgba(54, 162, 235, 1)',
+            borderWidth: 1
+        }]
+    },
+    options: {
+        scales: {
+            y: {
+                beginAtZero: true
+            }
+        }
+    }
+});
+</script>
+<br>
+{% endblock %}

@@ -1,0 +1,121 @@
+<!-- guardian_form.html -->
+
+{% extends 'base.html' %}
+
+{% block content %}
+<script>
+  function previewImage(input) {
+      var file = input.files[0];
+      var reader = new FileReader();
+
+      reader.onload = function(e) {
+          document.getElementById('profile-img-preview').src = e.target.result;
+          document.getElementById('profile-img-preview').style.display = 'block';
+      };
+
+      reader.readAsDataURL(file);
+  }
+
+  document.getElementById('{{ form.profile_image.id_for_label }}').addEventListener('change', function() {
+      previewImage(this);
+  });
+</script>
+
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+            <h2 class="mb-2">{% if is_update %} Update Guardian {% else %} Create Guardian {% endif %}</h2>
+        </div>
+        <div class="card-body">
+            <form method="post" enctype="multipart/form-data" action="{% if is_update %}{% url 'guardian_update' guardian.user.id %}{% else %}{% url 'guardian_create' %}{% endif %}">
+                {% csrf_token %}
+                <div class="row">
+                  <!-- Username and Email -->
+                  <div class="col-md-6 mb-3">
+                    <label for="{{ form.username.id_for_label }}">{{ form.username.label }}</label>
+                    {{ form.username }}
+                    <div class="invalid-feedback">{{ form.username.errors }}</div>
+                  </div>
+                  <div class="col-md-6 mb-3">
+                    <label for="{{ form.email.id_for_label }}">{{ form.email.label }}</label>
+                    {{ form.email }}
+                    <div class="invalid-feedback">{{ form.email.errors }}</div>
+                  </div>
+                </div>
+                <div class="row">
+                  <!-- First Name and Last Name -->
+                  <div class="col-md-6 mb-3">
+                    <label for="{{ form.first_name.id_for_label }}">{{ form.first_name.label }}</label>
+                    {{ form.first_name }}
+                    <div class="invalid-feedback">{{ form.first_name.errors }}</div>
+                  </div>
+                  <div class="col-md-6 mb-3">
+                    <label for="{{ form.last_name.id_for_label }}">{{ form.last_name.label }}</label>
+                    {{ form.last_name }}
+                    <div class="invalid-feedback">{{ form.last_name.errors }}</div>
+                  </div>
+                </div>
+                <div class="row">
+                  <!-- Password1 and Password2 -->
+                  <div class="col-md-6 mb-3">
+                    <label for="{{ form.password1.id_for_label }}">{{ form.password1.label }}</label>
+                    {{ form.password1 }}
+                    <div class="invalid-feedback">{{ form.password1.errors }}</div>
+                  </div>
+                  <div class="col-md-6 mb-3">
+                    <label for="{{ form.password2.id_for_label }}">{{ form.password2.label }}</label>
+                    {{ form.password2 }}
+                    <div class="invalid-feedback">{{ form.password2.errors }}</div>
+                  </div>
+                </div>
+                <div class="row">
+                  <!-- Gender and Contact -->
+                  <div class="col-md-6 mb-3">
+                    <label for="{{ form.gender.id_for_label }}">{{ form.gender.label }}</label>
+                    {{ form.gender }}
+                    <div class="invalid-feedback">{{ form.gender.errors }}</div>
+                  </div>
+                  <div class="col-md-6 mb-3">
+                    <label for="{{ form.contact.id_for_label }}">{{ form.contact.label }}</label>
+                    {{ form.contact }}
+                    <div class="invalid-feedback">{{ form.contact.errors }}</div>
+                  </div>
+                </div>
+                <div class="row">
+                  <!-- Address -->
+                  <div class="col-12 mb-3">
+                    <label for="{{ form.address.id_for_label }}">{{ form.address.label }}</label>
+                    {{ form.address }}
+                    <div class="invalid-feedback">{{ form.address.errors }}</div>
+                  </div>
+                </div>
+                <div class="row">
+                  <!-- Profile Image -->
+                  <div class="col-12 mb-3">
+                    <label for="{{ form.profile_image.id_for_label }}">{{ form.profile_image.label }}</label>
+                    {{ form.profile_image }}
+                    <div class="invalid-feedback">{{ form.profile_image.errors }}</div>
+                    <img id="profile-img-preview" src="#" alt="Profile Image Preview" style="display: none; width: 150px; margin-top: 10px;">
+                  </div>
+                </div>
+                <!-- Submit Button -->
+                <div class="d-grid">
+                    {% if is_update %}
+                      <button type="submit" class="btn btn-primary">Update Guardian</button>
+                    {% else %}
+                      <button type="submit" class="btn btn-primary">Create Guardian</button>
+                    {% endif %}
+                  </div>
+              </form>
+            <div class="card-footer">
+                <div class="mt-3 text-center">
+                    {% if superuser %}
+                    <a href="{% url 'guardian_list' %}" class="btn btn-outline-info">Back to Guardian List</a>
+                    {% endif %}
+                  </div>
+            </div>
+        </div>
+          
+    </div>
+  
+{% endblock %}

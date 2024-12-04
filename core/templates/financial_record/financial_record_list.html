@@ -1,0 +1,98 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block content %}
+<div class="container">
+    <h2 class="mt-4 mb-3 text-center">Financial Records Overview</h2>
+
+    <!-- Statistics Section -->
+    <div class="row mb-3">
+        <div class="col-md-3">
+            <div class="card bg-light">
+                <div class="card-body text-center">
+                    <h5 class="card-title">Total Fees</h5>
+                    <p class="card-text display-6">₦{{ total_fee|floatformat:2|intcomma }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-light">
+                <div class="card-body text-center">
+                    <h5 class="card-title">Total Discounts</h5>
+                    <p class="card-text display-6">₦{{ total_discount|floatformat:2|intcomma }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-light">
+                <div class="card-body text-center">
+                    <h5 class="card-title">Total Payments</h5>
+                    <p class="card-text display-6">₦{{ total_paid|floatformat:2|intcomma }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card bg-light">
+                <div class="card-body text-center">
+                    <h5 class="card-title">Total Balance</h5>
+                    <p class="card-text display-6">₦{{ total_outstanding_balance|floatformat:2|intcomma }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Financial Records Table -->
+    <div class="container">
+        <h2 class="mt-4 mb-3 text-center">Financial Records Overview</h2>
+        <a href="{% url 'payment_list' %}" class="btn btn-secondary mb-3">Back to Payment List</a>
+    
+        <div class="card">
+            <div class="card-body">
+                <table class="table table-bordered table-striped">
+                    <thead class="thead-dark">
+                        <tr>
+                            <th>S/N</th>
+                            <th>Student</th>
+                            <th>Term</th>
+                            <th>Total Fee</th>
+                            <th>Total Discount</th>
+                            <th>Total Paid</th>
+                            <th>Total Balance</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for record in financial_records %}
+                            <tr>
+                                <td>{{ forloop.counter }}</td>
+                                <td>{{ record.student.user.get_full_name }}</td>
+                                <td>{{ record.term }}</td>
+                                <td>₦{{ record.total_fee|floatformat:2|intcomma }}</td>
+                                <td>₦{{ record.total_discount|floatformat:2|intcomma }}</td>
+                                <td>
+                                    {% if record.total_paid %}
+                                        ₦{{ record.total_paid|floatformat:2|intcomma }}
+                                    {% else %}
+                                        ₦0.00
+                                    {% endif %}
+                                </td>
+                                <td>₦{{ record.outstanding_balance|floatformat:2|intcomma }}</td>
+                                <td>
+                                    {% if record.is_fully_paid %}
+                                        <span class="badge bg-success">Fully Paid</span>
+                                    {% else %}
+                                        <span class="badge bg-warning">Outstanding</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="8" class="text-center">No financial records available.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% endblock %}

@@ -1,0 +1,17 @@
+<!-- templates/teacher/register.html -->
+{% extends 'base.html' %}
+
+{% block title %}Teacher Registration{% endblock %}
+
+{% block header %}Register as a Teacher{% endblock %}
+
+{% block content %}
+<form method="POST" enctype="multipart/form-data">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit" class="btn btn-primary btn-block">Register</button>
+</form>
+<p class="text-center mt-3">
+    <a href="{% url 'password_reset' %}">Forgot your password?</a>
+</p>
+{% endblock %}

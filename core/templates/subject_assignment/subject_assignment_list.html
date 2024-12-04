@@ -1,0 +1,95 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h2>Subject Assignments</h2>
+            <a href="{% url 'assign_subject' %}" class="btn btn-primary">Assign New Subject</a>
+        </div>
+        <div class="card-body">
+            <!-- Search Form -->
+            <form method="GET" action="{% url 'subject_assignment_list' %}">
+                <div class="input-group mb-3">
+                    <input type="text" class="form-control" placeholder="Search..." name="q" value="{{ search_query }}">
+                    <div class="input-group-append">
+                        <button class="btn btn-outline-secondary" type="submit">Search</button>
+                    </div>
+                </div>
+            </form>
+
+            <!-- Subject Assignments Table -->
+            {% if page_obj %}
+                <table class="table table-bordered table-hover">
+                    <thead class="thead-dark">
+                        <tr>
+                            <th>#</th>
+                            <th>Class</th>
+                            <th>Subject</th>
+                            <th>Teacher</th>
+                            <th>Session</th>
+                            <th>Term</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for assignment in page_obj %}
+                        <tr>
+                            <td>{{ forloop.counter }}</td>
+                            <td>{{ assignment.class_assigned.name }}</td>
+                            <td>{{ assignment.subject.name }}</td>
+                            <td>{{ assignment.teacher.user.get_full_name }}</td>
+                            <td>{{ assignment.session.name }}</td>
+                            <td>{{ assignment.term.name }}</td>
+                            <td>
+                                <a href="{% url 'subject_assignment_detail' assignment.id %}" class="btn btn-sm btn-info">View</a>
+                                <a href="{% url 'subject_assignment_update' assignment.id %}" class="btn btn-sm btn-warning">Edit</a>
+                                <a href="{% url 'subject_assignment_delete' assignment.id %}" class="btn btn-sm btn-danger" 
+                                   onclick="return confirm('Are you sure you want to delete this assignment?');">Delete</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            {% else %}
+                <p>No subject assignments found.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Pagination -->
+<div style="text-align: center; margin-top: 20px;">
+    <table style="margin: 0 auto; border-spacing: 10px;">
+        <tr>
+            {% if page_obj.has_previous %}
+                <td>
+                    <a href="?page=1&search={{ search_query }}" 
+                       style="text-decoration: none; padding: 5px 10px; border: 1px solid #ccc; background-color: #f8f9fa; color: #000;">&laquo; First</a>
+                </td>
+                <td>
+                    <a href="?page={{ page_obj.previous_page_number }}&search={{ search_query }}" 
+                       style="text-decoration: none; padding: 5px 10px; border: 1px solid #ccc; background-color: #f8f9fa; color: #000;">Previous</a>
+                </td>
+            {% endif %}
+
+            <td>
+                <span style="display: inline-block; padding: 5px 10px; border: 1px solid #ccc; background-color: #e9ecef; color: #000;">
+                    Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+                </span>
+            </td>
+
+            {% if page_obj.has_next %}
+                <td>
+                    <a href="?page={{ page_obj.next_page_number }}&search={{ search_query }}" 
+                       style="text-decoration: none; padding: 5px 10px; border: 1px solid #ccc; background-color: #f8f9fa; color: #000;">Next</a>
+                </td>
+                <td>
+                    <a href="?page={{ page_obj.paginator.num_pages }}&search={{ search_query }}" 
+                       style="text-decoration: none; padding: 5px 10px; border: 1px solid #ccc; background-color: #f8f9fa; color: #000;">Last &raquo;</a>
+                </td>
+            {% endif %}
+        </tr>
+    </table>
+</div>
+{% endblock %}

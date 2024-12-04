@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+
+{% load crispy_forms_tags %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-5">
+            <div class="card">
+                <div class="card-header text-center bg-info text-white">
+                    <h4>{{ form.instance.pk|yesno:"Edit Class,Add New Class" }}</h4>
+                </div>
+                <div class="card-body">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        {{ form.non_field_errors }}
+
+                        <!-- Render all fields with crispy for simplicity -->
+                        {{ form|crispy }}
+
+                        <div class="d-flex justify-content-center mt-3">
+                            <button type="submit" class="btn btn-primary">
+                                {{ form.instance.pk|yesno:"Update Class,Create Class" }}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

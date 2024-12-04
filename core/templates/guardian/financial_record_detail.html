@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2>Financial Records for {{ student.user.get_full_name }}</h2>
+
+    <div class="card mt-3">
+        <div class="card-body">
+            <h5 class="card-title">Current Term: {{ current_term.name }}</h5>
+            <p>Class: {{ student.current_class.name }}</p>
+        </div>
+    </div>
+
+    <h5 class="mt-4">Financial Records</h5>
+    <ul class="list-group">
+        {% for record in financial_records %}
+        <li class="list-group-item">
+            <strong>Term:</strong> {{ record.term.name }}<br>
+            <strong>Total Fee:</strong> {{ record.total_fee }}<br>
+            <strong>Total Discount:</strong> {{ record.total_discount }}<br>
+            <strong>Total Paid:</strong> {{ record.total_paid }}<br>
+            <strong>Outstanding Balance:</strong> {{ record.calculate_balance }}<br>
+            <strong>Status:</strong> 
+            {% if record.is_fully_paid %}
+                <span class="text-success">Fully Paid</span>
+            {% else %}
+                <span class="text-danger">Outstanding</span>
+            {% endif %}
+        </li>
+        {% empty %}
+        <li class="list-group-item text-muted">No financial records available.</li>
+        {% endfor %}
+    </ul>
+</div>
+{% endblock %}

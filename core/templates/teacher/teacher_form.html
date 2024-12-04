@@ -1,0 +1,141 @@
+<!-- teacher_form.html -->
+
+{% extends 'base.html' %}
+
+{% block content %}
+<script>
+  function previewImage(input) {
+      var file = input.files[0];
+      var reader = new FileReader();
+
+      reader.onload = function(e) {
+          document.getElementById('profile-img-preview').src = e.target.result;
+          document.getElementById('profile-img-preview').style.display = 'block';
+      };
+
+      reader.readAsDataURL(file);
+  }
+
+  document.getElementById('{{ form.profile_image.id_for_label }}').addEventListener('change', function() {
+      previewImage(this);
+  });
+</script>
+
+<div class="container mt-5">
+    <div class="card shadow">
+        <!-- Card Header -->
+        <div class="card-header">
+            <h3 class="mb-2">{% if is_update %}Update Teacher{% else %}Register Teacher{% endif %}</h3>
+        </div>
+
+        <!-- Card Body -->
+        <div class="card-body">
+            <form method="post" enctype="multipart/form-data" class="needs-validation" novalidate action="{% if is_update %}{% url 'teacher_update' teacher.user.id %}{% else %}{% url 'teacher_create' %}{% endif %}">
+                {% csrf_token %}
+                
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.username.id_for_label }}">{{ form.username.label }}</label>
+                        {{ form.username }}
+                        <div class="invalid-feedback">{{ form.username.errors }}</div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.email.id_for_label }}">{{ form.email.label }}</label>
+                        {{ form.email }}
+                        <div class="invalid-feedback">{{ form.email.errors }}</div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.first_name.id_for_label }}">{{ form.first_name.label }}</label>
+                        {{ form.first_name }}
+                        <div class="invalid-feedback">{{ form.first_name.errors }}</div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.last_name.id_for_label }}">{{ form.last_name.label }}</label>
+                        {{ form.last_name }}
+                        <div class="invalid-feedback">{{ form.last_name.errors }}</div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.password1.id_for_label }}">{{ form.password1.label }}</label>
+                        {{ form.password1 }}
+                        <div class="invalid-feedback">{{ form.password1.errors }}</div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.password2.id_for_label }}">{{ form.password2.label }}</label>
+                        {{ form.password2 }}
+                        <div class="invalid-feedback">{{ form.password2.errors }}</div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.date_of_birth.id_for_label }}">{{ form.date_of_birth.label }}</label>
+                        {{ form.date_of_birth }}
+                        <div class="invalid-feedback">{{ form.date_of_birth.errors }}</div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.contact.id_for_label }}">{{ form.contact.label }}</label>
+                        {{ form.contact }}
+                        <div class="invalid-feedback">{{ form.contact.errors }}</div>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.address.id_for_label }}">{{ form.address.label }}</label>
+                        {{ form.address }}
+                        <div class="invalid-feedback">{{ form.address.errors }}</div>
+                    </div>
+                    <div class="col-md-6 mb-3">
+                        <label for="{{ form.gender.id_for_label }}">{{ form.gender.label }}</label>
+                        {{ form.gender }}
+                        <div class="invalid-feedback">{{ form.gender.errors }}</div>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label for="{{ form.profile_image.id_for_label }}">{{ form.profile_image.label }}</label>
+                    {{ form.profile_image }}
+                    <div class="invalid-feedback">{{ form.profile_image.errors }}</div>
+                    <img id="profile-img-preview" src="#" alt="Profile Image Preview" style="display: none; width: 150px; margin-top: 10px;">
+                </div>
+
+                <div class="d-grid">
+                    <button type="submit" class="btn btn-primary">
+                        {% if is_update %}Update Teacher{% else %}Register Teacher{% endif %}
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Card Footer -->
+        <div class="card-footer">
+            <!-- Error Section -->
+            {% if form.errors %}
+                <div class="text-danger mb-3">
+                    <h5>There were some errors with your submission:</h5>
+                    <ul>
+                        {% for field, errors in form.errors.items %}
+                            <li><strong>{{ field }}</strong>: {{ errors|join:", " }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            {% endif %}
+            
+            <!-- Navigation Links -->
+            <div class="text-end">
+                {% if is_update %}
+                    <a href="{% url 'teacher_detail' teacher.user.id %}" class="btn btn-secondary">Back to Details</a>
+                {% else %}
+                    <a href="{% url 'teacher_list' %}" class="btn btn-secondary">Back to Teacher List</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

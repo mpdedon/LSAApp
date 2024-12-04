@@ -1,0 +1,15 @@
+<!-- session_confirm_delete.html -->
+
+{% extends 'base.html' %}
+
+{% block title %}Confirm Session Delete{% endblock %}
+
+{% block content %}
+    
+    <h1>Confirm Delete Session</h1>
+    <p>Are you sure you want to delete "{{ session.name }}"?</p>
+    <form method="post">
+        {% csrf_token %}
+        <button type="submit">Delete</button>
+    </form>
+{% endblock %}

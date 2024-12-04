@@ -1,0 +1,136 @@
+{% extends 'base.html' %}
+
+{% load humanize %}
+
+{% block content %}
+<div class="container">
+    <h2 class="mt-4">Student Fee Records - {{ session.name }} ({{ term.name }})</h2>
+
+    <form method="post" id="student-fee-form">
+        {% csrf_token %}
+        
+        {% for class_name, page_obj in paginated_class_records.items %}
+            <h3 class="mt-4">Class: {{ class_name }}</h3>
+            <table class="table table-bordered mt-3">
+                <thead class="table-light">
+                    <tr>
+                        <th style="width: 5%;">S/N</th>
+                        <th style="width: 25%;">Student</th>
+                        <th style="width: 15%;">Amount</th>
+                        <th style="width: 15%;">Discount</th>
+                        <th style="width: 25%;">Set Discount</th>
+                        <th style="width: 5%;">Waiver</th>
+                        <th style="width: 15%;">Net Fee</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for record in page_obj %}
+                        <tr data-record-id="{{ record.id }}">
+                            <td>{{ forloop.counter }}</td>
+                            <td>{{ record.student.user.get_full_name }}</td>
+                            <td>₦{{ record.amount|floatformat:2|intcomma }}</td>
+                            <td>₦{{ record.discount|floatformat:2|intcomma }}</td>
+                            <td>
+                                <div class="input-group">
+                                    <input type="number" step="1000" name="discount" value="{{ record.discount }}" class="form-control form-control-sm discount-input" style="min-width: 80px;">
+                                    <input type="hidden" name="record_id" value="{{ record.id }}">
+                                    <input type="hidden" name="action" value="update_discount">
+                                    <button type="submit" class="btn btn-primary btn-sm ms-2">Update</button>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="form-check">
+                                    <input type="checkbox" name="waiver" class="form-check-input waiver-input" {% if record.waiver %}checked{% endif %}>
+                                    <button type="submit" class="btn btn-primary btn-sm ms-2">Update</button>
+                                </div>
+                            </td>
+                            <td class="net-fee">₦{{ record.net_fee|floatformat:2|intcomma }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+
+            <!-- Pagination controls for this class -->
+            <div class="d-flex justify-content-center">
+                <nav aria-label="Page navigation">
+                    <ul class="pagination">
+                        {% if page_obj.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page_{{ class_name }}={{ page_obj.previous_page_number }}" aria-label="Previous">
+                                    <span aria-hidden="true">&laquo;</span>
+                                </a>
+                            </li>
+                        {% else %}
+                            <li class="page-item disabled">
+                                <span class="page-link">&laquo;</span>
+                            </li>
+                        {% endif %}
+
+                        {% for page_num in page_obj.paginator.page_range %}
+                            <li class="page-item {% if page_num == page_obj.number %}active{% endif %}">
+                                <a class="page-link" href="?page_{{ class_name }}={{ page_num }}">{{ page_num }}</a>
+                            </li>
+                        {% endfor %}
+
+                        {% if page_obj.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page_{{ class_name }}={{ page_obj.next_page_number }}" aria-label="Next">
+                                    <span aria-hidden="true">&raquo;</span>
+                                </a>
+                            </li>
+                        {% else %}
+                            <li class="page-item disabled">
+                                <span class="page-link">&raquo;</span>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            </div>
+        {% endfor %}
+        
+        <div class="d-flex justify-content-end mt-4">
+            <button type="submit" name="save_all" class="btn btn-success">Save All and Return to Fee Assignments</button>
+        </div>
+    </form>
+</div>
+
+<!-- Add JavaScript for dynamic updates (remains unchanged) -->
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Handle discount changes
+        document.querySelectorAll('.discount-input').forEach(function(input) {
+            input.addEventListener('input', function() {
+                const row = input.closest('tr');
+                const recordId = row.dataset.recordId;
+                const discount = parseFloat(input.value) || 0;
+                const amount = parseFloat(row.querySelector('.net-fee').dataset.amount);
+                const waiverInput = row.querySelector('.waiver-input');
+                
+                let netFee = waiverInput.checked ? 0 : Math.max(amount - discount, 0);
+                row.querySelector('.net-fee').textContent = `₦${netFee.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
+
+                // Update hidden inputs for saving later
+                input.nextElementSibling.value = recordId;
+                input.nextElementSibling.nextElementSibling.value = 'update_discount';
+            });
+        });
+
+        // Handle waiver changes
+        document.querySelectorAll('.waiver-input').forEach(function(checkbox) {
+            checkbox.addEventListener('change', function() {
+                const row = checkbox.closest('tr');
+                const recordId = row.dataset.recordId;
+                const discount = parseFloat(row.querySelector('.discount-input').value) || 0;
+                const amount = parseFloat(row.querySelector('.net-fee').dataset.amount);
+
+                let netFee = checkbox.checked ? 0 : Math.max(amount - discount, 0);
+                row.querySelector('.net-fee').textContent = `₦${netFee.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
+
+                // Update hidden inputs for saving later
+                checkbox.nextElementSibling.value = recordId;
+                checkbox.nextElementSibling.nextElementSibling.value = 'update_waiver';
+            });
+        });
+    });
+</script>
+{% endblock %}

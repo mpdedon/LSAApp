@@ -1,0 +1,61 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container">
+    <div class="card shadow-sm mb-4">
+        <div class="card-header bg-light text-dark">
+            <h4>Student Result - {{ student.user.get_full_name }}</h4>
+        </div>
+        <div class="card-body">
+            <h5 class="text-muted">Non-Academic Results for Term: {{ result.term }}</h5>
+            
+            <!-- Display the results -->
+            <div class="row mb-3">
+                <div class="col-6">
+                    <strong>Punctuality:</strong> {{ result.punctuality }}
+                </div>
+                <div class="col-6">
+                    <strong>Diligence:</strong> {{ result.diligence }}
+                </div>
+            </div>
+            <div class="row mb-3">
+                <div class="col-6">
+                    <strong>Cooperation:</strong> {{ result.cooperation }}
+                </div>
+                <div class="col-6">
+                    <strong>Respectfulness:</strong> {{ result.respectfulness }}
+                </div>
+            </div>
+            <div class="row mb-3">
+                <div class="col-6">
+                    <strong>Sportsmanship:</strong> {{ result.sportsmanship }}
+                </div>
+                <div class="col-6">
+                    <strong>Agility:</strong> {{ result.agility }}
+                </div>
+            </div>
+            <div class="row mb-3">
+                <div class="col-6">
+                    <strong>Creativity:</strong> {{ result.creativity }}
+                </div>
+                <div class="col-6">
+                    <strong>Hand-Eye Coordination:</strong> {{ result.hand_eye_coordination }}
+                </div>
+            </div>
+
+            <!-- Teacher's Comment -->
+            <div class="mb-3">
+                <strong>Teacher's Remark:</strong>
+                <p>{{ result.teacher_remarks }}</p>
+            </div>
+
+            <!-- Buttons to update result or go back to dashboard -->
+            <div class="d-flex justify-content-between">
+                <a href="{% url 'update_result' student.user.id result.term.id %}" class="btn btn-warning">Edit Result</a>
+                <a href="{% url 'teacher_dashboard' %}" class="btn btn-secondary">Back to Dashboard</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+

@@ -1,0 +1,13 @@
+<!-- update_feeassignment.html -->
+
+{% extends 'base.html' %}
+
+{% block content %}
+    <h1>Edit Fee Assignment</h1>
+    <form method="post">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit" class="btn btn-success">Update</button>
+        <a href="{% url 'fee_assignment_list' %}" class="btn btn-secondary">Cancel</a>
+    </form>
+{% endblock %}

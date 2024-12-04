@@ -1,0 +1,26 @@
+<!-- feeassignment_detail.html -->
+
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container">
+    <h2 class="mt-4">Fee Assignment Details</h2>
+
+    <div class="card mt-3">
+        <div class="card-body">
+            <p class="card-text"><strong>Class:</strong> {{ assignment.class_instance }}</p>
+            <p class="card-text"><strong>Term:</strong> {{ assignment.term }}</p>
+            <p class="card-text"><strong>Amount:</strong> {{ assignment.amount }}</p>
+            <p class="card-text"><strong>Discount:</strong> {{ assignment.discount }}</p>
+            <p class="card-text"><strong>Net Fee:</strong> {{ assignment.net_fee }}</p>
+            <p class="card-text"><strong>Waiver:</strong> {{ assignment.waiver|yesno:"Yes,No" }}</p>
+        </div>
+    </div>
+
+    <div class="mt-4">
+        <a href="{% url 'fee_assignment_list' %}" class="btn btn-secondary">Back to List</a>
+        <a href="{% url 'update_fee_assignment' assignment.pk %}" class="btn btn-primary">Edit</a>
+        <a href="{% url 'delete_fee_assignment' assignment.pk %}" class="btn btn-danger">Delete</a>
+    </div>
+</div>
+{% endblock %}

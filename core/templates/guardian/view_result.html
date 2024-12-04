@@ -1,0 +1,267 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<!-- Framing the entire document -->
+<div class="container mt-5" style="border: 2px solid #333; border-radius: 10px; padding: 20px; background: #fafafa;">
+    <!-- School Header Section -->
+    <div class="text-center mb-5">
+        <img src="{% static 'images/school-logo.jpg' %}" alt="LearnSwift Academia Logo" class="mb-3" style="max-width: 120px;">
+        <h1 class="display-4 fw-bold text-dark" style="font-family: 'Poppins', sans-serif;">LearnSwift Academia</h1>
+        <p class="lead text-muted" style="font-family: 'Roboto', sans-serif;">Term: {{ result.term }} | Session: {{ result.session }}</p>
+    </div>
+
+    <!-- Student Information Section -->
+    <div class="row mb-5 justify-content-center align-items-center">
+        <div class="col-md-4 text-center mb-4 mb-md-0">
+            <img src="{{ student.profile_image.url }}" alt="{{ student.user.get_full_name }}'s Profile Image" class="rounded-circle shadow-lg" style="width: 150px; height: 150px; object-fit: cover;">
+        </div>
+        <div class="col-md-8 text-center">
+            <h2 class="fw-bold text-dark" style="font-family: 'Poppins', sans-serif;">{{ student.user.get_full_name }}</h2>
+            <p class="text-muted" style="font-family: 'Roboto', sans-serif;">Class: {{ student.current_class }}  |   Roll No: {{ student.LSA_number }}</p>
+        </div>
+    </div>
+   
+    <div class="row mb-5">
+        <!-- Teacher's Comment Column -->
+        <div class="col-md-6">
+            <div class="card shadow-lg border-0" style="background: #f9f9f9; border-radius: 10px;">
+                <div class="card-header bg-warning text-white">
+                    <h5 class="h6 mb-0">Teacher's Remarks</h5>
+                </div>
+                <div class="card-body">
+                    <p>{{ result.teacher_remarks|default:"No comments yet." }}</p>
+                </div>
+            </div>
+        </div>
+    
+        <!-- Principal's Comment Column -->
+        <div class="col-md-6">
+            <div class="card shadow-lg border-0" style="background: #f9f9f9; border-radius: 10px;">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="h6 mb-0">Principal's Remarks</h5>
+                </div>
+                <div class="card-body">
+                    <p>{{ result.principal_remarks|default:"No comments yet." }}</p>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+
+    <!-- Attendance, Affective Skills, and Psychomotor Skills Section -->
+    <div class="row mb-5">
+        <!-- Attendance Section -->
+        <div class="col-md-4">
+            <div class="card shadow-lg border-0" style="background: #f4f4f4; border-radius: 10px; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="h6 mb-0">Attendance Records</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center" style="font-family: 'Roboto', sans-serif;">
+                        <div><strong>Total Days:</strong></div>
+                        <div class="digital-number">{{ attendance_data.total_days }}</div>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center" style="font-family: 'Roboto', sans-serif;">
+                        <div><strong>Days Present:</strong></div>
+                        <div class="digital-number">{{ attendance_data.present_days }}</div>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center" style="font-family: 'Roboto', sans-serif;">
+                        <div><strong>Days Absent:</strong></div>
+                        <div class="digital-number">{{ attendance_data.absent_days }}</div>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center" style="font-family: 'Roboto', sans-serif;">
+                        <div><strong>Attendance Percentage:</strong></div>
+                        <div class="digital-number">{{ attendance_data.attendance_percentage|floatformat:1 }}%</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Affective Skills Section -->
+        <div class="col-md-4">
+            <div class="card shadow-lg border-0" style="background: #e0f7fa; border-radius: 10px; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);">
+                <div class="card-header bg-info text-white">
+                    <h5 class="h6 mb-0">Affective Skills (Character)</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center" style="font-family: 'Roboto', sans-serif;">
+                        <div><strong>Punctuality:</strong></div>
+                        <div class="digital-number">{{ result.punctuality }}</div>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center" style="font-family: 'Roboto', sans-serif;">
+                        <div><strong>Diligence:</strong></div>
+                        <div class="digital-number">{{ result.diligence }}</div>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center" style="font-family: 'Roboto', sans-serif;">
+                        <div><strong>Cooperation:</strong></div>
+                        <div class="digital-number">{{ result.cooperation }}</div>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center" style="font-family: 'Roboto', sans-serif;">
+                        <div><strong>Respectfulness:</strong></div>
+                        <div class="digital-number">{{ result.respectfulness }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Psychomotor Skills Section -->
+        <div class="col-md-4">
+            <div class="card shadow-lg border-0" style="background: #e1bee7; border-radius: 10px; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);">
+                <div class="card-header bg-purple text-white">
+                    <h5 class="h6 mb-0">Psychomotor Skills (Physical)</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center" style="font-family: 'Roboto', sans-serif;">
+                        <div><strong>Sportsmanship:</strong></div>
+                        <div class="digital-number">{{ result.sportsmanship }}</div>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center" style="font-family: 'Roboto', sans-serif;">
+                        <div><strong>Agility:</strong></div>
+                        <div class="digital-number">{{ result.agility }}</div>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center" style="font-family: 'Roboto', sans-serif;">
+                        <div><strong>Creativity:</strong></div>
+                        <div class="digital-number">{{ result.creativity }}</div>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center" style="font-family: 'Roboto', sans-serif;">
+                        <div><strong>Hand-Eye Coordination:</strong></div>
+                        <div class="digital-number">{{ result.hand_eye_coordination }}</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Academic Records Section -->
+    <div class="card shadow-lg mb-5 border-0" style="background: linear-gradient(145deg, #333c53, #2a3442);">
+        <div class="card-header bg-success text-white">
+            <h3 class="h5 mb-0">Academic Records</h3>
+        </div>
+        <div class="card-body">
+            <table class="table table-hover table-bordered text-white">
+                <thead class="bg-success text-white">
+                    <tr>
+                        <th>Subject</th>
+                        <th>Test 1</th>
+                        <th>Test 2</th>
+                        <th>Test 3</th>
+                        <th>Assgt.</th>
+                        <th>Oral</th>
+                        <th>Exam</th>
+                        <th>Total</th>
+                        <th>Grade</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for subject_result in subject_results %}
+                    <tr>
+                        <td>{{ subject_result.subject.name }}</td>
+                        <td>{{ subject_result.continuous_assessment_1|default:0 }}</td>
+                        <td>{{ subject_result.continuous_assessment_2|default:0 }}</td>
+                        <td>{{ subject_result.continuous_assessment_3|default:0 }}</td>
+                        <td>{{ subject_result.assignment|default:0 }}</td>
+                        <td>{{ subject_result.oral_test|default:0 }}</td>
+                        <td>{{ subject_result.exam_score|default:0 }}</td>
+                        <td>{{ subject_result.total_score }}</td>
+                        <td>{{ subject_result.calculate_grade }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- GPA, Chart, and Signatures Section -->
+    <div class="row mb-5">
+        <!-- GPA and Digital Signature Section -->
+        <div class="col-md-4">
+            <div class="card shadow-lg border-0" style="background: #e8f5e9; border-radius: 10px;">
+                <div class="card-header bg-success text-white">
+                    <h5 class="h6 mb-0">Grade Point Average (GPA)</h5>
+                </div>
+                <div class="card-body text-center">
+                    <p class="h4 text-dark" style="font-family: 'Roboto', sans-serif;">{{ result.calculate_gpa }}</p>
+                </div>
+            </div>
+            <br>
+            <br>
+            <div class="card shadow-lg border-0" style="background: #f5f5f5; border-radius: 10px;">
+                <div class="card-header bg-dark text-white">
+                    <h5 class="h6 mb-0">Digital Signature</h5>
+                </div>
+                <div class="card-body text-center">
+                    <div class="signature-box" style="width: 200px; height: 80px; border: 2px solid #333; background-color: #fff; border-radius: 10px;">
+                        <p class="text-dark">Principal's Signature</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Performance vs Class Average Chart Section -->
+        <div class="col-md-8">
+            <div class="card shadow-lg border-0" style="background: #f3f4f6; border-radius: 10px;">
+                <div class="card-header bg-info text-white">
+                    <h5 class="h6 mb-0">Performance vs Class Average</h5>
+                </div>
+                <div class="card-body">
+                    <canvas id="performanceChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Button to Download as PDF -->
+<div class="text-center mt-4">
+    <a href="{% url 'view_student_result' student.user.id result.term.id %}?download=pdf" class="btn btn-primary btn-lg shadow-sm">
+        <i class="bi bi-file-earmark-pdf"></i> Download as PDF
+    </a>
+</div>
+
+<script>
+    var ctx = document.getElementById('performanceChart').getContext('2d');
+    var performanceChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: [ {% for subject_result in subject_results %}'{{ subject_result.subject.name }}', {% endfor %} ],
+            datasets: [{
+                label: 'Student Score',
+                data: [ {% for subject_result in subject_results %}{{ subject_result.total_score }}, {% endfor %} ],
+                backgroundColor: '#0072ff',
+                borderColor: '#0056b3',
+                borderWidth: 1
+            }, {
+                label: 'Class Average',
+                data: [ {% for subject_result in subject_results %}{{ subject_result.subject.class_average }}, {% endfor %} ],
+                backgroundColor: '#ff9a8b',
+                borderColor: '#ff5e62',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    max: 100,
+                    ticks: {
+                        stepSize: 10
+                    }
+                }
+            },
+            plugins: {
+                title: {
+                    display: true,
+                    text: 'Student Performance vs Class Average'
+                },
+                tooltip: {
+                    mode: 'index',
+                    intersect: false,
+                }
+            }
+        }
+    });
+</script>
+
+{% endblock %}

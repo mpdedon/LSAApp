@@ -1,0 +1,12 @@
+<!-- expense_detail.html -->
+
+{% extends 'base.html' %}
+
+{% block title %}Expense Detail{% endblock %}
+
+{% block content %}
+<h2>Expense Detail</h2>
+<p>Name: {{ expense.name }}</p>
+<p>Amount: {{ expense.amount }}</p>
+<!-- Add more details here -->
+{% endblock %}

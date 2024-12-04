@@ -1,0 +1,190 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container my-5">
+    <div class="card shadow-sm border-0">
+        <div class="card-header bg-secondary text-white text-center py-3">
+            <h3 class="text-white">Create a New Assignment</h3>
+        </div>
+        <div class="card-body">
+            <form method="POST" action="{% url 'create_assignment' %}">
+                {% csrf_token %}
+                <div class="mb-4">
+                    <label for="id_title">Title</label>
+                    {{ form.title }}
+                    {% if form.title.errors %}
+                        <ul class="text-danger">
+                            {% for error in form.title.errors %}
+                                <li>{{ error }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                </div>
+                <div class="mb-4">
+                    <label for="id_description">Description</label>
+                    {{ form.description }}
+                    {% if form.description.errors %}
+                        <ul class="text-danger">
+                            {% for error in form.description.errors %}
+                                <li>{{ error }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                </div>
+                <div class="mb-4">
+                    <label for="id_class_assigned">Class Assigned</label>
+                    {{ form.class_assigned }}
+                    {% if form.class_assigned.errors %}
+                        <ul class="text-danger">
+                            {% for error in form.class_assigned.errors %}
+                                <li>{{ error }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                </div>
+                <div class="mb-4">
+                    <label for="id_subject">Subject</label>
+                    {{ form.subject }}
+                    {% if form.subject.errors %}
+                        <ul class="text-danger">
+                            {% for error in form.subject.errors %}
+                                <li>{{ error }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                </div>
+                <div class="mb-4">
+                    <label for="id_due_date">Due Date</label>
+                    {{ form.due_date }}
+                    {% if form.due_date.errors %}
+                        <ul class="text-danger">
+                            {% for error in form.due_date.errors %}
+                                <li>{{ error }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                </div>
+
+                <h5 class="mt-4">Add Questions</h5>
+                <div id="questions-container"></div>
+
+                <div class="text-center mt-4">
+                    <button type="button" id="add-question" class="btn btn-secondary">
+                        <i class="bi bi-plus-circle"></i> Add Question
+                    </button>
+                </div>
+
+                <div class="text-center mt-4">
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        <i class="bi bi-plus-circle"></i> Create Assignment
+                    </button>
+                </div>
+            </form>
+            {% if errors %}
+                <div class="alert alert-danger mt-4">
+                    <ul>
+                        {% for error in errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            {% endif %}
+        </div>
+        <div class="text-end mb-3">
+            <a href="{% url 'teacher_dashboard' %}" class="btn btn-secondary">
+                <i class="bi bi-arrow-left"></i> Back to Dashboard
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- JavaScript to handle adding questions -->
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+    let questionCount = 0;
+
+    function createQuestionForm() {
+        questionCount++;
+        const questionHtml = `
+            <div class="card mb-3 question-card">
+                <div class="card-body">
+                    <h6>Question ${questionCount}</h6>
+                    <div class="form-group">
+                        <label for="question_type_${questionCount}">Question Type:</label>
+                        <select name="question_type_${questionCount}" id="question_type_${questionCount}" class="form-control">
+                            <option value="SCQ">Single Choice Question</option>
+                            <option value="MCQ">Multiple Choice Question</option>
+                            <option value="ES">Essay Question</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="question_text_${questionCount}">Question Text:</label>
+                        <textarea name="question_text_${questionCount}" id="question_text_${questionCount}" class="form-control" rows="2" required></textarea>
+                    </div>
+                    <div class="form-group question-options" id="options_div_${questionCount}">
+                        <label for="options_${questionCount}">Options (comma separated):</label>
+                        <input type="text" name="options_${questionCount}" id="options_${questionCount}" class="form-control" placeholder="e.g. Option1, Option2, Option3" />
+                        <small class="form-text text-muted">Required for SCQ and MCQ. Separate options with commas.</small>
+                    </div>
+                    <div class="form-group question-answer" id="answer_div_${questionCount}">
+                        <label for="correct_answer_${questionCount}">Correct Answer:</label>
+                        <input type="text" name="correct_answer_${questionCount}" id="correct_answer_${questionCount}" class="form-control" required />
+                    </div>
+                    <div class="form-group essay-answer d-none" id="essay_answer_div_${questionCount}">
+                        <label for="essay_answer_${questionCount}">Suggested Answer (Optional):</label>
+                        <textarea name="essay_answer_${questionCount}" id="essay_answer_${questionCount}" class="form-control" rows="4"></textarea>
+                        <small class="form-text text-muted">Optional suggested answer for essay question.</small>
+                    </div>
+                    <button type="button" class="btn btn-danger remove-question">Remove Question</button>
+                </div>
+            </div>
+        `;
+        document.getElementById('questions-container').insertAdjacentHTML('beforeend', questionHtml);
+
+        document.getElementById(`question_type_${questionCount}`).addEventListener('change', function () {
+            toggleQuestionFields(questionCount);
+        });
+    }
+
+    function toggleQuestionFields(count) {
+        const questionType = document.getElementById(`question_type_${count}`).value;
+        const optionsField = document.getElementById(`options_div_${count}`);
+        const answerField = document.getElementById(`answer_div_${count}`);
+        const essayAnswerField = document.getElementById(`essay_answer_div_${count}`);
+
+        if (questionType === 'ES') {
+            optionsField.classList.add('d-none');
+            optionsField.querySelector('input').removeAttribute('required');
+            answerField.classList.add('d-none');
+            answerField.querySelector('input').removeAttribute('required');
+            essayAnswerField.classList.remove('d-none');
+        } else {
+            optionsField.classList.remove('d-none');
+            optionsField.querySelector('input').setAttribute('required', 'true');
+            answerField.classList.remove('d-none');
+            answerField.querySelector('input').setAttribute('required', 'true');
+            essayAnswerField.classList.add('d-none');
+        }
+    }
+
+    document.querySelector('form').addEventListener('submit', function (e) {
+        e.preventDefault();
+        const formData = new FormData(this);
+        for (const [key, value] of formData.entries()) {
+            console.log(key, value);
+        }
+        this.submit();
+    });
+    
+    document.getElementById('add-question').addEventListener('click', createQuestionForm);
+
+    document.getElementById('questions-container').addEventListener('click', function (e) {
+        if (e.target.classList.contains('remove-question')) {
+            e.target.closest('.question-card').remove();
+            questionCount--;
+        }
+    });
+});
+
+</script>
+{% endblock %}

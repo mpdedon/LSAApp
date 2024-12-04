@@ -1,0 +1,38 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+{% block title %}Enroll Student to Class{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <div class="card shadow">
+        <div class="card-header bg-secondary text-white text-center">
+            <h2>Enroll Student to Class</h2>
+        </div>
+        <div class="card-body">
+            <p class="text-muted text-center">Please select a student and the class you wish to enroll them in. Ensure all details are correct before submitting.</p>
+            <form method="POST" class="needs-validation" novalidate>
+                {% csrf_token %}
+                <div class="mb-3">
+                    {{ form.student|as_crispy_field }}
+                </div>
+                <div class="mb-3">
+                    {{ form.class_enrolled|as_crispy_field }}
+                </div>
+                <div class="mb-3">
+                    {{ form.session|as_crispy_field }}
+                </div>
+                <div class="mb-3">
+                    {{ form.term|as_crispy_field }}
+                </div>
+                <div class="mb-3">
+                    {{ form.is_active|as_crispy_field }}
+                </div>
+                <div class="text-center">
+                    <button type="submit" class="btn btn-primary btn-lg">Enroll Student</button>
+                    <a href="{% url 'school_setup' %}" class="btn btn-secondary btn-lg">Cancel</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

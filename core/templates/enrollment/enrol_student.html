@@ -1,0 +1,14 @@
+{% extends 'base.html' %}
+
+{% block title %}Assign Student to Class{% endblock %}
+
+{% block content %}
+<div class="container mt-5">
+    <h2 class="text-center mb-4">Assign Student to Class</h2>
+    <form method="POST">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit" class="btn btn-primary">Assign Student</button>
+    </form>
+</div>
+{% endblock %}

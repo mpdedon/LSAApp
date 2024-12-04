@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+{% load form_extras %}  <!-- Load the custom filter -->
+
+{% block content %}
+<div class="container mt-4">
+    <h2 class="text-center mb-4">Record New Payment</h2>
+    <form method="post" class="p-4 bg-light rounded shadow-sm">
+        {% csrf_token %}
+        
+        <div class="mb-3">
+            <label for="{{ form.student.id_for_label }}" class="form-label">Student</label>
+            {{ form.student|add_class:"form-select" }}  <!-- Use the custom filter -->
+            {% if form.student.errors %}
+                <div class="text-danger small">{{ form.student.errors }}</div>
+            {% endif %}
+        </div>
+        
+        <div class="mb-3">
+            <label for="{{ form.term.id_for_label }}" class="form-label">Term</label>
+            {{ form.term|add_class:"form-select" }}  <!-- Use the custom filter -->
+            {% if form.term.errors %}
+                <div class="text-danger small">{{ form.term.errors }}</div>
+            {% endif %}
+        </div>
+        
+        <div class="mb-3">
+            <label for="{{ form.amount_paid.id_for_label }}" class="form-label">Amount Paid (₦)</label>
+            {{ form.amount_paid|add_class:"form-control" }}  <!-- Use the custom filter -->
+            {% if form.amount_paid.errors %}
+                <div class="text-danger small">{{ form.amount_paid.errors }}</div>
+            {% endif %}
+        </div>
+        
+        <div class="mb-3">
+            <label for="{{ form.payment_date.id_for_label }}" class="form-label">Payment Date</label>
+            {{ form.payment_date|add_class:"form-control datepicker" }}  <!-- Use the custom filter -->
+            {% if form.payment_date.errors %}
+                <div class="text-danger small">{{ form.payment_date.errors }}</div>
+            {% endif %}
+        </div>
+        
+        <button type="submit" class="btn btn-success w-100">Record Payment</button>
+        <a href="{% url 'payment_list' %}" class="btn btn-secondary w-100 mt-2">Cancel</a>
+    </form>
+</div>
+<script>
+    $(document).ready(function(){
+        $('.datepicker').datepicker({
+            format: 'yyyy-mm-dd', // Set the date format
+            autoclose: true, // Automatically close the picker after selection
+            todayHighlight: true // Highlight today's date
+        });
+    });
+</script>
+<style>
+    .form-select, .form-control {
+        border-radius: 0.25rem; /* Rounded corners */
+        box-shadow: none; /* Remove shadow */
+    }
+    
+    .form-select:focus, .form-control:focus {
+        border-color: #5cb85c; /* Custom border color */
+        box-shadow: 0 0 0 0.2rem rgba(92, 184, 92, 0.25); /* Focus shadow */
+    }
+    
+    .btn-success {
+        background-color: #5cb85c; /* Custom success color */
+        border-color: #5cb85c; /* Ensure the border matches */
+    }
+    
+    .btn-success:hover {
+        background-color: #4cae4c; /* Darker shade on hover */
+    }
+</style>
+
+{% endblock %}

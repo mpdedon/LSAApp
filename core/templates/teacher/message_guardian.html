@@ -1,0 +1,52 @@
+{% extends 'base.html' %}
+{% block content %}
+<div class="container my-5">
+    <div class="card shadow-sm border-0">
+        <div class="card-header bg-secondary text-white">
+            <h4 class="text-white">Message Guardian: {{ guardian.user.get_full_name }}</h4>
+        </div>
+        <div class="card-body">
+            <form method="POST">
+                {% csrf_token %}
+                
+                <!-- Title Field -->
+                <div class="form-group mb-2">
+                    <label for="{{ form.title.id_for_label }}" class="form-label">Title</label>
+                    <input 
+                        type="text" 
+                        name="{{ form.title.name }}" 
+                        id="{{ form.title.id_for_label }}" 
+                        class="form-control" 
+                        placeholder="Enter the title of your message"
+                        value="{{ form.title.value|default_if_none:'' }}"
+                    >
+                </div>
+                
+                <!-- Content Field -->
+                <div class="form-group mb-3">
+                    <label for="{{ form.content.id_for_label }}" class="form-label">
+                        Message to {{ guardian.user.get_full_name }}
+                    </label>
+                    <textarea 
+                        name="{{ form.content.name }}" 
+                        id="{{ form.content.id_for_label }}" 
+                        class="form-control" 
+                        rows="5"
+                        placeholder="Write your message here..."
+                    >{{ form.content.value|default_if_none:'' }}</textarea>
+                </div>
+                
+                <!-- Submit and Back Buttons -->
+                <div class="text-end">
+                    <button type="submit" class="btn btn-success">
+                        <i class="bi bi-send"></i> Send Message
+                    </button>
+                    <a href="{% url 'teacher_dashboard' %}" class="btn btn-secondary">
+                        <i class="bi bi-arrow-left"></i> Back to Dashboard
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

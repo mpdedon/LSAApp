@@ -1,0 +1,649 @@
+{% extends 'base.html' %}
+
+{% load static %}
+{% load message_filters %}
+{% load humanize %}
+
+{% block content %}
+<link href="https://maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css" rel="stylesheet">
+
+<div class="container-fluid py-4">
+    <div class="row">
+        <!-- Profile Navigation -->
+        <div class="profile-nav col-md-3">
+            <div class="panel shadow-sm">
+                <!-- Profile Heading -->
+                <div class="user-heading text-center py-3 bg-light rounded-top">
+                    {% if guardian.profile_image %}
+                        <img src="{{ guardian.profile_image.url }}" class="img-fluid rounded-circle mb-2" alt="{{ guardian.user.get_full_name }}" style="max-height: 150px; object-fit: cover;">
+                    {% else %}
+                        <img src="{% static 'images/profile_images/default.jpg' %}" class="img-fluid rounded-circle mb-2" alt="Default Profile Image" style="max-height: 150px; object-fit: cover;">
+                    {% endif %}
+                    <h5 class="fw-bold">{{ guardian.user.username }}</h5>
+                    <p class="text-muted mb-0">{{ guardian.user.email }}</p>
+                </div>
+        
+                <!-- Navigation Boxes -->
+                <ul class="nav flex-column mt-3">
+                    <!-- Profile Link -->
+                    <li class="nav-item mb-3">
+                        <div class="card shadow-sm">
+                            <a href="#" class="nav-link active py-3 text-center">
+                                <i class="fa fa-user me-2"></i> Profile
+                            </a>
+                        </div>
+                    </li>
+                    <!-- Recent Activity Link -->
+                    <li class="nav-item mb-3">
+                        <div class="card shadow-sm">
+                            <a href="#" class="nav-link py-3 text-center">
+                                <i class="fa fa-calendar me-2"></i> Recent Activity 
+                                <span class="badge bg-warning float-end"></span>
+                            </a>
+                        </div>
+                    </li>
+                    <!-- Edit Profile Link -->
+                    <li class="nav-item">
+                        <div class="card shadow-sm">
+                            <a href="{% url 'guardian_update' guardian.user.id %}" class="nav-link py-3 text-center">
+                                <i class="fa fa-edit me-2"></i> Edit Profile
+                            </a>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </div>
+               
+        <!-- Profile Information -->
+        <div class="profile-info col-md-9">
+            <div class="panel shadow-sm mb-4">
+                <div class="panel-body">
+                    <form>
+                        <!-- Textarea for post content -->
+                        <div class="input-group mb-3">
+                            <textarea placeholder="What's on your mind today?" rows="2" class="form-control p-text-area" aria-label="What's on your mind today?"></textarea>
+                            
+                        </div>
+            
+                        <!-- Icons for microphone, camera, or file uploads -->
+                        <div class="d-flex align-items-center justify-content-between">
+                            <!-- Icons on the left with little space between -->
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-sm btn-light">
+                                    <i class="fa fa-microphone"></i> 
+                                </button>
+                                <button class="btn btn-sm btn-light">
+                                    <i class="fa fa-camera"></i>
+                                </button>
+                                <button class="btn btn-sm btn-light">
+                                    <i class="fa fa-upload"></i>
+                                </button>
+                            </div>
+                            
+                            <!-- Post Button aligned to the right -->
+                            <button class="btn btn-warning btn-sm" type="submit" id="postButton">
+                                <i class="fa fa-paper-plane"></i> Post
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Notifications -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-light text-white p-2">
+                    <h5 class="mb-0">Notifications</h5>
+                </div>
+                <div class="card-body p-3">
+                    {% if notifications %}
+                        <div class="list-group">
+                            {% for notification in notifications %}
+                                <a href="#" class="list-group-item list-group-item-action {% if notification.is_new %}bg-light{% endif %}">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <!-- Notification Icon -->
+                                        <div class="me-2">
+                                            <i class="fa fa-bell"></i>
+                                        </div>
+                                        <div class="flex-grow-1">
+                                            <span>{{ notification.message }}</span>
+                                        </div>
+                                        <small class="text-muted">{{ notification.created_at|date:"M d, Y H:i A" }}</small>
+                                    </div>
+                                </a>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="alert alert-warning" role="alert">
+                            No notifications available.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Academic Alerts -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-light text-white">
+                    <h5 class="mb-0"><i class="fa fa-bell me-2"></i> Academic Alerts</h5>
+                </div>
+                <div class="card-body">
+                    {% if academic_alerts %}
+                        <ul class="list-group">
+                            {% for alert in academic_alerts %}
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="mb-0"><i class="fa fa-{{ alert.alert_type }}"></i> {{ alert.title }}</h6>
+                                        <p class="text-muted mb-0">{{ alert.summary }}</p>
+                                        <p class="small mb-0 text-muted">
+                                            Due: {{ alert.due_date|date:"M d, Y H:i A" }}
+                                            {% if alert.is_done %}
+                                                <span class="badge bg-success">Completed</span>
+                                            {% else %}
+                                                <span class="badge bg-danger">Pending</span>
+                                            {% endif %}
+                                        </p>
+                                    </div>
+                                    <a href="#" class="btn btn-primary btn-sm">
+                                        View <i class="fa fa-arrow-right"></i>
+                                    </a>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% else %}
+                        <p class="text-muted">No academic alerts available.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Bio Graph -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-light text-white">
+                    <h5 class="mb-0"><i class="fa fa-user me-2"></i> Bio Graph</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="bio-info-item mb-3">
+                                <div class="d-flex align-items-center">
+                                    <i class="fa fa-user-circle text-primary me-2"></i>
+                                    <span><strong>First Name:</strong> {{ guardian.user.first_name }}</span>
+                                </div>
+                            </div>
+                            <div class="bio-info-item mb-3">
+                                <div class="d-flex align-items-center">
+                                    <i class="fa fa-user-circle text-primary me-2"></i>
+                                    <span><strong>Last Name:</strong> {{ guardian.user.last_name }}</span>
+                                </div>
+                            </div>
+                            <div class="bio-info-item mb-3">
+                                <div class="d-flex align-items-center">
+                                    <i class="fa fa-globe text-primary me-2"></i>
+                                    <span><strong>Country:</strong> Nigeria</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="bio-info-item mb-3">
+                                <div class="d-flex align-items-center">
+                                    <i class="fa fa-map-marker-alt text-primary me-2"></i>
+                                    <span><strong>Address:</strong> {{ guardian.address }}</span>
+                                </div>
+                            </div>
+                            <div class="bio-info-item mb-3">
+                                <div class="d-flex align-items-center">
+                                    <i class="fa fa-phone text-primary me-2"></i>
+                                    <span><strong>Phone:</strong> {{ guardian.contact }}</span>
+                                </div>
+                            </div>
+                            <div class="bio-info-item mb-3">
+                                <div class="d-flex align-items-center">
+                                    <i class="fa fa-envelope text-primary me-2"></i>
+                                    <span><strong>Email:</strong> {{ guardian.user.email }}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!-- Tabs for Students -->
+            <div class="card shadow-lg mb-4">
+                <div class="card-header bg-light text-white">
+                    <h5 class="mb-0"><i class="fa fa-users me-2"></i> Students</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="nav nav-tabs mb-4" id="studentTabs" role="tablist">
+                        {% for student in students %}
+                            <li class="nav-item">
+                                <a class="nav-link {% if forloop.first %}active{% endif %}" 
+                                id="tab-{{ student.user.id }}" 
+                                data-bs-toggle="tab" 
+                                href="#student-{{ student.user.id }}" 
+                                role="tab">
+                                    <i class="fa fa-user-circle me-2"></i>{{ student.user.get_full_name }}
+                                    {% if student.status %}
+                                        <span class="badge bg-success ms-2">Active</span>
+                                    {% else %}
+                                        <span class="badge bg-danger ms-2">Inactive</span>
+                                    {% endif %}
+                                </a>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                    <div class="tab-content" id="studentTabContent">
+                        {% for student in students %}
+                            <div class="tab-pane fade {% if forloop.first %}show active{% endif %}" 
+                                id="student-{{ student.user.id }}" 
+                                role="tabpanel" 
+                                aria-labelledby="tab-{{ student.user.id }}">
+                                <div class="card shadow-sm">
+                                    <div class="card-body">
+                                        <h5 class="card-title mb-4"><i class="fa fa-user-circle me-2"></i>Student Details</h5>
+                                        <div class="row">
+                                            <!-- Left Column -->
+                                            <div class="col-md-6 mb-3">
+                                                <p class="mb-1"><i class="fa fa-user me-2"></i><strong>Name:</strong> {{ student.user.get_full_name }}</p>
+                                                <p class="mb-1"><i class="fa fa-id-badge me-2"></i><strong>Enrollment Number:</strong> {{ student.LSA_number }}</p>
+                                                <p class="mb-1"><i class="fa fa-graduation-cap me-2"></i><strong>Current Class:</strong> {{ student.current_class }}</p>
+                                                <p class="mb-1"><i class="fa fa-star me-2"></i><strong>Student Age:</strong> {{ student.age }}</p>
+                                            </div>
+                                            <!-- Right Column -->
+                                            <div class="col-md-6">
+                                                <p class="mb-1"><i class="fa fa-check-circle me-2"></i><strong>Status:</strong> 
+                                                    {% if student.status %}
+                                                        <span class="badge bg-success">Active</span>
+                                                    {% else %}
+                                                        <span class="badge bg-danger">Inactive</span>
+                                                    {% endif %}
+                                                </p>
+                                                <p class="mb-1"><i class="fa fa-user-circle me-2"></i><strong>Username:</strong> {{ student.user.username }}</p>
+                                                <p class="mb-1"><i class="fa fa-envelope me-2"></i><strong>Email:</strong> {{ student.user.email }}</p>
+                                                <p class="mb-1"><i class="fa fa-chalkboard-teacher me-2"></i><strong>Class Teacher:</strong> {{ student.current_class.teacher.user.get_full_name }}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <!-- Attendance Section -->
+                                    <div class="attendance-section">
+                                        <h5 class="card-title"><i class="bi bi-calendar-check me-2"></i>Attendance Overview</h5>
+                                    
+                                        <!-- Attendance Stats Cards -->
+                                        <div class="row text-center my-4">
+                                            <div class="col-md-4">
+                                                <div class="card shadow-sm py-3">
+                                                    <div class="card-body">
+                                                        <h6>Total Days</h6>
+                                                        <span class="badge bg-primary fs-5">{{ attendance_data|get_item:student.user.id|get_item:"total_days" }}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="card shadow-sm py-3">
+                                                    <div class="card-body">
+                                                        <h6>Present Days</h6>
+                                                        <span class="badge bg-success fs-5">{{ attendance_data|get_item:student.user.id|get_item:"present_days" }}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="card shadow-sm py-3">
+                                                    <div class="card-body">
+                                                        <h6>Absent Days</h6>
+                                                        <span class="badge bg-danger fs-5">{{ attendance_data|get_item:student.user.id|get_item:"absent_days" }}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    
+                                            <!-- Attendance Percentage -->
+                                        <div class="mt-4 text-center">
+                                            <h6 class="text-muted">Attendance Percentage</h6>
+                                            <div class="progress mx-auto" style="width: 50%; height: 25px;">
+                                                <div 
+                                                    class="progress-bar" 
+                                                    role="progressbar" 
+                                                    style="width: {{ attendance_data|get_item:student.user.id|get_item:'attendance_percentage' }}%;"
+                                                    aria-valuenow="{{ attendance_data|get_item:student.user.id|get_item:'attendance_percentage' }}" 
+                                                    aria-valuemin="0" 
+                                                    aria-valuemax="100">
+                                                    {{ attendance_data|get_item:student.user.id|get_item:'attendance_percentage' }}%
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <br>
+                                    </div>
+                                    <!-- Assignments Section -->
+                                    <div class="assignment-section">
+                                        <h5 class="card-title"><i class="bi bi-book me-2"></i>Assignments Overview</h5>
+
+                                        <!-- Assignment Stats Cards -->
+                                        <div class="row text-center my-4">
+                                            <div class="col-md-4">
+                                                <div class="card shadow-sm py-3">
+                                                    <div class="card-body">
+                                                        <h6>Total Assignments</h6>
+                                                        <span class="badge bg-secondary fs-5">{{ assignments_data|get_item:student.user.id|get_item:'total' }}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="card shadow-sm py-3">
+                                                    <div class="card-body">
+                                                        <h6>Completed Assignments</h6>
+                                                        <span class="badge bg-warning fs-5">{{ assignments_data|get_item:student.user.id|get_item:'completed' }}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="card shadow-sm py-3">
+                                                    <div class="card-body">
+                                                        <h6>Pending Assignments</h6>
+                                                        <span class="badge bg-info fs-5">{{ assignments_data|get_item:student.user.id|get_item:'pending' }}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Progress Bar -->
+                                        <div class="mt-4 text-center">
+                                            <div class="progress mx-auto" style="width: 50%; height: 25px;">
+                                                <div class="progress-bar bg-success" role="progressbar"
+                                                    style="width: {{ assignments_data|get_item:student.user.id|get_item:'completion_percentage' }}%" 
+                                                    aria-valuenow="{{ assignments_data|get_item:student.user.id|get_item:'completed' }}" 
+                                                    aria-valuemin="0" 
+                                                    aria-valuemax="{{ assignments_data|get_item:student.user.id|get_item:'total' }}">
+                                                    {{ assignments_data|get_item:student.user.id|get_item:'completed' }} / {{ assignments_data|get_item:student.user.id|get_item:'total' }}
+                                                </div>
+                                            </div>
+                                            <br>
+
+                                            <!-- Toggle Entire Assignment List Section -->
+                                            <button class="btn btn-sm btn-info mb-4" type="button" data-bs-toggle="collapse" data-bs-target="#assignments-list" aria-expanded="false" aria-controls="assignments-list">
+                                                View Assignments
+                                            </button>
+
+                                            <div class="collapse" id="assignments-list">
+                                                <ul class="list-group">
+                                                    {% for assignment in assignments_data|get_item:student.user.id|get_item:'details' %}
+                                                        <li class="list-group-item">
+                                                            <div class="d-flex justify-content-between">
+                                                                <h6>{{ assignment.title }}</h6>
+                                                                <small class="text-muted">Due: {{ assignment.due_date }}</small>
+                                                            </div>
+                                                            <div class="mt-2">
+                                                                <a href="{% url 'submit_assignment' assignment.id %}" class="btn btn-sm btn-primary">Submit</a>
+                                                            </div>
+                                                        </li>
+                                                    {% empty %}
+                                                        <li class="list-group-item">No assignments available</li>
+                                                    {% endfor %}
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Assessments and Exams Section -->
+                                    <div class="row mb-4">
+                                        <!-- Assessments Overview -->
+                                        <div class="col-lg-6">
+                                            <div class="card shadow-sm">
+                                                <div class="card-body">
+                                                    <h5 class="card-title"><i class="bi bi-pencil-square me-2"></i>Online Assessments</h5>
+                                                    
+                                                    <!-- Assessments Data Overview -->
+                                                    <div class="row mb-3">
+                                                        <div class="col-6">
+                                                            <strong>Total Assessments:</strong> {{ assessments_data|get_item:student.user.id|length }}
+                                                        </div>
+                                                        <div class="col-6">
+                                                            <strong>Upcoming:</strong> {{ assessments_data|get_item:student.user.id|length }}
+                                                        </div>
+                                                    </div>
+
+                                                    <!-- Progress Bar -->
+                                                    <div class="progress mb-4">
+                                                        <div class="progress-bar bg-primary" role="progressbar" style="width: 100%" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100">
+                                                            {{ assessments_data|get_item:student.user.id|length }} assessments available
+                                                        </div>
+                                                    </div>
+
+                                                    <!-- Assessments List -->
+                                                    <ul class="list-group">
+                                                        {% for assessment in assessments_data|get_item:student.user.id %}
+                                                            <li class="list-group-item">
+                                                                <div class="d-flex justify-content-between">
+                                                                    <h6>{{ assessment.title }}</h6>
+                                                                    <small class="text-muted">Due: {{ assessment.due_date|date:"d M Y" }}</small>
+                                                                </div>
+                                                                <div class="mt-2">
+                                                                    <a href="{% url 'take_assessment' assessment.id %}" class="btn btn-sm btn-primary">Start Assessment</a>
+                                                                </div>
+                                                            </li>
+                                                        {% empty %}
+                                                            <li class="list-group-item">No upcoming assessments</li>
+                                                        {% endfor %}
+                                                    </ul>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Exams Overview -->
+                                        <div class="col-lg-6">
+                                            <div class="card shadow-sm">
+                                                <div class="card-body">
+                                                    <h5 class="card-title"><i class="bi bi-file-earmark-check me-2"></i>Online Exams</h5>
+                                                    
+                                                    <!-- Exams Data Overview -->
+                                                    <div class="row mb-3">
+                                                        <div class="col-6">
+                                                            <strong>Total Exams:</strong> {{ exams_data|get_item:student.user.id|length }}
+                                                        </div>
+                                                        <div class="col-6">
+                                                            <strong>Upcoming:</strong> {{ exams_data|get_item:student.user.id|length }}
+                                                        </div>
+                                                    </div>
+
+                                                    <!-- Progress Bar -->
+                                                    <div class="progress mb-4">
+                                                        <div class="progress-bar bg-success" role="progressbar" style="width: 100%" aria-valuenow="100" aria-valuemin="0" aria-valuemax="100">
+                                                            {{ exams_data|get_item:student.user.id|length }} exams available
+                                                        </div>
+                                                    </div>
+
+                                                    <!-- Exams List -->
+                                                    <ul class="list-group">
+                                                        {% for exam in exams_data|get_item:student.user.id %}
+                                                            <li class="list-group-item">
+                                                                <div class="d-flex justify-content-between">
+                                                                    <h6>{{ exam.title }}</h6>
+                                                                    <small class="text-muted">Due: {{ exam.due_date|date:"d M Y" }}</small>
+                                                                </div>
+                                                                <div class="mt-2">
+                                                                    <a href="{% url 'take_exam' exam.id %}" class="btn btn-sm btn-success">Start Exam</a>
+                                                                </div>
+                                                            </li>
+                                                        {% empty %}
+                                                            <li class="list-group-item">No upcoming exams</li>
+                                                        {% endfor %}
+                                                    </ul>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="row mb-4">
+                                        <!-- Messages Overview -->
+                                        <div class="col-lg-12">
+                                            <div class="card shadow-sm">
+                                                <div class="card-body">
+                                                    <h5 class="card-title"><i class="bi bi-envelope-open me-2"></i>Messages from Teachers</h5>
+                                    
+                                                    <!-- Message Count Overview -->
+                                                    <div class="row mb-3">
+                                                        <div class="col-6">
+                                                            <strong>Total Messages:</strong> 
+                                                            {{ messages_data|get_item:student.user.id|get_item:"messages"|length|default:"0" }}
+                                                        </div>
+                                                    </div>
+                                    
+                                                    <!-- Messages List -->
+                                                    <div class="list-group">
+                                                        {% for message in messages_data|get_item:student.user.id|get_item:"messages" %}
+                                                            <div class="list-group-item d-flex justify-content-between align-items-start">
+                                                                <div class="d-flex w-100">
+                                                                    <!-- Sender and Subject -->
+                                                                    <div class="me-3">
+                                                                        <h6>{{ message.sender }}</h6>
+                                                                        <small class="text-muted">{{ message.date|date:"d M Y" }}</small>
+                                                                    </div>
+                                                                    <div class="flex-fill">
+                                                                        <strong>{{ message.title }}</strong>
+                                                                        <p class="text-truncate" style="max-width: 70%;">{{ message.content|slice:":100" }}...</p>
+                                                                    </div>
+                                                                </div>
+                                    
+                                                                <!-- Toggle Button -->
+                                                                <button class="btn btn-link" type="button" data-bs-toggle="collapse" data-bs-target="#message-{{ message.id }}" aria-expanded="false" aria-controls="message-{{ message.id }}">
+                                                                    <i class="bi bi-chevron-down"></i>
+                                                                </button>
+                                                            </div>
+                                                            <!-- Full Message (Hidden) -->
+                                                            <div class="collapse" id="message-{{ message.id }}">
+                                                                <div class="card card-body mt-2">
+                                                                    <p>{{ message.content }}</p>
+                                                                </div>
+                                                            </div>
+                                                        {% empty %}
+                                                            <li class="list-group-item">No messages found</li>
+                                                        {% endfor %}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>                                    
+                                    <!-- Financial Overview Section -->
+                                    <div class="financial-overview-section mb-4">
+                                        <h5 class="card-title"><i class="bi bi-wallet2 me-2"></i>Financial Overview</h5>
+
+                                        <!-- Financial Stats Cards -->
+                                        <div class="row text-center my-4">
+                                            <div class="col-md-4">
+                                                <div class="card shadow-sm py-3">
+                                                    <div class="card-body">
+                                                        <h6>Total Fee</h6>
+                                                        <span class="badge bg-primary fs-5">₦{{ financial_data|get_item:student.user.id|get_item:'total_fee'|floatformat:2|intcomma }}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="card shadow-sm py-3">
+                                                    <div class="card-body">
+                                                        <h6>Total Discount</h6>
+                                                        <span class="badge bg-success fs-5">₦{{ financial_data|get_item:student.user.id|get_item:'total_discount'|floatformat:2|intcomma }}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div class="col-md-4">
+                                                <div class="card shadow-sm py-3">
+                                                    <div class="card-body">
+                                                        <h6>Total Paid</h6>
+                                                        <span class="badge bg-info fs-5">₦{{ financial_data|get_item:student.user.id|get_item:'total_paid'|floatformat:2|intcomma }}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Outstanding Balance -->
+                                        <div class="row text-center">
+                                            <div class="col-12">
+                                                <div class="card shadow-sm py-3">
+                                                    <div class="card-body">
+                                                        <h6>Outstanding Balance</h6>
+                                                        <span class="badge bg-danger fs-5">₦{{ financial_data|get_item:student.user.id|get_item:'outstanding_balance'|floatformat:2|intcomma }}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Payment Progress Bar -->
+                                        <div class="mt-4 text-center">
+                                            {% with data=financial_data|get_item:student.user.id %}
+                                            {% if data %}
+                                                <div class="progress mx-auto" style="width: 50%; height: 25px;">
+                                                    <div id="payment-progress-bar" class="progress-bar bg-success" role="progressbar"
+                                                        aria-valuenow="{{ data.total_paid|default:0 }}" 
+                                                        aria-valuemin="0" 
+                                                        aria-valuemax="{{ data.total_fee|default:100 }}">
+                                                        ₦{{ data.total_paid|floatformat:2|default:"0.00" }} / ₦{{ data.total_fee|floatformat:2|default:"0.00" }}
+                                                    </div>
+                                                </div>
+                                                <script>
+                                                    // JavaScript to update progress bar width
+                                                    const totalFee = {{ data.total_fee|default:100 }};
+                                                    const totalPaid = {{ data.total_paid|default:0 }};
+                                                    const paymentPercentage = totalFee > 0 ? (totalPaid / totalFee) * 100 : 0;
+                                                    
+                                                    // Set the width of the progress bar dynamically
+                                                    document.getElementById('payment-progress-bar').style.width = paymentPercentage + '%';
+                                                </script>
+                                            {% else %}
+                                                <p class="text-warning">Financial data not available.</p>
+                                            {% endif %}
+                                        {% endwith %}
+                                        </div>
+                                    </div>
+                                    <!-- Results Section -->
+                                    <div class="results-section mb-4">
+                                        <h5 class="card-title"><i class="bi bi-file-earmark-text me-2"></i>Results Overview</h5>
+                                        
+                                        <!-- Check if the user can access the results -->
+                                        {% if financial_data|get_item:student.user.id|get_item:'can_access_results' %}
+                                            <div class="row">
+                                                <div class="col-md-9">
+                                                    <div class="card shadow-sm py-3">
+                                                        <div class="card-body text-center">
+                                                            <h6>Results are Available</h6>
+                                                            <p>You have access to the results as more than 80% of the fee has been paid.</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="col-md-3 mb-4">
+                                                    <div class="card shadow-sm border-1">
+                                                        <div class="card-body text-center">
+                                                            <h5 class="card-title">{{ student.user.first_name }} {{ student.user.last_name }}</h5>
+                                                            {% with result=result_data|get_item:student.user.id %}
+                                                                {% if result %}
+                                                                    <a href="{% url 'view_student_result' result.student_id result.term_id %}" class="btn btn-primary btn-sm">
+                                                                        <i class="fas fa-file-alt"></i> View Results
+                                                                    </a>
+                                                                {% else %}
+                                                                    <p class="text-danger">No results available for this term.</p>
+                                                                {% endif %}
+                                                            {% endwith %}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                
+                                            </div>
+                                        {% else %}
+                                            <div class="row">
+                                                <div class="col-md-12">
+                                                    <div class="card shadow-sm py-3">
+                                                        <div class="card-body text-center">
+                                                            <h6>Results are Not Available</h6>
+                                                            <p>You need to pay at least 80% of the fee to view the results.</p>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                    <!-- Add more student-specific sections as needed -->
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

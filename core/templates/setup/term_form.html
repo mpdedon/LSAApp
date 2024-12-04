@@ -1,0 +1,78 @@
+{% extends 'base.html' %}
+
+{% load crispy_forms_tags %}
+{% block content %}
+<div class="container mt-4">
+    <h2 class="text-center mb-4">{% if is_update %}Update Term{% else %}Create Term{% endif %}</h2>
+ 
+    <div class="card">
+        <div class="card-body">
+            <form method="post" enctype="multipart/form-data" class="needs-validation" novalidate action="{% if is_update %}{% url 'term_update' term.id %}{% else %}{% url 'term_create' %}{% endif %}">
+                {% csrf_token %}
+                
+                <div class="form-row">
+                    <div class="form-group col-md-6">
+                        {{ form.session|as_crispy_field }}
+                        <div class="invalid-feedback">
+                            {{ form.session.errors }}
+                        </div>
+                    </div>
+                    <div class="form-group col-md-6">
+                        {{ form.name|as_crispy_field }}
+                        <div class="invalid-feedback">
+                            {{ form.name.errors }}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group col-md-6">
+                        {{ form.start_date|as_crispy_field }} 
+                        <div class="invalid-feedback">
+                            {{ form.start_date.errors }}
+                        </div>
+                    </div>
+                    <div class="form-group col-md-6">
+                        {{ form.end_date|as_crispy_field }}
+                        <div class="invalid-feedback">
+                            {{ form.end_date.errors }}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group col-md-6">
+                        {{ form.is_active|as_crispy_field }}
+                        <div class="invalid-feedback">
+                            {{ form.is_active.errors }}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="text-center">
+                    {% if is_update %}
+                        <button type="submit" class="btn btn-primary">Update Term</button>
+                    {% else %}
+                        <button type="submit" class="btn btn-success">Create Term</button>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <br>
+    <div class="text-center">
+        <a href="{% url 'term_list' %}" class="btn btn-outline-secondary">Back to Term List</a>
+    </div>
+</div>
+<
+<script type="text/javascript">
+    $(document).ready(function(){
+        $('.datepicker').datepicker({
+            format: 'yyyy-mm-dd',
+            autoclose: true,
+            todayHighlight: true
+        });
+    });
+</script>
+{% endblock %}

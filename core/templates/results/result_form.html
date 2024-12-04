@@ -1,0 +1,14 @@
+<!-- result_form.html -->
+
+{% extends 'base.html' %}
+
+{% block title %}Create or Update Result{% endblock %}
+
+{% block content %}
+<h2>Create or Update Result</h2>
+<form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">Save</button>
+</form>
+{% endblock %}

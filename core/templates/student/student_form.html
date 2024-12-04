@@ -1,0 +1,197 @@
+<!-- student_form.html -->
+
+{% extends 'base.html' %}
+{% load add_class %}
+
+{% block content %}
+<script>
+  function previewImage(input) {
+      var file = input.files[0];
+      var reader = new FileReader();
+
+      reader.onload = function(e) {
+          document.getElementById('profile-img-preview').src = e.target.result;
+          document.getElementById('profile-img-preview').style.display = 'block';
+      };
+
+      reader.readAsDataURL(file);
+  }
+
+  document.getElementById('{{ form.profile_image.id_for_label }}').addEventListener('change', function() {
+      previewImage(this);
+  });
+</script>
+
+<div class="container mt-5">
+    <div class="card shadow">
+        <!-- Card Header -->
+        <div class="card-header">
+            <h3 class="mb-2">{% if is_update %}Update Student{% else %}Register Student{% endif %}</h3>
+        </div>
+
+        <!-- Card Body -->
+        <div class="card-body">
+            <form method="post" enctype="multipart/form-data" novalidate>
+                {% csrf_token %}
+                
+                <div class="row">
+                    <!-- Username -->
+                    <div class="col-md-6 mb-3">
+                        {{ form.username.label_tag }}
+                        {{ form.username|add_class:"form-control" }}
+                        {% if form.username.help_text %}
+                            <small class="form-text text-muted">{{ form.username.help_text }}</small>
+                        {% endif %}
+                        {% for error in form.username.errors %}
+                            <div class="text-danger">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <!-- Email -->
+                    <div class="col-md-6 mb-3">
+                        {{ form.email.label_tag }}
+                        {{ form.email|add_class:"form-control" }}
+                        {% for error in form.email.errors %}
+                            <div class="text-danger">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="row">
+                    <!-- First Name -->
+                    <div class="col-md-6 mb-3">
+                        {{ form.first_name.label_tag }}
+                        {{ form.first_name|add_class:"form-control" }}
+                        {% for error in form.first_name.errors %}
+                            <div class="text-danger">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <!-- Last Name -->
+                    <div class="col-md-6 mb-3">
+                        {{ form.last_name.label_tag }}
+                        {{ form.last_name|add_class:"form-control" }}
+                        {% for error in form.last_name.errors %}
+                            <div class="text-danger">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                {% if not is_update %}
+                <div class="row">
+                    <!-- Password1 -->
+                    <div class="col-md-6 mb-3">
+                        {{ form.password1.label_tag }}
+                        {{ form.password1|add_class:"form-control" }}
+                        {% for error in form.password1.errors %}
+                            <div class="text-danger">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <!-- Password2 -->
+                    <div class="col-md-6 mb-3">
+                        {{ form.password2.label_tag }}
+                        {{ form.password2|add_class:"form-control" }}
+                        {% for error in form.password2.errors %}
+                            <div class="text-danger">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+
+                <div class="row">
+                    <!-- Date of Birth -->
+                    <div class="col-md-6 mb-3">
+                        {{ form.date_of_birth.label_tag }}
+                        {{ form.date_of_birth|add_class:"form-control" }}
+                        {% for error in form.date_of_birth.errors %}
+                            <div class="text-danger">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <!-- Gender -->
+                    <div class="col-md-6 mb-3">
+                        {{ form.gender.label_tag }}
+                        {{ form.gender|add_class:"form-select" }}
+                        {% for error in form.gender.errors %}
+                            <div class="text-danger">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="row">
+                    <!-- Profile Image -->
+                    <div class="col-md-6 mb-3">
+                        {{ form.profile_image.label_tag }}
+                        {{ form.profile_image|add_class:"form-control" }}
+                        {% for error in form.profile_image.errors %}
+                            <div class="text-danger">{{ error }}</div>
+                        {% endfor %}
+                        <img id="profile-img-preview" src="#" alt="Profile Image Preview" style="display: none; width: 150px; margin-top: 10px;">
+                    </div>
+
+                    <!-- Student Guardian -->
+                    <div class="col-md-6 mb-3">
+                        {{ form.student_guardian.label_tag }}
+                        {{ form.student_guardian|add_class:"form-select" }}
+                        {% for error in form.student_guardian.errors %}
+                            <div class="text-danger">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="row">
+                    <!-- Relationship -->
+                    <div class="col-md-6 mb-3">
+                        {{ form.relationship.label_tag }}
+                        {{ form.relationship|add_class:"form-control" }}
+                        {% for error in form.relationship.errors %}
+                            <div class="text-danger">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+
+                    <!-- Current Class -->
+                    <div class="col-md-6 mb-3">
+                        {{ form.current_class.label_tag }}
+                        {{ form.current_class|add_class:"form-select" }}
+                        {% for error in form.current_class.errors %}
+                            <div class="text-danger">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <div class="d-grid">
+                    <button type="submit" class="btn btn-primary">
+                        {% if is_update %}Update Student{% else %}Register Student{% endif %}
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Card Footer -->
+        <div class="card-footer">
+            <!-- General Errors -->
+            {% if form.errors %}
+                <div class="text-danger mb-3">
+                    <h5>There were some errors with your submission:</h5>
+                    <ul>
+                        {% for field, errors in form.errors.items %}
+                            <li><strong>{{ field }}</strong>: {{ errors|join:", " }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            {% endif %}
+
+            <!-- Back Link -->
+            <div class="text-end">
+                {% if superuser and is_update %}
+                    <a href="{% url 'student_detail' student.user.id %}" class="btn btn-secondary">Back to Details</a>
+                {% elif superuser %}
+                    <a href="{% url 'student_list' %}" class="btn btn-secondary">Back to Students List</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

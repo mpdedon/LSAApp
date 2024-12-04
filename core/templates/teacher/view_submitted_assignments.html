@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="container">
+    <h1>Submitted Assignments by Subject</h1>
+    
+    {% if submissions_by_subject %}
+        <div class="accordion" id="subjectAccordion">
+            {% for submission in submissions_by_subject %}
+                {% with previous_subject=submissions_by_subject|slice:"1" %}
+                {% if submission.subject != previous_subject.subject %}
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="heading{{ submission.subject|slugify }}">
+                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse"
+                                    data-bs-target="#collapse{{ submission.subject|slugify }}" aria-expanded="false">
+                                {{ submission.subject }}
+                            </button>
+                        </h2>
+                        <div id="collapse{{ submission.subject|slugify }}" class="accordion-collapse collapse"
+                             data-bs-parent="#subjectAccordion">
+                            <div class="accordion-body">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Assignment</th>
+                                            <th>Student</th>
+                                            <th>Score</th>
+                                            <th>Feedback</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                    {% for sub in submissions_by_subject %}
+                                        {% if sub.subject == submission.subject %}
+                                            <tr>
+                                                <td>{{ sub.assignment.title }}</td>
+                                                <td>{{ sub.student.user.get_full_name }}</td>
+                                                <td>{{ sub.grade|default:"N/A" }}</td>
+                                                <td>{{ sub.feedback|default:"-" }}</td>
+                                                <td>
+                                                    <a href="{% url 'grade_essay_questions' sub.assignment.id %}" 
+                                                       class="btn btn-sm btn-outline-primary">Grade Essay</a>
+                                                </td>
+                                            </tr>
+                                        {% endif %}
+                                    {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+                {% endwith %}
+            {% endfor %}
+        </div>
+    {% else %}
+        <p>No submitted assignments available for grading.</p>
+    {% endif %}
+</div>
+{% endblock %}

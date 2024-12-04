@@ -1,0 +1,50 @@
+<form method="post" action="{% url 'bulk_update_students' %}">
+    {% csrf_token %}
+    <table class="table table-striped table-bordered mt-3">
+        <thead>
+            <tr>
+                <th>
+                    <input type="checkbox" id="select-all">
+                </th>
+                <th>S/N</th>
+                <th>LSA Number</th>
+                <th>Name</th>
+                <th>Class</th>
+                <th>Guardian</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for student in students %}
+            <tr>
+                <td><input type="checkbox" name="selected_students" value="{{ student.id }}"></td>
+                <td>{{ forloop.counter }}</td>
+                <td>{{ student.LSA_number }}</td>
+                <td>{{ student.user.get_full_name }}</td>
+                <td>{{ student.current_class.name }}</td>
+                <td>{{ student.student_guardian.user.get_full_name }}</td>
+                <td>{{ student.get_status_display }}</td>
+                <td>
+                    <a href="{% url 'student_detail' student.user.id %}" class="btn btn-info btn-sm">View</a>
+                    <a href="{% url 'student_update' student.user.id %}" class="btn btn-warning btn-sm">Edit</a>
+                    <a href="{% url 'student_delete' student.user.id %}" class="btn btn-danger btn-sm">Delete</a>
+                    <div class="dropdown">
+                        <button class="btn btn-secondary btn-sm dropdown-toggle" type="button" id="actionsDropdown" data-bs-toggle="dropdown" aria-expanded="false">
+                            More Actions
+                        </button>
+                        <ul class="dropdown-menu" aria-labelledby="actionsDropdown">
+                            <li><a class="dropdown-item" href="{% url 'promote_student' student.user.id %}">Promote</a></li>
+                            <li><a class="dropdown-item" href="{% url 'repeat_student' student.user.id %}">Repeat</a></li>
+                            <li><a class="dropdown-item" href="{% url 'demote_student' student.user.id %}">Demote</a></li>
+                            <li><a class="dropdown-item" href="{% url 'mark_dormant_student' student.user.id %}">Mark as Dormant</a></li>
+                            <li><a class="dropdown-item" href="{% url 'mark_left_student' student.user.id %}">Mark as Left</a></li>
+                        </ul>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <button type="submit" class="btn btn-primary">Apply Changes</button>
+</form>

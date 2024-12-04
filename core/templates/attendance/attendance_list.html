@@ -1,0 +1,18 @@
+<!-- attendance_list.html -->
+
+{% extends 'base.html' %}
+
+{% block content %}
+  <h2>Attendance List</h2>
+  <ul>
+    {% for attendance in attendance_list %}
+      <li>{{ attendance.student }} - {{ attendance.date }} - {% if attendance.is_present %}Present{% else %}Absent{% endif %}</li>
+    {% endfor %}
+  </ul>
+  <h2>Create New Attendance Record</h2>
+  <form method="post">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <button type="submit">Create Attendance Record</button>
+  </form>
+{% endblock %}

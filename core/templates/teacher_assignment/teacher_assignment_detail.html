@@ -1,0 +1,12 @@
+<!-- teacher_assignment_detail.html -->
+
+{% extends 'base.html' %}
+
+{% block title %}Teacher Assignment Detail{% endblock %}
+
+{% block content %}
+<h2>Teacher Assignment Detail</h2>
+<p>Teacher: {{ assignment.teacher.name }}</p>
+<p>Subject: {{ assignment.subject }}</p>
+<!-- Add more details here -->
+{% endblock %}

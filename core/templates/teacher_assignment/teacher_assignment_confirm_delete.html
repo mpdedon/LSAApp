@@ -1,0 +1,14 @@
+<!-- teacher_assignment_confirm_delete.html -->
+
+{% extends 'base.html' %}
+
+{% block title %}Confirm Delete Teacher Assignment{% endblock %}
+
+{% block content %}
+<h2>Confirm Delete Teacher Assignment</h2>
+<p>Are you sure you want to delete the assignment for "{{ assignment.teacher.name }}"?</p>
+<form method="post">
+    {% csrf_token %}
+    <button type="submit">Delete</button>
+</form>
+{% endblock %}
