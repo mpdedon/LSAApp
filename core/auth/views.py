@@ -199,15 +199,10 @@ def guardian_dashboard(request):
 
         online_exams = Exam.objects.filter(class_assigned=student.current_class, due_date__gte=timezone.now())
         exams_data[student.user.id] = online_exams
-
-        # Retrieve the teachers associated with the current student
-        student_teachers = teachers.filter(subjectassignment__subject__students=student)
-        teacher_users = student_teachers.values_list('user', flat=True)  # Get CustomUser instances of teachers
-        
+    
         # Fetch messages sent by any of these teachers regarding this student
         student_messages = Message.objects.filter(
             recipient=guardian.user,  # Ensure recipient is the guardian
-            sender__in=teacher_users,  # Sender must be one of the associated teachers
             student=student  # Ensure the message is related to this student
         ).order_by('-timestamp')
         print(student_messages)
