@@ -524,6 +524,17 @@ def message_guardian(request, guardian_id):
     )
 
 @login_required
+def performance_chart_view(request, student_id):
+    subject_results = SubjectResult.objects.filter(result__student_id=student_id)
+    for result in subject_results:
+        result.class_average = SubjectResult.get_class_average(result.subject)
+
+    context = {
+        'subject_results': subject_results,
+    }
+    return render(request, 'performance_chart.html', context)
+
+@login_required
 def create_assignment(request):
     # Ensure the logged-in user is a teacher
     teacher = get_object_or_404(Teacher, user=request.user)

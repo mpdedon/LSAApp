@@ -205,7 +205,6 @@ def guardian_dashboard(request):
             recipient=guardian.user,  # Ensure recipient is the guardian
             student=student  # Ensure the message is related to this student
         ).order_by('-timestamp')
-        print(student_messages)
         # Initialize messages data for each student
         if student.user.id not in messages_data:
             messages_data[student.user.id] = {'messages': [], 'message_counts': {}}

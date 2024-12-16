@@ -2,6 +2,10 @@
 
 {% block content %}
 <div class="container mt-5">
+    <!-- Back to Admin Dashboard Button -->
+    <a href="{% url 'school_setup' %}" class="btn btn-secondary mb-3">
+        <i class="bi bi-arrow-left"></i> Back to Admin Dashboard
+    </a>
     <h2>Active Notifications</h2>
     {% if notifications %}
         <ul class="list-group mb-4">

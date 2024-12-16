@@ -664,6 +664,12 @@ class SubjectResult(models.Model):
         total = ca1 + ca2 + ca3 + assignment + oral_test + exam_score
         return total
 
+    @classmethod
+    def get_class_average(cls, subject):
+        # Calculate the average of total scores for all results associated with this subject
+        total_scores = cls.objects.filter(subject=subject).aggregate(avg_total=Avg(models.F('continuous_assessment_1') + models.F('continuous_assessment_2') + models.F('continuous_assessment_3') + models.F('assignment') + models.F('oral_test') + models.F('exam_score')))
+        return total_scores['avg_total'] or 0
+    
     def calculate_grade(self):
         score = self.total_score()
         if score >= 75:

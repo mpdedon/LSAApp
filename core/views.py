@@ -103,7 +103,7 @@ class NotificationListView(ListView):
 
         # Add a "new" flag to notifications created within the last day
         for notification in notifications:
-            notification.is_new = notification.created_at >= current_date - timedelta(days=1)
+            notification.is_new = notification.created_at.date() >= current_date - timedelta(days=1)
 
         # Initialize the notification form
         form = NotificationForm()

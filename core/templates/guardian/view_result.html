@@ -3,7 +3,7 @@
 
 {% block content %}
 <!-- Framing the entire document -->
-<div class="container mt-5" style="border: 2px solid #333; border-radius: 10px; padding: 20px; background: #fafafa;">
+<div class="container" style="max-width: 1000px; border: 2px solid #333; border-radius: 10px; padding: 20px; background: #fafafa;">
     <!-- School Header Section -->
     <div class="text-center mb-5">
         <img src="{% static 'images/school-logo.jpg' %}" alt="LearnSwift Academia Logo" class="mb-3" style="max-width: 120px;">
@@ -107,8 +107,8 @@
 
         <!-- Psychomotor Skills Section -->
         <div class="col-md-4">
-            <div class="card shadow-lg border-0" style="background: #e1bee7; border-radius: 10px; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);">
-                <div class="card-header bg-purple text-white">
+            <div class="card shadow-lg border-0" style="background: #dc9ce9; border-radius: 10px; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);">
+                <div class="card-header bg-lemon text-white">
                     <h5 class="h6 mb-0">Psychomotor Skills (Physical)</h5>
                 </div>
                 <div class="card-body">
@@ -191,11 +191,13 @@
                     <h5 class="h6 mb-0">Digital Signature</h5>
                 </div>
                 <div class="card-body text-center">
-                    <div class="signature-box" style="width: 200px; height: 80px; border: 2px solid #333; background-color: #fff; border-radius: 10px;">
-                        <p class="text-dark">Principal's Signature</p>
+                    <div class="signature-box" style="width: 200px; height: 80px; border: 2px solid #333; background-color: #fff; border-radius: 10px; overflow: hidden;">
+                        <img src="{% static 'images/signature.png' %}" alt="Principal's Signature" class="img-fluid" style="max-height: 100%; max-width: 100%; object-fit: contain;">
                     </div>
+                    <p class="text-dark mt-2">Principal's Signature</p>
                 </div>
             </div>
+          
         </div>
 
         <!-- Performance vs Class Average Chart Section -->
@@ -220,21 +222,24 @@
     </a>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
+    var subjectResults = JSON.parse(document.getElementById('subject_results_json').textContent);
+
     var ctx = document.getElementById('performanceChart').getContext('2d');
     var performanceChart = new Chart(ctx, {
         type: 'bar',
         data: {
-            labels: [ {% for subject_result in subject_results %}'{{ subject_result.subject.name }}', {% endfor %} ],
+            labels: subjectResults.map(sr => sr.subject.name),
             datasets: [{
                 label: 'Student Score',
-                data: [ {% for subject_result in subject_results %}{{ subject_result.total_score }}, {% endfor %} ],
+                data: subjectResults.map(sr => parseFloat(sr.total_score)),
                 backgroundColor: '#0072ff',
                 borderColor: '#0056b3',
                 borderWidth: 1
             }, {
                 label: 'Class Average',
-                data: [ {% for subject_result in subject_results %}{{ subject_result.subject.class_average }}, {% endfor %} ],
+                data: subjectResults.map(sr => parseFloat(sr.class_average)),
                 backgroundColor: '#ff9a8b',
                 borderColor: '#ff5e62',
                 borderWidth: 1
