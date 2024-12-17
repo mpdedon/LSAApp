@@ -115,6 +115,9 @@ class GuardianCreateView(View):
         if form.is_valid():
             form.save()
             return redirect('guardian_list')
+        else:
+            print(form.errors)
+            
         return render(request, self.template_name, {'form': form})
 
 class GuardianUpdateView(View):

@@ -7,7 +7,7 @@ from django.core.exceptions import ValidationError
 from django.contrib.auth.models import AbstractUser
 from django.conf import settings
 from django.db.models.signals import pre_save
-from django.db.models import Sum
+from django.db.models import Sum, Avg
 from django.utils import timezone
 from datetime import date, timedelta, datetime
 from decimal import Decimal

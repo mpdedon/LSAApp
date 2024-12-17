@@ -4,18 +4,66 @@
 
 {% block content %}
 {% load static %}
-<!-- Hero Section -->
-<header class="hero bg-dark text-white position-relative" style="background-image: url('{% static "images/front_image.webp" %}'); background-size: cover; background-position: center; height: 100vh;">
+<!-- Hero Section with Carousel -->
+<header class="hero bg-dark text-white position-relative" style="height: 100vh;">
     <div class="overlay" style="background-color: rgba(0, 0, 0, 0.6); position: absolute; top: 0; left: 0; right: 0; bottom: 0;"></div>
-    <div class="container position-relative text-center h-100 d-flex flex-column justify-content-center align-items-center">
-        <h1 class="display-3 fw-bold mb-3 animate__animated animate__fadeInDown">Welcome to LearnSwift Academia</h1>
-        <p class="lead mb-4 animate__animated animate__fadeInUp">Empowering education with modern technology solutions.</p>
-        {% if user.is_authenticated and user.is_superuser %}
-        <div>
-            <a href="{% url 'student_list' %}" class="btn btn-primary btn-lg me-3 animate__animated animate__zoomIn">View Students</a>
-            <a href="{% url 'teacher_list' %}" class="btn btn-outline-light btn-lg animate__animated animate__zoomIn">View Teachers</a>
+    <div id="heroCarousel" class="carousel slide h-100" data-bs-ride="carousel">
+        <div class="carousel-inner h-100">
+            <!-- Slide 1: Holistic Development -->
+            <div class="carousel-item active h-100">
+                <div class="container position-relative text-center h-100 d-flex flex-column justify-content-center align-items-center">
+                    <h1 class="display-3 fw-bold mb-3 animate__animated animate__fadeInDown">Holistic Development</h1>
+                    <p class="lead mb-4 animate__animated animate__fadeInUp">Balanced academics, character, and faith – nurturing well-rounded individuals ready to thrive.</p>
+                    <a href="#" class="btn btn-primary btn-lg animate__animated animate__zoomIn">Contact School for Enquiries</a>
+                </div>
+            </div>
+            
+            <!-- Slide 2: Personalized Attention -->
+            <div class="carousel-item h-100">
+                <div class="container position-relative text-center h-100 d-flex flex-column justify-content-center align-items-center">
+                    <h1 class="display-3 fw-bold mb-3 animate__animated animate__fadeInDown">Personalized Attention</h1>
+                    <p class="lead mb-4 animate__animated animate__fadeInUp">Tailored learning paths that nurture your child’s unique strengths and potential.</p>
+                    <a href="#" class="btn btn-primary btn-lg animate__animated animate__zoomIn">Take Online Assessment</a>
+                </div>
+            </div>
+            
+            <!-- Slide 3: Character-Driven Education -->
+            <div class="carousel-item h-100">
+                <div class="container position-relative text-center h-100 d-flex flex-column justify-content-center align-items-center">
+                    <h1 class="display-3 fw-bold mb-3 animate__animated animate__fadeInDown">Character-Driven Education</h1>
+                    <p class="lead mb-4 animate__animated animate__fadeInUp">Building courage, honesty, and courtesy into everyday learning experiences.</p>
+                    <a href="#" class="btn btn-primary btn-lg animate__animated animate__zoomIn">Contact School for Enquiries</a>
+                </div>
+            </div>
+            
+            <!-- Slide 4: Parental Partnership -->
+            <div class="carousel-item h-100">
+                <div class="container position-relative text-center h-100 d-flex flex-column justify-content-center align-items-center">
+                    <h1 class="display-3 fw-bold mb-3 animate__animated animate__fadeInDown">Parental Partnership</h1>
+                    <p class="lead mb-4 animate__animated animate__fadeInUp">Stay informed and involved through regular updates, workshops, and collaborative events.</p>
+                    <a href="#" class="btn btn-primary btn-lg animate__animated animate__zoomIn">Take Online Assessment</a>
+                </div>
+            </div>
+            
+            <!-- Slide 5: Future-Ready Skills -->
+            <div class="carousel-item h-100">
+                <div class="container position-relative text-center h-100 d-flex flex-column justify-content-center align-items-center">
+                    <h1 class="display-3 fw-bold mb-3 animate__animated animate__fadeInDown">Future-Ready Skills</h1>
+                    <p class="lead mb-4 animate__animated animate__fadeInUp">Equipping your child with literacy, critical thinking, and life skills for lifelong success.</p>
+                    <a href="#" class="btn btn-primary btn-lg animate__animated animate__zoomIn">Contact School for Enquiries</a>
+                </div>
+            </div>
         </div>
-        {% endif %}
+
+        <!-- Carousel Controls -->
+        <button class="carousel-control-prev" type="button" data-bs-target="#heroCarousel" data-bs-slide="prev">
+            <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+            <span class="visually-hidden">Previous</span>
+        </button>
+        <button class="carousel-control-next" type="button" data-bs-target="#heroCarousel" data-bs-slide="next">
+            <span class="carousel-control-next-icon" aria-hidden="true"></span>
+            <span class="visually-hidden">Next</span>
+        </button>
     </div>
 </header>
 
