@@ -5,54 +5,54 @@
 {% block content %}
 {% load static %}
 <!-- Hero Section with Carousel -->
-<header class="hero bg-dark text-white position-relative" style="height: 100vh;">
-    <div class="overlay" style="background-color: rgba(0, 0, 0, 0.6); position: absolute; top: 0; left: 0; right: 0; bottom: 0;"></div>
+<header class="hero bg-dark text-white position-relative" style="height: 80vh; overflow: hidden;">
     <div id="heroCarousel" class="carousel slide h-100" data-bs-ride="carousel">
         <div class="carousel-inner h-100">
-            <!-- Slide 1: Holistic Development -->
+            <!-- Holistic Development Slide -->
             <div class="carousel-item active h-100">
-                <div class="container position-relative text-center h-100 d-flex flex-column justify-content-center align-items-center">
-                    <h1 class="display-3 fw-bold mb-3 animate__animated animate__fadeInDown">Holistic Development</h1>
+                <div class="overlay position-absolute top-0 start-0 w-100 h-100" style="background-color: rgba(0, 0, 0, 0.5);"></div>
+                <img src="{% static 'images/holistic.jpg' %}" class="d-block w-100 h-100 object-fit-cover" alt="Holistic Development">
+                <div class="carousel-caption d-flex flex-column justify-content-center align-items-center h-100">
+                    <h1 class="display-4 fw-bold mb-3 animate__animated animate__fadeInDown">Holistic Development</h1>
                     <p class="lead mb-4 animate__animated animate__fadeInUp">Balanced academics, character, and faith – nurturing well-rounded individuals ready to thrive.</p>
-                    <a href="#" class="btn btn-primary btn-lg animate__animated animate__zoomIn">Contact School for Enquiries</a>
+                    <a href="#" class="btn btn-primary btn-lg animate__animated animate__zoomIn">Contact School</a>
                 </div>
             </div>
             
-            <!-- Slide 2: Personalized Attention -->
+            <!-- Personalized Attention Slide -->
             <div class="carousel-item h-100">
-                <div class="container position-relative text-center h-100 d-flex flex-column justify-content-center align-items-center">
-                    <h1 class="display-3 fw-bold mb-3 animate__animated animate__fadeInDown">Personalized Attention</h1>
+                <div class="overlay position-absolute top-0 start-0 w-100 h-100" style="background-color: rgba(0, 0, 0, 0.5);"></div>
+                <img src="{% static 'images/personalized.jpg' %}" class="d-block w-100 h-100 object-fit-cover" alt="Personalized Attention">
+                <div class="carousel-caption d-flex flex-column justify-content-center align-items-center h-100">
+                    <h1 class="display-4 fw-bold mb-3 animate__animated animate__fadeInDown">Personalized Attention</h1>
                     <p class="lead mb-4 animate__animated animate__fadeInUp">Tailored learning paths that nurture your child’s unique strengths and potential.</p>
                     <a href="#" class="btn btn-primary btn-lg animate__animated animate__zoomIn">Take Online Assessment</a>
                 </div>
             </div>
             
-            <!-- Slide 3: Character-Driven Education -->
+            <!-- Future-Ready Skills Slide -->
             <div class="carousel-item h-100">
-                <div class="container position-relative text-center h-100 d-flex flex-column justify-content-center align-items-center">
-                    <h1 class="display-3 fw-bold mb-3 animate__animated animate__fadeInDown">Character-Driven Education</h1>
-                    <p class="lead mb-4 animate__animated animate__fadeInUp">Building courage, honesty, and courtesy into everyday learning experiences.</p>
-                    <a href="#" class="btn btn-primary btn-lg animate__animated animate__zoomIn">Contact School for Enquiries</a>
+                <div class="overlay position-absolute top-0 start-0 w-100 h-100" style="background-color: rgba(0, 0, 0, 0.5);"></div>
+                <img src="{% static 'images/future_skills.jpg' %}" class="d-block w-100 h-100 object-fit-cover" alt="Future-Ready Skills">
+                <div class="carousel-caption d-flex flex-column justify-content-center align-items-center h-100">
+                    <h1 class="display-4 fw-bold mb-3 animate__animated animate__fadeInDown">Future-Ready Skills</h1>
+                    <p class="lead mb-4 animate__animated animate__fadeInUp">Equipping your child with literacy, critical thinking, and life skills for lifelong success.</p>
+                    <a href="#" class="btn btn-primary btn-lg animate__animated animate__zoomIn">Contact School</a>
                 </div>
             </div>
             
-            <!-- Slide 4: Parental Partnership -->
+            <!-- Parental Partnership Slide -->
             <div class="carousel-item h-100">
-                <div class="container position-relative text-center h-100 d-flex flex-column justify-content-center align-items-center">
-                    <h1 class="display-3 fw-bold mb-3 animate__animated animate__fadeInDown">Parental Partnership</h1>
+                <div class="overlay position-absolute top-0 start-0 w-100 h-100" style="background-color: rgba(0, 0, 0, 0.5);"></div>
+                <img src="{% static 'images/parental.jpg' %}" class="d-block w-100 h-100 object-fit-cover" alt="Parental Partnership">
+                <div class="carousel-caption d-flex flex-column justify-content-center align-items-center h-100">
+                    <h1 class="display-4 fw-bold mb-3 animate__animated animate__fadeInDown">Parental Partnership</h1>
                     <p class="lead mb-4 animate__animated animate__fadeInUp">Stay informed and involved through regular updates, workshops, and collaborative events.</p>
                     <a href="#" class="btn btn-primary btn-lg animate__animated animate__zoomIn">Take Online Assessment</a>
                 </div>
             </div>
             
-            <!-- Slide 5: Future-Ready Skills -->
-            <div class="carousel-item h-100">
-                <div class="container position-relative text-center h-100 d-flex flex-column justify-content-center align-items-center">
-                    <h1 class="display-3 fw-bold mb-3 animate__animated animate__fadeInDown">Future-Ready Skills</h1>
-                    <p class="lead mb-4 animate__animated animate__fadeInUp">Equipping your child with literacy, critical thinking, and life skills for lifelong success.</p>
-                    <a href="#" class="btn btn-primary btn-lg animate__animated animate__zoomIn">Contact School for Enquiries</a>
-                </div>
-            </div>
+            <!-- Character-Driven Education Slide -->
         </div>
 
         <!-- Carousel Controls -->
@@ -67,47 +67,105 @@
     </div>
 </header>
 
+<!-- Add these CSS styles to your stylesheet to perfect the carousel -->
+<style>
+    .hero {
+        position: relative;
+        overflow: hidden;
+    }
+    .carousel-inner {
+        height: 100vh;  /* Ensure the carousel takes full screen height */
+    }
+    .carousel-item {
+        height: 100%;  /* Ensure carousel items fill the full height of the carousel */
+    }
+    .carousel-item img {
+        object-fit: cover; /* Ensures the image fills the container without distortion */
+        width: 100%;  /* Ensures the image takes full width */
+        height: 100%;  /* Ensures the image takes full height */
+    }
+    .carousel-caption {
+        z-index: 2;
+        color: white;
+        text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.7);
+    }
+    .carousel-caption h1 {
+        font-size: 3rem;
+        font-weight: bold;
+    }
+    .carousel-caption p {
+        font-size: 1.25rem;
+    }
+    .carousel-caption .btn {
+        font-size: 1.25rem;
+        padding: 10px 25px;
+        transition: background-color 0.3s ease;
+    }
+    .carousel-caption .btn:hover {
+        background-color: #0056b3;
+    }
+
+    /* Control Buttons */
+    .carousel-control-prev-icon,
+    .carousel-control-next-icon {
+        background-color: #007bff;
+        border-radius: 50%;
+    }
+
+    /* Make the carousel full height on mobile */
+    @media (max-width: 768px) {
+        .carousel-item {
+            height: 70vh;  /* Reduce height on smaller screens */
+        }
+        .carousel-caption h1 {
+            font-size: 2rem;
+        }
+        .carousel-caption p {
+            font-size: 1rem;
+        }
+    }
+</style>
+
 <!-- About Section -->
 <section class="py-5 bg-light">
     <div class="container text-center">
-        <h2 class="text-uppercase text-primary mb-4 fw-bold">Why Choose Us?</h2>
-        <p class="text-muted mx-auto" style="max-width: 800px;">LearnSwift Academia provides cutting-edge solutions for schools, ensuring seamless management of students, teachers, classes, and more—all in one place.</p>
+        <h2 class="text-uppercase text-primary mb-4 fw-bold">Why Choose LearnSwift Academia?</h2>
+        <p class="text-muted mx-auto" style="max-width: 800px;">We understand that every child is unique. Our holistic approach integrates academics, character, and Islamic values to ensure your child thrives academically and personally.</p>
     </div>
 </section>
 
-<!-- Cards Section -->
-<section class="container py-5">
-    <div class="row text-center">
-        <!-- Students -->
-        <div class="col-lg-4 col-md-6 mb-4">
-            <div class="card shadow border-0">
-                <img src="{% static 'images/student.jpg' %}" class="card-img-top" alt="Students">
-                <div class="card-body">
-                    <h5 class="card-title text-primary">Students</h5>
-                    <p class="card-text">Effortlessly manage student profiles, grades, and activities.</p>
-                    <a href="#" class="btn btn-primary">Explore</a>
+<!-- Call to Action Section -->
+<section class="bg-primary text-white text-center py-5">
+    <div class="container">
+        <h2 class="text-uppercase mb-4">Ready to Empower Your Child?</h2>
+        <p class="lead mb-4">Join a community that nurtures confident, independent leaders of tomorrow.</p>
+        <a href="#" class="btn btn-light btn-lg">Contact Us Now</a>
+    </div>
+</section>
+
+<!-- Key Benefits Section -->
+<section class="py-5">
+    <div class="container">
+        <div class="row">
+            <div class="col-lg-4 mb-4">
+                <div class="card h-100 shadow border-0 text-center p-4">
+                    <i class="fas fa-brain fa-3x text-primary mb-3"></i>
+                    <h5 class="fw-bold">Holistic Development</h5>
+                    <p class="text-muted">We focus on academics, character-building, and faith to nurture well-rounded individuals.</p>
                 </div>
             </div>
-        </div>
-        <!-- Teachers -->
-        <div class="col-lg-4 col-md-6 mb-4">
-            <div class="card shadow border-0">
-                <img src="{% static 'images/teacher.jpg' %}" class="card-img-top" alt="Teachers">
-                <div class="card-body">
-                    <h5 class="card-title text-primary">Teachers</h5>
-                    <p class="card-text">Maintain teacher profiles and streamline class management.</p>
-                    <a href="#" class="btn btn-primary">Discover</a>
+            <div class="col-lg-4 mb-4">
+                <div class="card h-100 shadow border-0 text-center p-4">
+                    <i class="fas fa-user-cog fa-3x text-primary mb-3"></i>
+                    <h5 class="fw-bold">Personalized Attention</h5>
+                    <p class="text-muted">Individual learning paths that help each student reach their full potential.</p>
                 </div>
             </div>
-        </div>
-        <!-- Classes -->
-        <div class="col-lg-4 col-md-6 mb-4">
-            <div class="card shadow border-0">
-                <img src="{% static 'images/class.jpg' %}" class="card-img-top" alt="Classes">
-                <div class="card-body">
-                    <h5 class="card-title text-primary">Classes</h5>
-                    <p class="card-text">Schedule classes, manage curriculums, and track progress.</p>
-                    <a href="#" class="btn btn-primary">Learn More</a>
+            <div class="col-lg-4 mb-4">
+                <div class="card h-100 shadow border-0 text-center p-4">
+                    <i class="fas fa-graduation-cap fa-3x text-primary mb-3"></i>
+                    <h5 class="fw-bold">Future-Ready Skills</h5>
+                    <p class="text-muted">Preparing students with skills for literacy, critical thinking, and lifelong success.</p>
                 </div>
             </div>
         </div>
