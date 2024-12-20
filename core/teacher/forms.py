@@ -93,26 +93,34 @@ class TeacherRegistrationForm(UserCreationForm):
         return email
 
     def save(self, commit=True):
-        # First, save the CustomUser data
         user = super().save(commit=False)
         user.role = 'teacher'  # Assign the 'teacher' role
+
         if commit:
             user.save()
 
-        # Now, save the Teacher-specific data
-        teacher = Teacher.objects.create(
-            user=user,
-            date_of_birth=self.cleaned_data['date_of_birth'],
-            contact=self.cleaned_data['contact'],
-            address=self.cleaned_data['address'],
-            gender=self.cleaned_data['gender'],
-            profile_image=self.cleaned_data.get('profile_image')
-        )
+        # Handle Teacher instance
+        if hasattr(self, 'teacher_instance') and self.teacher_instance:
+            teacher = self.teacher_instance  # Use the existing Teacher instance
+            teacher.date_of_birth = self.cleaned_data['date_of_birth']
+            teacher.contact = self.cleaned_data['contact']
+            teacher.address = self.cleaned_data['address']
+            teacher.gender = self.cleaned_data['gender']
+            teacher.profile_image = self.cleaned_data.get('profile_image')
+        else:
+            teacher = Teacher(
+                user=user,
+                date_of_birth=self.cleaned_data['date_of_birth'],
+                contact=self.cleaned_data['contact'],
+                address=self.cleaned_data['address'],
+                gender=self.cleaned_data['gender'],
+                profile_image=self.cleaned_data.get('profile_image')
+            )
+
         if commit:
             teacher.save()
 
         return teacher
-
 
 class MessageForm(forms.Form):
     title = forms.CharField(max_length=100, label="Title")

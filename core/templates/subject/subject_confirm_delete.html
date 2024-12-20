@@ -1,17 +1,13 @@
 <!-- subject_confirm_delete.html -->
+{% extends 'base.html' %}
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Confirm Delete Subject</title>
-</head>
-<body>
+{% block content %}
+
     <h1>Confirm Delete Subject</h1>
     <p>Are you sure you want to delete "{{ subject.name }}"?</p>
     <form method="post">
         {% csrf_token %}
         <button type="submit">Delete</button>
     </form>
-</body>
-</html>
+
+{% endblock %}

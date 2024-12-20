@@ -1,42 +1,51 @@
-<!-- teacher_assignment_list.html -->
-
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="container my-5">
+<div class="container my-4">
 
-    <div class="mb-3">
-        <h2>Teacher Assignment List</h2>
-        <a href="{% url 'assign_teacher' %}" class="btn btn-primary">Assign New Teacher</a>
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h4 class="mb-0">Teacher Assignment List</h4>
+        <a href="{% url 'assign_teacher' %}" class="btn btn-sm btn-primary">+ Assign New Teacher</a>
     </div>
 
-    <table class="table table-bordered table-striped">
-        <thead>
-            <tr>
-                <th>#</th>
-                <th>Class Assigned</th>
-                <th>Teacher</th>
-                <th>Session</th>
-                <th>Term</th>
-                <th>Form Teacher</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for teacher_assignment in teacher_assignments %}
+    <div class="table-responsive">
+        <table class="table table-hover table-sm align-middle">
+            <thead class="table-light">
                 <tr>
-                    <td>{{ forloop.counter }}</td>
-                    <td>{{ teacher_assignment.class_assigned.name }}</td>
-                    <td>{{ teacher_assignment.teacher.user.get_full_name }}</td>
-                    <td>{{ teacher_assignment.session.name }}</td>
-                    <td>{{ teacher_assignment.term.name }}</td>
-                    <td>{{ teacher_assignment.is_form_teacher|yesno:"Yes,No" }}</td>
+                    <th>#</th>
+                    <th>Class</th>
+                    <th>Teacher</th>
+                    <th>Session</th>
+                    <th>Term</th>
+                    <th class="text-center">Form Teacher</th>
                 </tr>
-            {% empty %}
-                <tr>
-                    <td colspan="6" class="text-center">No Teacher Assignment found.</td>
-                </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+            </thead>
+            <tbody>
+                {% for assignment in teacher_assignments %}
+                    <tr>
+                        <td>{{ forloop.counter }}</td>
+                        <td>{{ assignment.class_assigned.name }}</td>
+                        <td>{{ assignment.teacher.user.get_full_name }}</td>
+                        <td>{{ assignment.session.name }}</td>
+                        <td>{{ assignment.term.name }}</td>
+                        <td class="text-center">
+                            {% if assignment.is_form_teacher %}
+                                <span class="badge bg-success">Yes</span>
+                            {% else %}
+                                <span class="badge bg-secondary">No</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center text-muted py-3">
+                            No Teacher Assignments found.
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
 </div>
 {% endblock %}

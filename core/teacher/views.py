@@ -137,7 +137,7 @@ class TeacherUpdateView(View):
 
     def post(self, request, pk, *args, **kwargs):
         teacher = get_object_or_404(Teacher, pk=pk)
-        form = TeacherRegistrationForm(request.POST, request.FILES, instance=teacher.user)
+        form = TeacherRegistrationForm(request.POST, request.FILES, instance=teacher.user, teacher_instance=teacher)
         if form.is_valid():
             user = form.save(commit=False)
             user.save()
@@ -150,6 +150,7 @@ class TeacherUpdateView(View):
             teacher.save()
 
             return redirect('teacher_detail', pk=teacher.pk)
+        
         print(f"Form Errors: {form.errors}")
         return render(request, self.template_name, {'form': form, 'is_update': True, 'teacher': teacher})
  
