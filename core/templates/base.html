@@ -37,11 +37,6 @@
                                 <i class="fas fa-home me-1"></i>Home
                             </a>
                         </li>
-                        <li class="nav-item">
-                            <a href="#">
-                                <i class="fas fa-home me-1"></i>
-                            </a>
-                        </li>
                         {% if user.is_superuser %}
                             <li class="nav-item">
                                 <a class="nav-link" href="{% url 'student_list' %}">
@@ -74,8 +69,18 @@
                         </li>
                     {% else %}
                         <li class="nav-item">
+                            <a class="nav-link" href="#">
+                                <i class="fas fa-pencil me-1"></i>Programs
+                            </a>
+                        </li>
+                        <li class="nav-item">
                             <a class="btn btn-light btn-sm ms-2" href="{% url 'login' %}">
                                 <i class="fas fa-sign-in-alt me-1"></i>Login
+                            </a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="btn btn-light btn-sm ms-2" href="{% url 'register' %}">
+                                <i class="fas fa-address-book me-1"></i>Sign Up
                             </a>
                         </li>
                     {% endif %}

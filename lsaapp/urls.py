@@ -20,7 +20,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 
 from core.views import home
-from core.auth.views import register
+from core.auth.views import RegisterView, GuardianRegistrationView, TeacherRegistrationView
 from core.auth.views import CustomLoginView, CustomLogoutView
 from core.auth.views import PasswordResetView, PasswordResetDoneView, PasswordResetConfirmView, PasswordResetCompleteView
 from core.auth.views import teacher_dashboard, student_dashboard, guardian_dashboard
@@ -53,7 +53,9 @@ urlpatterns = [
    
     # Home and Auth URLs
     path('', home, name='home'),
-    path('register/', register, name='register'),
+    path('register/', RegisterView.as_view(), name='register'),
+    path('register/guardian/', GuardianRegistrationView.as_view(), name='guardian_register'),
+    path('register/teacher/', TeacherRegistrationView.as_view(), name='teacher_register'),
     path('login/', CustomLoginView.as_view(template_name='auth/login.html'), name='login'),
     path('logout/', CustomLogoutView.as_view(template_name='auth/logout.html', next_page='home'), name='logout'),
     path('password_reset/', PasswordResetView.as_view(), name='password_reset'),

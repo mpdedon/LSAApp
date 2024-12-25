@@ -1,0 +1,30 @@
+{% extends 'auth/base_auth.html' %}
+
+{% load static %}
+{% block content %}
+<div class="container mt-5">
+    <h2 class="text-center">Select Registration Category</h2>
+    <div class="row justify-content-center mt-4">
+        <div class="col-md-5 text-center mb-4">
+            <div class="card shadow-sm">
+                <img src="{% static 'images/teacher_icon.png' %}" alt="Teacher" class="card-img-top" style="height: 200px; object-fit: cover;">
+                <div class="card-body">
+                    <h4 class="card-title">Teacher</h4>
+                    <p class="card-text">As a teacher, you can manage classrooms, assignments, and more. Your role includes the ability to track students' progress and create engaging learning experiences.</p>
+                    <a href="{% url 'teacher_register' %}" class="btn btn-lg btn-info">Register as Teacher</a>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-5 text-center mb-4">
+            <div class="card shadow-sm">
+                <img src="{% static 'images/guardian_icon.png' %}" alt="Guardian" class="card-img-top" style="height: 200px; object-fit: cover;">
+                <div class="card-body">
+                    <h4 class="card-title">Guardian</h4>
+                    <p class="card-text">As a guardian, you will have access to your child's school activities, grades, and events. Stay connected and monitor progress throughout their academic journey.</p>
+                    <a href="{% url 'guardian_register' %}" class="btn btn-lg btn-info">Register as Guardian</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,6 +1,7 @@
 # core/auth/views.py
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.views import LoginView, LogoutView
+from django.views.generic import TemplateView
 from django.contrib.auth.views import PasswordResetView, PasswordResetDoneView, PasswordResetConfirmView, PasswordResetCompleteView
 from django.contrib.auth import login, authenticate, logout, get_user_model
 from django.contrib.auth.decorators import login_required, user_passes_test
@@ -8,6 +9,7 @@ from django.contrib.auth.forms import PasswordResetForm, SetPasswordForm
 from django.contrib.messages.views import SuccessMessageMixin
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
+from django.utils.log import AdminEmailHandler
 from django.urls import reverse_lazy
 from django.db.models import Count, Q
 from collections import defaultdict
@@ -16,24 +18,67 @@ from core.models import CustomUser, Student, Teacher, Guardian, Class, Subject, 
 from core.models import Session, Term, Message, Assessment, Exam, Notification, AssignmentSubmission, AcademicAlert
 from core.models import FeeAssignment, Payment, FinancialRecord, StudentFeeRecord
 from django.db.models import Sum
+from django.views.generic.edit import FormView
+from django.contrib import messages
 from core.forms import CustomUserCreationForm
+from core.guardian.forms import GuardianRegistrationForm
+from core.teacher.forms import TeacherRegistrationForm
 from core.auth.forms import LoginForm
+import logging
 
+logger = logging.getLogger(__name__)
 
 User = get_user_model()
 
+class RegisterView(TemplateView):
+    template_name = 'auth/register.html'
 
-def register(request):
-    if request.method == 'POST':
-        form = CustomUserCreationForm(request.POST)
-        if form.is_valid():
-            user = form.save()
-            login(request, user)
-            return redirect('home')
-    else:
-        form = CustomUserCreationForm()
-    return render(request, 'register.html', {'form': form})
+    # You can override get_context_data if you need to pass additional context
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Add any custom context if needed
+        return context
+# Custom Guardian Registration
+class GuardianRegistrationView(FormView):
+    template_name = 'auth/guardian_register.html'
+    form_class = GuardianRegistrationForm
+    success_url = reverse_lazy('guardian_registration')
 
+    def form_valid(self, form):
+        # Create the user and guardian instances
+        user = form.save(commit=False)
+        user.role = 'guardian'
+        user.save()
+
+        # Create Guardian profile
+        guardian = form.save_guardian_profile(user)
+        messages.success(self.request, f"Guardian {user.username} registered successfully!")
+        return super().form_valid(form)
+
+    def form_invalid(self, form):
+        messages.error(self.request, "There was an error with the registration. Please try again.")
+        return super().form_invalid(form)
+
+# Custom Teacher Registration
+class TeacherRegistrationView(FormView):
+    template_name = 'auth/teacher_register.html'
+    form_class = TeacherRegistrationForm
+    success_url = reverse_lazy('teacher_registration')
+
+    def form_valid(self, form):
+        # Create the user and teacher instances
+        user = form.save(commit=False)
+        user.role = 'teacher'
+        user.save()
+
+        # Create Teacher profile
+        teacher = form.save_teacher_profile(user)
+        messages.success(self.request, f"Teacher {user.username} registered successfully!")
+        return super().form_valid(form)
+
+    def form_invalid(self, form):
+        messages.error(self.request, "There was an error with the registration. Please try again.")
+        return super().form_invalid(form)
 
 # Login view
 class CustomLoginView(LoginView):
@@ -42,8 +87,9 @@ class CustomLoginView(LoginView):
 
     def get_success_url(self):
         user = self.request.user
-        print(f"User: {user}, Role: {user.role}")
-        
+        logger.info(f"Login successful: User: {user.username}, Role: {user.role}")
+
+        # Redirection based on user roles
         if user.is_superuser:
             return reverse_lazy('school_setup')
         elif user.role == 'teacher':
@@ -53,7 +99,26 @@ class CustomLoginView(LoginView):
         elif user.role == 'guardian':
             return reverse_lazy('guardian_dashboard')
         else:
+            logger.warning(f"Unknown role for user {user.username}. Redirecting to login.")
             return reverse_lazy('login')
+
+    def form_invalid(self, form):
+        # Log the invalid login attempt
+        username = form.cleaned_data.get('username')
+        logger.warning(f"Invalid login attempt: {username}")
+        return super().form_invalid(form)
+
+    def form_valid(self, form):
+        # Log successful login and handle login process
+        try:
+            user = form.get_user()
+            logger.info(f"Login successful for user: {user.username}")
+            login(self.request, user)
+            return super().form_valid(form)
+        except Exception as e:
+            logger.error(f"Error during login for user: {form.cleaned_data.get('username')}. Error: {str(e)}")
+            form.add_error(None, _("An unexpected error occurred. Please try again."))
+            return super().form_invalid(form)
 
 # Admin dashboard view
 @login_required
@@ -71,12 +136,13 @@ def student_dashboard(request):
     if request.user.role != 'student':
         return redirect('login')  
     
-    student = Student.objects.get(user=request.user)
+    student = Student.objects.select_related('current_class').get(user=request.user)
     current_class = student.current_class
-    subjects = current_class.subjects.all()
-    assignments = Assignment.objects.filter(class_assigned=current_class)
-    results = Result.objects.filter(student=student)
-    attendance = Attendance.objects.filter(student=student)
+    subjects = current_class.subjects.prefetch_related('assignments').all()
+    assignments = Assignment.objects.filter(class_assigned=current_class).select_related('teacher')
+    results = Result.objects.filter(student=student).select_related('term')
+    attendance = Attendance.objects.filter(student=student).order_by('-date')
+
 
     context = {
         'student': student,

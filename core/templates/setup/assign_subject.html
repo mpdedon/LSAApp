@@ -1,45 +1,48 @@
-<!-- assign_subject.html -->
-
 {% extends 'base.html' %}
 {% block content %}
-<div class="container my-5">
-    <form method="POST" enctype="multipart/form-data">
-        {% csrf_token %}
-        <div class="card shadow-sm">
-            <div class="card-header">
-                <div>
-                    <h2>Assign Teacher to Subject</h2>
+<div class="container my-5 d-flex justify-content-center">
+    <div class="card shadow-sm" style="max-width: 700px; width: 100%;">
+        <div class="card-header bg-info text-white">
+            <h4 class="text-center mb-2">Assign Teacher to Subject</h4>
+        </div>
+        <div class="card-body">
+            <form method="POST" enctype="multipart/form-data">
+                {% csrf_token %}
+                
+                <!-- Class and Subject Selection -->
+                <div class="mb-3">
+                    <label for="class_assigned" class="form-label">Class Assigned</label>
+                    {{ subject_assignment_form.class_assigned }}
                 </div>
-            </div>
-            <div class="card-body">
-                <!-- Subject Assignment Form Fields -->
-                <div class="form-row">
-                    <div class="form-group col-md-6">
-                        <label for="class_assigned" class="form-label">Class Assigned</label>
-                        {{ subject_assignment_form.class_assigned }}
-                    </div>
-                    <div class="form-group col-md-6">
-                        <label for="subject" class="form-label">Subject</label>
-                        {{ subject_assignment_form.subject }}
-                    </div>
+                <div class="mb-3">
+                    <label for="subject" class="form-label">Subject</label>
+                    {{ subject_assignment_form.subject }}
                 </div>
-                <div class="form-row">
-                    <div class="form-group col-md-3">
+
+                <!-- Teacher and Session Details -->
+                <div class="row">
+                    <div class="col-md-6 mb-3">
                         <label for="teacher" class="form-label">Teacher</label>
                         {{ subject_assignment_form.teacher }}
                     </div>
-                    <div class="form-group col-md-3">
+                    <div class="col-md-6 mb-3">
                         <label for="session" class="form-label">Session</label>
                         {{ subject_assignment_form.session }}
                     </div>
-                    <div class="form-group col-md-3">
-                        <label for="term" class="form-label">Term</label>
-                        {{ subject_assignment_form.term }}
-                    </div>
-                </div> 
-            </div>
+                </div>
+
+                <!-- Term Selection -->
+                <div class="mb-3">
+                    <label for="term" class="form-label">Term</label>
+                    {{ subject_assignment_form.term }}
+                </div>
+                
+                <!-- Submit Button -->
+                <div class="text-center">
+                    <button type="submit" class="btn btn-success">Assign Subject</button>
+                </div>
+            </form>
         </div>
-        <button type="submit" class="btn btn-primary mt-3">Assign Subject</button>
-    </form>
+    </div>
 </div>
 {% endblock %}
