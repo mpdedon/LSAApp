@@ -1,24 +1,151 @@
-<!-- templates/auth/login.html -->
 {% extends 'auth/base_auth.html' %}
 
 {% load static %}
-
+{% load form_tags %}
 {% block title %}Login{% endblock %}
 
 {% block content %}
-<div class="login-form">
-    <h2>Login</h2>
-    <form method="POST" action="{% url 'login' %}">
-        {% csrf_token %}
-        {{ form.as_p }}
-        <button type="submit" class="btn btn-primary btn-block">Login</button>
-    </form>
-    <p class="text-center mt-3">
-        <a href="{% url 'password_reset' %}">Forgot your password?</a>
-    </p>
-    <p class="text-center mt-5">
-        Don't have an account? <a href="{% url 'register' %}">Sign up here</a>
-    </p>
+<!-- Full-page container with no margin/padding between navbar and background image -->
+<div class="container-fluid p-0" style="height: 100vh; background: url('{% static "images/lsa1.jpg" %}') no-repeat center center/cover; background-size: cover;">
+    <div class="row w-100 h-100">
+        <!-- Left Side: Motivational Text with Box -->
+        <div class="col-md-6 d-flex flex-column justify-content-center align-items-center p-5" style="background: rgba(0, 0, 0, 0.5);">
+            <div class="text-box text-white p-4 rounded shadow-lg">
+                <h1 class="display-4 fw-bold mb-3 animate__animated animate__fadeInDown">Empowering Future Leaders</h1>
+                <p class="lead text-center animate__animated animate__fadeInUp mb-5">Your child's education starts here. Let’s create a bright future together!</p>
+            </div>
+        </div>
+
+        <!-- Right Side: Login Form -->
+        <div class="col-md-6 d-flex justify-content-center align-items-center">
+            <div class="login-form card shadow-lg p-5 animate__animated animate__fadeInUp" style="width: 80%; max-width: 450px; border-radius: 20px; background: rgba(255, 255, 255, 0.9);">
+                <h2 class="text-center mb-4">Login</h2>
+                <form method="POST" action="{% url 'login' %}" class="needs-validation" novalidate>
+                    {% csrf_token %}
+                    <!-- Username Field -->
+                    <div class="mb-3 position-relative">
+                        <label for="username" class="form-label">Username</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light border-0 rounded-start"><i class="bi bi-person"></i></span>
+                            {{ form.username|add_class:"form-control border-start-0 rounded-end" }}
+                        </div>
+                    </div>
+                    <!-- Password Field with Eye Toggle -->
+                    <div class="mb-3 position-relative">
+                        <label for="password" class="form-label">Password</label>
+                        <div class="input-group">
+                            <span class="input-group-text bg-light border-0 rounded-start"><i class="bi bi-lock"></i></span>
+                            <input type="password" id="password" class="form-control border-start-0 rounded-0" name="password">
+                            <button type="button" class="input-group-text bg-light border-0 rounded-end" onclick="togglePassword()">
+                                <i id="password-icon" class="bi bi-eye"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <!-- Forgot Password -->
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <div>
+                            <a href="{% url 'password_reset' %}" class="small text-decoration-none">Forgot Password?</a>
+                        </div>
+                    </div>
+                    <!-- Submit Button -->
+                    <button type="submit" class="btn btn-primary w-100 rounded-pill">Login</button>
+                </form>
+                <!-- OAuth Buttons -->
+                <div class="mt-4">
+                    <p class="text-center">Or sign in with</p>
+                    <div class="d-flex justify-content-center">
+                        <a href="#" class="btn btn-light border rounded-circle me-2 d-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                            <i class="bi bi-google fs-4"></i>
+                        </a>
+                        <a href="#" class="btn btn-light border rounded-circle me-2 d-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                            <i class="bi bi-facebook fs-4"></i>
+                        </a>
+                        <a href="#" class="btn btn-light border rounded-circle d-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
+                            <i class="bi bi-twitter fs-4"></i>
+                        </a>
+                    </div>
+                </div>
+                <!-- Register Link -->
+                <div class="text-center mt-4">
+                    <p class="small">Don't have an account? <a href="{% url 'register' %}" class="text-decoration-none">Register</a></p>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
+<script>
+    function togglePassword() {
+        const passwordField = document.getElementById('password');
+        const passwordIcon = document.getElementById('password-icon');
+        if (passwordField.type === 'password') {
+            passwordField.type = 'text';
+            passwordIcon.classList.remove('bi-eye');
+            passwordIcon.classList.add('bi-eye-slash');
+        } else {
+            passwordField.type = 'password';
+            passwordIcon.classList.remove('bi-eye-slash');
+            passwordIcon.classList.add('bi-eye');
+        }
+    }
+</script>
+
 {% endblock %}
+
+<style>
+/* Full-page container, no margins or paddings */
+.container-fluid {
+    padding: 0;
+    height: 100vh;
+    background: url('{% static "images/lsa1.jpg" %}') no-repeat center center/cover;
+    background-size: cover;
+}
+
+/* Left-side text box styling */
+.text-box {
+    background: rgba(0, 0, 0, 0.6); /* Semi-transparent black background */
+    border-radius: 15px;
+    width: 100%;
+}
+
+/* Card styling */
+.card {
+    backdrop-filter: blur(10px);
+    border: none;
+}
+
+/* Input styling */
+.input-group .form-control {
+    border-radius: 0 !important;
+}
+
+.input-group-text {
+    border-radius: 0 !important;
+}
+
+/* Button styling */
+.btn-primary {
+    background-color: #007bff;
+    border: none;
+    padding: 10px;
+    font-size: 1.1rem;
+}
+
+.btn-primary:hover {
+    background-color: #0056b3;
+}
+
+/* OAuth button styling */
+.btn-light {
+    color: #6c757d;
+    background-color: #f8f9fa;
+    border-color: #ced4da;
+}
+
+/* Adjustments for the 2-column layout */
+@media (max-width: 768px) {
+    .col-md-6 {
+        width: 100%;
+    }
+}
+</style>

@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     'crispy_forms',
     'crispy_bootstrap5',
     'django.contrib.humanize',
+    'reportlab',
   ]
 
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"  # or bootstrap4, tailwind, etc.
@@ -142,6 +143,11 @@ CSRF_COOKIE_SECURE = False
 SECURE_HSTS_SECONDS = 0
 SECURE_HSTS_PRELOAD = False
 SECURE_HSTS_INCLUDE_SUBDOMAINS = False
+
+CSRF_TRUSTED_ORIGINS = [
+    'https://learnswift.icu',  # Add your domain here
+]
+
 
 # Set a session timeout (optional)
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True

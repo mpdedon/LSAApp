@@ -4,15 +4,13 @@
 
 {% block content %}
 {% load static %}
-<!-- Hero Section with Carousel -->
-<header class="hero bg-dark text-white position-relative" style="height: 80vh; overflow: hidden;">
+<header class="hero position-relative" style="height: 90vh; overflow: hidden; padding-top: 0; padding-bottom: 0; margin-bottom: 0;">
     <div id="heroCarousel" class="carousel slide h-100" data-bs-ride="carousel">
         <div class="carousel-inner h-100">
             <!-- Holistic Development Slide -->
             <div class="carousel-item active h-100">
-                <div class="overlay position-absolute top-0 start-0 w-100 h-100" style="background-color: rgba(0, 0, 0, 0.5);"></div>
                 <img src="{% static 'images/holistic.jpg' %}" class="d-block w-100 h-100 object-fit-cover" alt="Holistic Development">
-                <div class="carousel-caption d-flex flex-column justify-content-center align-items-center h-100">
+                <div class="carousel-caption d-flex flex-column justify-content-center align-items-center text-center">
                     <h1 class="display-4 fw-bold mb-3 animate__animated animate__fadeInDown">Holistic Development</h1>
                     <p class="lead mb-4 animate__animated animate__fadeInUp">Balanced academics, character, and faith – nurturing well-rounded individuals ready to thrive.</p>
                     <a href="#" class="btn btn-primary btn-lg animate__animated animate__zoomIn">Contact School</a>
@@ -21,9 +19,8 @@
             
             <!-- Personalized Attention Slide -->
             <div class="carousel-item h-100">
-                <div class="overlay position-absolute top-0 start-0 w-100 h-100" style="background-color: rgba(0, 0, 0, 0.5);"></div>
                 <img src="{% static 'images/personalized.jpg' %}" class="d-block w-100 h-100 object-fit-cover" alt="Personalized Attention">
-                <div class="carousel-caption d-flex flex-column justify-content-center align-items-center h-100">
+                <div class="carousel-caption d-flex flex-column justify-content-center align-items-center text-center">
                     <h1 class="display-4 fw-bold mb-3 animate__animated animate__fadeInDown">Personalized Attention</h1>
                     <p class="lead mb-4 animate__animated animate__fadeInUp">Tailored learning paths that nurture your child’s unique strengths and potential.</p>
                     <a href="#" class="btn btn-primary btn-lg animate__animated animate__zoomIn">Take Online Assessment</a>
@@ -32,9 +29,8 @@
             
             <!-- Future-Ready Skills Slide -->
             <div class="carousel-item h-100">
-                <div class="overlay position-absolute top-0 start-0 w-100 h-100" style="background-color: rgba(0, 0, 0, 0.5);"></div>
                 <img src="{% static 'images/future_skills.jpg' %}" class="d-block w-100 h-100 object-fit-cover" alt="Future-Ready Skills">
-                <div class="carousel-caption d-flex flex-column justify-content-center align-items-center h-100">
+                <div class="carousel-caption d-flex flex-column justify-content-center align-items-center text-center">
                     <h1 class="display-4 fw-bold mb-3 animate__animated animate__fadeInDown">Future-Ready Skills</h1>
                     <p class="lead mb-4 animate__animated animate__fadeInUp">Equipping your child with literacy, critical thinking, and life skills for lifelong success.</p>
                     <a href="#" class="btn btn-primary btn-lg animate__animated animate__zoomIn">Contact School</a>
@@ -43,16 +39,23 @@
             
             <!-- Parental Partnership Slide -->
             <div class="carousel-item h-100">
-                <div class="overlay position-absolute top-0 start-0 w-100 h-100" style="background-color: rgba(0, 0, 0, 0.5);"></div>
                 <img src="{% static 'images/parental.jpg' %}" class="d-block w-100 h-100 object-fit-cover" alt="Parental Partnership">
-                <div class="carousel-caption d-flex flex-column justify-content-center align-items-center h-100">
+                <div class="carousel-caption d-flex flex-column justify-content-center align-items-center text-center">
                     <h1 class="display-4 fw-bold mb-3 animate__animated animate__fadeInDown">Parental Partnership</h1>
                     <p class="lead mb-4 animate__animated animate__fadeInUp">Stay informed and involved through regular updates, workshops, and collaborative events.</p>
                     <a href="#" class="btn btn-primary btn-lg animate__animated animate__zoomIn">Take Online Assessment</a>
                 </div>
             </div>
-            
+
             <!-- Character-Driven Education Slide -->
+            <div class="carousel-item h-100">
+                <img src="{% static 'images/character.jpg' %}" class="d-block w-100 h-100 object-fit-cover" alt="Character-Driven Education">
+                <div class="carousel-caption d-flex flex-column justify-content-center align-items-center text-center">
+                    <h1 class="display-4 fw-bold mb-3 animate__animated animate__fadeInDown">Character-Driven Education</h1>
+                    <p class="lead mb-4 animate__animated animate__fadeInUp">Building courage, honesty, and courtesy into everyday learning experiences.</p>
+                    <a href="#" class="btn btn-primary btn-lg animate__animated animate__zoomIn">Contact School</a>
+                </div>
+            </div>
         </div>
 
         <!-- Carousel Controls -->
@@ -70,60 +73,39 @@
 <!-- Add these CSS styles to your stylesheet to perfect the carousel -->
 <style>
     .hero {
-        position: relative;
-        overflow: hidden;
-    }
-    .carousel-inner {
-        height: 100vh;  /* Ensure the carousel takes full screen height */
-    }
-    .carousel-item {
-        height: 100%;  /* Ensure carousel items fill the full height of the carousel */
-    }
-    .carousel-item img {
-        object-fit: cover; /* Ensures the image fills the container without distortion */
-        width: 100%;  /* Ensures the image takes full width */
-        height: 100%;  /* Ensures the image takes full height */
-    }
-    .carousel-caption {
-        z-index: 2;
-        color: white;
-        text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.7);
-    }
-    .carousel-caption h1 {
-        font-size: 3rem;
-        font-weight: bold;
-    }
-    .carousel-caption p {
-        font-size: 1.25rem;
-    }
-    .carousel-caption .btn {
-        font-size: 1.25rem;
-        padding: 10px 25px;
-        transition: background-color 0.3s ease;
-    }
-    .carousel-caption .btn:hover {
-        background-color: #0056b3;
-    }
+    position: relative;
+    overflow: hidden;
+}
 
-    /* Control Buttons */
-    .carousel-control-prev-icon,
-    .carousel-control-next-icon {
-        background-color: #007bff;
-        border-radius: 50%;
-    }
+.carousel-inner {
+    height: 100vh; /* Full-screen height for carousel */
+}
 
-    /* Make the carousel full height on mobile */
-    @media (max-width: 768px) {
-        .carousel-item {
-            height: 70vh;  /* Reduce height on smaller screens */
-        }
-        .carousel-caption h1 {
-            font-size: 2rem;
-        }
-        .carousel-caption p {
-            font-size: 1rem;
-        }
-    }
+.carousel-item img {
+    object-fit: cover;
+    width: 100%;
+    height: 100%;
+}
+
+.carousel-caption {
+    z-index: 2;
+    text-shadow: 2px 2px 5px rgba(0, 0, 0, 0.7);
+}
+
+.carousel-caption h1 {
+    font-size: 3rem;
+    font-weight: bold;
+}
+
+.carousel-caption p {
+    font-size: 1.25rem;
+}
+
+.carousel-caption .btn {
+    font-size: 1.25rem;
+    padding: 10px 25px;
+}
+
 </style>
 
 <!-- About Section -->
