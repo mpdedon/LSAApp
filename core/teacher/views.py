@@ -380,7 +380,7 @@ def input_scores(request, class_id, subject_id, term_id):
     class_obj = get_object_or_404(Class, id=class_id)
     subject = get_object_or_404(Subject, id=subject_id)
     term = get_object_or_404(Term, id=term_id)
-    students = class_obj.students.all()
+    students = Student.objects.filter(current_class=class_obj).distinct()
 
     # Collect all subject results for the term
     subject_results = {}

@@ -27,6 +27,11 @@ class Session(models.Model):
         end_year = self.end_date.year
         return f"{start_year}-{end_year} Session"
 
+    def save(self, *args, **kwargs):
+        if self.active:
+            Session.objects.filter(active=True).update(active=False)
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return self.name
 
@@ -46,6 +51,9 @@ class Term(models.Model):
     is_active = models.BooleanField(default=True)
 
     def save(self, *args, **kwargs):
+
+        if self.active:
+            Term.objects.filter(active=True).update(active=False)
         super().save(*args, **kwargs)
         # Generate SchoolDay entries for the term
         current_date = self.start_date

@@ -58,6 +58,24 @@
                                     <i class="fas fa-cogs me-1"></i>School Setup
                                 </a>
                             </li>
+                        {% elif user.role == 'teacher' %}
+                            <li class="nav-item">
+                                <a class="btn btn-outline-light btn-sm ms-2" href="{% url 'teacher_dashboard' %}">
+                                    <i class="fas fa-cogs me-1"></i>Dashboard
+                                </a>
+                            </li>
+                        {% elif user.role == 'guardian' %}
+                            <li class="nav-item">
+                                <a class="btn btn-outline-light btn-sm ms-2" href="{% url 'guardian_dashboard' %}">
+                                    <i class="fas fa-cogs me-1"></i>Dashboard
+                                </a>
+                            </li>
+                        {% elif user.role == 'student' %}
+                            <li class="nav-item">
+                                <a class="btn btn-outline-light btn-sm ms-2" href="{% url 'student_dashboard' %}">
+                                    <i class="fas fa-cogs me-1"></i>Dashboard
+                                </a>
+                            </li>
                         {% endif %}
                         <li class="nav-item">
                             <form method="POST" action="{% url 'logout' %}">

@@ -16,7 +16,7 @@ from collections import defaultdict
 from django.utils.timezone import localdate
 from core.models import CustomUser, Student, Teacher, Guardian, Class, Subject, Assignment, Result, Attendance, Payment
 from core.models import Session, Term, Message, Assessment, Exam, Notification, AssignmentSubmission, AcademicAlert
-from core.models import FeeAssignment, Payment, FinancialRecord, StudentFeeRecord
+from core.models import FeeAssignment, Payment, FinancialRecord, StudentFeeRecord, SubjectAssignment
 from django.db.models import Sum
 from django.views.generic.edit import FormView
 from django.contrib import messages
@@ -163,9 +163,15 @@ def teacher_dashboard(request):
         return redirect('login')  
     
     teacher = Teacher.objects.get(user=request.user)
-    assigned_classes = Class.objects.filter(teacher=teacher)
+    assigned_classes = Class.objects.filter(Q(teacher=teacher) | Q(teacherassignment__teacher=teacher)).distinct()
     students = Student.objects.filter(current_class__in=assigned_classes).distinct()
-    subjects = Subject.objects.filter(subjectassignment__class_assigned__in=assigned_classes).distinct()
+    print(students)
+    class_subjects = Subject.objects.filter(class_assignments__class_assigned__in=assigned_classes).distinct()
+    subject_assignments = SubjectAssignment.objects.filter(teacher=teacher)
+    subjects_taught = Subject.objects.filter(id__in=subject_assignments.values_list('subject', flat=True)                        ).distinct()
+    classes_subjects_taught = Class.objects.filter(
+                    id__in=subject_assignments.values_list('class_assigned', flat=True)
+                    ).distinct()
     guardians = set(student.student_guardian for student in students if student.student_guardian is not None)
     assignments = Assignment.objects.filter(teacher=teacher)
 
@@ -190,7 +196,9 @@ def teacher_dashboard(request):
         'teacher': teacher,
         'assigned_classes': assigned_classes,
         'students': students,
-        'subjects': subjects,
+        'class_subjects': class_subjects,
+        'subjects_taught': subjects_taught,
+        'classes_subjects_taught': classes_subjects_taught,
         'guardians': guardians,
         'current_term': current_term,
         'weeks': weeks,

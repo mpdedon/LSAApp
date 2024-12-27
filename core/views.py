@@ -414,7 +414,6 @@ def AssignTeacherView(request):
 
     return render(request, 'setup/assign_teacher.html', context)
 
-
 class TeacherAssignmentListView(AdminRequiredMixin, ListView):
     template_name = 'teacher_assignment/teacher_assignment_list.html'
 

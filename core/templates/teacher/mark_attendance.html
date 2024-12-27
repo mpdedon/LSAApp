@@ -8,16 +8,19 @@
 
 <!-- Navigation for weeks -->
 <div>
-  {% if current_week > 0 %}
-      <a href="?week={{ current_week|add:"-1" }}" class="btn btn-info">Previous Week</a>
-  {% endif %}
-  <span></span>
-  <span>Week {{ current_week|add:1 }} of {{ total_weeks }}</span>
-  {% if current_week < max_week %}
-  <span></span>
-      <a href="?week={{ current_week|add:"1" }}" class="btn btn-info">Next Week</a>
-  {% endif %}
-</div>
+    {% if selected_week > 0 %}
+        <a href="?week={{ selected_week|add:"-1" }}" class="btn btn-info">Previous Week</a>
+    {% else %}
+        <span class="btn btn-info disabled">Previous Week</span>
+    {% endif %}
+    <span>Week {{ selected_week|add:1 }} of {{ weeks|length }}</span>
+    {% if selected_week < max_week %}
+        <a href="?week={{ selected_week|add:"1" }}" class="btn btn-info">Next Week</a>
+    {% else %}
+        <span class="btn btn-info disabled">Next Week</span>
+    {% endif %}
+  </div>
+  
 <br>
 <form method="POST">
     {% csrf_token %}
