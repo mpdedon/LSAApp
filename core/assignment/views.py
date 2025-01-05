@@ -2,7 +2,7 @@
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views import View
-from .forms import AssignmentForm, AssessmentForm, AttendanceForm
+from .forms import AssignmentForm
 from ..models import Assignment
 
 # Assignment Views

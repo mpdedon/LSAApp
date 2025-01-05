@@ -4,6 +4,22 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from core.models import Student, Term, SchoolDay, Student, Result, FeeAssignment, StudentFeeRecord
 
+from django.core.mail import send_mail, EmailMultiAlternatives
+from django.template.loader import render_to_string
+from core.models import CustomUser
+from core.tasks import send_email_task
+
+
+@receiver(post_save, sender=CustomUser)
+def send_welcome_email(sender, instance, created, **kwargs):
+    if created:
+        send_email_task.delay(
+            subject="Welcome to Our Platform",
+            to_email=instance.email,
+            template='emails/welcome_email.html',
+            context={'user': instance}
+        )
+
 
 @receiver(post_save, sender=Term)
 def generate_attendance_records(sender, instance, created, **kwargs):

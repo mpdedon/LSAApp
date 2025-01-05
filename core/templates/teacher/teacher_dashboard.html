@@ -1,450 +1,594 @@
 {% extends 'base.html' %}
 
+{% load static %}
 {% load message_filters %}
-{% block content %}
-<div class="container my-5">
-    <!-- Teacher Info Section -->
-    <div class="card mb-5 col-md-9 shadow-lg">
-        <div class="card-header bg-light text-white">
-            <h3 class="mb-0 text-center">Welcome, {{ teacher.user.get_full_name }}</h3>
-        </div>
-        <div class="card-body row">
-            <!-- Left Column -->
-            <div class="col-md-6 mb-3">
-                <p class="mb-1"><i class="fa fa-user me-2"></i><strong>Name:</strong> {{ teacher.user.get_full_name }}</p>
-                <p class="mb-1"><i class="fa fa-id-badge me-2"></i><strong>Employment Number:</strong> {{ teacher.employee_id }}</p>
-                <p class="mb-1"><i class="fa fa-graduation-cap me-2"></i><strong>Assigned Class:</strong> {{ assigned_classes|join:", " }}</p>
-                <p class="mb-1"><i class="fa fa-hourglass me-2"></i><strong>Date of Birth:</strong> {{ teacher.date_of_birth }}</p>
-            </div>
-            <!-- Right Column -->
-            <div class="col-md-6">
-                <p class="mb-1"><i class="fa fa-check-circle me-2"></i><strong>Status:</strong> 
-                    {% if teacher.status %}
-                        <span class="badge bg-success">Active</span>
-                    {% else %}
-                        <span class="badge bg-danger">Inactive</span>
-                    {% endif %}
-                </p>
-                <p class="mb-1"><i class="fa fa-user-circle me-2"></i><strong>Username:</strong> {{ teacher.user.username }}</p>
-                <p class="mb-1"><i class="fa fa-envelope me-2"></i><strong>Email:</strong> {{ teacher.user.email }}</p>
-                <p class="mb-1"><i class="fa fa-phone-square me-2"></i><strong>Phone Number:</strong> {{ teacher.contact }}</p>
-            </div>
-        </div>
-    </div>
+{% load humanize %}
 
-    <!-- Main Content -->
+{% block content %}
+<link href="https://maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css" rel="stylesheet">
+
+<div class="container-fluid py-4">
     <div class="row">
-        <!-- First Column: Subjects in Assigned Classes -->
-        <div class="col-md-4">
-            <div class="card shadow-sm">
-                <div class="card-header bg-light">
-                    <h4 class="mb-2">Subjects in Your Assigned Classes</h4>
+        <!-- Profile Navigation -->
+        <div class="profile-nav col-md-3">
+            <div class="panel shadow-sm">
+                <!-- Profile Heading -->
+                <div class="user-heading text-center py-3 bg-light rounded-top">
+                    {% if teacher.profile_image %}
+                        <img src="{{ teacher.profile_image.url }}" class="img-fluid rounded-circle mb-2" alt="{{ teacher.user.get_full_name }}" style="max-height: 150px; object-fit: cover;">
+                    {% else %}
+                        <img src="{% static 'images/profile_images/default.jpg' %}" class="img-fluid rounded-circle mb-2" alt="Default Profile Image" style="max-height: 150px; object-fit: cover;">
+                    {% endif %}
+                    <h5 class="fw-bold">{{ teacher.user.username }}</h5>
+                    <p class="text-muted mb-0">{{ teacher.user.email }}</p>
                 </div>
-                <div class="card-body">
-                    {% if class_subjects %}
-                        <ul class="list-group list-group-flush">
-                            {% for subject in class_subjects|slice:":5" %}
-                                <li class="list-group-item d-flex justify-content-between align-items-center">
-                                    {{ subject.name }}
-                                    <span class="badge bg-success rounded-pill">{{ subject.subject_weight }} units</span>
-                                </li>
+        
+                <!-- Navigation Boxes -->
+                <ul class="nav flex-column mt-3">
+                    <!-- Profile Link -->
+                    <li class="nav-item mb-3">
+                        <div class="card shadow-sm">
+                            <a href="#" class="nav-link active py-3 text-center">
+                                <i class="fa fa-user me-2"></i> Profile
+                            </a>
+                        </div>
+                    </li>
+                    <!-- Recent Activity Link -->
+                    <li class="nav-item mb-3">
+                        <div class="card shadow-sm">
+                            <a href="#" class="nav-link py-3 text-center">
+                                <i class="fa fa-calendar me-2"></i> Recent Activity 
+                                <span class="badge bg-warning float-end"></span>
+                            </a>
+                        </div>
+                    </li>
+                    <!-- Edit Profile Link -->
+                    <li class="nav-item">
+                        <div class="card shadow-sm">
+                            <a href="{% url 'teacher_update' teacher.user.id %}" class="nav-link py-3 text-center">
+                                <i class="fa fa-edit me-2"></i> Edit Profile
+                            </a>
+                        </div>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        <div class="profile-info col-md-9">
+            <div class="panel shadow-sm mb-4">
+                <div class="panel-body">
+                    <form>
+                        <!-- Textarea for post content -->
+                        <div class="input-group mb-3">
+                            <textarea placeholder="What's on your mind today?" rows="2" class="form-control p-text-area" aria-label="What's on your mind today?"></textarea>
+                            
+                        </div>
+            
+                        <!-- Icons for microphone, camera, or file uploads -->
+                        <div class="d-flex align-items-center justify-content-between">
+                            <!-- Icons on the left with little space between -->
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-sm btn-light">
+                                    <i class="fa fa-microphone"></i> 
+                                </button>
+                                <button class="btn btn-sm btn-light">
+                                    <i class="fa fa-camera"></i>
+                                </button>
+                                <button class="btn btn-sm btn-light">
+                                    <i class="fa fa-upload"></i>
+                                </button>
+                            </div>
+                            
+                            <!-- Post Button aligned to the right -->
+                            <button class="btn btn-warning btn-sm" type="submit" id="postButton">
+                                <i class="fa fa-paper-plane"></i> Post
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            <!-- Notifications -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-light text-white p-2">
+                    <h5 class="mb-0">Notifications</h5>
+                </div>
+                <div class="card-body p-3">
+                    {% if notifications %}
+                        <div class="list-group">
+                            {% for notification in notifications %}
+                                <a href="#" class="list-group-item list-group-item-action {% if notification.is_new %}bg-light{% endif %}">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <!-- Notification Icon -->
+                                        <div class="me-2">
+                                            <i class="fa fa-bell"></i>
+                                        </div>
+                                        <div class="flex-grow-1">
+                                            <span>{{ notification.message }}</span>
+                                        </div>
+                                        <small class="text-muted">{{ notification.created_at|date:"M d, Y H:i A" }}</small>
+                                    </div>
+                                </a>
                             {% endfor %}
-                            {% if class_subjects|length > 5 %}
-                                <li class="list-group-item text-center">
-                                    <button class="btn btn-outline-primary btn-sm" data-bs-toggle="collapse" data-bs-target="#allSubjects" aria-expanded="false" aria-controls="allSubjects">
-                                        Show All Subjects
-                                    </button>
-                                </li>
-                                <div class="collapse" id="allSubjects">
-                                    {% for subject in class_subjects|slice:"5:" %}
+                        </div>
+                    {% else %}
+                        <div class="alert alert-warning" role="alert">
+                            No notifications available.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            <!-- Teacher Info Section -->
+            <div class="card mb-5 shadow-lg">
+                <div class="card-header bg-light text-white">
+                    <h3 class="mb-0 text-center">Welcome, {{ teacher.user.get_full_name }}</h3>
+                </div>
+                <div class="card-body row">
+                    <!-- Left Column -->
+                    <div class="col-md-6 mb-3">
+                        <p class="mb-1"><i class="fa fa-user me-2"></i><strong>Name:</strong> {{ teacher.user.get_full_name }}</p>
+                        <p class="mb-1"><i class="fa fa-id-badge me-2"></i><strong>Employment Number:</strong> {{ teacher.employee_id }}</p>
+                        <p class="mb-1"><i class="fa fa-graduation-cap me-2"></i><strong>Assigned Class:</strong> {{ assigned_classes|join:", " }}</p>
+                        <p class="mb-1"><i class="fa fa-hourglass me-2"></i><strong>Date of Birth:</strong> {{ teacher.date_of_birth }}</p>
+                    </div>
+                    <!-- Right Column -->
+                    <div class="col-md-6">
+                        <p class="mb-1"><i class="fa fa-check-circle me-2"></i><strong>Status:</strong> 
+                            {% if teacher.status %}
+                                <span class="badge bg-success">Active</span>
+                            {% else %}
+                                <span class="badge bg-danger">Inactive</span>
+                            {% endif %}
+                        </p>
+                        <p class="mb-1"><i class="fa fa-user-circle me-2"></i><strong>Username:</strong> {{ teacher.user.username }}</p>
+                        <p class="mb-1"><i class="fa fa-envelope me-2"></i><strong>Email:</strong> {{ teacher.user.email }}</p>
+                        <p class="mb-1"><i class="fa fa-phone-square me-2"></i><strong>Phone Number:</strong> {{ teacher.contact }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Content -->
+            <div class="row">
+                <!-- First Column: Subjects in Assigned Classes -->
+                <div class="col-md-6">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-light">
+                            <h4 class="mb-2">Subjects in Your Assigned Classes</h4>
+                        </div>
+                        <div class="card-body">
+                            {% if class_subjects %}
+                                <ul class="list-group list-group-flush">
+                                    {% for subject in class_subjects|slice:":5" %}
                                         <li class="list-group-item d-flex justify-content-between align-items-center">
                                             {{ subject.name }}
                                             <span class="badge bg-success rounded-pill">{{ subject.subject_weight }} units</span>
                                         </li>
                                     {% endfor %}
-                                </div>
+                                    {% if class_subjects|length > 5 %}
+                                        <li class="list-group-item text-center">
+                                            <button class="btn btn-outline-primary btn-sm" data-bs-toggle="collapse" data-bs-target="#allSubjects" aria-expanded="false" aria-controls="allSubjects">
+                                                Show All Subjects
+                                            </button>
+                                        </li>
+                                        <div class="collapse" id="allSubjects">
+                                            {% for subject in class_subjects|slice:"5:" %}
+                                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                                    {{ subject.name }}
+                                                    <span class="badge bg-success rounded-pill">{{ subject.subject_weight }} units</span>
+                                                </li>
+                                            {% endfor %}
+                                        </div>
+                                    {% endif %}
+                                </ul>
+                            {% else %}
+                                <p class="text-muted text-center">No subjects assigned to your classes.</p>
                             {% endif %}
-                        </ul>
-                    {% else %}
-                        <p class="text-muted text-center">No subjects assigned to your classes.</p>
-                    {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Second Column: Classes and Subjects Taught -->
+                <div class="col-md-6">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-light">
+                            <h4 class="mb-2 text-center">Classes & Subjects You Teach</h4>
+                        </div>
+                        <div class="card-body">
+                            {% if classes_subjects_taught %}
+                                <div class="table-responsive">
+                                    <table class="table table-striped table-bordered">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Class</th>
+                                                <th>Subjects</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for class in classes_subjects_taught %}
+                                                <tr>
+                                                    <td><strong>{{ class.name }}</strong></td>
+                                                    <td>
+                                                        {% for subject in subjects_taught %}
+                                                            <span class="badge bg-primary me-1">{{ subject.name }}</span>
+                                                        {% endfor %}
+                                                    </td>
+                                                </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            {% else %}
+                                <p class="text-muted text-center">No subjects taught in other classes.</p>
+                            {% endif %}
+                        </div>
+                    </div>
                 </div>
             </div>
-        </div>
-
-        <!-- Second Column: Classes and Subjects Taught -->
-        <div class="col-md-6">
-            <div class="card shadow-sm">
-                <div class="card-header bg-light">
-                    <h4 class="mb-2 text-center">Classes & Subjects You Teach</h4>
+            <br>
+            <!-- Students Table --> 
+            <div class="card mb-4 shadow-sm">
+                <div class="card-header bg-light text-white">
+                    <h4 class="mb-0">Students in Assigned Class {{current_class.name}} </h4>
                 </div>
                 <div class="card-body">
-                    {% if classes_subjects_taught %}
-                        <div class="table-responsive">
-                            <table class="table table-striped table-bordered">
+                    <table class="table table-hover align-middle">
+                        <thead class="table-light ">
+                            <tr>
+                                <th>Student Name</th>
+                                <th>LSA No.</th>
+                                <th>Guardian</th>
+                                <th class="text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for student in students %}
+                                <tr>
+                                    <!-- Student Details -->
+                                    <td>{{ student.user.get_full_name }}</td>
+                                    <td>{{ student.LSA_number }}</td>
+                                    <!-- Guardian Details -->
+                                    <td>
+                                        {% if student.student_guardian %}
+                                            <div>
+                                                <strong>{{ student.student_guardian.user.get_full_name }}</strong>
+                                                <br>
+                                                <small class="text-muted">{{ student.student_guardian.user.email }}</small>
+                                            </div>
+                                        {% else %}
+                                            <span class="badge bg-secondary">No Guardian Assigned</span>
+                                        {% endif %}
+                                    </td>
+
+                                    <!-- Actions -->
+                                    <td class="text-center">
+                                        <a href="{% url 'mark_attendance' student.current_class.id %}" class="btn btn-outline-primary btn-sm mb-1">
+                                            <i class="fa fa-calendar-check"></i> Mark Attendance
+                                        </a>
+                                        {% if student.student_guardian %}
+                                            <a href="{% url 'message_guardian' student.student_guardian.user.id %}" class="btn btn-outline-warning btn-sm mb-1">
+                                                <i class="fa fa-envelope"></i> Message Guardian
+                                            </a>
+                                            {% if message_counts|get_item:student.user.id|default:0 %}
+                                                <span class="badge bg-info text-dark">
+                                                    {{ message_counts|get_item:student.user.id|default:0 }} Messages
+                                                </span>
+                                            {% endif %}
+                                        {% endif %}
+                                        <a href="{% url 'student_detail' student.user.id %}" class="btn btn-outline-info btn-sm">
+                                            <i class="fa fa-info-circle"></i> Student Info
+                                        </a>
+                                    </td>
+                                </tr>
+                            {% empty %}
+                                <tr>
+                                    <td colspan="5" class="text-center text-muted">No students enrolled yet.</td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+            <!-- Assignment Section -->
+            <div class="card mb-4 shadow-sm">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h4>Assignments</h4>
+                    <a href="{% url 'create_assignment' %}" class="btn btn-sm btn-outline-info">
+                        <i class="bi bi-plus-circle"></i> Create Assignment
+                    </a>
+                </div>
+                <div class="card-body">
+                    <!-- Recent Assignments List -->
+                    <ul class="list-group">
+                        {% for assignment in assignments|slice:":5" %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>{{ assignment.title }}</strong>
+                                <br>
+                                <small class="text-muted">
+                                    Class: {{ assignment.class_assigned.name }} | Subject: {{ assignment.subject.name }}
+                                    <br>Due: {{ assignment.due_date|date:"M d, Y" }}
+                                </small>
+                            </div>
+                            <div>
+                                <a href="{% url 'assignment_detail' assignment.id %}" class="btn btn-sm btn-outline-info me-2">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <a href="{% url 'update_assignment' assignment.id %}" class="btn btn-sm btn-outline-warning me-2">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <a href="{% url 'delete_assignment' assignment.id %}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure you want to delete this assignment?');">
+                                    <i class="bi bi-trash"></i>
+                                </a>
+                            </div>
+                        </li>
+                        {% empty %}
+                        <li class="list-group-item text-muted text-center">No assignments created yet.</li>
+                        {% endfor %}
+                    </ul>
+                    <!-- Link to View and Grade Assignments -->
+                    <div class="mt-3">
+                        <a href="{% url 'view_submitted_assignments' %}" class="btn btn-lg btn-outline-info">
+                            View Submitted Assignments by Subject
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Assessment Section -->
+            <div class="card mb-4 shadow-sm">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h4>Assessments</h4>
+                    <a href="{% url 'create_assessment' %}" class="btn btn-sm btn-outline-info">
+                        <i class="bi bi-plus-circle"></i> Create Assessment
+                    </a>
+                </div>
+                <div class="card-body">
+                    <!-- Recent Assessments List -->
+                    <ul class="list-group">
+                        {% for assessment in assessments|slice:":5" %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>{{ assessment.title }}</strong>
+                                <br>
+                                <small class="text-muted">
+                                    Class: {{ assessment.class_assigned.name }} | Subject: {{ assessment.subject.name }}
+                                    <br>Term: {{ assessment.term.name }} | Due: {{ assessment.due_date|date:"M d, Y" }} | Duration: {{ assessment.duration }} min
+                                </small>
+                            </div>
+                            <div>
+                                {% if not assessment.is_approved %}
+                                <span class="badge bg-warning text-dark">Pending Approval</span>
+                                {% elif assessment.is_approved %}
+                                <span class="badge bg-success texr-dark">Approved</span>
+                                {% endif %}
+                            </div>
+                            <div>
+                                <a href="{% url 'view_assessment' assessment.id %}" class="btn btn-sm btn-outline-info me-2">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                <a href="{% url 'update_assessment' assessment.id %}" class="btn btn-sm btn-outline-warning me-2">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <a href="{% url 'delete_assessment' assessment.id %}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure?');">
+                                    <i class="bi bi-trash"></i>
+                                </a>
+                            </div>
+                        </li>
+                        {% empty %}
+                        <li class="list-group-item text-muted text-center">No assessments created yet.</li>
+                        {% endfor %}
+                    </ul>
+                    <!-- Link to View and Grade Assessments -->
+                    <div class="mt-3">
+                        <a href="{% url 'teacher_assessment_list' %}" class="btn btn-lg btn-outline-info">
+                            View All Assessments
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Academic Record Section -->
+            <div class="card mb-4 shadow-sm">
+                <div class="card-header">
+                    <h4>Students Academic Record for {{ current_term }}</h4>
+                </div>
+                <div class="card-body">
+
+                    <!-- Class Subject Scores Section -->
+                    <button class="btn btn-primary mb-3" type="button" data-bs-toggle="collapse" data-bs-target="#classSubjectScores" aria-expanded="false" aria-controls="classSubjectScores">
+                        Input Class Subject Scores
+                    </button>
+                    <div class="collapse" id="classSubjectScores">
+                        <div class="card card-body">
+                            <h5>Class Subject Scores</h5>
+                            <table class="table table-hover table-striped">
                                 <thead class="table-light">
                                     <tr>
                                         <th>Class</th>
-                                        <th>Subjects</th>
+                                        <th>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {% for class in classes_subjects_taught %}
+                                    {% for assigned_class in assigned_classes %}
                                         <tr>
-                                            <td><strong>{{ class.name }}</strong></td>
+                                            <td>{{ assigned_class.name }}</td>
                                             <td>
-                                                {% for subject in subjects_taught %}
-                                                    <span class="badge bg-primary me-1">{{ subject.name }}</span>
+                                                {% for subject in class_subjects %}
+                                                    <a href="{% url 'input_scores' assigned_class.id subject.id current_term.id %}" class="btn btn-info btn-sm">
+                                                        Input Scores for {{ subject.name }}
+                                                    </a>
                                                 {% endfor %}
                                             </td>
+                                        </tr>
+                                    {% empty %}
+                                        <tr>
+                                            <td colspan="2" class="text-center text-muted">No classes available.</td>
                                         </tr>
                                     {% endfor %}
                                 </tbody>
                             </table>
                         </div>
-                    {% else %}
-                        <p class="text-muted text-center">No subjects taught in other classes.</p>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-    </div>
-    <br>
-    <!-- Students Table --> 
-    <div class="card mb-4 shadow-sm">
-        <div class="card-header bg-light text-white">
-            <h4 class="mb-0">Students in Assigned Class</h4>
-        </div>
-        <div class="card-body">
-            <table class="table table-hover align-middle">
-                <thead class="table-light ">
-                    <tr>
-                        <th>Student Name</th>
-                        <th>LSA Number</th>
-                        <th>Class</th>
-                        <th>Guardian</th>
-                        <th class="text-center">Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for student in students %}
-                        <tr>
-                            <!-- Student Details -->
-                            <td>{{ student.user.get_full_name }}</td>
-                            <td>{{ student.LSA_number }}</td>
-                            <td>{{ student.current_class.name }}</td>
-
-                            <!-- Guardian Details -->
-                            <td>
-                                {% if student.student_guardian %}
-                                    <div>
-                                        <strong>{{ student.student_guardian.user.get_full_name }}</strong>
-                                        <br>
-                                        <small class="text-muted">{{ student.student_guardian.user.email }}</small>
-                                    </div>
-                                {% else %}
-                                    <span class="badge bg-secondary">No Guardian Assigned</span>
-                                {% endif %}
-                            </td>
-
-                            <!-- Actions -->
-                            <td class="text-center">
-                                <a href="{% url 'mark_attendance' student.current_class.id %}" class="btn btn-outline-primary btn-sm mb-1">
-                                    <i class="fa fa-calendar-check"></i> Mark Attendance
-                                </a>
-                                {% if student.student_guardian %}
-                                    <a href="{% url 'message_guardian' student.student_guardian.user.id %}" class="btn btn-outline-warning btn-sm mb-1">
-                                        <i class="fa fa-envelope"></i> Message Guardian
-                                    </a>
-                                    {% if message_counts|get_item:student.user.id|default:0 %}
-                                        <span class="badge bg-info text-dark">
-                                            {{ message_counts|get_item:student.user.id|default:0 }} Messages
-                                        </span>
-                                    {% endif %}
-                                {% endif %}
-                                <a href="{% url 'student_detail' student.user.id %}" class="btn btn-outline-info btn-sm">
-                                    <i class="fa fa-info-circle"></i> Student Detail
-                                </a>
-                            </td>
-                        </tr>
-                    {% empty %}
-                        <tr>
-                            <td colspan="5" class="text-center text-muted">No students enrolled yet.</td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-    <!-- Assignment Section -->
-    <div class="card mb-4 shadow-sm">
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h4>Assignments</h4>
-            <button type="button" class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#createAssignmentModal">
-                <i class="bi bi-plus-circle"></i> Create Assignment
-            </button>
-        </div>
-        <div class="card-body">
-            <!-- Recent Assignments List -->
-            <ul class="list-group">
-                {% for assignment in assignments|slice:":5" %}
-                <li class="list-group-item d-flex justify-content-between align-items-center">
-                    <div>
-                        <strong>{{ assignment.title }}</strong>
-                        <br>
-                        <small class="text-muted">
-                            Class: {{ assignment.class_assigned.name }} | Subject: {{ assignment.subject.name }}
-                            <br>Due: {{ assignment.due_date|date:"M d, Y" }}
-                        </small>
                     </div>
-                    <div>
-                        <a href="{% url 'update_assignment' assignment.id %}" class="btn btn-sm btn-outline-info me-2">
-                            <i class="bi bi-pencil"></i>
-                        </a>
-                        <a href="{% url 'delete_assignment' assignment.id %}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure you want to delete this assignment?');">
-                            <i class="bi bi-trash"></i>
-                        </a>
-                    </div>
-                </li>
-                {% empty %}
-                <li class="list-group-item text-muted text-center">No assignments created yet.</li>
-                {% endfor %}
-            </ul>
-            <!-- Link to View and Grade Assignments -->
-            <div class="mt-3">
-                <a href="{% url 'view_submitted_assignments' %}" class="btn btn-lg btn-outline-info">
-                    View Submitted Assignments by Subject
-                </a>
-            </div>
-        </div>
-    </div>
 
-    <!-- Create Assignment Modal -->
-    <div class="modal fade" id="createAssignmentModal" tabindex="-1" aria-labelledby="createAssignmentModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header bg-primary text-white">
-                    <h5 class="modal-title" id="createAssignmentModalLabel">Create New Assignment</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <form method="POST" action="{% url 'create_assignment' %}" enctype="multipart/form-data">
-                    {% csrf_token %}
-                    <div class="modal-body">
-                        {{ form.as_p }}  <!-- Render the entire form using Django's as_p -->
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                        <button type="submit" class="btn btn-success">
-                            <i class="bi bi-check-circle"></i> Create Assignment
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <!-- Academic Record Section -->
-    <div class="card mb-4 shadow-sm">
-        <div class="card-header">
-            <h4>Students Academic Record for {{ current_term }}</h4>
-        </div>
-        <div class="card-body">
-
-            <!-- Class Subject Scores Section -->
-            <button class="btn btn-primary mb-3" type="button" data-bs-toggle="collapse" data-bs-target="#classSubjectScores" aria-expanded="false" aria-controls="classSubjectScores">
-                Input Class Subject Scores
-            </button>
-            <div class="collapse" id="classSubjectScores">
-                <div class="card card-body">
-                    <h5>Class Subject Scores</h5>
-                    <table class="table table-hover table-striped">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Class</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for assigned_class in assigned_classes %}
-                                <tr>
-                                    <td>{{ assigned_class.name }}</td>
-                                    <td>
-                                        {% for subject in class_subjects %}
-                                            <a href="{% url 'input_scores' assigned_class.id subject.id current_term.id %}" class="btn btn-info btn-sm">
-                                                Input Scores for {{ subject.name }}
-                                            </a>
-                                        {% endfor %}
-                                    </td>
-                                </tr>
-                            {% empty %}
-                                <tr>
-                                    <td colspan="2" class="text-center text-muted">No classes available.</td>
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- Subject Teaching Scores Section -->
-            <button class="btn btn-secondary mb-3" type="button" data-bs-toggle="collapse" data-bs-target="#subjectTeachingScores" aria-expanded="false" aria-controls="subjectTeachingScores">
-                Input Subject Teaching Scores
-            </button>
-            <div class="collapse" id="subjectTeachingScores">
-                <div class="card card-body">
-                    <h5>Subject Teaching Scores</h5>
-                    <table class="table table-hover table-striped">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Class</th>
-                                <th>Subject</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for class in classes_subjects_taught%}
-                                {% for subject in subjects_taught %}
+                    <!-- Subject Teaching Scores Section -->
+                    <button class="btn btn-secondary mb-3" type="button" data-bs-toggle="collapse" data-bs-target="#subjectTeachingScores" aria-expanded="false" aria-controls="subjectTeachingScores">
+                        Input Subject Teaching Scores
+                    </button>
+                    <div class="collapse" id="subjectTeachingScores">
+                        <div class="card card-body">
+                            <h5>Subject Teaching Scores</h5>
+                            <table class="table table-hover table-striped">
+                                <thead class="table-light">
                                     <tr>
-                                        <td>{{ class.name }}</td>
-                                        <td>{{ subject.name }}</td>
-                                        <td>
-                                            <a href="{% url 'input_scores' class.id subject.id current_term.id %}" class="btn btn-info btn-sm">
-                                                Input Scores
-                                            </a>
-                                        </td>
+                                        <th>Class</th>
+                                        <th>Subject</th>
+                                        <th>Actions</th>
                                     </tr>
-                                {% endfor %}
-                            {% empty %}
-                                <tr>
-                                    <td colspan="3" class="text-center text-muted">No subject assignments available.</td>
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-        </div>
-    </div>
-
-    <!-- Non-Academic Record Input Section -->
-    <div class="card mb-4 shadow-sm">
-        <div class="card-header bg-light text-dark">
-            <h4>Input Non-Academic Records</h4>
-        </div>
-        <div class="card-body">
-            {% for student in students %}
-            <div class="accordion mb-3" id="accordion{{ student.user.id }}">
-                <div class="accordion-item">
-                    <h2 class="accordion-header" id="heading{{ student.user.id }}">
-                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ student.user.id }}" aria-expanded="false" aria-controls="collapse{{ student.user.id }}">
-                            {{ student.user.get_full_name }} - {{ student.LSA_number }}
-                        </button>
-                    </h2>
-                    <div id="collapse{{ student.user.id }}" class="accordion-collapse collapse" aria-labelledby="heading{{ student.user.id }}" data-bs-parent="#accordion{{ student.user.id }}">
-                        <div class="accordion-body">
-                            <form method="POST" action="{% url 'update_result' student.user.id current_term.id %}">
-                                {% csrf_token %}
-                                <div class="mb-4">
-                                    <h5 class="text-muted">Character Skills</h5>
-                                    <div class="row">
-                                        <div class="col-6 mb-3">
-                                            <label for="punctuality{{ student.user.id }}" class="form-label">Honesty</label>
-                                            <select name="punctuality" id="punctuality{{ student.user.id }}" class="form-select form-select-sm">
-                                                {% for i in "1234" %}
-                                                    <option value="{{ i }}">{{ i }}</option>
-                                                {% endfor %}
-                                            </select>
-                                        </div>
-                                        <div class="col-6 mb-3">
-                                            <label for="diligence{{ student.user.id }}" class="form-label">Diligence</label>
-                                            <select name="diligence" id="diligence{{ student.user.id }}" class="form-select form-select-sm">
-                                                {% for i in "1234" %}
-                                                    <option value="{{ i }}">{{ i }}</option>
-                                                {% endfor %}
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div class="row">
-                                        <div class="col-6 mb-3">
-                                            <label for="cooperation{{ student.user.id }}" class="form-label">Cooperation</label>
-                                            <select name="cooperation" id="cooperation{{ student.user.id }}" class="form-select form-select-sm">
-                                                {% for i in "1234" %}
-                                                    <option value="{{ i }}">{{ i }}</option>
-                                                {% endfor %}
-                                            </select>
-                                        </div>
-                                        <div class="col-6 mb-3">
-                                            <label for="respectfulness{{ student.user.id }}" class="form-label">Respectfulness</label>
-                                            <select name="respectfulness" id="respectfulness{{ student.user.id }}" class="form-select form-select-sm">
-                                                {% for i in "1234" %}
-                                                    <option value="{{ i }}">{{ i }}</option>
-                                                {% endfor %}
-                                            </select>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="mb-4">
-                                    <h5 class="text-muted">Physical Skills</h5>
-                                    <div class="row">
-                                        <div class="col-6 mb-3">
-                                            <label for="sportsmanship{{ student.user.id }}" class="form-label">Sportsmanship</label>
-                                            <select name="sportsmanship" id="sportsmanship{{ student.user.id }}" class="form-select form-select-sm">
-                                                {% for i in "1234" %}
-                                                    <option value="{{ i }}">{{ i }}</option>
-                                                {% endfor %}
-                                            </select>
-                                        </div>
-                                        <div class="col-6 mb-3">
-                                            <label for="agility{{ student.user.id }}" class="form-label">Agility</label>
-                                            <select name="agility" id="agility{{ student.user.id }}" class="form-select form-select-sm">
-                                                {% for i in "1234" %}
-                                                    <option value="{{ i }}">{{ i }}</option>
-                                                {% endfor %}
-                                            </select>
-                                        </div>
-                                    </div>
-                                    <div class="row">
-                                        <div class="col-6 mb-3">
-                                            <label for="creativity{{ student.user.id }}" class="form-label">Creativity</label>
-                                            <select name="creativity" id="creativity{{ student.user.id }}" class="form-select form-select-sm">
-                                                {% for i in "1234" %}
-                                                    <option value="{{ i }}">{{ i }}</option>
-                                                {% endfor %}
-                                            </select>
-                                        </div>
-                                        <div class="col-6 mb-3">
-                                            <label for="hand_eye_coordination{{ student.user.id }}" class="form-label">Hand-Eye Coordination</label>
-                                            <select name="hand_eye_coordination" id="hand_eye_coordination{{ student.user.id }}" class="form-select form-select-sm">
-                                                {% for i in "1234" %}
-                                                    <option value="{{ i }}">{{ i }}</option>
-                                                {% endfor %}
-                                            </select>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="mb-4">
-                                    <label for="teacher_comment{{ student.user.id }}" class="form-label">Teacher's Comment</label>
-                                    <textarea name="teacher_comment" id="teacher_comment{{ student.user.id }}" class="form-control form-control-sm" rows="3" placeholder="Enter your comment here..."></textarea>
-                                </div>
-
-                                <div class="text-end">
-                                    <button type="submit" class="btn btn-primary btn-sm">
-                                        <i class="bi bi-check-circle"></i> Save
-                                    </button>
-                                </div>
-                            </form>
+                                </thead>
+                                <tbody>
+                                    {% for class in classes_subjects_taught%}
+                                        {% for subject in subjects_taught %}
+                                            <tr>
+                                                <td>{{ class.name }}</td>
+                                                <td>{{ subject.name }}</td>
+                                                <td>
+                                                    <a href="{% url 'input_scores' class.id subject.id current_term.id %}" class="btn btn-info btn-sm">
+                                                        Input Scores
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    {% empty %}
+                                        <tr>
+                                            <td colspan="3" class="text-center text-muted">No subject assignments available.</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
                         </div>
                     </div>
+
                 </div>
             </div>
-            {% empty %}
-            <div class="text-center text-muted">No students available for non-academic record input.</div>
-            {% endfor %}
+
+            <!-- Non-Academic Record Input Section -->
+            <div class="card mb-4 shadow-sm">
+                <div class="card-header bg-light text-dark">
+                    <h4>Input Non-Academic Records</h4>
+                </div>
+                <div class="card-body">
+                    {% for student in students %}
+                    <div class="accordion mb-3" id="accordion{{ student.user.id }}">
+                        <div class="accordion-item">
+                            <h2 class="accordion-header" id="heading{{ student.user.id }}">
+                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ student.user.id }}" aria-expanded="false" aria-controls="collapse{{ student.user.id }}">
+                                    {{ student.user.get_full_name }} - {{ student.LSA_number }}
+                                </button>
+                            </h2>
+                            <div id="collapse{{ student.user.id }}" class="accordion-collapse collapse" aria-labelledby="heading{{ student.user.id }}" data-bs-parent="#accordion{{ student.user.id }}">
+                                <div class="accordion-body">
+                                    <form method="POST" action="{% url 'update_result' student.user.id current_term.id %}">
+                                        {% csrf_token %}
+                                        <div class="mb-4">
+                                            <h5 class="text-muted">Character Skills</h5>
+                                            <div class="row">
+                                                <div class="col-6 mb-3">
+                                                    <label for="punctuality{{ student.user.id }}" class="form-label">Honesty</label>
+                                                    <select name="punctuality" id="punctuality{{ student.user.id }}" class="form-select form-select-sm">
+                                                        {% for i in "1234" %}
+                                                            <option value="{{ i }}">{{ i }}</option>
+                                                        {% endfor %}
+                                                    </select>
+                                                </div>
+                                                <div class="col-6 mb-3">
+                                                    <label for="diligence{{ student.user.id }}" class="form-label">Diligence</label>
+                                                    <select name="diligence" id="diligence{{ student.user.id }}" class="form-select form-select-sm">
+                                                        {% for i in "1234" %}
+                                                            <option value="{{ i }}">{{ i }}</option>
+                                                        {% endfor %}
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="row">
+                                                <div class="col-6 mb-3">
+                                                    <label for="cooperation{{ student.user.id }}" class="form-label">Cooperation</label>
+                                                    <select name="cooperation" id="cooperation{{ student.user.id }}" class="form-select form-select-sm">
+                                                        {% for i in "1234" %}
+                                                            <option value="{{ i }}">{{ i }}</option>
+                                                        {% endfor %}
+                                                    </select>
+                                                </div>
+                                                <div class="col-6 mb-3">
+                                                    <label for="respectfulness{{ student.user.id }}" class="form-label">Respectfulness</label>
+                                                    <select name="respectfulness" id="respectfulness{{ student.user.id }}" class="form-select form-select-sm">
+                                                        {% for i in "1234" %}
+                                                            <option value="{{ i }}">{{ i }}</option>
+                                                        {% endfor %}
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="mb-4">
+                                            <h5 class="text-muted">Physical Skills</h5>
+                                            <div class="row">
+                                                <div class="col-6 mb-3">
+                                                    <label for="sportsmanship{{ student.user.id }}" class="form-label">Sportsmanship</label>
+                                                    <select name="sportsmanship" id="sportsmanship{{ student.user.id }}" class="form-select form-select-sm">
+                                                        {% for i in "1234" %}
+                                                            <option value="{{ i }}">{{ i }}</option>
+                                                        {% endfor %}
+                                                    </select>
+                                                </div>
+                                                <div class="col-6 mb-3">
+                                                    <label for="agility{{ student.user.id }}" class="form-label">Agility</label>
+                                                    <select name="agility" id="agility{{ student.user.id }}" class="form-select form-select-sm">
+                                                        {% for i in "1234" %}
+                                                            <option value="{{ i }}">{{ i }}</option>
+                                                        {% endfor %}
+                                                    </select>
+                                                </div>
+                                            </div>
+                                            <div class="row">
+                                                <div class="col-6 mb-3">
+                                                    <label for="creativity{{ student.user.id }}" class="form-label">Creativity</label>
+                                                    <select name="creativity" id="creativity{{ student.user.id }}" class="form-select form-select-sm">
+                                                        {% for i in "1234" %}
+                                                            <option value="{{ i }}">{{ i }}</option>
+                                                        {% endfor %}
+                                                    </select>
+                                                </div>
+                                                <div class="col-6 mb-3">
+                                                    <label for="hand_eye_coordination{{ student.user.id }}" class="form-label">Hand-Eye Coordination</label>
+                                                    <select name="hand_eye_coordination" id="hand_eye_coordination{{ student.user.id }}" class="form-select form-select-sm">
+                                                        {% for i in "1234" %}
+                                                            <option value="{{ i }}">{{ i }}</option>
+                                                        {% endfor %}
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div class="mb-4">
+                                            <label for="teacher_comment{{ student.user.id }}" class="form-label">Teacher's Comment</label>
+                                            <textarea name="teacher_comment" id="teacher_comment{{ student.user.id }}" class="form-control form-control-sm" rows="3" placeholder="Enter your comment here..."></textarea>
+                                        </div>
+
+                                        <div class="text-end">
+                                            <button type="submit" class="btn btn-primary btn-sm">
+                                                <i class="bi bi-check-circle"></i> Save
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="text-center text-muted">No students available for non-academic record input.</div>
+                    {% endfor %}
+                </div>
+            </div>
         </div>
     </div>
-
-
+</div>
 {% endblock %}

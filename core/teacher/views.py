@@ -8,18 +8,20 @@ from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.core.paginator import Paginator
 from django.utils import timezone
-from django.utils.timezone import now
-from django.urls import reverse, reverse_lazy
-from django.db.models import Q, Count, Prefetch, F
+from django.db.models import Q, Count, F
+from django.http import HttpResponseForbidden
 from datetime import date
-from .forms import TeacherRegistrationForm, MessageForm
-from core.forms import NonAcademicSkillsForm
+from core.teacher.forms import TeacherRegistrationForm, MessageForm
 from core.models import Teacher, Student, Guardian, Class, Subject, Attendance, Assessment
-from core.models import Assignment, Question, AssignmentSubmission, AcademicAlert
-from core.models import Session, Term, Message, Holiday, SubjectResult, Result, SubjectAssignment
+from core.models import Assignment, Question, AssignmentSubmission, AssessmentSubmission, AcademicAlert
+from core.models import Session, Term, Message, SubjectResult, Result
 from core.subject_result.form import SubjectResultForm
-from core.assignment.forms import AssignmentForm, QuestionForm, AssignmentSubmissionForm
+from core.forms import NonAcademicSkillsForm
+from core.assignment.forms import AssignmentForm, QuestionForm
+from core.assessment.forms import AssessmentForm, OnlineQuestionForm
+import logging
 
+logger = logging.getLogger(__name__)
 
 # Teacher Views
 
@@ -541,8 +543,8 @@ def create_assignment(request):
     teacher = get_object_or_404(Teacher, user=request.user)
 
     # Retrieve classes and subjects assigned to the teacher
-    assigned_classes = Class.objects.filter(teacher=teacher)
-    subjects = Subject.objects.filter(subjectassignment__class_assigned__in=assigned_classes).distinct()
+    assigned_classes = teacher.assigned_classes()
+    subjects = teacher.assigned_subjects()
 
     if request.method == 'POST':
         form = AssignmentForm(request.POST)
@@ -658,7 +660,6 @@ def assignment_detail(request, assignment_id):
     
     # No need to manually set `options_list` since it's handled by the @property
     return render(request, 'assignment/assignment_detail.html', {'assignment': assignment})
-
 
 @login_required
 def grade_assignment(request, submission_id):
@@ -795,3 +796,289 @@ def view_na_result(request, student_id, term_id):
         'student': student,
         'result': result,
     })
+
+@login_required
+def create_assessment(request):
+    # Ensure the logged-in user is authorized
+    user = request.user
+    teacher = None
+    if not user.is_superuser:
+        teacher = get_object_or_404(Teacher, user=user)
+        assigned_classes = teacher.assigned_classes().all()
+        subjects = teacher.assigned_subjects().all()
+    else:
+        assigned_classes = Class.objects.all()
+        subjects = Subject.objects.all()
+
+    # Handle GET request: render form
+    if request.method == 'GET':
+        form = AssessmentForm()
+        form.fields['class_assigned'].queryset = assigned_classes
+        form.fields['subject'].queryset = subjects
+        return render(request, 'assessment/create_assessment.html', {'form': form})
+
+    # Handle POST request: process form data
+    if request.method == 'POST':
+        form = AssessmentForm(request.POST)
+
+        # Limit class and subject choices for teachers
+        form.fields['class_assigned'].queryset = assigned_classes
+        form.fields['subject'].queryset = subjects
+
+        if form.is_valid():
+            # Save the assessment instance
+            assessment = form.save(commit=False)
+            assessment.created_by = user
+            assessment.is_approved = user.is_superuser  # Auto-approve if admin
+            assessment.due_date = form.cleaned_data['due_date']
+            assessment.duration = form.cleaned_data['duration']
+            assessment.save()
+            form.save_m2m()  # Save many-to-many questions
+
+            # Process and validate questions dynamically
+            errors = process_questions(request, assessment)
+
+            if not errors:
+                # Notify students if the assessment is approved
+                if assessment.is_approved:
+                    notify_students(assessment)
+                return redirect('teacher_dashboard' if teacher else 'admin_dashboard')
+            else:
+                print("Errors in questions:", errors)  # Debugging line
+                return render(request, 'assessment/create_assessment.html', {
+                    'form': form,
+                    'errors': errors,
+                })
+        else:
+            print("Form errors:", form.errors)  # Debugging line
+            return render(request, 'assessment/create_assessment.html', {
+                'form': form,
+                'errors': form.errors,  # Add form errors to be displayed in the template
+            })
+
+                  
+def process_questions(request, assessment):
+    errors = []
+    question_number = 1
+
+    while f'question_type_{question_number}' in request.POST:
+        question_type = request.POST.get(f'question_type_{question_number}')
+        question_text = request.POST.get(f'question_text_{question_number}')
+        options = request.POST.get(f'options_{question_number}', '')
+        correct_answer = request.POST.get(f'correct_answer_{question_number}')
+
+        print(f"Processing Question {question_number}: {question_type}, {question_text}, {options}, {correct_answer}")  # Debugging line
+
+        options_list = [opt.strip() for opt in options.split(',') if opt.strip()]
+        question_data = {
+            'question_type': question_type,
+            'question_text': question_text,
+            'options': json.dumps(options_list) if options_list else '',
+            'correct_answer': correct_answer
+        }
+
+        question_form = OnlineQuestionForm(question_data)
+        if question_form.is_valid():
+            if question_type in ['SCQ', 'MCQ']:
+                if not options_list:
+                    errors.append(f"Error in Question {question_number}: Options are required for SCQ/MCQ.")
+                else:
+                    question_form.save()
+                    assessment.questions.add(question_form.instance)
+            elif question_type == 'ES':
+                question_form.save()
+                assessment.questions.add(question_form.instance)
+        else:
+            print(f"Question {question_number} Errors: {question_form.errors}")  # Debugging line
+            errors.append(f"Error in Question {question_number}: {question_form.errors}")
+        question_number += 1
+
+    return errors
+
+def notify_students(assessment):
+    students = Student.objects.filter(current_class=assessment.class_assigned)
+    for student in students:
+        teacher = get_object_or_404(Teacher, user=assessment.created_by)
+        AcademicAlert.objects.create(
+            alert_type='assessment',
+            title=assessment.title,
+            summary=assessment.short_description or 'New assessment available!',
+            teacher=teacher,
+            student=student,
+            due_date=assessment.due_date,
+            duration=assessment.duration,
+            related_object_id=assessment.id
+        )
+
+@login_required
+def teacher_assessment_list(request):
+
+    teacher = get_object_or_404(Teacher, user=request.user)
+    assessments = Assessment.objects.filter(created_by=teacher.user)
+    submitted_assessments = AssessmentSubmission.objects.filter(assessment__in=assessments)
+    assessment_essay_submissions = submitted_assessments.filter(assessment__questions__question_type='ES', is_graded=False ).distinct()
+    
+    return render(request, 'assessment/teacher_assessment_list.html', 
+                  {'assessments': assessments,
+                    'submitted_assessments': submitted_assessments,
+                    'assessment_essay_submissions': assessment_essay_submissions,})
+
+@login_required
+def view_assessment(request, assessment_id):
+    # Retrieve the assessment and its questions
+    assessment = get_object_or_404(Assessment, id=assessment_id)
+    questions = assessment.questions.all()
+    
+    context = {
+        'assessment': assessment,
+        'questions': questions,
+    }
+    return render(request, 'assessment/assessment_detail.html', context)
+
+@login_required
+def update_assessment(request, assessment_id):
+    assessment = get_object_or_404(Assessment, id=assessment_id)
+    user = request.user
+    teacher = None
+
+    if not user.is_superuser:
+        teacher = get_object_or_404(Teacher, user=user)
+        assigned_classes = teacher.assigned_classes().all()
+        subjects = teacher.assigned_subjects().all()
+    else:
+        assigned_classes = Class.objects.all()
+        subjects = Subject.objects.all()
+
+    # Authorization Check
+    if assessment.created_by != user and not user.is_superuser:
+        return HttpResponseForbidden("You are not authorized to update this assessment.")
+
+    # Handle GET request (Render Form)
+    if request.method == 'GET':
+        form = AssessmentForm(instance=assessment)
+        form.fields['class_assigned'].queryset = assigned_classes
+        form.fields['subject'].queryset = subjects
+        return render(request, 'assessment/update_assessment.html', {
+            'form': form,
+            'assessment': assessment,
+            'questions': assessment.questions.all()
+        })
+
+    # Handle POST request (Process Form)
+    if request.method == 'POST':
+        form = AssessmentForm(request.POST, instance=assessment)
+        form.fields['class_assigned'].queryset = assigned_classes
+        form.fields['subject'].queryset = subjects
+
+        if form.is_valid():
+            assessment = form.save(commit=False)
+            assessment.is_approved = user.is_superuser
+            assessment.save()
+            form.save_m2m()
+
+            # Process Existing and New Questions
+            errors = process_questions(request, assessment)
+
+            if not errors:
+                # Redirect after successful update
+                return redirect('view_assessment', assessment.id)
+            else:
+                logger.error("Errors in questions: %s", errors)
+                return render(request, 'assessment/update_assessment.html', {
+                    'form': form,
+                    'assessment': assessment,
+                    'questions': assessment.questions.all(),
+                    'errors': errors
+                })
+        else:
+            logger.error("Assessment form errors: %s", form.errors)
+            return render(request, 'assessment/update_assessment.html', {
+                'form': form,
+                'assessment': assessment,
+                'questions': assessment.questions.all(),
+                'errors': form.errors
+            })
+
+
+def process_questions(request, assessment):
+    errors = []
+    question_number = 1
+
+    # Update existing questions
+    for question in assessment.questions.all():
+        question_text = request.POST.get(f'question_text_{question.id}')
+        question_type = request.POST.get(f'question_type_{question.id}')
+        options = request.POST.get(f'options_{question.id}', '')
+        correct_answer = request.POST.get(f'correct_answer_{question.id}')
+
+        if question_text:
+            options_list = [opt.strip() for opt in options.split(',') if opt.strip()]
+            question.question_text = question_text
+            question.question_type = question_type
+            question.options = options_list
+            question.correct_answer = correct_answer
+            question.save()
+        else:
+            errors.append(f"Error: Missing data for question ID {question.id}")
+
+    # Add new questions
+    while f'new_question_text_{question_number}' in request.POST:
+        new_text = request.POST.get(f'new_question_text_{question_number}')
+        new_type = request.POST.get(f'new_question_type_{question_number}')
+        new_options = request.POST.get(f'new_options_{question_number}', '')
+        new_correct_answer = request.POST.get(f'new_correct_answer_{question_number}')
+
+        options_list = [opt.strip() for opt in new_options.split(',') if opt.strip()]
+
+        question_form = OnlineQuestionForm({
+            'question_text': new_text,
+            'question_type': new_type,
+            'options': json.dumps(options_list),
+            'correct_answer': new_correct_answer
+        })
+
+        if question_form.is_valid():
+            question = question_form.save()
+            assessment.questions.add(question)
+        else:
+            errors.append(f"Error in new question {question_number}: {question_form.errors}")
+
+        question_number += 1
+
+    return errors
+
+@login_required
+def delete_assessment(request, assessment_id):
+    assessment = get_object_or_404(Assessment, id=assessment_id)
+    teacher = get_object_or_404(Teacher, user=request.user)
+
+    # Ensure the logged-in user is the creator or an admin
+    if assessment.created_by != teacher.user and not request.user.is_superuser:
+        return HttpResponseForbidden("You do not have permission to delete this assessment.")
+
+    if request.method == 'POST':
+        assessment.delete()
+        return redirect('teacher_dashboard')
+
+    return render(request, 'assessment/delete_assessment.html', {
+        'assessment': assessment,
+    })
+
+@login_required
+def grade_essay_assessment(request, submission_id):
+    submission = get_object_or_404(AssessmentSubmission, id=submission_id)
+
+    if request.method == 'POST':
+        score = request.POST.get('score')
+        feedback = request.POST.get('feedback')
+
+        if score:
+            submission.score = score
+            submission.feedback = feedback
+            submission.is_graded = True
+            submission.save()
+            messages.success(request, "Essay successfully graded!")
+            return redirect('teacher_dashboard')
+
+    return render(request, 'grade_essay_assessment.html', {'submission': submission})
+

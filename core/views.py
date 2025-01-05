@@ -1,31 +1,36 @@
+import json
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.mixins import UserPassesTestMixin
-from django.contrib.auth.decorators import login_required
+from django.contrib.auth.decorators import login_required, user_passes_test
 from django.urls import reverse, reverse_lazy
 from django.db import IntegrityError, transaction
-from django.db.models import Sum, Count, Max, F, Q
+from django.db.models import Sum, Max, Q
 from django.contrib import messages
 from django.views.generic import ListView, CreateView, DetailView, UpdateView, DeleteView, TemplateView, FormView
 from django.core.paginator import Paginator
-from django.http import Http404
+from django.http import HttpResponseBadRequest
 from django.core.mail import send_mail
+from django.shortcuts import HttpResponse
 from django.utils import timezone
-from decimal import Decimal, InvalidOperation
-from datetime import date, timedelta
+from decimal import Decimal
+from datetime import timedelta
 from core.models import Session, Term, Student, Teacher, Guardian, Notification
-from core.models import Class, Subject, FeeAssignment, Enrollment, Payment
+from core.models import Class, Subject, FeeAssignment, Enrollment, Payment, Assessment
 from core.models import SubjectAssignment, TeacherAssignment, ClassSubjectAssignment
-from core.models import SubjectResult, Result, StudentFeeRecord, FinancialRecord
+from core.models import SubjectResult, Result, StudentFeeRecord, FinancialRecord, AcademicAlert
 from core.forms import ClassSubjectAssignmentForm, NonAcademicSkillsForm, NotificationForm
 from core.session.forms import SessionForm
 from core.term.forms import TermForm
 from core.subject.forms import SubjectForm
-from core.fee_assignment.forms import FeeAssignmentForm, StudentFeeRecordForm
+from core.fee_assignment.forms import FeeAssignmentForm
 from core.payment.forms import PaymentForm
 from core.enrollment.forms import EnrollmentForm
 from core.subject_assignment.forms import SubjectAssignmentForm
 from core.teacher_assignment.forms import TeacherAssignmentForm
+from core.assessment.forms import AssessmentForm, OnlineQuestionForm
+import logging
 
+logger = logging.getLogger(__name__)
 
 # Create your views here.
 
@@ -54,8 +59,8 @@ class AdminDashboardView(AdminRequiredMixin, TemplateView):
         context['recent_enrollments'] = Enrollment.objects.order_by('-id')[:5]
         return context
 
-class CreateNotificationView(CreateView):
-    template_name = 'create_notification.html'
+class CreateNotificationView(AdminRequiredMixin, CreateView):
+    template_name = 'setup/notification_form.html'
 
     def get(self, request):
         form = NotificationForm()
@@ -273,18 +278,6 @@ class PromoteStudentView(AdminRequiredMixin, ListView):
         # Logic for promoting students
         return redirect('student/student_list')
 
-# Class and Teacher Assignment Views
-class AssignTeacherView(AdminRequiredMixin, CreateView):
-    model = TeacherAssignment
-    template_name = 'setup/assign_teacher.html'
-    fields = ['teacher', 'class_assigned']
-
-class AssignSubjectView(AdminRequiredMixin, CreateView):
-    model = SubjectAssignment
-    template_name = 'setup/assign_subject.html'
-    fields = ['subject', 'teacher', 'class_assigned']
-
-
 # Subject Record Management
 class SubjectListView(AdminRequiredMixin, ListView):
     template_name = 'subject/subject_list.html'
@@ -377,6 +370,7 @@ def StudentEnrollmentsView(request, student_id):
     return render(request, 'setup/view_enrollments.html', {'student': student, 'enrollments': enrollments})
 
 # View for assigning teachers to classes
+
 def AssignTeacherView(request): 
     error_message = None  # Initialize error message
 
@@ -476,11 +470,7 @@ class SubjectAssignmentListView(ListView):
     template_name = 'subject_assignment/subject_assignment_list.html'
 
     def get(self, request, *args, **kwargs):
-        # Log all incoming GET parameters
-        print(f"GET parameters: {request.GET}")  # Debugging line
-        print('Name')
         search_query = request.GET.get('q', '').strip()
-        print(f"Search Query: {search_query}")  # Debugging line
 
         subject_assignments = SubjectAssignment.objects.all()
 
@@ -503,60 +493,91 @@ class SubjectAssignmentListView(ListView):
             'search_query': search_query,
         })
     
-class AssignClassSubjectView(AdminRequiredMixin, CreateView):
-    def get(self, request, pk):
-        class_instance = get_object_or_404(Class, pk=pk)
-        form = ClassSubjectAssignmentForm()  # Initialize your form here
-        if form.is_valid():
-            subjects = form.cleaned_data['subjects']
-            session = form.cleaned_data['session']
-            term = form.cleaned_data['term']
+class AssignClassSubjectView(CreateView, AdminRequiredMixin): 
+    template_name = 'setup/assign_class_subjects.html'
 
-            for subject in subjects:
-                ClassSubjectAssignment.objects.get_or_create(
-                    class_assigned=class_instance,
-                    subject=subject,
-                    session=session,
-                    term=term
-                )
-            class_instance.save(subjects=subjects)
-            return redirect('class_list', pk=class_instance.pk)
-        
-        return render(request, 'setup/assign_class_subjects.html', {
-            'form': form,
-            'class_instance': class_instance,
+    def get(self, request, pk):
+        """Display the form with pre-selected subjects for the class."""
+        class_instance = get_object_or_404(Class, pk=pk)
+        current_session = Session.objects.filter(is_active=True).first()
+        current_term = Term.objects.filter(is_active=True).first()
+        assigned_subject_ids = ClassSubjectAssignment.objects.filter(
+            class_assigned=class_instance,
+            session=current_session,
+            term=current_term
+        ).values_list('subject_id', flat=True)
+        form = ClassSubjectAssignmentForm(initial={
+            'subjects': list(assigned_subject_ids),
+            'session': current_session,
+            'term': current_term,
         })
+        return render(request, self.template_name, {'form': form, 'class_instance': class_instance, 'session': current_session, 'term': current_term})
 
     def post(self, request, pk):
+        """Handle the form submission to assign subjects."""
         class_instance = get_object_or_404(Class, pk=pk)
         form = ClassSubjectAssignmentForm(request.POST)
 
         if form.is_valid():
-            subjects = form.cleaned_data['subjects']
+            selected_subjects = form.cleaned_data['subjects']
             session = form.cleaned_data['session']
             term = form.cleaned_data['term']
 
-            for subject in subjects:
-                ClassSubjectAssignment.objects.get_or_create(
+            # Remove unselected subjects for this session and term
+            ClassSubjectAssignment.objects.filter(
+                class_assigned=class_instance, session=session, term=term
+            ).exclude(subject__in=selected_subjects).delete()
+
+            # Add new subjects
+            for subject in selected_subjects:
+                assignment, created = ClassSubjectAssignment.objects.get_or_create(
                     class_assigned=class_instance,
                     subject=subject,
                     session=session,
                     term=term
                 )
-            return redirect('class_detail', pk=class_instance.pk)
-        
-        return render(request, 'setup/assign_class_subjects.html', {
-            'form': form,
-            'class_instance': class_instance,
-        })
+                assignment.save()
+                # print(subject, 'assigned to', class_instance)
 
-class DeleteClassSubjectAssignmentView(AdminRequiredMixin, DeleteView):
+            return redirect(reverse('class_subjects'))
+
+        logger.error(f"Form is invalid: {form.errors}")
+        return render(request, self.template_name, {'form': form, 'class_instance': class_instance})
+
+
+def class_subjects(request):
+    classes = Class.objects.all()
+
+    # Retrieve subjects for each class
+    for class_instance in classes:
+        subjects = class_instance.subjects.all() # This uses the @property defined earlier
+
+    return render(request, 'setup/class_subjects.html', {'classes': classes})
+
+class DeleteClassSubjectAssigmentView(DeleteView, AdminRequiredMixin):
     def post(self, request, pk):
-        assignment = get_object_or_404(ClassSubjectAssignment, pk=pk)
-        class_pk = assignment.class_assigned.pk  # Preserve the class ID for redirection
-        assignment.delete()
-        return redirect('class_detail', pk=class_pk) 
-    
+        """Delete selected subjects for a class."""
+        class_instance = get_object_or_404(Class, pk=pk)
+        current_session = Session.objects.filter(is_active=True).first()
+        current_term = Term.objects.filter(is_active=True).first()
+        subject_ids_to_delete = request.POST.getlist('subject_ids')
+
+        if not subject_ids_to_delete:
+            return HttpResponseBadRequest("No subjects selected for deletion.")
+
+        deleted_count, _ = ClassSubjectAssignment.objects.filter(
+            class_assigned=class_instance,
+            subject_id__in=subject_ids_to_delete,
+            session=current_session,
+            term=current_term
+        ).delete()
+
+        if deleted_count == 0:
+            return HttpResponseBadRequest("No matching subjects found to delete.")
+
+        return redirect(reverse('class_subjects'))
+
+
 @login_required
 def approve_broadsheets(request):
     if not request.user.is_staff:
@@ -934,3 +955,165 @@ def mark_active(request, pk):
     student.save()
     messages.sucess(request, f"{student.user.get_full_name()} has been marked active.")
     return redirect('stuent_list')
+
+
+def send_test_email(request):
+    send_mail(
+        'Test Email',
+        'This is a test email.',
+        'your_email@example.com',
+        ['recipient@example.com'],
+        fail_silently=False,
+    )
+    return HttpResponse("Test email sent successfully!")
+
+
+@login_required
+def create_assessment(request):
+    # Ensure the logged-in user is authorized
+    user = request.user
+    teacher = None
+    if not user.is_superuser:
+        teacher = get_object_or_404(Teacher, user=user)
+        assigned_classes = teacher.assigned_classes().all()
+        subjects = teacher.assigned_subjects().all()
+    else:
+        assigned_classes = Class.objects.all()
+        subjects = Subject.objects.all()
+
+    # Handle GET request: render form
+    if request.method == 'GET':
+        form = AssessmentForm()
+        form.fields['class_assigned'].queryset = assigned_classes
+        form.fields['subject'].queryset = subjects
+        return render(request, 'assessment/create_assessment.html', {'form': form})
+
+    # Handle POST request: process form data
+    if request.method == 'POST':
+        form = AssessmentForm(request.POST)
+
+        # Limit class and subject choices for teachers
+        form.fields['class_assigned'].queryset = assigned_classes
+        form.fields['subject'].queryset = subjects
+
+        if form.is_valid():
+            # Save the assessment instance
+            assessment = form.save(commit=False)
+            assessment.created_by = user
+            assessment.is_approved = user.is_superuser  # Auto-approve if admin
+            assessment.due_date = form.cleaned_data['due_date']
+            assessment.duration = form.cleaned_data['duration']
+            assessment.save()
+            form.save_m2m()  # Save many-to-many questions
+
+            # Process and validate questions dynamically
+            errors = process_questions(request, assessment)
+
+            if not errors:
+                # Notify students if the assessment is approved
+                if assessment.is_approved:
+                    notify_students(assessment)
+                return redirect('teacher_dashboard' if teacher else 'admin_dashboard')
+            else:
+                print("Errors in questions:", errors)  # Debugging line
+                return render(request, 'assessment/create_assessment.html', {
+                    'form': form,
+                    'errors': errors,
+                })
+        else:
+            print("Form errors:", form.errors)  # Debugging line
+            return render(request, 'assessment/create_assessment.html', {
+                'form': form,
+                'errors': form.errors,  # Add form errors to be displayed in the template
+            })
+
+                  
+def process_questions(request, assessment):
+    errors = []
+    question_number = 1
+
+    while f'question_type_{question_number}' in request.POST:
+        question_type = request.POST.get(f'question_type_{question_number}')
+        question_text = request.POST.get(f'question_text_{question_number}')
+        options = request.POST.get(f'options_{question_number}', '')
+        correct_answer = request.POST.get(f'correct_answer_{question_number}')
+
+        print(f"Processing Question {question_number}: {question_type}, {question_text}, {options}, {correct_answer}")  # Debugging line
+
+        options_list = [opt.strip() for opt in options.split(',') if opt.strip()]
+        question_data = {
+            'question_type': question_type,
+            'question_text': question_text,
+            'options': json.dumps(options_list) if options_list else '',
+            'correct_answer': correct_answer
+        }
+
+        question_form = OnlineQuestionForm(question_data)
+        if question_form.is_valid():
+            if question_type in ['SCQ', 'MCQ']:
+                if not options_list:
+                    errors.append(f"Error in Question {question_number}: Options are required for SCQ/MCQ.")
+                else:
+                    question_form.save()
+                    assessment.questions.add(question_form.instance)
+            elif question_type == 'ES':
+                question_form.save()
+                assessment.questions.add(question_form.instance)
+        else:
+            print(f"Question {question_number} Errors: {question_form.errors}")  # Debugging line
+            errors.append(f"Error in Question {question_number}: {question_form.errors}")
+        question_number += 1
+
+    return errors
+
+def notify_students(assessment):
+    students = Student.objects.filter(current_class=assessment.class_assigned)
+    for student in students:
+        AcademicAlert.objects.create(
+            alert_type='assessment',
+            title=assessment.title,
+            summary=assessment.short_description or 'New assessment available!',
+            teacher=assessment.created_by,
+            student=student,
+            due_date=assessment.due_date,
+            duration=assessment.duration,
+            related_object_id=assessment.id
+        )
+
+@login_required
+@user_passes_test(lambda u: u.is_superuser)
+def approve_assessment(request, assessment_id):
+    assessment = get_object_or_404(Assessment, id=assessment_id, is_approved=False)
+    if request.method == 'POST':
+        assessment.is_approved = True
+        assessment.approved_by = request.user
+        assessment.save()
+        notify_students(assessment)
+        messages.success(request, f"Assessment '{assessment.title}' approved and published!")
+        return redirect('admin_dashboard')
+
+    return render(request, 'setup/approve_assessment.html', {'assessment': assessment})
+
+@login_required
+@user_passes_test(lambda u: u.is_superuser)
+def admin_assessment_list(request):
+    assessments = Assessment.objects.all()
+    return render(request, 'assessment/admin_assessment_list.html', {'assessments': assessments})
+
+@login_required
+@user_passes_test(lambda u: u.is_superuser)
+def pending_approvals(request):
+    pending_assessments = Assessment.objects.filter(is_approved=False)
+    return render(request, 'setup/pending_assessments.html', {'pending_assessments': pending_assessments})
+
+@login_required
+def view_assessment(request, assessment_id):
+    # Retrieve the assessment and its questions
+    assessment = get_object_or_404(Assessment, id=assessment_id)
+    questions = assessment.questions.all()
+
+    context = {
+        'assessment': assessment,
+        'questions': questions,
+    }
+    return render(request, 'assessment/assessment_detail.html', context)

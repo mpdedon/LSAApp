@@ -1,26 +1,23 @@
 # core/auth/views.py
-from django.shortcuts import render, redirect, get_object_or_404
+from django.shortcuts import render, redirect
 from django.contrib.auth.views import LoginView, LogoutView
 from django.views.generic import TemplateView
 from django.contrib.auth.views import PasswordResetView, PasswordResetDoneView, PasswordResetConfirmView, PasswordResetCompleteView
-from django.contrib.auth import login, authenticate, logout, get_user_model
+from django.contrib.auth import login, get_user_model
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.forms import PasswordResetForm, SetPasswordForm
 from django.contrib.messages.views import SuccessMessageMixin
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
-from django.utils.log import AdminEmailHandler
 from django.urls import reverse_lazy
 from django.db.models import Count, Q
 from collections import defaultdict
-from django.utils.timezone import localdate
-from core.models import CustomUser, Student, Teacher, Guardian, Class, Subject, Assignment, Result, Attendance, Payment
+from core.models import Student, Teacher, Guardian, Assignment, Result, Attendance
 from core.models import Session, Term, Message, Assessment, Exam, Notification, AssignmentSubmission, AcademicAlert
-from core.models import FeeAssignment, Payment, FinancialRecord, StudentFeeRecord, SubjectAssignment
+from core.models import FinancialRecord, StudentFeeRecord, AssessmentSubmission
 from django.db.models import Sum
 from django.views.generic.edit import FormView
 from django.contrib import messages
-from core.forms import CustomUserCreationForm
 from core.guardian.forms import GuardianRegistrationForm
 from core.teacher.forms import TeacherRegistrationForm
 from core.auth.forms import LoginForm
@@ -140,6 +137,7 @@ def student_dashboard(request):
     current_class = student.current_class
     subjects = current_class.subjects.prefetch_related('assignments').all()
     assignments = Assignment.objects.filter(class_assigned=current_class).select_related('teacher')
+    assessments = Assessment.objects.filter(class_assigned=current_class).select_related('teacher')
     results = Result.objects.filter(student=student).select_related('term')
     attendance = Attendance.objects.filter(student=student).order_by('-date')
 
@@ -149,6 +147,7 @@ def student_dashboard(request):
         'class': current_class,
         'subjects': subjects,
         'assignments': assignments,
+        'assessments': assessments,
         'results': results,
         'attendance': attendance,
     }
@@ -163,18 +162,15 @@ def teacher_dashboard(request):
         return redirect('login')  
     
     teacher = Teacher.objects.get(user=request.user)
-    assigned_classes = Class.objects.filter(Q(teacher=teacher) | Q(teacherassignment__teacher=teacher)).distinct()
+    assigned_classes = teacher.current_classes()
     students = Student.objects.filter(current_class__in=assigned_classes).distinct()
-    print(students)
-    class_subjects = Subject.objects.filter(class_assignments__class_assigned__in=assigned_classes).distinct()
-    subject_assignments = SubjectAssignment.objects.filter(teacher=teacher)
-    subjects_taught = Subject.objects.filter(id__in=subject_assignments.values_list('subject', flat=True)                        ).distinct()
-    classes_subjects_taught = Class.objects.filter(
-                    id__in=subject_assignments.values_list('class_assigned', flat=True)
-                    ).distinct()
+    class_subjects = teacher.form_class_subjects()
+    subjects_taught = teacher.subjects_taught()                       
+    classes_subjects_taught = teacher.assigned_classes()
     guardians = set(student.student_guardian for student in students if student.student_guardian is not None)
     assignments = Assignment.objects.filter(teacher=teacher)
-
+    assessments = Assessment.objects.filter(created_by=teacher.user).order_by('-created_at')
+    
     current_session = Session.objects.get(is_active=True)
     current_term = Term.objects.filter(session=current_session, is_active=True).order_by('-start_date').first()
 
@@ -203,6 +199,7 @@ def teacher_dashboard(request):
         'current_term': current_term,
         'weeks': weeks,
         'assignments': assignments,
+        'assessments': assessments,
         'message_counts': message_counts_dict,
     }
 
@@ -298,7 +295,6 @@ def guardian_dashboard(request):
         message_counts = student_messages.values('sender').annotate(count=Count('id'))
         message_counts_dict = {msg['sender']: msg['count'] for msg in message_counts}
         messages_data[student.user.id]['message_counts'] = message_counts_dict
-        print(messages_data)
         # Attendance data
         total_days = Attendance.objects.filter(student=student).count()
         present_days = Attendance.objects.filter(student=student, is_present=True).count()

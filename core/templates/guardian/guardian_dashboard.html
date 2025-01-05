@@ -415,7 +415,7 @@
                                                                     <small class="text-muted">Due: {{ assessment.due_date|date:"d M Y" }}</small>
                                                                 </div>
                                                                 <div class="mt-2">
-                                                                    <a href="{% url 'take_assessment' assessment.id %}" class="btn btn-sm btn-primary">Start Assessment</a>
+                                                                    <a href="{% url 'submit_assessment' assessment.id %}" class="btn btn-sm btn-primary">Start Assessment</a>
                                                                 </div>
                                                             </li>
                                                         {% empty %}

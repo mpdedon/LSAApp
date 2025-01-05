@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-5">
+    <div class="card shadow-lg border-danger">
+        <div class="card-body text-center">
+            <h2 class="text-danger">Assessment Due</h2>
+            <p class="lead">This assessment is no longer available for submission as the due date has passed.</p>
+            {% if request.user.student %}
+                <a href="{% url 'student_dashboard' %}" class="btn btn-primary">Back to Student Dashboard</a>
+            {% elif request.user.guardian %}
+                <a href="{% url 'guardian_dashboard' %}" class="btn btn-success">Back to Guardian Dashboard</a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

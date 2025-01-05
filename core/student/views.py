@@ -9,6 +9,7 @@ from django.views import View
 from django.core.paginator import Paginator
 from django.db.models import Q
 from core.models import Student, Assignment, AssignmentSubmission
+from core.models import Assessment, AssessmentSubmission, AcademicAlert 
 from .forms import StudentRegistrationForm
 from core.assignment.forms import AssignmentSubmissionForm
 
@@ -274,3 +275,104 @@ def submit_assignment(request, assignment_id):
         'form': form,
         'student': student,
     })
+
+@login_required
+def submit_assessment(request, assessment_id):
+    assessment = get_object_or_404(Assessment, id=assessment_id)
+    user = request.user
+
+    # Determine the logged-in user's type
+    if hasattr(request.user, 'guardian'):
+        guardian = request.user.guardian
+
+        # Filter students by the guardian and the assignment's class
+        students = Student.objects.filter(
+            student_guardian=guardian,
+            current_class=assessment.class_assigned
+        )
+
+        if not students.exists():
+            messages.error(request, "No students associated with this guardian are enrolled in the assignment's class.")
+            return redirect('guardian_dashboard')
+
+        # Check if a specific student is selected
+        student_id = request.GET.get('student_id')
+        if student_id:
+            student = get_object_or_404(students, id=student_id)
+        elif students.count() == 1:
+            student = students.first()
+        else:
+            # Render a selection page if multiple students match
+            return render(request, 'assessment/select_student.html', {
+                'students': students,
+                'assessment': assessment,
+            })
+
+    else:
+        # Handle student users submitting their own assignment
+        student = get_object_or_404(
+            Student,
+            user=request.user,
+            current_class=assessment.class_assigned
+        )
+
+    # Prevent multiple submissions and overdue submissions
+    if assessment.is_due:
+        return render(request, 'assessment/assessment_due.html', {"assessment": assessment})
+    
+    if AssessmentSubmission.objects.filter(assessment=assessment, student=student).exists():
+        return render(request, 'assessment/already_submitted.html')
+
+    # Handle POST submission
+    if request.method == "POST":
+        answers = {}
+        score = 0
+        requires_manual_review = False
+
+        for question in assessment.questions.all():
+            answer = request.POST.get(f'answer_{question.id}')
+            answers[str(question.id)] = answer
+
+            # Auto-grade SCQ/MCQ
+            if question.question_type in ['SCQ', 'MCQ']:
+                if question.correct_answer == answer:
+                    score += 1
+            elif question.question_type == 'ES':
+                requires_manual_review = True
+
+        # Save the submission
+        submission = AssessmentSubmission.objects.create(
+            assessment=assessment,
+            student=student,
+            answers=answers,
+            score=score if not requires_manual_review else None,
+            is_graded=not requires_manual_review,
+            requires_manual_review=requires_manual_review
+        )
+
+        # Notify guardian
+        notify_guardian(submission)
+        return redirect('student_dashboard' if hasattr(user, 'student') else 'guardian_dashboard')
+
+    # Render the assessment form
+    return render(request, 'assessment/submit_assessment.html', {
+        'assessment': assessment,
+        'questions': assessment.questions.all()
+    })
+
+def notify_guardian(student, assessment):
+    if student.student_guardian:
+        guardian = student.student_guardian
+        AcademicAlert.objects.create(
+            alert_type='assessment_submission',
+            title=f"{student.user.get_full_name()} submitted {assessment.title}",
+            summary=f"{student.user.get_full_name()} has submitted the assessment titled '{assessment.title}'.",
+            teacher=assessment.created_by.teacher,
+            student=student,
+            due_date=assessment.due_date,
+            duration=assessment.duration,
+            related_object_id=assessment.id
+        )
+    else:
+        print(f"No guardian associated with student {student.user.get_full_name()}")
+

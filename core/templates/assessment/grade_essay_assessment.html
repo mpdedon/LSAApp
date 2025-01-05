@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-5">
+    <h2 class="text-center">Manual Review for {{ submission.assessment.title }}</h2>
+    <p class="text-muted">Student: {{ submission.student.user.get_full_name }}</p>
+    <form method="post" class="mt-4">
+        {% csrf_token %}
+        {% for question_id, answer in submission.answers.items %}
+            <div class="card mb-3 p-3 shadow-sm">
+                <p><strong>Q{{ forloop.counter }}: </strong> Answered: {{ answer }}</p>
+            </div>
+        {% endfor %}
+
+        <label for="score">Assign Score (Out of 100)</label>
+        <input type="number" name="score" class="form-control" required min="0" max="100">
+        
+        <button type="submit" class="btn btn-primary mt-4">Submit Score</button>
+    </form>
+</div>
+{% endblock %}

@@ -179,3 +179,25 @@ LOGGING = {
         },
     },
 }
+
+# Email Configuration
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.mailgun.org'  # Replace with your SMTP host
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = 'postmaster@sandbox9e3dcf230bfb4f3d93a83515c6f1ec97.mailgun.org'
+EMAIL_HOST_PASSWORD = 'befb6f71f7702b43fe94ef6cc5a0a6d3-78f6ccbe-1ddbc4fe'
+DEFAULT_FROM_EMAIL = 'LSAApp <postmaster@sandbox9e3dcf230bfb4f3d93a83515c6f1ec97.mailgun.org>'
+
+# Optional: Configure AnyMail for transactional email services
+INSTALLED_APPS += ['anymail']
+ANYMAIL = {
+    "MAILGUN_API_KEY": "your-mailgun-api-key",
+    "MAILGUN_SENDER_DOMAIN": "your-domain.com",
+}
+
+CELERY_BROKER_URL = 'redis://localhost:6379/0'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+
+

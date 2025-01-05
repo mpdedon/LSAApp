@@ -7,7 +7,7 @@ from django.views.generic import DetailView, FormView
 from django.db.models import Count
 from .forms import ClassForm
 from core.enrollment.forms import EnrollmentForm
-from ..models import Class, Student, Enrollment
+from core.models import Class, Enrollment
 
 class ClassListView(View):
     template_name = 'class/class_list.html'

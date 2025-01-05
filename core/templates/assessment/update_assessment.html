@@ -1,0 +1,147 @@
+{% extends 'base.html' %}
+{% load add_class %}
+{% block content %}
+<div class="container my-5" style="max-width: 80%;">
+    <div class="card shadow-sm border-0">
+        <div class="card-header bg-info text-white text-center py-3">
+            <h2>Update Assessment: {{ assessment.title }}</h2>
+        </div>
+        <div class="card-body bg-light p-5">
+            <form method="POST">
+                {% csrf_token %}
+                
+                <!-- Title and Description -->
+                <div class="mb-4">
+                    <label class="form-label"><strong>Assessment Title</strong></label>
+                    {{ form.title|add_class:"form-control" }}
+                </div>
+                <div class="mb-4">
+                    <label class="form-label"><strong>Description</strong></label>
+                    {{ form.description|add_class:"form-control" }}
+                </div>
+
+                <!-- Class, Subject, and Term -->
+                <div class="row mb-4">
+                    <div class="col-md-4">
+                        <label class="form-label"><strong>Class Assigned</strong></label>
+                        {{ form.class_assigned|add_class:"form-select" }}
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label"><strong>Subject</strong></label>
+                        {{ form.subject|add_class:"form-select" }}
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label"><strong>Term</strong></label>
+                        {{ form.term|add_class:"form-select" }}
+                    </div>
+                </div>
+
+                <!-- Due Date and Duration -->
+                <div class="row mb-4">
+                    <div class="col-md-6">
+                        <label class="form-label"><strong>Due Date</strong></label>
+                        {{ form.due_date|add_class:"form-control" }}
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label"><strong>Duration (minutes)</strong></label>
+                        {{ form.duration|add_class:"form-control" }}
+                    </div>
+                </div>
+
+                <!-- Existing Questions Section (Read-Only by Default) -->
+                <h4 class="mt-5">Existing Questions</h4>
+                {% for question in questions %}
+                    <div class="card mb-4 p-4 shadow-sm" id="existing-question-{{ question.id }}">
+                        <div class="question-view">
+                            <p><strong>Question:</strong> {{ question.question_text }}</p>
+                            <p><strong>Type:</strong> {{ question.get_question_type_display }}</p>
+                            <p><strong>Options:</strong> {{ question.options|join:", " }}</p>
+                            <p><strong>Correct Answer:</strong> {{ question.correct_answer }}</p>
+                            <button type="button" class="btn btn-warning toggle-edit-btn" data-id="{{ question.id }}">Edit</button>
+                        </div>
+
+                        <!-- Hidden Edit Section -->
+                        <div class="question-edit d-none">
+                            <label>Question Text</label>
+                            <input type="text" name="question_{{ question.id }}_text" value="{{ question.question_text }}" class="form-control">
+
+                            <label>Type</label>
+                            <select name="question_{{ question.id }}_type" class="form-select">
+                                <option value="SCQ" {% if question.question_type == "SCQ" %}selected{% endif %}>Single Choice</option>
+                                <option value="MCQ" {% if question.question_type == "MCQ" %}selected{% endif %}>Multiple Choice</option>
+                                <option value="ES" {% if question.question_type == "ES" %}selected{% endif %}>Essay</option>
+                            </select>
+
+                            <label>Options</label>
+                            <input type="text" name="question_{{ question.id }}_options" value="{% if question.options %}{{ question.options|join:', ' }}{% endif %}" class="form-control">
+
+                            <label>Correct Answer</label>
+                            <input type="text" name="question_{{ question.id }}_correct_answer" value="{{ question.correct_answer }}" class="form-control">
+
+                            <button type="button" class="btn btn-secondary cancel-edit-btn" data-id="{{ question.id }}">Cancel</button>
+                        </div>
+                    </div>
+                {% endfor %}
+
+                <!-- New Questions Section -->
+                <h4 class="mt-5">Add New Questions</h4>
+                <div id="new-questions-container"></div>
+                <input type="hidden" id="new_question_count" name="new_question_count" value="0">
+                <button type="button" id="add-new-question-btn" class="btn btn-success mt-3">+ Add New Question</button>
+
+                <!-- Submit Button -->
+                <div class="text-center mt-5">
+                    <button type="submit" class="btn btn-primary btn-lg px-5">Save Changes</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- JavaScript -->
+<script>
+    let newQuestionCount = 0;
+
+    // Add New Question
+    document.getElementById('add-new-question-btn').addEventListener('click', function () {
+        newQuestionCount++;
+        document.getElementById('new_question_count').value = newQuestionCount;
+
+        const newQuestionHTML = `
+            <div class="card mb-4 p-4 shadow-sm" id="new-question-${newQuestionCount}">
+                <label>Question Text</label>
+                <input type="text" name="new_question_text_${newQuestionCount}" class="form-control" required>
+
+                <label>Type</label>
+                <select name="new_question_type_${newQuestionCount}" class="form-select">
+                    <option value="SCQ">Single Choice</option>
+                    <option value="MCQ">Multiple Choice</option>
+                    <option value="ES">Essay</option>
+                </select>
+
+                <label>Options</label>
+                <input type="text" name="new_options_${newQuestionCount}" class="form-control">
+
+                <label>Correct Answer</label>
+                <input type="text" name="new_correct_answer_${newQuestionCount}" class="form-control">
+
+                <button type="button" class="btn btn-danger mt-3" onclick="removeNewQuestion(${newQuestionCount})">Remove</button>
+            </div>
+        `;
+        document.getElementById('new-questions-container').insertAdjacentHTML('beforeend', newQuestionHTML);
+    });
+
+    function removeNewQuestion(count) {
+        document.getElementById(`new-question-${count}`).remove();
+    }
+
+    // Toggle Edit Button
+    document.querySelectorAll('.toggle-edit-btn').forEach(button => {
+        button.addEventListener('click', function () {
+            const id = this.getAttribute('data-id');
+            document.getElementById(`existing-question-${id}`).querySelector('.question-view').classList.toggle('d-none');
+            document.getElementById(`existing-question-${id}`).querySelector('.question-edit').classList.toggle('d-none');
+        });
+    });
+</script>
+{% endblock %}

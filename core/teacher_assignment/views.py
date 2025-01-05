@@ -1,7 +1,5 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views import View, ListView
-from itertools import groupby
-from operator import attrgetter
 from .forms import TeacherAssignmentForm
 from ..models import TeacherAssignment
 

@@ -1,5 +1,5 @@
 from django.shortcuts import render, redirect, get_object_or_404
-from core.models import Student, Class, Session, Term, Enrollment
+from core.models import Student
 from .forms import EnrollmentForm  
 
 def StudentClassEnrollmentView(request):
