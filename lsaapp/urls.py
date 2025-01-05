@@ -19,7 +19,7 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 
-from core.views import home
+from core.views import home, send_test_email
 from core.auth.views import RegisterView, GuardianRegistrationView, TeacherRegistrationView
 from core.auth.views import CustomLoginView, CustomLogoutView
 from core.auth.views import PasswordResetView, PasswordResetDoneView, PasswordResetConfirmView, PasswordResetCompleteView
@@ -29,11 +29,13 @@ from core.views import CreateNotificationView, NotificationListView
 from core.views import SessionListView, SessionDetailView, SessionCreateView, SessionUpdateView, SessionDeleteView
 from core.views import TermListView, TermDetailView, TermCreateView, TermUpdateView, TermDeleteView
 from core.views import promote_student, repeat_student, demote_student, mark_dormant_student, mark_left_student, mark_active
+from core.views import create_assessment, admin_assessment_list, approve_assessment, pending_approvals, view_assessment, class_subjects
 from core.student.views import StudentListView, StudentCreateView, StudentUpdateView, StudentDetailView, StudentDeleteView, BulkUpdateStudentsView, export_students, student_reports
-from core.student.views import submit_assignment
+from core.student.views import submit_assignment, submit_assessment
 from core.teacher.views import TeacherListView, TeacherCreateView, TeacherUpdateView, TeacherDetailView, TeacherDeleteView, TeacherBulkActionView, export_teachers, teacher_reports
 from core.teacher.views import input_scores, broadsheet, mark_attendance, attendance_log, message_guardian, update_result, view_na_result, grade_essay_questions
 from core.teacher.views import create_assignment, add_question, grade_assignment, view_submitted_assignments, update_assignment, delete_assignment, assignment_detail, assignment_list
+from core.teacher.views import create_assessment, teacher_assessment_list, view_assessment, update_assessment, delete_assessment, grade_essay_assessment
 from core.guardian.views import GuardianListView, GuardianCreateView, GuardianUpdateView, GuardianDetailView, GuardianDeleteView, GuardianBulkActionView
 from core.guardian.views import financial_record_detail, view_student_result, export_guardians, guardian_reports
 from core.classes.views import ClassListView, ClassCreateView, ClassUpdateView, ClassDetailView, ClassDeleteView, EnrollStudentView
@@ -42,7 +44,7 @@ from core.results.views import ResultCreateView, ResultListView, ResultUpdateVie
 from core.views import FeeAssignmentCreateView, FeeAssignmentListView, FeeAssignmentUpdateView, FeeAssignmentDetailView, FeeAssignmentDeleteView, StudentFeeRecordListView
 from core.views import PaymentCreateView, PaymentListView, PaymentUpdateView, PaymentDetailView, PaymentDeleteView, FinancialRecordListView
 from core.views import StudentClassEnrollmentView, StudentEnrollmentsView
-from core.views import AssignSubjectView, AssignTeacherView, AssignClassSubjectView, DeleteClassSubjectAssignmentView
+from core.views import AssignSubjectView, AssignTeacherView, AssignClassSubjectView, DeleteClassSubjectAssigmentView
 from core.views import TeacherAssignmentListView, TeacherAssignmentUpdateView, TeacherAssignmentDetailView, TeacherAssignmentDeleteView
 from core.subject_assignment.views import SubjectAssignmentListView, SubjectAssignmentCreateView, SubjectAssignmentUpdateView, SubjectAssignmentDetailView, SubjectAssignmentDeleteView
 
@@ -62,6 +64,7 @@ urlpatterns = [
     path('password_reset/done/', PasswordResetDoneView.as_view(), name='password_reset_done'),
     path('reset/<uidb64>/<token>/', PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
     path('reset/done/', PasswordResetCompleteView.as_view(), name='password_reset_complete'),
+    path('send_test_email/', send_test_email, name='send_test_email'),
     
     # School Setup URLs
     path('setup/', AdminDashboardView.as_view(), name='school_setup'),
@@ -166,7 +169,8 @@ urlpatterns = [
     path('classes/<int:pk>/delete/', ClassDeleteView.as_view(), name='class_delete'),
     path('classes/<int:pk>/enrol/', EnrollStudentView.as_view(), name='enrol_student'),
     path('assign_class_subjects/<int:pk>/', AssignClassSubjectView.as_view(), name='assign_class_subject'),
-    path('class/subject-assignment/<int:pk>/delete/', DeleteClassSubjectAssignmentView.as_view(), name='delete_class_subject_assignment'),
+    path('class_subjects', class_subjects, name='class_subjects'),
+    path('class_subjects/<int:pk>/delete/', DeleteClassSubjectAssigmentView.as_view(), name='delete_class_subjects'),
 
 
     # Subject URLs
@@ -199,7 +203,19 @@ urlpatterns = [
     path('payments/delete/<int:pk>/', PaymentDeleteView.as_view(), name='delete_payment'),
     path('financial-records/', FinancialRecordListView.as_view(), name='financial_record_list'),
 
+    # Assessment URLs
+    path('assessments-create/', create_assessment, name='create_assessment'),
+    path('approve/<int:assessment_id>/', approve_assessment, name='approve_assessment'),
+    path('pending-approvals/', pending_approvals, name='pending_approvals'),
+    path('teacher-list/', teacher_assessment_list, name='teacher_assessment_list'),
+    path('admin-list/', admin_assessment_list, name='admin_assessment_list'),
+    path('assessment<int:assessment_id>/', view_assessment, name='view_assessment'),
+    path('update/<int:assessment_id>/', update_assessment, name='update_assessment'),
+    path('delete/<int:assessment_id>/', delete_assessment, name='delete_assessment'),
+    path('submit_assessment/<int:assessment_id>/', submit_assessment, name='submit_assessment'),
+    path('grade_assessent/<int:submission_id>/', grade_essay_assessment, name='grade_essay_assessment'),
 ]
+
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

@@ -7,7 +7,7 @@ from .models import TeacherAssignment, SubjectAssignment, Assessment, Assignment
 from .models import Attendance, Expense, Payment, FeeAssignment, FinancialRecord
 from .models import Session, Term, Result, Enrollment, Holiday, SchoolDay, Message
 from .models import AssignmentSubmission, Notification, Exam, SubjectResult
-from .models import CustomUser
+from .models import CustomUser, EmailCampaign
 
 
 admin.site.register(Student)
@@ -88,3 +88,8 @@ class StudentAdmin(admin.ModelAdmin):
 
 # Register model with admin
 admin.site.register(Student, StudentAdmin)
+
+@admin.register(EmailCampaign)
+class EmailCampaignAdmin(admin.ModelAdmin):
+    list_display = ('subject', 'created_at')  # Use valid fields
+    search_fields = ('subject',)  # Add searchable fields

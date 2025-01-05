@@ -31,6 +31,18 @@
             </ul>
         </div>
     </div>
+    <!-- Assessments Sections -->
+    <div>
+        <h3>Pending Assessments</h3>
+        <ul>
+            {% for assessment in assessments %}
+                <li>
+                    {{ assessment.title }} (Due: {{ assessment.due_date }})
+                    <a href="{% url 'submit_assessment' assessment.id %}" class="btn btn-success">Submit</a>
+                </li>
+            {% endfor %}
+        </ul>
+    </div>
 
     <!-- Results -->
     <h5 class="mt-4">Results</h5>

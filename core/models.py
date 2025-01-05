@@ -1,12 +1,8 @@
 from django.db import models
-from django.contrib.auth.models import User
-from django.db.models.signals import post_save
-from django.dispatch import receiver
 from django.core.validators import MaxValueValidator
 from django.core.exceptions import ValidationError
-from django.contrib.auth.models import AbstractUser, BaseUserManager
+from django.contrib.auth.models import AbstractUser
 from django.conf import settings
-from django.db.models.signals import pre_save
 from django.db.models import Sum, Avg
 from django.utils import timezone
 from datetime import date, timedelta, datetime
@@ -268,12 +264,44 @@ class Teacher(models.Model):
     gender = models.CharField(max_length=1, choices=GENDER_CHOICES, default='M')
     contact = models.CharField(max_length=15, null=True)
     address = models.TextField()
-    current_class = models.ForeignKey('Class', on_delete=models.SET_NULL, null=True, blank=True, related_name='enrolled_class', default=None)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='active')
 
+    def current_classes(self):
+        """Retrieve all classes where the teacher is a form teacher."""
+        form_teacher_assignments = TeacherAssignment.objects.filter(teacher=self, is_form_teacher=True)
+        return Class.objects.filter(teacherassignment__in=form_teacher_assignments) if form_teacher_assignments.exists() else Class.objects.none()
+
+
+    def assigned_classes(self):
+        """Retrieve all classes the teacher is assigned to, including form classes and subject-teaching classes."""
+        form_classes = Class.objects.filter(teacherassignment__teacher=self).distinct()
+        subject_classes = Class.objects.filter(subjectassignment__teacher=self).distinct()
+        # Combine the two QuerySets, removing duplicates
+        all_classes = form_classes | subject_classes
+        return all_classes
+
+    def subjects_taught(self):
+        """Retrieve all subjects taught by the teacher across all classes."""
+        return Subject.objects.filter(subjectassignment__teacher=self).distinct()
+
+    def form_class_subjects(self):
+        """Retrieve subjects assigned to the class where the teacher is the form teacher."""
+        form_classes = self.current_classes()
+        if form_classes:
+            subjects = Subject.objects.filter(class_set__in=form_classes).distinct()
+            return subjects
+        return Subject.objects.none()
+    
+    def assigned_subjects(self):
+        """Retrieve all subjects in form classes and other classes for assignments etc."""
+        subject_teaching = self.subjects_taught()
+        class_teaching = self.form_class_subjects()
+        all_subjects = subject_teaching | class_teaching
+        return all_subjects
+    
 
     def __str__(self):
-        return self.user.get_full_name()
+        return self.user.get_full_name() - ({self.employee_id})
     
     def save(self, *args, **kwargs):
         if not self.employee_id:
@@ -308,11 +336,15 @@ class Class(models.Model):
     name = models.CharField(max_length=20, unique=True)
     school_level = models.CharField(max_length=20, choices=LEVEL_CHOICES, unique=False, default=None)
     description = models.TextField()
-    teacher = models.ForeignKey('Teacher', on_delete=models.SET_NULL, null=True, blank=True, related_name='classes')
     subjects = models.ManyToManyField('Subject', related_name='class_set', blank=True)  # Assuming you have a Subject model
     students = models.ManyToManyField('Student', related_name='classes', blank=True)
     order = models.PositiveIntegerField(null=True)  # Order defines the class progression
 
+    def form_teacher(self):
+        """Retrieve the teacher who is the form teacher for this class."""
+        form_teacher_assignment = TeacherAssignment.objects.filter(class_assigned=self, is_form_teacher=True).first()
+        return form_teacher_assignment.teacher if form_teacher_assignment else None
+    
     def next_class(self):
         try:
             return Class.objects.get(order=self.order + 1)
@@ -326,10 +358,17 @@ class Class(models.Model):
             return None
 
     def save(self, *args, **kwargs):
+        # Handle the auto-increment of the `order` field
         if self.order is None:
             max_order = Class.objects.aggregate(max_order=models.Max('order'))['max_order']
             self.order = 1 if max_order is None else max_order + 1
+
         super().save(*args, **kwargs)
+
+        class_subject_assignments = ClassSubjectAssignment.objects.filter(class_assigned=self)
+        assigned_subjects = [assignment.subject for assignment in class_subject_assignments]
+
+        self.subjects.set(assigned_subjects)
 
     def subject_count(self):
         return self.subjects.count()
@@ -415,6 +454,21 @@ class ClassSubjectAssignment(models.Model):
 
     class Meta:
         unique_together = ('class_assigned', 'subject', 'session', 'term')
+
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        # Ensure the subject is added to the Class.subjects field
+        if not self.class_assigned.subjects.filter(pk=self.subject.pk).exists():
+            self.class_assigned.subjects.add(self.subject)
+
+    def delete(self, *args, **kwargs):
+        # Remove the subject from Class.subjects if no other assignments exist
+        super().delete(*args, **kwargs)
+        if not ClassSubjectAssignment.objects.filter(
+            class_assigned=self.class_assigned,
+            subject=self.subject
+        ).exists():
+            self.class_assigned.subjects.remove(self.subject)
 
     def __str__(self):
         return f"{self.subject.name} - {self.class_assigned.name} ({self.session.name} - {self.term.name})"
@@ -519,26 +573,28 @@ class OnlineQuestion(models.Model):
         return self.question_text
     
     def options_list(self):
-        """Returns options as a Python list."""
-        if self.options:
-            try:
-                return json.loads(self.options)
-            except json.JSONDecodeError:
-                return []
+        if isinstance(self.options, list):
+            return self.options
+        elif isinstance(self.options, str):
+            return json.loads(self.options)
         return []
     
-
 class Assessment(models.Model):
+    term = models.ForeignKey('Term', on_delete=models.CASCADE, default=1)
     subject = models.ForeignKey('Subject', on_delete=models.CASCADE)
     title = models.CharField(max_length=255, null=True)
     short_description = models.CharField(max_length=500, null=True, blank=True)
-    date = models.DateField(default=timezone.now)
     score = models.IntegerField(default=0, null=True, blank=True)
     class_assigned = models.ForeignKey('Class', on_delete=models.CASCADE, default=None)
-    is_online = models.BooleanField(default=False)
-    due_date = models.DateTimeField(null=True, blank=True)  # Only for online
-    duration = models.IntegerField(null=True, blank=True)  # Only for online, in minutes
-    questions = models.ManyToManyField('OnlineQuestion', related_name='assessment', blank=True)  # Link to questions
+    is_online = models.BooleanField(default=True)
+    due_date = models.DateTimeField(null=True, blank=True)
+    duration = models.IntegerField(null=True, blank=True)
+    questions = models.ManyToManyField('OnlineQuestion', related_name='assessments', blank=True)
+    is_approved = models.BooleanField(default=False)  # New field
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name="created_assessments")
+    approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="approved_assessments")
+    created_at = models.DateTimeField(default=datetime.now())
+    updated_at = models.DateTimeField(default=datetime.now())
 
     def __str__(self):
         return f"{self.title} - {self.subject.name}"
@@ -550,6 +606,17 @@ class Assessment(models.Model):
             return timezone.now() > self.due_date
         return False
 
+class AssessmentSubmission(models.Model):
+    assessment = models.ForeignKey('Assessment', on_delete=models.CASCADE)
+    student = models.ForeignKey('Student', on_delete=models.CASCADE)
+    answers = models.JSONField()  # Stores the student's answers
+    score = models.IntegerField(null=True, blank=True)
+    submitted_at = models.DateTimeField(auto_now_add=True)
+    is_graded = models.BooleanField(default=False)
+    requires_manual_review = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"{self.student.user.get_full_name()} - {self.assessment.title}"
 
 class Exam(models.Model):
     subject = models.ForeignKey('Subject', on_delete=models.CASCADE)
@@ -900,5 +967,13 @@ class Expense(models.Model):
         return f"{self.description} - {self.amount} on {self.expense_date}"
 
 
+from django.conf import settings
+class EmailCampaign(models.Model):
+    subject = models.CharField(max_length=255)
+    message = models.TextField()
+    recipients = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name="email_campaigns")
+    created_at = models.DateTimeField(auto_now_add=True)
 
+    def __str__(self):
+        return self.subject
 

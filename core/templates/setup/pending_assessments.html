@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Pending Approvals</h2>
+<table>
+    <thead>
+        <tr>
+            <th>Title</th>
+            <th>Teacher</th>
+            <th>Class</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for assessment in pending_assessments %}
+        <tr>
+            <td>{{ assessment.title }}</td>
+            <td>{{ assessment.created_by.get_full_name }}</td>
+            <td>{{ assessment.class_assigned.name }}</td>
+            <td><a href="{% url 'assessments:approve_assessment' assessment.id %}">Approve</a></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

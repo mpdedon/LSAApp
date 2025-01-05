@@ -1,0 +1,7 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <h1>Welcome, {{ user.first_name }}!</h1>
+    <p>Thank you for signing up as a {{ "Teacher" if user.role == 'teacher' else "Guardian" if user.role == 'guardian' else "Student" }}.</p>
+    <p>We're thrilled to have you with us.</p>
+{% endblock %}

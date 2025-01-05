@@ -13,10 +13,29 @@
                 <div class="carousel-caption d-flex flex-column justify-content-center align-items-center text-center">
                     <h1 class="display-4 fw-bold mb-3 animate__animated animate__fadeInDown">Holistic Development</h1>
                     <p class="lead mb-4 animate__animated animate__fadeInUp">Balanced academics, character, and faith – nurturing well-rounded individuals ready to thrive.</p>
-                    <a href="#" class="btn btn-primary btn-lg animate__animated animate__zoomIn">Contact School</a>
+                    <!-- Button -->
+                    <button 
+                        class="btn btn-primary btn-lg animate__animated animate__zoomIn" 
+                        type="button" 
+                        data-bs-toggle="collapse" 
+                        data-bs-target="#contactInfo" 
+                        aria-expanded="false" 
+                        aria-controls="contactInfo">
+                        Contact School
+                    </button>
+                    <!-- Contact Info (Collapsible) -->
+                    <div id="contactInfo" class="collapse mt-3 text-white">
+                        <p><strong>Email:</strong> learnswift2020@gmail.com</p>
+                        <p><strong>Phone:</strong> +234 703 485 8160, +234 706 236 1134</p>
+                        <p><strong>Address:</strong> 5 Bode Tobun Street, off Oniwaya Road, Agege, Lagos, Nigeria</p>
+                    </div>
                 </div>
             </div>
-            
+
+            <!-- Make sure to include Bootstrap CSS and JS -->
+            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/css/bootstrap.min.css" rel="stylesheet">
+            <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/js/bootstrap.bundle.min.js"></script>
+                        
             <!-- Personalized Attention Slide -->
             <div class="carousel-item h-100">
                 <img src="{% static 'images/personalized.jpg' %}" class="d-block w-100 h-100 object-fit-cover" alt="Personalized Attention">
@@ -33,10 +52,28 @@
                 <div class="carousel-caption d-flex flex-column justify-content-center align-items-center text-center">
                     <h1 class="display-4 fw-bold mb-3 animate__animated animate__fadeInDown">Future-Ready Skills</h1>
                     <p class="lead mb-4 animate__animated animate__fadeInUp">Equipping your child with literacy, critical thinking, and life skills for lifelong success.</p>
-                    <a href="#" class="btn btn-primary btn-lg animate__animated animate__zoomIn">Contact School</a>
+                    <!-- Button -->
+                    <button 
+                        class="btn btn-primary btn-lg animate__animated animate__zoomIn" 
+                        type="button" 
+                        data-bs-toggle="collapse" 
+                        data-bs-target="#contactInfo" 
+                        aria-expanded="false" 
+                        aria-controls="contactInfo">
+                        Contact School
+                    </button>
+                    <!-- Contact Info (Collapsible) -->
+                    <div id="contactInfo" class="collapse mt-3 text-white">
+                        <p><strong>Email:</strong> learnswift2020@gmail.com</p>
+                        <p><strong>Phone:</strong> +234 703 485 8160, +234 706 236 1134</p>
+                        <p><strong>Address:</strong> 5 Bode Tobun Street, off Oniwaya Road, Agege, Lagos, Nigeria</p>
+                    </div>
                 </div>
             </div>
-            
+            <!-- Make sure to include Bootstrap CSS and JS -->
+            <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/css/bootstrap.min.css" rel="stylesheet">
+            <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha3/dist/js/bootstrap.bundle.min.js"></script>
+                        
             <!-- Parental Partnership Slide -->
             <div class="carousel-item h-100">
                 <img src="{% static 'images/parental.jpg' %}" class="d-block w-100 h-100 object-fit-cover" alt="Parental Partnership">
@@ -121,8 +158,23 @@
     <div class="container">
         <h2 class="text-uppercase mb-4">Ready to Empower Your Child?</h2>
         <p class="lead mb-4">Join a community that nurtures confident, independent leaders of tomorrow.</p>
-        <a href="#" class="btn btn-light btn-lg">Contact Us Now</a>
-    </div>
+        <!-- Button -->
+        <button 
+        class="btn btn-light btn-lg animate__animated animate__zoomIn" 
+        type="button" 
+        data-bs-toggle="collapse" 
+        data-bs-target="#contactInfo" 
+        aria-expanded="false" 
+        aria-controls="contactInfo">
+        Make Enquiries NOW
+        </button>
+        <!-- Contact Info (Collapsible) -->
+        <div id="contactInfo" class="collapse mt-3 text-white">
+            <p><strong>Email:</strong> learnswift2020@gmail.com</p>
+            <p><strong>Phone:</strong> +234 703 485 8160, +234 706 236 1134</p>
+            <p><strong>Address:</strong> 5 Bode Tobun Street, off Oniwaya Road, Agege, Lagos, Nigeria</p>
+        </div>
+        </div>
 </section>
 
 <!-- Key Benefits Section -->
@@ -216,7 +268,22 @@
     <div class="container">
         <h2 class="text-uppercase mb-4">Ready to Get Started?</h2>
         <p class="lead mb-4">Join hundreds of schools transforming education with LearnSwift Academia.</p>
-        <a href="#" class="btn btn-light btn-lg">Sign Up Now</a>
+        <button 
+        class="btn btn-light btn-lg animate__animated animate__zoomIn" 
+        type="button" 
+        data-bs-toggle="collapse" 
+        data-bs-target="#contactInfo" 
+        aria-expanded="false" 
+        aria-controls="contactInfo">
+        Sign Up Now
+        </button>
+        <!-- Contact Info (Collapsible) -->
+        <div id="contactInfo" class="collapse mt-3 text-white">
+            <p><strong>Email:</strong> learnswift2020@gmail.com</p>
+            <p><strong>Phone:</strong> +234 703 485 8160, +234 706 236 1134</p>
+            <p><strong>Address:</strong> 5 Bode Tobun Street, off Oniwaya Road, Agege, Lagos, Nigeria</p>
+        </div>
+        </div>
     </div>
 </section>
 {% endblock %}

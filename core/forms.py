@@ -1,7 +1,8 @@
 # core/forms.py
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
-from .models import CustomUser, Subject, Session, Term, Result, Notification
+from core.models import CustomUser, Subject, Session, Term, Result, Notification
+
 
 class CustomUserCreationForm(UserCreationForm):
     class Meta:
@@ -48,3 +49,4 @@ class NotificationForm(forms.ModelForm):
         widgets = {
             'expiry_date': forms.DateInput(attrs={'type': 'date'}),
         }
+
