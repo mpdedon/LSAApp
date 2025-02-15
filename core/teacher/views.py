@@ -12,13 +12,14 @@ from django.db.models import Q, Count, F
 from django.http import HttpResponseForbidden
 from datetime import date
 from core.teacher.forms import TeacherRegistrationForm, MessageForm
-from core.models import Teacher, Student, Guardian, Class, Subject, Attendance, Assessment
-from core.models import Assignment, Question, AssignmentSubmission, AssessmentSubmission, AcademicAlert
+from core.models import Teacher, Student, Guardian, Class, Subject, Attendance, Assessment, Exam
+from core.models import Assignment, Question, AssignmentSubmission, AssessmentSubmission, ExamSubmission, AcademicAlert
 from core.models import Session, Term, Message, SubjectResult, Result
 from core.subject_result.form import SubjectResultForm
 from core.forms import NonAcademicSkillsForm
 from core.assignment.forms import AssignmentForm, QuestionForm
 from core.assessment.forms import AssessmentForm, OnlineQuestionForm
+from core.exams.forms import ExamForm, OnlineQuestion
 import logging
 
 logger = logging.getLogger(__name__)
@@ -1082,3 +1083,288 @@ def grade_essay_assessment(request, submission_id):
 
     return render(request, 'grade_essay_assessment.html', {'submission': submission})
 
+
+@login_required
+def create_exam(request):
+    # Ensure the logged-in user is authorized
+    user = request.user
+    teacher = None
+    if not user.is_superuser:
+        teacher = get_object_or_404(Teacher, user=user)
+        assigned_classes = teacher.assigned_classes().all()
+        subjects = teacher.assigned_subjects().all()
+    else:
+        assigned_classes = Class.objects.all()
+        subjects = Subject.objects.all()
+
+    # Handle GET request: render form
+    if request.method == 'GET':
+        form = ExamForm()
+        form.fields['class_assigned'].queryset = assigned_classes
+        form.fields['subject'].queryset = subjects
+        return render(request, 'exam/create_exam.html', {'form': form})
+
+    # Handle POST request: process form data
+    if request.method == 'POST':
+        form = ExamForm(request.POST)
+
+        # Limit class and subject choices for teachers
+        form.fields['class_assigned'].queryset = assigned_classes
+        form.fields['subject'].queryset = subjects
+
+        if form.is_valid():
+            # Save the Exam instance
+            exam = form.save(commit=False)
+            exam.created_by = user
+            exam.is_approved = user.is_superuser  # Auto-approve if admin
+            exam.due_date = form.cleaned_data['due_date']
+            exam.duration = form.cleaned_data['duration']
+            exam.save()
+            form.save_m2m()  # Save many-to-many questions
+
+            # Process and validate questions dynamically
+            errors = process_questions(request, exam)
+
+            if not errors:
+                # Notify students if the exam is approved
+                if exam.is_approved:
+                    notify_students(exam)
+                return redirect('teacher_dashboard' if teacher else 'admin_dashboard')
+            else:
+                print("Errors in questions:", errors)  # Debugging line
+                return render(request, 'exam/create_exam.html', {
+                    'form': form,
+                    'errors': errors,
+                })
+        else:
+            print("Form errors:", form.errors)  # Debugging line
+            return render(request, 'exam/create_exam.html', {
+                'form': form,
+                'errors': form.errors,  # Add form errors to be displayed in the template
+            })
+
+                  
+def process_questions(request, exam):
+    errors = []
+    question_number = 1
+
+    while f'question_type_{question_number}' in request.POST:
+        question_type = request.POST.get(f'question_type_{question_number}')
+        question_text = request.POST.get(f'question_text_{question_number}')
+        options = request.POST.get(f'options_{question_number}', '')
+        correct_answer = request.POST.get(f'correct_answer_{question_number}')
+
+        print(f"Processing Question {question_number}: {question_type}, {question_text}, {options}, {correct_answer}")  # Debugging line
+
+        options_list = [opt.strip() for opt in options.split(',') if opt.strip()]
+        question_data = {
+            'question_type': question_type,
+            'question_text': question_text,
+            'options': json.dumps(options_list) if options_list else '',
+            'correct_answer': correct_answer
+        }
+
+        question_form = OnlineQuestionForm(question_data)
+        if question_form.is_valid():
+            if question_type in ['SCQ', 'MCQ']:
+                if not options_list:
+                    errors.append(f"Error in Question {question_number}: Options are required for SCQ/MCQ.")
+                else:
+                    question_form.save()
+                    exam.questions.add(question_form.instance)
+            elif question_type == 'ES':
+                question_form.save()
+                exam.questions.add(question_form.instance)
+        else:
+            print(f"Question {question_number} Errors: {question_form.errors}")  # Debugging line
+            errors.append(f"Error in Question {question_number}: {question_form.errors}")
+        question_number += 1
+
+    return errors
+
+def notify_students(exam):
+    students = Student.objects.filter(current_class=exam.class_assigned)
+    for student in students:
+        teacher = get_object_or_404(Teacher, user=exam.created_by)
+        AcademicAlert.objects.create(
+            alert_type='exam',
+            title=exam.title,
+            summary=exam.short_description or 'New exam available!',
+            teacher=teacher,
+            student=student,
+            due_date=exam.due_date,
+            duration=exam.duration,
+            related_object_id=exam.id
+        )
+
+@login_required
+def teacher_exam_list(request):
+
+    teacher = get_object_or_404(Teacher, user=request.user)
+    exams = Exam.objects.filter(created_by=teacher.user)
+    submitted_exams = ExamSubmission.objects.filter(exam__in=exams)
+    exam_essay_submissions = submitted_exams.filter(exam__questions__question_type='ES', is_graded=False ).distinct()
+    
+    return render(request, 'exam/teacher_exam_list.html', 
+                  {'exams': exams,
+                    'submitted_exams': submitted_exams,
+                    'exam_essay_submissions': exam_essay_submissions,})
+
+@login_required
+def view_exam(request, exam_id):
+    # Retrieve the exam and its questions
+    exam = get_object_or_404(Exam, id=exam_id)
+    questions = exam.questions.all()
+    
+    context = {
+        'exam': exam,
+        'questions': questions,
+    }
+    return render(request, 'exam/exam_detail.html', context)
+
+@login_required
+def update_exam(request, exam_id):
+    exam = get_object_or_404(Exam, id=exam_id)
+    user = request.user
+    teacher = None
+
+    if not user.is_superuser:
+        teacher = get_object_or_404(Teacher, user=user)
+        assigned_classes = teacher.assigned_classes().all()
+        subjects = teacher.assigned_subjects().all()
+    else:
+        assigned_classes = Class.objects.all()
+        subjects = Subject.objects.all()
+
+    # Authorization Check
+    if exam.created_by != user and not user.is_superuser:
+        return HttpResponseForbidden("You are not authorized to update this exam.")
+
+    # Handle GET request (Render Form)
+    if request.method == 'GET':
+        form = ExamForm(instance=exam)
+        form.fields['class_assigned'].queryset = assigned_classes
+        form.fields['subject'].queryset = subjects
+        return render(request, 'exam/update_exam.html', {
+            'form': form,
+            'exam': exam,
+            'questions': exam.questions.all()
+        })
+
+    # Handle POST request (Process Form)
+    if request.method == 'POST':
+        form = ExamForm(request.POST, instance=exam)
+        form.fields['class_assigned'].queryset = assigned_classes
+        form.fields['subject'].queryset = subjects
+
+        if form.is_valid():
+            exam = form.save(commit=False)
+            exam.is_approved = user.is_superuser
+            exam.save()
+            form.save_m2m()
+
+            # Process Existing and New Questions
+            errors = process_questions(request, exam)
+
+            if not errors:
+                # Redirect after successful update
+                return redirect('view_exam', exam.id)
+            else:
+                logger.error("Errors in questions: %s", errors)
+                return render(request, 'exam/update_exam.html', {
+                    'form': form,
+                    'exam': exam,
+                    'questions': exam.questions.all(),
+                    'errors': errors
+                })
+        else:
+            logger.error("Exam form errors: %s", form.errors)
+            return render(request, 'exam/update_exam.html', {
+                'form': form,
+                'exam': exam,
+                'questions': exam.questions.all(),
+                'errors': form.errors
+            })
+
+
+def process_questions(request, exam):
+    errors = []
+    question_number = 1
+
+    # Update existing questions
+    for question in exam.questions.all():
+        question_text = request.POST.get(f'question_text_{question.id}')
+        question_type = request.POST.get(f'question_type_{question.id}')
+        options = request.POST.get(f'options_{question.id}', '')
+        correct_answer = request.POST.get(f'correct_answer_{question.id}')
+
+        if question_text:
+            options_list = [opt.strip() for opt in options.split(',') if opt.strip()]
+            question.question_text = question_text
+            question.question_type = question_type
+            question.options = options_list
+            question.correct_answer = correct_answer
+            question.save()
+        else:
+            errors.append(f"Error: Missing data for question ID {question.id}")
+
+    # Add new questions
+    while f'new_question_text_{question_number}' in request.POST:
+        new_text = request.POST.get(f'new_question_text_{question_number}')
+        new_type = request.POST.get(f'new_question_type_{question_number}')
+        new_options = request.POST.get(f'new_options_{question_number}', '')
+        new_correct_answer = request.POST.get(f'new_correct_answer_{question_number}')
+
+        options_list = [opt.strip() for opt in new_options.split(',') if opt.strip()]
+
+        question_form = OnlineQuestionForm({
+            'question_text': new_text,
+            'question_type': new_type,
+            'options': json.dumps(options_list),
+            'correct_answer': new_correct_answer
+        })
+
+        if question_form.is_valid():
+            question = question_form.save()
+            exam.questions.add(question)
+        else:
+            errors.append(f"Error in new question {question_number}: {question_form.errors}")
+
+        question_number += 1
+
+    return errors
+
+@login_required
+def delete_exam(request, exam_id):
+    exam = get_object_or_404(Exam, id=exam_id)
+    teacher = get_object_or_404(Teacher, user=request.user)
+
+    # Ensure the logged-in user is the creator or an admin
+    if exam.created_by != teacher.user and not request.user.is_superuser:
+        return HttpResponseForbidden("You do not have permission to delete this exam.")
+
+    if request.method == 'POST':
+        exam.delete()
+        return redirect('teacher_dashboard')
+
+    return render(request, 'exam/delete_exam.html', {
+        'exam': exam,
+    })
+
+@login_required
+def grade_essay_exam(request, submission_id):
+    submission = get_object_or_404(ExamSubmission, id=submission_id)
+
+    if request.method == 'POST':
+        score = request.POST.get('score')
+        feedback = request.POST.get('feedback')
+
+        if score:
+            submission.score = score
+            submission.feedback = feedback
+            submission.is_graded = True
+            submission.save()
+            messages.success(request, "Essay successfully graded!")
+            return redirect('teacher_dashboard')
+
+    return render(request, 'grade_essay_exam.html', {'submission': submission})

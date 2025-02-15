@@ -458,7 +458,7 @@
                                                                     <small class="text-muted">Due: {{ exam.due_date|date:"d M Y" }}</small>
                                                                 </div>
                                                                 <div class="mt-2">
-                                                                    <a href="{% url 'take_exam' exam.id %}" class="btn btn-sm btn-success">Start Exam</a>
+                                                                    <a href="{% url 'submit_exam' exam.id %}" class="btn btn-sm btn-success">Start Exam</a>
                                                                 </div>
                                                             </li>
                                                         {% empty %}

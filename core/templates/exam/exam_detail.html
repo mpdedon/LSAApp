@@ -1,0 +1,64 @@
+{% extends 'base.html' %}
+{% load add_class %}
+{% block content %}
+<div class="container my-5" style="max-width: 70%;">
+    <div class="card shadow-lg border-0">
+        <div class="card-header bg-light text-white text-center">
+            <h2>{{ exam.title }}</h2>
+        </div>
+        <div class="card-body row">
+            <!-- Left Column -->
+            <div class="col-md-6 mb-0">
+                <p><strong>Subject:</strong> {{ exam.subject.name }}</p>
+                <p><strong>Class:</strong> {{ exam.class_assigned.name }}</p>
+                <p><strong>Term:</strong> {{ exam.term.name }}</p>
+            </div>
+            <div class="col-md-6 mb-0">
+                <p><strong>Due Date:</strong> {{ exam.due_date|date:"M d, Y H:i" }}</p>
+                <p><strong>Duration:</strong> {{ exam.duration }} minutes</p>
+                <p><strong>Is Online:</strong> {{ exam.is_online|yesno:"Yes,No" }}</p>
+            </div>
+           
+            <h3 class="mt-5 text-center">Questions</h3>
+            
+            {% if questions %}
+                {% for question in questions %}
+                    <div class="card my-4 p-4 shadow-sm">
+                        <p><strong>Q{{ forloop.counter }}: {{ question.question_text }}</strong></p>
+                        <p><small>Type: {{ question.get_question_type_display }}</small></p>
+                        
+                        <!-- Check if the question has options and render them -->
+                        {% if question.options %}
+                            <ul class="list-group">
+                                {% for option in question.options %}
+                                    <li class="list-group-item {% if option == question.correct_answer %}bg-success text-white{% endif %}">
+                                        {{ option }}
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            <p><em>No options provided for this question.</em></p>
+                        {% endif %}
+                        
+                        <!-- Display Correct Answer (For Essay type or no options) -->
+                        {% if question.question_type == "ES" or not question.options %}
+                            <p class="mt-3"><strong>Correct Answer:</strong> {{ question.correct_answer }}</p>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+            {% else %}
+                <p>No questions available for this exam.</p>
+            {% endif %}
+            
+            <div>
+                <div class="text-center mt-5">
+                    <a href="{% url 'teacher_dashboard' %}" class="btn btn-outline-secondary btn-sm">Back to Dashboard</a>
+                    <a href="{% url 'update_exam' exam.id%}" class="btn btn-outline-danger btn-sm">Update Exam</a>
+
+                </div>
+            </div>
+            
+        </div>
+    </div>
+</div>
+{% endblock %}

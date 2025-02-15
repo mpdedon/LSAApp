@@ -15,7 +15,7 @@ from django.utils import timezone
 from decimal import Decimal
 from datetime import timedelta
 from core.models import Session, Term, Student, Teacher, Guardian, Notification
-from core.models import Class, Subject, FeeAssignment, Enrollment, Payment, Assessment
+from core.models import Class, Subject, FeeAssignment, Enrollment, Payment, Assessment, Exam
 from core.models import SubjectAssignment, TeacherAssignment, ClassSubjectAssignment
 from core.models import SubjectResult, Result, StudentFeeRecord, FinancialRecord, AcademicAlert
 from core.forms import ClassSubjectAssignmentForm, NonAcademicSkillsForm, NotificationForm
@@ -28,6 +28,7 @@ from core.enrollment.forms import EnrollmentForm
 from core.subject_assignment.forms import SubjectAssignmentForm
 from core.teacher_assignment.forms import TeacherAssignmentForm
 from core.assessment.forms import AssessmentForm, OnlineQuestionForm
+from core.exams.forms import ExamForm
 import logging
 
 logger = logging.getLogger(__name__)
@@ -1117,3 +1118,154 @@ def view_assessment(request, assessment_id):
         'questions': questions,
     }
     return render(request, 'assessment/assessment_detail.html', context)
+
+
+@login_required
+def create_exam(request):
+    # Ensure the logged-in user is authorized
+    user = request.user
+    teacher = None
+    if not user.is_superuser:
+        teacher = get_object_or_404(Teacher, user=user)
+        assigned_classes = teacher.assigned_classes().all()
+        subjects = teacher.assigned_subjects().all()
+    else:
+        assigned_classes = Class.objects.all()
+        subjects = Subject.objects.all()
+
+    # Handle GET request: render form
+    if request.method == 'GET':
+        form = ExamForm()
+        form.fields['class_assigned'].queryset = assigned_classes
+        form.fields['subject'].queryset = subjects
+        return render(request, 'exam/create_exam.html', {'form': form})
+
+    # Handle POST request: process form data
+    if request.method == 'POST':
+        form = ExamForm(request.POST)
+
+        # Limit class and subject choices for teachers
+        form.fields['class_assigned'].queryset = assigned_classes
+        form.fields['subject'].queryset = subjects
+
+        if form.is_valid():
+            # Save the Exam instance
+            exam = form.save(commit=False)
+            exam.created_by = user
+            exam.is_approved = user.is_superuser  # Auto-approve if admin
+            exam.due_date = form.cleaned_data['due_date']
+            exam.duration = form.cleaned_data['duration']
+            exam.save()
+            form.save_m2m()  # Save many-to-many questions
+
+            # Process and validate questions dynamically
+            errors = process_questions(request, exam)
+
+            if not errors:
+                # Notify students if the exam is approved
+                if exam.is_approved:
+                    notify_students(exam)
+                return redirect('teacher_dashboard' if teacher else 'admin_dashboard')
+            else:
+                print("Errors in questions:", errors)  # Debugging line
+                return render(request, 'exam/create_exam.html', {
+                    'form': form,
+                    'errors': errors,
+                })
+        else:
+            print("Form errors:", form.errors)  # Debugging line
+            return render(request, 'exam/create_exam.html', {
+                'form': form,
+                'errors': form.errors,  # Add form errors to be displayed in the template
+            })
+
+                  
+def process_questions(request, exam):
+    errors = []
+    question_number = 1
+
+    while f'question_type_{question_number}' in request.POST:
+        question_type = request.POST.get(f'question_type_{question_number}')
+        question_text = request.POST.get(f'question_text_{question_number}')
+        options = request.POST.get(f'options_{question_number}', '')
+        correct_answer = request.POST.get(f'correct_answer_{question_number}')
+
+        print(f"Processing Question {question_number}: {question_type}, {question_text}, {options}, {correct_answer}")  # Debugging line
+
+        options_list = [opt.strip() for opt in options.split(',') if opt.strip()]
+        question_data = {
+            'question_type': question_type,
+            'question_text': question_text,
+            'options': json.dumps(options_list) if options_list else '',
+            'correct_answer': correct_answer
+        }
+
+        question_form = OnlineQuestionForm(question_data)
+        if question_form.is_valid():
+            if question_type in ['SCQ', 'MCQ']:
+                if not options_list:
+                    errors.append(f"Error in Question {question_number}: Options are required for SCQ/MCQ.")
+                else:
+                    question_form.save()
+                    exam.questions.add(question_form.instance)
+            elif question_type == 'ES':
+                question_form.save()
+                exam.questions.add(question_form.instance)
+        else:
+            print(f"Question {question_number} Errors: {question_form.errors}")  # Debugging line
+            errors.append(f"Error in Question {question_number}: {question_form.errors}")
+        question_number += 1
+
+    return errors
+
+def notify_students(exam):
+    students = Student.objects.filter(current_class=exam.class_assigned)
+    for student in students:
+        AcademicAlert.objects.create(
+            alert_type='exam',
+            title=exam.title,
+            summary=exam.short_description or 'New exam available!',
+            teacher=exam.created_by,
+            student=student,
+            due_date=exam.due_date,
+            duration=exam.duration,
+            related_object_id=exam.id
+        )
+
+@login_required
+@user_passes_test(lambda u: u.is_superuser)
+def approve_exam(request, exam_id):
+    exam = get_object_or_404(Exam, id=exam_id, is_approved=False)
+    if request.method == 'POST':
+        exam.is_approved = True
+        exam.approved_by = request.user
+        exam.save()
+        notify_students(exam)
+        messages.success(request, f"Exam '{exam.title}' approved and published!")
+        return redirect('admin_dashboard')
+
+    return render(request, 'setup/approve_exam.html', {'exam': exam})
+
+@login_required
+@user_passes_test(lambda u: u.is_superuser)
+def admin_exam_list(request):
+    exams = Exam.objects.all()
+    return render(request, 'exam/admin_exam_list.html', {'exams': exams})
+
+@login_required
+@user_passes_test(lambda u: u.is_superuser)
+def pending_approvals(request):
+    pending_exams = Exam.objects.filter(is_approved=False)
+    return render(request, 'setup/pending_exams.html', {'pending_exams': pending_exams})
+
+@login_required
+def view_exam(request, exam_id):
+    # Retrieve the exam and its questions
+    exam = get_object_or_404(Exam, id=exam_id)
+    questions = exam.questions.all()
+
+    context = {
+        'exam': exam,
+        'questions': questions,
+    }
+    return render(request, 'exam/exam_detail.html', context)

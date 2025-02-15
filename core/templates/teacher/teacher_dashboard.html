@@ -386,6 +386,59 @@
                 </div>
             </div>
 
+            <!-- Exam Section -->
+            <div class="card mb-4 shadow-sm">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h4>Exams</h4>
+                    <a href="{% url 'create_exam' %}" class="btn btn-sm btn-outline-info">
+                        <i class="bi bi-plus-circle"></i> Create Exam
+                    </a>
+                </div>
+                <div class="card-body">
+                    <!-- Recent Exams List -->
+                    <ul class="list-group">
+                        {% for exam in exams|slice:":5" %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>{{ exam.title }}</strong>
+                                <br>
+                                <small class="text-muted">
+                                    Class: {{ exam.class_assigned.name }} | Subject: {{ exam.subject.name }}
+                                    <br>Term: {{ exam.term.name }} | Due: {{ exam.due_date|date:"M d, Y" }} | Duration: {{ exam.duration }} min
+                                </small>
+                            </div>
+                            <div>
+                                {% if not exam.is_approved %}
+                                <span class="badge bg-warning text-dark">Pending Approval</span>
+                                {% elif exam.is_approved %}
+                                <span class="badge bg-success texr-dark">Approved</span>
+                                {% endif %}
+                            </div>
+                            <div>
+                                <a href="{% url 'view_exam' exam.id %}" class="btn btn-sm btn-outline-info me-2">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                <a href="{% url 'update_exam' exam.id %}" class="btn btn-sm btn-outline-warning me-2">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <a href="{% url 'delete_exam' exam.id %}" class="btn btn-sm btn-outline-danger" onclick="return confirm('Are you sure?');">
+                                    <i class="bi bi-trash"></i>
+                                </a>
+                            </div>
+                        </li>
+                        {% empty %}
+                        <li class="list-group-item text-muted text-center">No exams created yet.</li>
+                        {% endfor %}
+                    </ul>
+                    <!-- Link to View and Grade Exams -->
+                    <div class="mt-3">
+                        <a href="{% url 'teacher_exam_list' %}" class="btn btn-lg btn-outline-info">
+                            View All Exams
+                        </a>
+                    </div>
+                </div>
+            </div>
+
             <!-- Academic Record Section -->
             <div class="card mb-4 shadow-sm">
                 <div class="card-header">

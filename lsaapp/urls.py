@@ -30,14 +30,17 @@ from core.views import SessionListView, SessionDetailView, SessionCreateView, Se
 from core.views import TermListView, TermDetailView, TermCreateView, TermUpdateView, TermDeleteView
 from core.views import promote_student, repeat_student, demote_student, mark_dormant_student, mark_left_student, mark_active
 from core.views import create_assessment, admin_assessment_list, approve_assessment, pending_approvals, view_assessment, class_subjects
+from core.views import create_exam, admin_exam_list, approve_exam, pending_approvals, view_exam, class_subjects
 from core.student.views import StudentListView, StudentCreateView, StudentUpdateView, StudentDetailView, StudentDeleteView, BulkUpdateStudentsView, export_students, student_reports
-from core.student.views import submit_assignment, submit_assessment
+from core.student.views import submit_assignment, submit_assessment, submit_exam
 from core.teacher.views import TeacherListView, TeacherCreateView, TeacherUpdateView, TeacherDetailView, TeacherDeleteView, TeacherBulkActionView, export_teachers, teacher_reports
 from core.teacher.views import input_scores, broadsheet, mark_attendance, attendance_log, message_guardian, update_result, view_na_result, grade_essay_questions
 from core.teacher.views import create_assignment, add_question, grade_assignment, view_submitted_assignments, update_assignment, delete_assignment, assignment_detail, assignment_list
 from core.teacher.views import create_assessment, teacher_assessment_list, view_assessment, update_assessment, delete_assessment, grade_essay_assessment
+from core.teacher.views import create_exam, teacher_exam_list, view_exam, update_exam, delete_exam, grade_essay_exam
 from core.guardian.views import GuardianListView, GuardianCreateView, GuardianUpdateView, GuardianDetailView, GuardianDeleteView, GuardianBulkActionView
 from core.guardian.views import financial_record_detail, view_student_result, export_guardians, guardian_reports
+from core.guardian.views import submit_assignment, submit_assessment, submit_exam
 from core.classes.views import ClassListView, ClassCreateView, ClassUpdateView, ClassDetailView, ClassDeleteView, EnrollStudentView
 from core.views import SubjectCreateView, SubjectListView, SubjectUpdateView, SubjectDetailView, SubjectDeleteView
 from core.results.views import ResultCreateView, ResultListView, ResultUpdateView, ResultDetailView, ResultDeleteView
@@ -208,12 +211,24 @@ urlpatterns = [
     path('approve/<int:assessment_id>/', approve_assessment, name='approve_assessment'),
     path('pending-approvals/', pending_approvals, name='pending_approvals'),
     path('teacher-list/', teacher_assessment_list, name='teacher_assessment_list'),
-    path('admin-list/', admin_assessment_list, name='admin_assessment_list'),
+    path('admin-assessment-list/', admin_assessment_list, name='admin_assessment_list'),
     path('assessment<int:assessment_id>/', view_assessment, name='view_assessment'),
     path('update/<int:assessment_id>/', update_assessment, name='update_assessment'),
     path('delete/<int:assessment_id>/', delete_assessment, name='delete_assessment'),
     path('submit_assessment/<int:assessment_id>/', submit_assessment, name='submit_assessment'),
     path('grade_assessent/<int:submission_id>/', grade_essay_assessment, name='grade_essay_assessment'),
+
+    # Exam URLs
+    path('exams-create/', create_exam, name='create_exam'),
+    path('approve/<int:exam_id>/', approve_exam, name='approve_exam'),
+    path('pending-approvals/', pending_approvals, name='pending_approvals'),
+    path('teacher-list/', teacher_exam_list, name='teacher_exam_list'),
+    path('admin-exam-list/', admin_exam_list, name='admin_exam_list'),
+    path('exam<int:exam_id>/', view_exam, name='view_exam'),
+    path('update/<int:exam_id>/', update_exam, name='update_exam'),
+    path('delete/<int:exam_id>/', delete_exam, name='delete_exam'),
+    path('submit_exam/<int:exam_id>/', submit_exam, name='submit_exam'),
+    path('grade_assessent/<int:submission_id>/', grade_essay_exam, name='grade_essay_exam'),
 ]
 
 

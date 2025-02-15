@@ -481,8 +481,8 @@ class Assignment(models.Model):
     subject = models.ForeignKey('Subject', on_delete=models.CASCADE)
     class_assigned = models.ForeignKey('Class', related_name='assignments', on_delete=models.CASCADE)
     due_date = models.DateTimeField(default=timezone.now)
-    created_at = models.DateTimeField(default=datetime.now())
-    updated_at = models.DateTimeField(default=datetime.now())
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(default=timezone.now)
     active = models.BooleanField(default=True)  # To mark assignments as active/inactive
 
     def has_expired(self):
@@ -524,7 +524,7 @@ class Question(models.Model):
 class AssignmentSubmission(models.Model):
     student = models.ForeignKey('Student', on_delete=models.CASCADE)
     assignment = models.ForeignKey(Assignment, related_name='submissions', on_delete=models.CASCADE)
-    submitted_at = models.DateTimeField(auto_now_add=True)
+    submitted_at = models.DateTimeField(default=timezone.now)
     answers = models.JSONField()  # Store answers as JSON for simplicity
     grade = models.FloatField(null=True, blank=True)  # Auto-graded for SCQ/MCQ
     feedback = models.TextField(null=True, blank=True)  # Teacher feedback for essay/manual grading
@@ -593,8 +593,8 @@ class Assessment(models.Model):
     is_approved = models.BooleanField(default=False)  # New field
     created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name="created_assessments")
     approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="approved_assessments")
-    created_at = models.DateTimeField(default=datetime.now())
-    updated_at = models.DateTimeField(default=datetime.now())
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(default=timezone.now)
 
     def __str__(self):
         return f"{self.title} - {self.subject.name}"
@@ -611,7 +611,7 @@ class AssessmentSubmission(models.Model):
     student = models.ForeignKey('Student', on_delete=models.CASCADE)
     answers = models.JSONField()  # Stores the student's answers
     score = models.IntegerField(null=True, blank=True)
-    submitted_at = models.DateTimeField(auto_now_add=True)
+    submitted_at = models.DateTimeField(default=timezone.now)
     is_graded = models.BooleanField(default=False)
     requires_manual_review = models.BooleanField(default=False)
 
@@ -619,19 +619,24 @@ class AssessmentSubmission(models.Model):
         return f"{self.student.user.get_full_name()} - {self.assessment.title}"
 
 class Exam(models.Model):
+    term = models.ForeignKey('Term', on_delete=models.CASCADE, default=1)
     subject = models.ForeignKey('Subject', on_delete=models.CASCADE)
     title = models.CharField(max_length=255, null=True)
     short_description = models.CharField(max_length=500, null=True, blank=True)
-    date = models.DateField(default=timezone.now)
     score = models.IntegerField(default=0, null=True, blank=True)
     class_assigned = models.ForeignKey('Class', on_delete=models.CASCADE, default=None)
-    is_online = models.BooleanField(default=False)
-    due_date = models.DateTimeField(null=True, blank=True)  # Only for online
-    duration = models.IntegerField(null=True, blank=True)  # Only for online, in minutes
-    questions = models.ManyToManyField('OnlineQuestion', related_name='exams', blank=True)  # Link to questions
+    is_online = models.BooleanField(default=True)
+    due_date = models.DateTimeField(null=True, blank=True)
+    duration = models.IntegerField(null=True, blank=True)
+    questions = models.ManyToManyField('OnlineQuestion', related_name='exams', blank=True)
+    is_approved = models.BooleanField(default=False)  # New field
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name="created_exams")
+    approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="approved_exams")
+    created_at = models.DateTimeField(default=timezone.now)
+    updated_at = models.DateTimeField(default=timezone.now)
 
     def __str__(self):
-        return f"{self.title} - {self.subject.name} - {self.class_assigned.name}"
+        return f"{self.title} - {self.subject.name}"
 
     @property
     def is_due(self):
@@ -639,8 +644,19 @@ class Exam(models.Model):
         if self.is_online and self.due_date:
             return timezone.now() > self.due_date
         return False
-    
 
+class ExamSubmission(models.Model):
+    exam = models.ForeignKey('Exam', on_delete=models.CASCADE)
+    student = models.ForeignKey('Student', on_delete=models.CASCADE)
+    answers = models.JSONField()  # Stores the student's answers
+    score = models.IntegerField(null=True, blank=True)
+    submitted_at = models.DateTimeField(default=timezone.now)
+    is_graded = models.BooleanField(default=False)
+    requires_manual_review = models.BooleanField(default=False)
+
+    def __str__(self):
+        return f"{self.student.user.get_full_name()} - {self.exam.title}"
+    
 class AcademicAlert(models.Model):
     ALERT_TYPE_CHOICES = [
         ('assignment', 'Assignment'),

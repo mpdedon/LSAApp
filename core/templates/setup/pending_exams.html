@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Pending Approvals</h2>
+<table>
+    <thead>
+        <tr>
+            <th>Title</th>
+            <th>Teacher</th>
+            <th>Class</th>
+            <th>Actions</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for exam in pending_exams %}
+        <tr>
+            <td>{{ exam.title }}</td>
+            <td>{{ exam.created_by.get_full_name }}</td>
+            <td>{{ exam.class_assigned.name }}</td>
+            <td><a href="{% url 'exams:approve_exam' exam.id %}">Approve</a></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}
