@@ -27,7 +27,7 @@ SECRET_KEY = os.environ.get('SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = bool(os.environ.get('DEBUG', default=0))
 
-ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', '*,localhost:8000,127.0.0.1:8000,0.0.0.0:8000,learnswift.icu').split(',')
+ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', '*,localhost:8001,127.0.0.1:8001,0.0.0.0:8000,learnswift.icu').split(',')
 # Application definition
 
 INSTALLED_APPS = [
@@ -76,7 +76,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'lsaapp.wsgi.application'
+WSGI_APPLICATION = 'lsaapp.wsgi:application'
 
 
 # Database
@@ -158,14 +158,14 @@ SECURE_HSTS_PRELOAD = False
 SECURE_HSTS_INCLUDE_SUBDOMAINS = False
 
 CSRF_TRUSTED_ORIGINS = [
-    'http://localhost:8000'
+    'http://localhost:8001'
     'https://learnswift.icu',  # Add your domain here
 ]
 
 # Set a session timeout (optional)
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 
-LOG_DIR = '/app/logs'
+LOG_DIR = '/tmp/logs'
 if not os.path.exists(LOG_DIR):
     os.makedirs(LOG_DIR)
 
