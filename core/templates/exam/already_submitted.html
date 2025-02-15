@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-3">
+    <div class="card shadow-lg border-info">
+        <div class="card-body text-center">
+            <h2 class="text-info">Exam Already Submitted</h2>
+            <p class="lead">You have already submitted this exam. Further submissions are not allowed.</p>
+            {% if request.user.student %}
+                <a href="{% url 'student_dashboard' %}" class="btn btn-primary">Back to Dashboard</a>
+            {% elif request.user.guardian %}
+                <a href="{% url 'guardian_dashboard' %}" class="btn btn-success">Back to Dashboard</a>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

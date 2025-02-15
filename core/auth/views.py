@@ -170,6 +170,7 @@ def teacher_dashboard(request):
     guardians = set(student.student_guardian for student in students if student.student_guardian is not None)
     assignments = Assignment.objects.filter(teacher=teacher)
     assessments = Assessment.objects.filter(created_by=teacher.user).order_by('-created_at')
+    exams = Exam.objects.filter(created_by=teacher.user).order_by('-created_at')
     
     current_session = Session.objects.get(is_active=True)
     current_term = Term.objects.filter(session=current_session, is_active=True).order_by('-start_date').first()
@@ -200,6 +201,7 @@ def teacher_dashboard(request):
         'weeks': weeks,
         'assignments': assignments,
         'assessments': assessments,
+        'exams': exams,
         'message_counts': message_counts_dict,
     }
 

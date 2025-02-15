@@ -1,0 +1,9 @@
+{% extends 'base.html' %}
+{% block content %}
+<h2>Approve Assessment</h2>
+<p>Do you want to approve the exam "{{ exam.title }}"?</p>
+<form method="POST">
+    {% csrf_token %}
+    <button type="submit" class="btn btn-success">Approve</button>
+</form>
+{% endblock %}

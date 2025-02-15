@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-5">
+    <div>
+        <strong>{{ exam.title }}</strong>
+        <br>
+        <small class="text-muted">
+            Class: {{ exam.class_assigned.name }} | Subject: {{ exam.subject.name }}
+            <br>Term: {{ exam.term.name }} | Due: {{ exam.due_date|date:"M d, Y" }} | Duration: {{ exam.duration }} min
+        </small>
+    </div>
+
+    <form method="post" class="mt-4">
+        {% csrf_token %}
+        {% for question in questions %}
+            <div class="card mb-3 p-3 shadow-sm">
+                <p><strong>Q{{ forloop.counter }}: {{ question.question_text }}</strong></p>
+                
+                {% if question.question_type == "SCQ" or question.question_type == "MCQ" %}
+                    {% for option in question.options_list %}
+                        <div class="form-check">
+                            <input type="radio" class="form-check-input" name="answer_{{ question.id }}" value="{{ option }}" required>
+                            <label class="form-check-label">{{ option }}</label>
+                        </div>
+                    {% endfor %}
+                {% elif question.question_type == "ES" %}
+                    <textarea name="answer_{{ question.id }}" class="form-control mt-2" rows="4" required></textarea>
+                {% endif %}
+            </div>
+        {% endfor %}
+        
+        <button type="submit" class="btn btn-success w-100">Submit Exam</button>
+    </form>
+</div>
+{% endblock %}

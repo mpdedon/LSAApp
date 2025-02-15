@@ -1,0 +1,77 @@
+{%   'base.html' %}
+
+{% block content %}
+<div class="container my-5" style="max-width: 80%;">
+    <h2>My Exams</h2>
+    <table class="table table-striped table-bordered">
+        <thead class="thead-dark">
+            <tr>
+                <th>Title</th>
+                <th>Subject</th>
+                <th>Class</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for exam in exams %}
+                <tr>
+                    <td>{{ exam.title }}</td>
+                    <td>{{ exam.subject.name }}</td>
+                    <td>{{ exam.class_assigned.name }}</td>
+                    <td>
+                        <span class="badge {% if exam.is_approved %}bg-success{% else %}bg-warning{% endif %}">
+                            {% if exam.is_approved %}
+                                Approved
+                            {% else %}
+                                Pending Approval
+                            {% endif %}
+                        </span>
+                    </td>
+                    <td>
+                        <a href="{% url 'view_exam' exam.id %}" class="btn btn-info btn-sm">View</a>
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    <!-- Submitted Exams Section -->
+    <div class="card mb-4">
+        <div class="card-header bg-success text-white">Submitted exams</div>
+        <div class="card-body">
+            {% if submitted_exams %}
+                <ul class="list-group">
+                    {% for submission in submitted_exams %}
+                        <li class="list-group-item">
+                            <strong>{{ submission.exam.title }}</strong> - 
+                            {{ submission.student.user.get_full_name }} | Score: {{ submission.score }}
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p>No exams submitted yet.</p>
+            {% endif %}
+        </div>
+    </div>
+    <!-- Pending Essays Section -->
+    <div class="card mb-4">
+        <div class="card-header bg-warning text-white">Pending Essay Grading</div>
+        <div class="card-body">
+            {% if pending_essay_submissions %}
+                <ul class="list-group">
+                    {% for submission in pending_essay_submissions %}
+                        <li class="list-group-item">
+                            <strong>{{ submission.exam.title }}</strong> - 
+                            {{ submission.student.user.get_full_name }}
+                            <a href="{% url 'grade_essay_exam' submission.id %}" 
+                               class="btn btn-outline-primary btn-sm float-end">Grade Essay</a>
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p>No pending essay exams for review.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

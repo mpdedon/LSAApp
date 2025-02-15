@@ -1,0 +1,156 @@
+{% extends 'base.html' %}
+{% load add_class %}
+{% block content %}
+<div class="container my-5" style="max-width: 80%;">
+    <div class="card shadow-sm border-0">
+        <div class="card-header bg-info text-white text-center py-2">
+            <h2>Create a New Exam</h2>
+        </div>
+        <div class="card-body bg-light p-5">
+            <form method="POST">
+                {% csrf_token %}
+                <!-- Title -->
+                <div class="mb-4">
+                    <label for="id_title" class="form-label"><strong>Exam Title</strong></label>
+                    <input type="text" id="id_title" name="title" class="form-control" placeholder="Enter the title of the exam" required>
+                </div>
+
+                <!-- Description -->
+                <div class="mb-4">
+                    <label for="id_description" class="form-label"><strong>Description</strong></label>
+                    <textarea id="id_description" name="description" class="form-control" rows="3" placeholder="Provide a brief description" required></textarea>
+                </div>
+
+                <!-- Class Assigned and Subject -->
+                <div class="row mb-4">
+                    <div class="col-md-4">
+                        <label for="id_class_assigned" class="form-label"><strong>Class Assigned</strong></label>
+                        <div class="form-group">
+                            {{ form.class_assigned|add_class:"form-select" }}
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="id_subject" class="form-label"><strong>Subject</strong></label>
+                        <div class="form-group">
+                            {{ form.subject|add_class:"form-select" }}
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <label for="id_term" class="form-label"><strong>Term</strong></label>
+                        <div class="form-group"></div>
+                        {{ form.term | add_class:"form-select"}}
+                    </div>
+                </div>
+    
+                <!-- Due Date and Duration -->
+                 <div class="row mb-4">
+                    <div class="col-md-6">
+                        <label for="id_due_date" class="form-label"><strong>Due Date</strong></label>
+                        <input type="date" id="id_due_date" name="due_date" class="form-control" required>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="id_duration" class="form-label"><strong>Duration (in minutes)</strong></label>
+                        <input type="number" id="id_duration" name="duration" class="form-control" required>
+                    </div>
+                 </div>
+                
+                <!-- Questions Section -->
+                <div class="mt-5">
+                    <h4 class="mb-3">Questions</h4>
+                    <div id="questions-container"></div>
+                    <div class="text-center mt-4">
+                        <button type="button" id="add-question-btn" class="btn btn-success btn-lg">
+                            <i class="bi bi-plus-circle"></i> Add Question
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <div class="text-center mt-5">
+                    <button type="submit" class="btn btn-primary btn-lg px-5">
+                        <i class="bi bi-check-circle"></i> Save Exam
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- JavaScript for dynamic question management -->
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        let questionCount = 0;
+
+        const createQuestionCard = () => {
+            questionCount++;
+            return `
+                <div class="card mb-4 shadow-sm" id="question-card-${questionCount}">
+                    <div class="card-body">
+                        <h5 class="card-title">Question ${questionCount}</h5>
+                        <div class="mb-3">
+                            <label for="question_type_${questionCount}" class="form-label">Question Type</label>
+                            <select name="question_type_${questionCount}" id="question_type_${questionCount}" class="form-select">
+                                <option value="SCQ">Single Choice Question</option>
+                                <option value="MCQ">Multiple Choice Question</option>
+                                <option value="ES">Essay</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="question_text_${questionCount}" class="form-label">Question Text</label>
+                            <textarea name="question_text_${questionCount}" id="question_text_${questionCount}" class="form-control" rows="2" required></textarea>
+                        </div>
+                        <div class="mb-3 d-none" id="options-container-${questionCount}">
+                            <label for="options_${questionCount}" class="form-label">Options (comma-separated)</label>
+                            <input type="text" name="options_${questionCount}" id="options_${questionCount}" class="form-control" placeholder="Option1, Option2, Option3">
+                            <small class="form-text text-muted">Only for SCQ and MCQ types.</small>
+                        </div>
+                        <div class="mb-3 d-none" id="answer-container-${questionCount}">
+                            <label for="correct_answer_${questionCount}" class="form-label">Correct Answer</label>
+                            <input type="text" name="correct_answer_${questionCount}" id="correct_answer_${questionCount}" class="form-control">
+                        </div>
+                        <div class="mb-3 d-none" id="essay-answer-container-${questionCount}">
+                            <label for="essay_answer_${questionCount}" class="form-label">Suggested Answer (Optional)</label>
+                            <textarea name="essay_answer_${questionCount}" id="essay_answer_${questionCount}" class="form-control" rows="2"></textarea>
+                        </div>
+                        <button type="button" class="btn btn-danger btn-sm remove-question-btn" data-id="${questionCount}">
+                            <i class="bi bi-trash"></i> Remove Question
+                        </button>
+                    </div>
+                </div>
+            `;
+        };
+
+        const toggleQuestionFields = (id) => {
+            const questionType = document.getElementById(`question_type_${id}`).value;
+            const optionsContainer = document.getElementById(`options-container-${id}`);
+            const answerContainer = document.getElementById(`answer-container-${id}`);
+            const essayAnswerContainer = document.getElementById(`essay-answer-container-${id}`);
+
+            if (questionType === 'ES') {
+                optionsContainer.classList.add('d-none');
+                answerContainer.classList.add('d-none');
+                essayAnswerContainer.classList.remove('d-none');
+            } else {
+                optionsContainer.classList.remove('d-none');
+                answerContainer.classList.remove('d-none');
+                essayAnswerContainer.classList.add('d-none');
+            }
+        };
+
+        document.getElementById('add-question-btn').addEventListener('click', () => {
+            const questionsContainer = document.getElementById('questions-container');
+            questionsContainer.insertAdjacentHTML('beforeend', createQuestionCard());
+
+            const questionTypeSelect = document.getElementById(`question_type_${questionCount}`);
+            questionTypeSelect.addEventListener('change', () => toggleQuestionFields(questionCount));
+        });
+
+        document.getElementById('questions-container').addEventListener('click', (event) => {
+            if (event.target.classList.contains('remove-question-btn')) {
+                const questionId = event.target.getAttribute('data-id');
+                document.getElementById(`question-card-${questionId}`).remove();
+            }
+        });
+    });
+</script>
+{% endblock %}

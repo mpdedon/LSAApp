@@ -12,23 +12,22 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 
 from pathlib import Path
 import os
+from dotenv import load_dotenv
+import dj_database_url
+
+# Load environment variables from .env file
+load_dotenv()  
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
-
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-kf52q09*k_sqh%1lda&b8*msq*jg&@yk=n!#!ejrf1&3=#**&q'
+SECRET_KEY = os.environ.get('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = bool(os.environ.get('DEBUG', default=0))
 
-ALLOWED_HOSTS = []
-
-
+ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', '*,localhost:8000,127.0.0.1:8000,0.0.0.0:8000,learnswift.icu').split(',')
 # Application definition
 
 INSTALLED_APPS = [
@@ -56,6 +55,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
 ]
 
 ROOT_URLCONF = 'lsaapp.urls'
@@ -82,13 +82,26 @@ WSGI_APPLICATION = 'lsaapp.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/4.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
-}
+DATABASE_URL = os.getenv("DATABASE_URL")  # Fetch database URL from environment variables
 
+if DATABASE_URL:
+    DATABASES = {
+        'default': dj_database_url.config(default=DATABASE_URL)
+    }
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': 'lsaapp', 
+            'USER': 'lsaapp_user', 
+            'PASSWORD': 'password',  
+            'HOST': 'localhost',
+            'PORT': '5432',
+            'OPTIONS': {
+            'options': '-c search_path=lsaapp_schema'
+        },
+        }
+    }
 
 AUTH_USER_MODEL = 'core.CustomUser'
 
@@ -125,7 +138,7 @@ STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'core/static')
     ]
 STATIC_ROOT = BASE_DIR / "staticfiles"
-
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 # Media files
 
 MEDIA_URL = '/media/'
@@ -145,39 +158,40 @@ SECURE_HSTS_PRELOAD = False
 SECURE_HSTS_INCLUDE_SUBDOMAINS = False
 
 CSRF_TRUSTED_ORIGINS = [
+    'http://localhost:8000'
     'https://learnswift.icu',  # Add your domain here
 ]
 
-
 # Set a session timeout (optional)
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+
+LOG_DIR = '/app/logs'
+if not os.path.exists(LOG_DIR):
+    os.makedirs(LOG_DIR)
 
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
     'handlers': {
         'console': {
-            'level': 'INFO',
+            'level': 'ERROR',
             'class': 'logging.StreamHandler',
         },
         'file': {
             'level': 'ERROR',
             'class': 'logging.FileHandler',
-            'filename': 'logs/error.log',
+            'filename': os.path.join(LOG_DIR, 'error.log'),
+            'mode': 'a',  # Append mode
         },
     },
     'loggers': {
         'django': {
-            'handlers': ['console'],
-            'level': 'INFO',
+            'handlers': ['file', 'console'],  # Log to both file and console
+            'level': 'ERROR',
             'propagate': True,
         },
-        'custom': {
-            'handlers': ['file'],
-            'level': 'ERROR',
-            'propagate': False,
-        },
     },
+    
 }
 
 
@@ -185,5 +199,3 @@ LOGGING = {
 CELERY_BROKER_URL = 'redis://localhost:6379/0'
 CELERY_ACCEPT_CONTENT = ['json']
 CELERY_TASK_SERIALIZER = 'json'
-
-

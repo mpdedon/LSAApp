@@ -10,15 +10,15 @@ from core.models import CustomUser
 from core.tasks import send_email_task
 
 
-@receiver(post_save, sender=CustomUser)
-def send_welcome_email(sender, instance, created, **kwargs):
-    if created:
-        send_email_task.delay(
-            subject="Welcome to Our Platform",
-            to_email=instance.email,
-            template='emails/welcome_email.html',
-            context={'user': instance}
-        )
+# @receiver(post_save, sender=CustomUser)
+# def send_welcome_email(sender, instance, created, **kwargs):
+#    if created:
+#        send_email_task.delay(
+#            subject="Welcome to Our Platform",
+#            to_email=instance.email,
+#            template='emails/welcome_email.html',
+#            context={'user': instance}
+#        )
 
 
 @receiver(post_save, sender=Term)
