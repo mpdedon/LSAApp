@@ -29,6 +29,10 @@ DEBUG = True
 ALLOWED_HOSTS = []
 
 
+<<<<<<< HEAD
+=======
+ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', '*,localhost:8001,127.0.0.1:8001,0.0.0.0:8000,learnswift.icu').split(',')
+>>>>>>> 618f009e (Postgres Database for Render)
 # Application definition
 
 INSTALLED_APPS = [
@@ -76,7 +80,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'lsaapp.wsgi.application'
+WSGI_APPLICATION = 'lsaapp.wsgi:application'
 
 
 # Database
@@ -145,6 +149,10 @@ SECURE_HSTS_PRELOAD = False
 SECURE_HSTS_INCLUDE_SUBDOMAINS = False
 
 CSRF_TRUSTED_ORIGINS = [
+<<<<<<< HEAD
+=======
+    'http://localhost:8001'
+>>>>>>> 618f009e (Postgres Database for Render)
     'https://learnswift.icu',  # Add your domain here
 ]
 
@@ -152,6 +160,13 @@ CSRF_TRUSTED_ORIGINS = [
 # Set a session timeout (optional)
 SESSION_EXPIRE_AT_BROWSER_CLOSE = True
 
+<<<<<<< HEAD
+=======
+LOG_DIR = '/tmp/logs'
+if not os.path.exists(LOG_DIR):
+    os.makedirs(LOG_DIR)
+
+>>>>>>> 618f009e (Postgres Database for Render)
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
