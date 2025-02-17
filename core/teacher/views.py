@@ -70,16 +70,15 @@ class TeacherListView(View):
         status = request.GET.get('status', 'active')
         query = request.GET.get('q', '')
 
-        teachers = Teacher.objects.filter(status=status).order_by('current_class')
+        teachers = Teacher.objects.filter(status=status).order_by('first_name')
 
         if query:
             teachers = teachers.filter(
                 Q(user__username__icontains=query)  |
                 Q(user__first_name__icontains=query) |
                 Q(user__last_name__icontains=query) |
-                Q(user__email__icontains=query) |
-                Q(current_class__name__icontains=query) 
-            )
+                Q(user__email__icontains=query) 
+                                        )
 
         # Pagination
         paginator = Paginator(teachers, 15)  # Show 15 teachers per page

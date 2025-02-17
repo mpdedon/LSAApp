@@ -25,7 +25,7 @@ class Session(models.Model):
 
     def save(self, *args, **kwargs):
         if self.active:
-            Session.objects.filter(active=True).update(active=False)
+            Session.objects.filter(is_active=True).update(is_active=False)
         super().save(*args, **kwargs)
 
     def __str__(self):
