@@ -80,7 +80,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'lsaapp.wsgi:application'
+WSGI_APPLICATION = 'lsaapp.wsgi.application'
 
 
 # Database

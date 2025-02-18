@@ -3,6 +3,7 @@
 import json
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login
+from django.contrib.auth.mixins import UserPassesTestMixin
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 from django.template.loader import render_to_string
@@ -18,6 +19,10 @@ from core.assignment.forms import AssignmentSubmission, AssignmentSubmissionForm
 
 
 # Guardian Views
+class AdminRequiredMixin(UserPassesTestMixin):
+    def test_func(self):
+        return self.request.user.is_superuser
+    
 
 def GuardianRegisterView(request):
     if request.method == 'POST':
@@ -48,7 +53,7 @@ def guardian_dashboard(request):
     return render(request, 'guardian_dashboard.html')
 
 
-class GuardianListView(View):
+class GuardianListView(View, AdminRequiredMixin):
     template_name = 'guardian/guardian_list.html'
 
     def get(self, request, *args, **kwargs):
@@ -76,8 +81,7 @@ class GuardianListView(View):
             'query': query,
         })
 
-
-class GuardianBulkActionView(View):
+class GuardianBulkActionView(View, AdminRequiredMixin):
     def post(self, request, *args, **kwargs):
         action = request.POST.get('action')
         print(action)

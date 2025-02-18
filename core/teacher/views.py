@@ -6,6 +6,7 @@ from django.views import View
 from django.contrib import messages
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required, user_passes_test
+from django.contrib.auth.mixins import UserPassesTestMixin
 from django.core.paginator import Paginator
 from django.utils import timezone
 from django.utils.timezone import now
@@ -23,6 +24,10 @@ from core.assignment.forms import AssignmentForm, QuestionForm, AssignmentSubmis
 
 # Teacher Views
 
+class AdminRequiredMixin(UserPassesTestMixin):
+    def test_func(self):
+        return self.request.user.is_superuser
+    
 def TeacherRegisterView(request):
     if request.method == 'POST':
         form = TeacherRegistrationForm(request.POST, request.FILES)
@@ -60,14 +65,14 @@ def teacher_dashboard(request):
     }
     return render(request, 'teacher/teacher_dashboard.html', context)
 
-class TeacherListView(View):
+class TeacherListView(View, AdminRequiredMixin):
     template_name = 'teacher/teacher_list.html'
 
     def get(self, request, *args, **kwargs):
         status = request.GET.get('status', 'active')
         query = request.GET.get('q', '')
 
-        teachers = Teacher.objects.filter(status=status).order_by('first_name')
+        teachers = Teacher.objects.filter(status=status).order_by('employee_id')
 
         if query:
             teachers = teachers.filter(
@@ -87,7 +92,7 @@ class TeacherListView(View):
             'active_tab': status,
         })
 
-class TeacherBulkActionView(View):
+class TeacherBulkActionView(View, AdminRequiredMixin):
     def post(self, request, *args, **kwargs):
         action = request.POST.get('action')
         selected_teachers = request.POST.getlist('selected_teachers')

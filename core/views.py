@@ -32,6 +32,11 @@ from core.teacher_assignment.forms import TeacherAssignmentForm
 def home(request):
     return render(request, 'home.html')
 
+from django.views.generic import TemplateView
+
+def programs(request):
+    return render(request, 'programs.html')
+
 # Base Admin Privilege Mixin
 class AdminRequiredMixin(UserPassesTestMixin):
     def test_func(self):
