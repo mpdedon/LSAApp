@@ -20,11 +20,11 @@ from django.conf import settings
 from django.conf.urls.static import static
 
 from core.views import home, send_test_email
-from core.auth.views import RegisterView, GuardianRegistrationView, TeacherRegistrationView
+from core.auth.views import RegisterView, GuardianRegisterView, TeacherRegisterView
 from core.auth.views import CustomLoginView, CustomLogoutView
 from core.auth.views import PasswordResetView, PasswordResetDoneView, PasswordResetConfirmView, PasswordResetCompleteView
 from core.auth.views import teacher_dashboard, student_dashboard, guardian_dashboard
-from core.views import AdminDashboardView, PromoteStudentView
+from core.views import AdminDashboardView, PromoteStudentView, programs
 from core.views import CreateNotificationView, NotificationListView
 from core.views import SessionListView, SessionDetailView, SessionCreateView, SessionUpdateView, SessionDeleteView
 from core.views import TermListView, TermDetailView, TermCreateView, TermUpdateView, TermDeleteView
@@ -58,9 +58,10 @@ urlpatterns = [
    
     # Home and Auth URLs
     path('', home, name='home'),
+    path('programs/', programs, name='programs'),
     path('register/', RegisterView.as_view(), name='register'),
-    path('register/guardian/', GuardianRegistrationView.as_view(), name='guardian_register'),
-    path('register/teacher/', TeacherRegistrationView.as_view(), name='teacher_register'),
+    path('register/guardian/', GuardianRegisterView.as_view(), name='guardian_register'),
+    path('register/teacher/', TeacherRegisterView.as_view(), name='teacher_register'),
     path('login/', CustomLoginView.as_view(template_name='auth/login.html'), name='login'),
     path('logout/', CustomLogoutView.as_view(template_name='auth/logout.html', next_page='home'), name='logout'),
     path('password_reset/', PasswordResetView.as_view(), name='password_reset'),
