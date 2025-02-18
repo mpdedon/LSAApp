@@ -24,7 +24,11 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-kf52q09*k_sqh%1lda&b8*msq*jg&@yk=n!#!ejrf1&3=#**&q'
 
 # SECURITY WARNING: don't run with debug turned on in production!
+<<<<<<< HEAD
 DEBUG = True
+=======
+DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
+>>>>>>> e413b279 (Session Issues)
 
 ALLOWED_HOSTS = []
 
@@ -129,6 +133,10 @@ STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'core/static')
     ]
 STATIC_ROOT = BASE_DIR / "staticfiles"
+<<<<<<< HEAD
+=======
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+>>>>>>> e413b279 (Session Issues)
 
 # Media files
 
