@@ -6,6 +6,7 @@ from django.contrib.auth.views import PasswordResetView, PasswordResetDoneView, 
 from django.contrib.auth import login, get_user_model
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib.auth.forms import PasswordResetForm, SetPasswordForm
+from django.contrib.sessions.models import Session
 from django.contrib.messages.views import SuccessMessageMixin
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
@@ -154,6 +155,18 @@ def student_dashboard(request):
 @user_passes_test(lambda u: u.role == 'teacher')
 def teacher_dashboard(request):
 
+    # Check if there's a valid session key
+    session_key = request.session.session_key
+    if not session_key:
+        # No session key at all, redirect to login or handle as needed
+        return redirect('login_page')
+
+    try:
+        Session.objects.get(session_key=session_key)
+    except Session.DoesNotExist:
+        # Session is invalid or expired
+        return redirect('login_page')
+    
     if request.user.role != 'teacher':
         return redirect('login')  
     
@@ -208,6 +221,21 @@ def teacher_dashboard(request):
 @login_required
 @user_passes_test(lambda u: u.role == 'guardian')
 def guardian_dashboard(request):
+
+    session_key = request.session.session_key
+    if not session_key:
+        # No session key at all, redirect to login or handle as needed
+        return redirect('login_page')
+
+    try:
+        Session.objects.get(session_key=session_key)
+    except Session.DoesNotExist:
+        # Session is invalid or expired
+        return redirect('login_page')
+    
+    if request.user.role != 'guardian':
+        return redirect('login') 
+    
     guardian = Guardian.objects.get(user=request.user)
     students = guardian.students.all()
     current_session = Session.objects.get(is_active=True)
