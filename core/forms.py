@@ -46,7 +46,25 @@ class NotificationForm(forms.ModelForm):
     class Meta:
         model = Notification
         fields = ['title', 'message', 'audience', 'expiry_date', 'is_active']
-        widgets = {
-            'expiry_date': forms.DateInput(attrs={'type': 'date'}),
-        }
-
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['title'].widget.attrs.update({
+            'class': 'form-control',
+            'placeholder': 'Enter notification title'
+        })
+        self.fields['message'].widget.attrs.update({
+            'class': 'form-control',
+            'rows': 4,
+            'placeholder': 'Enter the message content'
+        })
+        self.fields['audience'].widget.attrs.update({
+            'class': 'form-select'
+        })
+        self.fields['expiry_date'].widget.attrs.update({
+            'class': 'form-control',
+            'placeholder': 'YYYY-MM-DD'
+        })
+        self.fields['is_active'].widget.attrs.update({
+            'class': 'form-check-input'
+        })

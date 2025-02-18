@@ -2,22 +2,23 @@
 
 {% load crispy_forms_tags %}
 {% block content %}
-<div class="container mt-4">
-    <h2 class="text-center mb-4">{% if is_update %}Update Term{% else %}Create Term{% endif %}</h2>
- 
+<div class="container mt-4" style="max-width: 600px;">
     <div class="card">
+        <div class="card-header">
+            <h2 class="text-center mb-4">{% if is_update %}Update Term{% else %}Create Term{% endif %}</h2>
+        </div>
         <div class="card-body">
             <form method="post" enctype="multipart/form-data" class="needs-validation" novalidate action="{% if is_update %}{% url 'term_update' term.id %}{% else %}{% url 'term_create' %}{% endif %}">
                 {% csrf_token %}
                 
                 <div class="form-row">
-                    <div class="form-group col-md-6">
+                    <div class="form-group col-md-12">
                         {{ form.session|as_crispy_field }}
                         <div class="invalid-feedback">
                             {{ form.session.errors }}
                         </div>
                     </div>
-                    <div class="form-group col-md-6">
+                    <div class="form-group col-md-12">
                         {{ form.name|as_crispy_field }}
                         <div class="invalid-feedback">
                             {{ form.name.errors }}
@@ -26,13 +27,13 @@
                 </div>
 
                 <div class="form-row">
-                    <div class="form-group col-md-6">
+                    <div class="form-group col-md-12">
                         {{ form.start_date|as_crispy_field }} 
                         <div class="invalid-feedback">
                             {{ form.start_date.errors }}
                         </div>
                     </div>
-                    <div class="form-group col-md-6">
+                    <div class="form-group col-md-12">
                         {{ form.end_date|as_crispy_field }}
                         <div class="invalid-feedback">
                             {{ form.end_date.errors }}
@@ -41,7 +42,7 @@
                 </div>
 
                 <div class="form-row">
-                    <div class="form-group col-md-6">
+                    <div class="form-group col-md-12">
                         {{ form.is_active|as_crispy_field }}
                         <div class="invalid-feedback">
                             {{ form.is_active.errors }}

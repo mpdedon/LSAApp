@@ -31,7 +31,6 @@ class ClassCreateView(View):
         if form.is_valid():
             try:
                 form.save()
-                print("Class created successfully!")  # Debug success message
                 return redirect('class_list')
             except Exception as e:
                 print(f"Error during save: {e}")  # Debug database errors

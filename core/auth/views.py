@@ -36,46 +36,42 @@ class RegisterView(TemplateView):
         # Add any custom context if needed
         return context
 # Custom Guardian Registration
-class GuardianRegistrationView(FormView):
+class GuardianRegisterView(FormView):
     template_name = 'auth/guardian_register.html'
-    form_class = GuardianRegistrationForm
-    success_url = reverse_lazy('guardian_registration')
 
-    def form_valid(self, form):
-        # Create the user and guardian instances
-        user = form.save(commit=False)
-        user.role = 'guardian'
-        user.save()
+    def get(self, request, *args, **kwargs):
+        form = GuardianRegistrationForm()
+        return render(request, self.template_name, {'form': form})
 
-        # Create Guardian profile
-        guardian = form.save_guardian_profile(user)
-        messages.success(self.request, f"Guardian {user.username} registered successfully!")
-        return super().form_valid(form)
+    def post(self, request, *args, **kwargs):
+        form = GuardianRegistrationForm(request.POST)
+        if form.is_valid():
+            form.save()
+            return redirect('login')
+        else:
+            print(form.errors)
+            
+        return render(request, self.template_name, {'form': form})
 
     def form_invalid(self, form):
         messages.error(self.request, "There was an error with the registration. Please try again.")
         return super().form_invalid(form)
 
 # Custom Teacher Registration
-class TeacherRegistrationView(FormView):
+class TeacherRegisterView(FormView):
     template_name = 'auth/teacher_register.html'
-    form_class = TeacherRegistrationForm
-    success_url = reverse_lazy('teacher_registration')
 
-    def form_valid(self, form):
-        # Create the user and teacher instances
-        user = form.save(commit=False)
-        user.role = 'teacher'
-        user.save()
+    def get(self, request, *args, **kwargs):
+        form = TeacherRegistrationForm()
+        return render(request, self.template_name, {'form': form})
 
-        # Create Teacher profile
-        teacher = form.save_teacher_profile(user)
-        messages.success(self.request, f"Teacher {user.username} registered successfully!")
-        return super().form_valid(form)
-
-    def form_invalid(self, form):
-        messages.error(self.request, "There was an error with the registration. Please try again.")
-        return super().form_invalid(form)
+    def post(self, request, *args, **kwargs):
+        form = TeacherRegistrationForm(request.POST)
+        if form.is_valid():
+            form.save()
+            return redirect('login')
+        return render(request, self.template_name, {'form': form})
+    
 
 # Login view
 class CustomLoginView(LoginView):
