@@ -301,7 +301,7 @@ class Teacher(models.Model):
     
 
     def __str__(self):
-        return self.user.get_full_name() - ({self.employee_id})
+        return f"{self.user.get_full_name()} - {self.employee_id}"
     
     def save(self, *args, **kwargs):
         if not self.employee_id:
