@@ -273,7 +273,11 @@ class Teacher(models.Model):
 
 
     def __str__(self):
+<<<<<<< HEAD
         return self.user.get_full_name()
+=======
+        return f"{self.user.get_full_name()} - {self.employee_id}"
+>>>>>>> e5c8a706 (Session Issues)
     
     def save(self, *args, **kwargs):
         if not self.employee_id:
