@@ -82,7 +82,7 @@ class CreateNotificationView(AdminRequiredMixin, CreateView):
         return render(request, self.template_name, {'form': form})
 
 def send_notification_to_users(notification):
-    if notification.audience in ['all', 'guardian']:
+    if notification.audience in ['all', 'guardian', 'teacher']:
         guardians = Guardian.objects.filter(groups__name='Guardians')
         for guardian in guardians:
             send_mail(
@@ -100,6 +100,16 @@ def send_notification_to_users(notification):
                 'from@example.com',
                 [student.email]
             )
+    if notification.audience in ['all', 'teacher']:
+        teachers = Teacher.objects.filter(groups__name='Teachers')
+        for teacher in teachers:
+            send_mail(
+                notification.title,
+                notification.message,
+                'admin@localhost',
+                [teacher.email]
+            )
+
 
 class NotificationListView(ListView):
     template_name = 'setup/notification_list.html'

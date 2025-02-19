@@ -407,12 +407,13 @@ def input_scores(request, class_id, subject_id, term_id):
                 subject_result = form.save(commit=False)
                 subject_result.is_finalized = final_submit
                 subject_result.save()  # Save the updated scores
-                print(f"Saved for {student.user.get_full_name}: Finalized: {subject_result.is_finalized}, CA1: {subject_result.continuous_assessment_1}")
+                print(f"Saved for {student.user.get_full_name()}: Finalized: {subject_result.is_finalized}")
             else:
                 all_forms_valid = False
-                print(f"Form errors for {student.user.get_full_name}: {form.errors}")
+                print(f"Form errors for {student.user.get_full_name()}: {form.errors}")
 
         if all_forms_valid:
+            print(subject_result.total_score())
             return redirect('broadsheet', class_id=class_id, term_id=term_id)
 
     forms = {student: SubjectResultForm(instance=subject_result, prefix=str(student.user.id)) for student, subject_result in subject_results.items()}
@@ -430,11 +431,9 @@ def input_scores(request, class_id, subject_id, term_id):
 def broadsheet(request, class_id, term_id):
     class_obj = get_object_or_404(Class, id=class_id)
     term = get_object_or_404(Term, id=term_id)
-    students = class_obj.students.all()
-
+    students = class_obj.enrolled_students.all()
     subjects = class_obj.subjects.all()
-    print(subjects)
-    
+
     results_data = []
     for student in students:
         result = Result.objects.filter(student=student, term=term).first()
@@ -448,12 +447,12 @@ def broadsheet(request, class_id, term_id):
                 'gpa': gpa,
                 'total_score': total_score,
             })
-
+            print("Subject Results:", subject_results)
     # Sort students by total score and then by GPA
     results_data.sort(key=lambda x: (-x['total_score'], -x['gpa']))
 
     context = {
-        'students': subjects,
+        'students': students,
         'class': class_obj,
         'term': term,
         'results_data': results_data,

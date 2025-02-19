@@ -154,19 +154,7 @@ def student_dashboard(request):
 @login_required
 @user_passes_test(lambda u: u.role == 'teacher')
 def teacher_dashboard(request):
-
-    # Check if there's a valid session key
-    session_key = request.session.session_key
-    if not session_key:
-        # No session key at all, redirect to login or handle as needed
-        return redirect('login_page')
-
-    try:
-        Session.objects.get(session_key=session_key)
-    except Session.DoesNotExist:
-        # Session is invalid or expired
-        return redirect('login_page')
-    
+ 
     if request.user.role != 'teacher':
         return redirect('login')  
     
@@ -221,18 +209,7 @@ def teacher_dashboard(request):
 @login_required
 @user_passes_test(lambda u: u.role == 'guardian')
 def guardian_dashboard(request):
-
-    session_key = request.session.session_key
-    if not session_key:
-        # No session key at all, redirect to login or handle as needed
-        return redirect('login_page')
-
-    try:
-        Session.objects.get(session_key=session_key)
-    except Session.DoesNotExist:
-        # Session is invalid or expired
-        return redirect('login_page')
-    
+  
     if request.user.role != 'guardian':
         return redirect('login') 
     

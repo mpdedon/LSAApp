@@ -57,13 +57,6 @@ h1, h2, h3, h4, h5, h6 {
     background-color: #f1f1f1;
 }
 
-.hero {
-    background: url("{% static 'images/hero-bg.jpg' %}") no-repeat center center;
-    background-size: cover;
-    color: #fff;
-    padding: 100px 0;
-}
-
 .card-img-top {
     height: 200px;
     object-fit: cover;
