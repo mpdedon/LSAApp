@@ -90,7 +90,7 @@
                     <td>{{ assignment.session.name }}</td>
                     <td>{{ assignment.term.name }}</td>
                     <td>
-                        <form method="post" action="{% url 'delete_class_subject_assignment' assignment.pk %}">
+                        <form method="post" action="{% url 'delete_class_subjects' class_instance.pk %}">
                             {% csrf_token %}
                             <button type="submit" class="btn btn-danger btn-sm">Delete</button>
                         </form>

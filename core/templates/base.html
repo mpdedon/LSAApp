@@ -18,7 +18,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet"/>
   <!-- Custom CSS -->
   {% load static %}
-  <link rel="stylesheet" href="{% static 'css/custom.css' %}" /> 
+  <!-- <link rel="stylesheet" href="{% static 'css/style.css' %}" /> -->
 
   <style>
     /* Make sure html/body take full height */
@@ -69,6 +69,11 @@
           <li class="nav-item">
             <a class="nav-link" href="{% url 'home' %}">
               <i class="fas fa-home me-1"></i>Home
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'programs' %}">
+              <i class="fas fa-pencil me-1"></i>Programs
             </a>
           </li>
           {% if user.is_authenticated %}
@@ -126,11 +131,6 @@
               </form>
             </li>
           {% else %}
-            <li class="nav-item">
-              <a class="nav-link" href="{% url 'programs' %}">
-                <i class="fas fa-pencil me-1"></i>Programs
-              </a>
-            </li>
             <li class="nav-item">
               <a class="btn btn-light btn-sm ms-2" href="{% url 'login' %}">
                 <i class="fas fa-sign-in-alt me-1"></i>Login
