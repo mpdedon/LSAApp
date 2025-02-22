@@ -136,7 +136,12 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 <<<<<<< HEAD
 =======
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+<<<<<<< HEAD
 >>>>>>> e413b279 (Session Issues)
+=======
+# STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
+
+>>>>>>> 3cd82a6b (Debug Teacher Assgt & Programs)
 
 # Media files
 

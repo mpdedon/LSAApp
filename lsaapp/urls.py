@@ -18,11 +18,16 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+<<<<<<< HEAD
 
 <<<<<<< HEAD
 from core.views import home
 from core.auth.views import RegisterView, GuardianRegistrationView, TeacherRegistrationView
 =======
+=======
+from django.conf.urls import handler404, handler500, handler403, handler400
+from core.views import custom_404, custom_500, custom_403, custom_400
+>>>>>>> 3cd82a6b (Debug Teacher Assgt & Programs)
 from core.views import home, send_test_email
 from core.auth.views import RegisterView, GuardianRegisterView, TeacherRegisterView
 >>>>>>> a6eaa791 (Production Errors Debug)
@@ -50,6 +55,7 @@ from core.views import StudentClassEnrollmentView, StudentEnrollmentsView
 from core.views import AssignSubjectView, AssignTeacherView, AssignClassSubjectView, DeleteClassSubjectAssignmentView
 from core.views import TeacherAssignmentListView, TeacherAssignmentUpdateView, TeacherAssignmentDetailView, TeacherAssignmentDeleteView
 from core.subject_assignment.views import SubjectAssignmentListView, SubjectAssignmentCreateView, SubjectAssignmentUpdateView, SubjectAssignmentDetailView, SubjectAssignmentDeleteView
+
 
 urlpatterns = [
 
@@ -207,5 +213,14 @@ urlpatterns = [
 
 ]
 
+<<<<<<< HEAD
+=======
+# Specify the fully qualified module path
+handler400 = 'core.views.custom_400'
+handler403 = 'core.views.custom_403'
+handler404 = 'core.views.custom_404'
+handler500 = 'core.views.custom_500'
+
+>>>>>>> 3cd82a6b (Debug Teacher Assgt & Programs)
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
