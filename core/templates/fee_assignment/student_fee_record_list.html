@@ -6,7 +6,7 @@
 <div class="container">
     <h2 class="mt-4">Student Fee Records - {{ session.name }} ({{ term.name }})</h2>
 
-    <form method="post" id="student-fee-form">
+    <form method="post" enctype="multipart/form-data" id="student-fee-form">
         {% csrf_token %}
         
         {% for class_name, page_obj in paginated_class_records.items %}
@@ -40,7 +40,9 @@
                             </td>
                             <td>
                                 <div class="form-check">
-                                    <input type="checkbox" name="waiver" class="form-check-input waiver-input" {% if record.waiver %}checked{% endif %}>
+                                    <input type="checkbox" name="waiver" class="form-check-input waiver-input" value="{{ record.id }}" {% if record.waiver %}checked{% endif %}>
+                                    <input type="hidden" name="record_id" value="{{ record.id }}">
+                                    <input type="hidden" name="action" value="update_waiver">
                                     <button type="submit" class="btn btn-primary btn-sm ms-2">Update</button>
                                 </div>
                             </td>

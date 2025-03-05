@@ -71,7 +71,7 @@ class GuardianListView(View, AdminRequiredMixin):
                 Q(contact__icontains=query) 
             )
 
-        paginator = Paginator(guardians, 15)
+        paginator = Paginator(guardians, 20)
         page_number = request.GET.get('page')
         page_obj = paginator.get_page(page_number)
 

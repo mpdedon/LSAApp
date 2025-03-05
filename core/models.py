@@ -259,7 +259,7 @@ class Teacher(models.Model):
 
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, primary_key=True, related_name='teacher')
     employee_id = models.CharField(max_length=20, unique=True, null=True)
-    profile_image = models.ImageField(upload_to='media/profile_images/', default='profile_images/default.jpg')
+    profile_image = models.ImageField(upload_to='profile_images/', default='profile_images/default.jpg')
     date_of_birth = models.DateField()
     gender = models.CharField(max_length=1, choices=GENDER_CHOICES, default='M')
     contact = models.CharField(max_length=15, null=True)
@@ -837,7 +837,7 @@ class Holiday(models.Model):
 class Notification(models.Model):
     title = models.CharField(max_length=255)
     message = models.TextField()
-    audience = models.CharField(max_length=20, choices=[('all', 'All'), ('guardian', 'Guardians'), ('student', 'Students')])
+    audience = models.CharField(max_length=20, choices=[('all', 'All'), ('guardian', 'Guardians'), ('student', 'Students'), ('teacher', 'Teachers')], default='all')
     created_at = models.DateTimeField(default=timezone.now)
     expiry_date = models.DateField(null=True, blank=True, help_text="Leave blank if the notification should not expire.")
     is_active = models.BooleanField(default=True)

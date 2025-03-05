@@ -686,20 +686,91 @@ class StudentFeeRecordListView(AdminRequiredMixin, ListView):
     model = StudentFeeRecord
     template_name = 'fee_assignment/student_fee_record_list.html'
     context_object_name = 'student_fee_records'
-    paginate_by = 20  # Adjust the number of records per page as needed
-    
+    paginate_by = 20
+
     def get_queryset(self):
-        # Synchronize records
         self.sync_fee_records()
-        return super().get_queryset().select_related('student', 'term', 'fee_assignment', 'student__current_class')
+        # IMPORTANT: Provide an order_by to avoid UnorderedObjectListWarning
+        return super().get_queryset() \
+            .select_related('student', 'term', 'fee_assignment', 'student__current_class') \
+            .order_by('student__current_class__name', 'student__user__last_name')
+
+    def post(self, request, *args, **kwargs):
+        # 1) Check if 'save_all' button was clicked
+        if 'save_all' in request.POST:
+            self.handle_save_all(request)
+            return redirect('fee_assignment_list')  
+        
+        else:
+            # 2) Otherwise, handle single-row updates
+            action = request.POST.get('action')
+            record_id = request.POST.get('record_id')
+            if action == 'update_discount':
+                discount_str = request.POST.get('discount', '0')
+                self.update_discount(record_id, discount_str)
+            elif action == 'update_waiver':
+                self.update_waiver(record_id, 'waiver' in request.POST)
+            # After single update, redirect or re-display the page
+            return redirect(request.path)
+
+    def handle_save_all(self, request):
+        """
+        Handle bulk saving of discount/waiver changes for all rows in the form.
+        """
+        # We'll parse all record_id and discount fields from the POST
+        record_ids = request.POST.getlist('record_id')
+        actions = request.POST.getlist('action')
+        discounts = request.POST.getlist('discount')
+        waived_ids = request.POST.getlist('waiver')
+
+        # Each row has the same 'name' attributes, so they appear as parallel lists
+        discount_index = 0  # We'll only increment this when we see a discount action
+
+        for i, rid in enumerate(record_ids):
+            record = StudentFeeRecord.objects.get(pk=rid)
+            if actions[i] == 'update_discount':
+                # Use the next discount value
+                discount_str = discounts[discount_index] if discount_index < len(discounts) else '0'
+                discount_index += 1
+                record.discount = Decimal(discount_str)
+            elif actions[i] == 'update_waiver':
+                # Check if this record_id was submitted in 'waiver'
+                waived_ids = request.POST.getlist('waiver')
+                record.waiver = (rid in waived_ids)
+                record.save()
+
+            record.net_fee = record.calculate_net_fee()
+            record.save()
+
+    def update_discount(self, record_id, discount_str):
+        """Handle a single discount update for a specific record."""
+        try:
+            record = StudentFeeRecord.objects.get(pk=record_id)
+        except StudentFeeRecord.DoesNotExist:
+            return
+        record.discount = Decimal(discount_str or '0.00')
+        record.net_fee = record.calculate_net_fee()
+        record.save()
+
+    def update_waiver(self, record_id, waiver_checked):
+        """Handle a single waiver update for a specific record."""
+        try:
+            record = StudentFeeRecord.objects.get(pk=record_id)
+        except StudentFeeRecord.DoesNotExist:
+            return
+        record.waiver = waiver_checked
+        record.net_fee = record.calculate_net_fee()
+        record.save()
 
     def sync_fee_records(self):
-        """Ensure fee records exist for all students."""
-        all_students = Student.objects.filter(current_class__isnull=False)  # Only students with a class
+        """Ensure fee records exist for all students and update if necessary."""
+        all_students = Student.objects.filter(current_class__isnull=False)
+
         for student in all_students:
             fee_assignments = FeeAssignment.objects.filter(class_instance=student.current_class)
+            
             for assignment in fee_assignments:
-                StudentFeeRecord.objects.get_or_create(
+                record, created = StudentFeeRecord.objects.get_or_create(
                     student=student,
                     term=assignment.term,
                     defaults={
@@ -710,6 +781,23 @@ class StudentFeeRecordListView(AdminRequiredMixin, ListView):
                         'net_fee': assignment.calculate_net_fee(assignment.amount, Decimal('0.00'), False),
                     }
                 )
+
+                # If the record already existed, update fields if necessary
+                if not created:
+                    updated = False
+                    if record.fee_assignment != assignment:
+                        record.fee_assignment = assignment
+                        updated = True
+                    if record.amount != assignment.amount:
+                        record.amount = assignment.amount
+                        updated = True
+                    if record.net_fee != record.calculate_net_fee():
+                        record.net_fee = record.calculate_net_fee()
+                        updated = True
+                    
+                    if updated:
+                        record.save()
+
                 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
