@@ -48,7 +48,7 @@ class GuardianRegisterView(FormView):
         return render(request, self.template_name, {'form': form})
 
     def post(self, request, *args, **kwargs):
-        form = GuardianRegistrationForm(request.POST)
+        form = GuardianRegistrationForm(request.POST, request.FILES)
         if form.is_valid():
             form.save()
             return redirect('login')
@@ -70,7 +70,7 @@ class TeacherRegisterView(FormView):
         return render(request, self.template_name, {'form': form})
 
     def post(self, request, *args, **kwargs):
-        form = TeacherRegistrationForm(request.POST)
+        form = TeacherRegistrationForm(request.POST, request.FILES)
         if form.is_valid():
             form.save()
             return redirect('login')
@@ -137,6 +137,11 @@ def student_dashboard(request):
     current_class = student.current_class
     subjects = current_class.subjects.prefetch_related('assignments').all()
     assignments = Assignment.objects.filter(class_assigned=current_class).select_related('teacher')
+<<<<<<< HEAD
+=======
+    assessments = Assessment.objects.filter(class_assigned=current_class).select_related('teacher')
+    exams = Exam.objects.filter(class_assigned=current_class).select_related('teacher')
+>>>>>>> aa6c4766 (Profile Pictures & Student Fee Records)
     results = Result.objects.filter(student=student).select_related('term')
     attendance = Attendance.objects.filter(student=student).order_by('-date')
 
