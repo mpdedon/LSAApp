@@ -65,7 +65,7 @@ class StudentListView(View):
             )
 
         # Paginate students
-        paginator = Paginator(students, 15)  # Show 15 students per page
+        paginator = Paginator(students, 20)  # Show 15 students per page
         page_number = request.GET.get('page')
         page_obj = paginator.get_page(page_number)
 

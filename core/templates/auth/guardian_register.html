@@ -17,7 +17,7 @@
         <div class="col-md-6 d-flex justify-content-center align-items-center">
             <div class="card shadow-lg p-5" style="width: 90%; max-width: 600px; border-radius: 20px; background: rgba(64, 174, 208, 0.9);">
                 <h3 class="text-center text-white mb-4">Guardian Registration</h3>
-                <form method="post" novalidate>
+                <form method="post" enctype="multipart/form-data" novalidate>
                     {% csrf_token %}
                     <div class="row g-3">
                         {{ form.non_field_errors }}

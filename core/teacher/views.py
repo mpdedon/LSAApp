@@ -86,7 +86,7 @@ class TeacherListView(View, AdminRequiredMixin):
                                         )
 
         # Pagination
-        paginator = Paginator(teachers, 15)  # Show 15 teachers per page
+        paginator = Paginator(teachers, 20)  # Show 15 teachers per page
         page_number = request.GET.get('page')
         page_obj = paginator.get_page(page_number)
 
