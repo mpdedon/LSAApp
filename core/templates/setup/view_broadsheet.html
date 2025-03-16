@@ -1,0 +1,102 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block content %}
+<div class="container mt-4">
+    <div class="card shadow-sm">
+        <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+            <h4 class="mb-0">📊 Broadsheet for {{ term.name }}</h4>
+            <a href="{% url 'all_broadsheets' %}" class="btn btn-warning btn-sm">⬅ Back to Term Broadsheets</a>
+        </div>
+        <div class="card-body">
+            <div class="accordion" id="broadsheetAccordion">
+                {% for broadsheet in broadsheets %}
+                <div class="accordion-item">
+                    <h2 class="accordion-header" id="heading{{ broadsheet.class.id }}">
+                        <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ broadsheet.class.id }}" aria-expanded="true">
+                            📚 {{ broadsheet.class.name }}
+                        </button>
+                    </h2>
+                    <div id="collapse{{ broadsheet.class.id }}" class="accordion-collapse collapse" aria-labelledby="heading{{ broadsheet.class.id }}" data-bs-parent="#broadsheetAccordion">
+                        <div class="accordion-body">
+                            <div class="table-responsive">
+                                <table class="table table-bordered table-striped">
+                                    <thead class="bg-light">
+                                        <tr>
+                                            <th>Student</th>
+                                            {% for subject in broadsheet.subjects %}
+                                                <th>{{ subject.name }}</th>
+                                            {% endfor %}
+                                            <th>Total Score</th>
+                                            <th>GPA</th>
+                                            <th>Approval</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for result in broadsheet.results_data %}
+                                        <tr>
+                                            <td><strong>{{ result.student.user.get_full_name }}</strong></td>
+                                            {% for subject_result in result.subject_results %}
+                                                <td>{{ subject_result.total_score }}</td>
+                                            {% endfor %}
+                                            <td><strong>{{ result.total_score }}</strong></td>
+                                            <td><span class="badge bg-info">{{ result.gpa }}</span></td>
+                                            <td>
+                                                {% if result.is_approved %}
+                                                    <span class="badge bg-success">✅ Approved</span>
+                                                {% else %}
+                                                    <span class="badge bg-danger">❌ Not Approved</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="text-center mt-3">
+                                {% if not broadsheet.is_approved %}
+                                    <button onclick="approveBroadsheet({{ term.id }}, {{ broadsheet.class.id }})" class="btn btn-success">✅ Approve Broadsheet</button>
+                                {% else %}
+                                    <span class="badge bg-success">✅ Approved</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <div class="text-center mt-4">
+                <button onclick="archiveBroadsheet({{ term.id }})" class="btn btn-dark">📂 Archive Broadsheet for Term</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    function approveBroadsheet(termId, classId) {
+        fetch(`/broadsheets/approve/${termId}/${classId}/`, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+        })
+        .then(response => response.json())
+        .then(data => {
+            alert(data.message);
+            location.reload();
+        })
+        .catch(error => console.error('Error:', error));
+    }
+
+    function archiveBroadsheet(termId) {
+        fetch(`/broadsheets/archive/${termId}/`, {
+            method: 'POST',
+            headers: { 'X-CSRFToken': '{{ csrf_token }}' }
+        })
+        .then(response => response.json())
+        .then(data => {
+            alert(data.message);
+            location.reload();
+        })
+        .catch(error => console.error('Error:', error));
+    }
+</script>
+{% endblock %}

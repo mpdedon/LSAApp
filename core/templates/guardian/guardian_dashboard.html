@@ -261,6 +261,7 @@
                                         </div>
                                     </div>
                                 </div>
+                                <br>
                                 <div class="row">
                                     <!-- Attendance Section -->
                                     <div class="attendance-section">
@@ -591,38 +592,35 @@
                                     </div>
                                     <!-- Results Section -->
                                     <div class="results-section mb-4">
-                                        <h5 class="card-title"><i class="bi bi-file-earmark-text me-2"></i>Results Overview</h5>
-                                        
-                                        <!-- Check if the user can access the results -->
-                                        {% if financial_data|get_item:student.user.id|get_item:'can_access_results' %}
-                                            <div class="row">
-                                                <div class="col-md-9">
-                                                    <div class="card shadow-sm py-3">
-                                                        <div class="card-body text-center">
-                                                            <h6>Results are Available</h6>
-                                                            <p>You have access to the results as more than 80% of the fee has been paid.</p>
-                                                        </div>
+                                        <h5 class="card-title"><i class="bi bi-file-earmark-text me-2"></i>Results Section</h5>
+                                        <div class="row">
+                                            <!-- Check if the user can access the results -->
+                                            {% if financial_data|get_item:student.user.id|get_item:'can_access_results' %}          
+                                            <div class="col-md-9">
+                                                <div class="card shadow-sm py-3">
+                                                    <div class="card-body text-center">
+                                                        <h6>Results are Available</h6>
+                                                        <p>Check Results (At least 80% of the fee has been paid).</p>
                                                     </div>
                                                 </div>
-                                                <div class="col-md-3 mb-4">
-                                                    <div class="card shadow-sm border-1">
-                                                        <div class="card-body text-center">
-                                                            <h5 class="card-title">{{ student.user.first_name }} {{ student.user.last_name }}</h5>
-                                                            {% with result=result_data|get_item:student.user.id %}
-                                                                {% if result %}
-                                                                    <a href="{% url 'view_student_result' result.student_id result.term_id %}" class="btn btn-primary btn-sm">
-                                                                        <i class="fas fa-file-alt"></i> View Results
-                                                                    </a>
-                                                                {% else %}
-                                                                    <p class="text-danger">No results available for this term.</p>
-                                                                {% endif %}
-                                                            {% endwith %}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                
                                             </div>
-                                        {% else %}
+                                            <div class="col-md-3 mb-4">
+                                                <div class="card shadow-sm py-3">
+                                                    <div class="card-body text-center">
+                                                        <h5 class="card-title">{{ student.user.first_name }} {{ student.user.last_name }}</h5>
+                                                        {% with result=result_data|get_item:student.user.id %}
+                                                            {% if result %}
+                                                                <a href="{% url 'view_student_result' result.student_id result.term_id %}" class="btn btn-primary btn-sm">
+                                                                    <i class="fas fa-file-alt"></i> View Results
+                                                                </a>
+                                                            {% else %}
+                                                                <p class="text-danger">No results available for this term.</p>
+                                                            {% endif %}
+                                                        {% endwith %}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {% else %}
                                             <div class="row">
                                                 <div class="col-md-12">
                                                     <div class="card shadow-sm py-3">
@@ -633,9 +631,43 @@
                                                     </div>
                                                 </div>
                                             </div>
-                                        {% endif %}
+                                            {% endif %}
+                                            <!-- Archived Results Accordion -->
+                                            <div class="col-md-12">
+                                                <div class="card shadow-sm border-1">
+                                                    <div class="card-body">
+                                                        <h5 class="card-title text-center"><i class="bi bi-archive"></i> Archived Results</h5>
+
+                                                        <div class="accordion" id="archivedResultsAccordion">
+                                                            {% with archived_results=archived_results_data|get_item:student.user.id %}
+                                                                {% if archived_results %}
+                                                                    {% for archive in archived_results %}
+                                                                        <div class="accordion-item">
+                                                                            <h2 class="accordion-header" id="heading{{ archive.term_id }}">
+                                                                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ archive.term_id }}" aria-expanded="false">
+                                                                                    {{ archive.term_name }}
+                                                                                </button>
+                                                                            </h2>
+                                                                            <div id="collapse{{ archive.term_id }}" class="accordion-collapse collapse" aria-labelledby="heading{{ archive.term_id }}" data-bs-parent="#archivedResultsAccordion">
+                                                                                <div class="accordion-body text-center">
+                                                                                    <a href="{% url 'view_student_result' archive.student_id archive.term_id %}" class="btn btn-info btn-sm">
+                                                                                        <i class="fas fa-file-alt"></i> View Archived Results
+                                                                                    </a>
+                                                                                </div>
+                                                                            </div>
+                                                                        </div>
+                                                                    {% endfor %}
+                                                                {% else %}
+                                                                    <p class="text-muted text-center">No archived results available.</p>
+                                                                {% endif %}
+                                                            {% endwith %}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <!-- End of Archived Results Accordion -->
+                                        </div>
                                     </div>
-                                    <!-- Add more student-specific sections as needed -->
                                 </div>
                             </div>
                         {% endfor %}

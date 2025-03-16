@@ -407,10 +407,8 @@ def input_scores(request, class_id, subject_id, term_id):
                 subject_result = form.save(commit=False)
                 subject_result.is_finalized = final_submit
                 subject_result.save()  # Save the updated scores
-                print(f"Saved for {student.user.get_full_name()}: Finalized: {subject_result.is_finalized}")
             else:
                 all_forms_valid = False
-                print(f"Form errors for {student.user.get_full_name()}: {form.errors}")
 
         if all_forms_valid:
             print(subject_result.total_score())

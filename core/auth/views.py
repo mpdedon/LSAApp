@@ -146,6 +146,7 @@ def student_dashboard(request):
         'subjects': subjects,
         'assignments': assignments,
         'assessments': assessments,
+        'exams': exams,
         'results': results,
         'attendance': attendance,
     }
@@ -219,6 +220,7 @@ def guardian_dashboard(request):
     current_session = Session.objects.get(is_active=True)
     current_term = Term.objects.filter(session=current_session, is_active=True).order_by('-start_date').first()
     teachers = Teacher.objects.filter(subjectassignment__subject__students__in=students).distinct()
+    archived_terms = Term.objects.filter(is_active=False).order_by('-start_date')
 
     assignments_data = {}
     assessments_data = {}
@@ -228,6 +230,7 @@ def guardian_dashboard(request):
     attendance_logs = {}
     financial_data = {}
     result_data = {}
+    archived_results_data = defaultdict(list)
     
     notifications = Notification.objects.filter(
         Q(audience='guardian') | Q(audience='all'),
@@ -369,6 +372,17 @@ def guardian_dashboard(request):
             else:
                 result_data[student.user.id] = None
         
+        # Fetch archived results (past terms)
+        for term in archived_terms:
+            archived_result = Result.objects.filter(student=student, term=term).first()
+            if archived_result:
+                archived_results_data[student.user.id].append({
+                    'term_name': term.name,
+                    'term_id': term.id,
+                    'student_id': student.user.id,
+                    'result_id': archived_result.id
+                })
+
     context = {
         'guardian': guardian,
         'students': students,
@@ -381,6 +395,7 @@ def guardian_dashboard(request):
         'attendance_logs': attendance_logs,
         'financial_data': financial_data,
         'result_data': result_data,
+        'archived_results_data': archived_results_data,
         'notifications': notifications,
         'academic_alerts': academic_alerts,
     }
