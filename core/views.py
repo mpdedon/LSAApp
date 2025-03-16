@@ -555,6 +555,38 @@ class AssignClassSubjectView(AdminRequiredMixin, CreateView):
             'class_instance': class_instance,
         })
 
+<<<<<<< HEAD
+=======
+            return redirect(reverse('class_subjects'))
+
+        logger.error(f"Form is invalid: {form.errors}")
+        return render(request, self.template_name, {'form': form, 'class_instance': class_instance})
+
+
+def class_subjects(request): 
+    classes = Class.objects.all()
+    current_session = Session.objects.filter(is_active=True).first()
+    current_term = Term.objects.filter(is_active=True).first()
+
+    class_subjects_data = []
+
+    for class_instance in classes:
+        subjects = Subject.objects.filter(
+            class_assignments__class_assigned=class_instance,
+            class_assignments__session=current_session,
+            class_assignments__term=current_term
+        ).distinct()
+
+        class_subjects_data.append({
+            'class': class_instance,
+            'subjects': subjects
+        })
+
+    return render(request, 'setup/class_subjects.html', {'class_subjects_data': class_subjects_data})
+
+
+class DeleteClassSubjectAssigmentView(DeleteView, AdminRequiredMixin):
+>>>>>>> 75ee8863 (Class Subjects)
     def post(self, request, pk):
         class_instance = get_object_or_404(Class, pk=pk)
         form = ClassSubjectAssignmentForm(request.POST)
