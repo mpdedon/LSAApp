@@ -32,6 +32,7 @@ from core.views import TermListView, TermDetailView, TermCreateView, TermUpdateV
 from core.views import promote_student, repeat_student, demote_student, mark_dormant_student, mark_left_student, mark_active
 from core.views import create_assessment, admin_assessment_list, approve_assessment, pending_approvals, view_assessment, class_subjects
 from core.views import create_exam, admin_exam_list, approve_exam, pending_approvals, view_exam, class_subjects
+from core.views import broadsheets, view_broadsheet, approve_broadsheet, archive_broadsheet
 from core.student.views import StudentListView, StudentCreateView, StudentUpdateView, StudentDetailView, StudentDeleteView, BulkUpdateStudentsView, export_students, student_reports
 from core.student.views import submit_assignment, submit_assessment, submit_exam
 from core.teacher.views import TeacherListView, TeacherCreateView, TeacherUpdateView, TeacherDetailView, TeacherDeleteView, TeacherBulkActionView, export_teachers, teacher_reports
@@ -94,6 +95,10 @@ urlpatterns = [
     path('setup/enrol_student/', StudentClassEnrollmentView, name='enrol_student'),
     path('student/<int:student_id>/enrollments/', StudentEnrollmentsView, name='view_enrollments'),
     path('setup/promote_students', PromoteStudentView.as_view(), name='promote_students'),
+    path('all_broadsheets/', broadsheets, name='all_broadsheets'),
+    path('broadsheets/<int:term_id>/', view_broadsheet, name='view_broadsheet'),
+    path('broadsheets/approve/<int:term_id>/<int:class_id>/', approve_broadsheet, name='approve_broadsheet'),
+    path('broadsheets/archive/<int:term_id>/', archive_broadsheet, name='archive_broadsheet'),
 
     # Subject & Teacher Assignment URLs
     path('assign_teacher/', AssignTeacherView, name='assign_teacher'),
@@ -177,7 +182,6 @@ urlpatterns = [
     path('assign_class_subjects/<int:pk>/', AssignClassSubjectView.as_view(), name='assign_class_subject'),
     path('class_subjects', class_subjects, name='class_subjects'),
     path('class_subjects/<int:pk>/delete/', DeleteClassSubjectAssigmentView.as_view(), name='delete_class_subjects'),
-
 
     # Subject URLs
     path('subjects/', SubjectListView.as_view(), name='subject_list'),

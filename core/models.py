@@ -714,6 +714,9 @@ class Result(models.Model):
     # Continuous assessments and assignments for each subject
     subjects = models.ManyToManyField('Subject', through='SubjectResult')
 
+    is_approved = models.BooleanField(default=False)
+    is_archived = models.BooleanField(default=False)
+    
     def total_continuous_assessment(self, subject):
         return sum(getattr(self, f'{subject}_ca{i}', 0) for i in range(1, 4))
 
@@ -782,7 +785,7 @@ class SubjectResult(models.Model):
     
     def calculate_grade(self):
         score = self.total_score()
-        if score >= 75:
+        if score >= 80:
             return 'A'
         elif score >= 65:
             return 'B'
@@ -923,11 +926,40 @@ class Payment(models.Model):
     payment_date = models.DateField(default=timezone.now)
     financial_record = models.ForeignKey('FinancialRecord', related_name='payments', on_delete=models.CASCADE, default=None)
 
+    def save(self, *args, **kwargs):
+
+        self.full_clean()  
+        super().save(*args, **kwargs)
+
+        # Only save the financial record if it exists
+        if self.financial_record:
+            self.financial_record.save()
+
+        # Get the latest StudentFeeRecord to calculate net fee
+        student_fee_record = StudentFeeRecord.objects.filter(student=self.student, term=self.term).first()
+        if not student_fee_record:
+            raise ValidationError("No fee record exists for this student and term.")
+
+        net_fee = student_fee_record.net_fee
+        if self.amount_paid > net_fee:
+            raise ValidationError(f"Payment exceeds the Total Fees for the student: {self.student}")
+        
+        if student_fee_record.waiver:
+            raise ValidationError("Payment not allowed for waived fees.")
+
+        # Calculate total paid including this payment
+        existing_payments = Payment.objects.filter(financial_record=self.financial_record).exclude(pk=self.pk)
+        total_paid = existing_payments.aggregate(total=Sum('amount_paid'))['total'] or 0
+        new_total = total_paid + (self.amount_paid or 0)
+
+        if new_total > net_fee:
+            raise ValidationError(f"Total payments ({new_total}) exceed net fee ({net_fee}).")
+
+
     def __str__(self):
         return f"{self.student.user.get_full_name()} - {self.term} - {self.amount_paid} on {self.payment_date}"
 
 
-# In models.py
 class FinancialRecord(models.Model):
     student = models.ForeignKey('Student', on_delete=models.CASCADE)
     term = models.ForeignKey('Term', on_delete=models.CASCADE)
@@ -938,7 +970,18 @@ class FinancialRecord(models.Model):
     archived = models.BooleanField(default=False)
     
     class Meta:
-        unique_together = ('student', 'term')  # Ensure one record per student per term
+        unique_together = ('student', 'term')
+        # Add check constraint to prevent negative values
+        constraints = [
+            models.CheckConstraint(
+                check=models.Q(total_fee__gte=0),
+                name='positive_total_fee'
+            ),
+            models.CheckConstraint(
+                check=models.Q(total_paid__gte=0),
+                name='positive_total_paid'
+            ),
+        ]
 
     def __str__(self):
         return f"{self.student.user.get_full_name()} - {self.term}"
@@ -947,16 +990,24 @@ class FinancialRecord(models.Model):
         """Automatically update outstanding balance and archive if term ends."""
         # Calculate net fee from FeeAssignment
         student_fee_record = StudentFeeRecord.objects.filter(student=self.student, term=self.term).first()
+        
         if student_fee_record:
             self.total_fee = student_fee_record.net_fee
             self.total_discount = student_fee_record.discount
+        else:
+            self.total_fee = 0
+            self.total_discount = 0
 
-        # Calculate total paid based on linked payments
-        self.total_paid = self.payments.aggregate(total=Sum('amount_paid'))['total'] or 0
+        # Calculate total paid based on linked payments and update total_paid if the record already exists in the database
+        if self.pk:
+            self.total_paid = self.payments.aggregate(total=Sum('amount_paid'))['total'] or 0
+        else:
+            self.total_paid = 0  
+        
         self.outstanding_balance = max(self.total_fee - self.total_paid, 0)
 
         # Archive if the term has ended
-        if self.term.end_date <= timezone.now().date():
+        if self.term.is_active:
             self.archived = True
 
         # Save changes without `update_fields` argument

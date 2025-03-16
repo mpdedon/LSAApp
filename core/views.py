@@ -8,7 +8,8 @@ from django.db.models import Sum, Max, Q
 from django.contrib import messages
 from django.views.generic import ListView, CreateView, DetailView, UpdateView, DeleteView, TemplateView, FormView
 from django.core.paginator import Paginator
-from django.http import HttpResponseBadRequest
+from django.core.exceptions import ValidationError
+from django.http import HttpResponseBadRequest, JsonResponse
 from django.core.mail import send_mail
 from django.shortcuts import HttpResponse
 from django.utils import timezone
@@ -608,32 +609,85 @@ class DeleteClassSubjectAssigmentView(DeleteView, AdminRequiredMixin):
 
 
 @login_required
-def approve_broadsheets(request):
-    if not request.user.is_staff:
-        return redirect('teacher_dashboard')
+def broadsheets(request):
+    """Display a paginated list of available terms (latest first)"""
+    terms = Term.objects.order_by('-start_date')  # Latest terms first
+    paginator = Paginator(terms, 6)  # Paginate (5 terms per page)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
 
-    terms = Term.objects.all()
-    class_instances = Class.objects.all()
-    context = {
-        'terms': terms,
-        'class_instances': class_instances,
-    }
-    return render(request, 'approve_broadsheets.html', context)
+    return render(request, 'setup/all_broadsheets.html', {'page_obj': page_obj})
 
 @login_required
-def approve_results(request, class_id):
-    class_instance = get_object_or_404(Class, id=class_id)
-    subject_results = SubjectResult.objects.filter(result__term=class_instance.term)
+def view_broadsheet(request, term_id):
+    term = get_object_or_404(Term, id=term_id)
 
-    if request.method == 'POST':
-        subject_results.update(is_finalized=True)
-        return redirect('approve_broadsheets')
+    # Check which classes these students belong to
+    classes = Class.objects.filter(enrolled_students__result__term=term).distinct()
+
+    broadsheets = []
+    for class_obj in classes:
+        students = class_obj.enrolled_students.all()
+        subjects = class_obj.subjects.all()
+        results_data = []
+
+        for student in students:
+            result = Result.objects.filter(student=student, term=term).first()
+            if result:
+                subject_results = result.subjectresult_set.all()
+                gpa = result.calculate_gpa()
+                total_score = sum(sr.total_score() for sr in subject_results)
+
+                results_data.append({
+                    'student': student,
+                    'subject_results': subject_results,
+                    'gpa': gpa,
+                    'total_score': total_score,
+                    'is_approved': result.is_approved,
+                })
+        # Sort students by total score and GPA
+        results_data.sort(key=lambda x: (-x['total_score'], -x['gpa']))
+
+        broadsheets.append({
+            'class': class_obj,
+            'students': students,
+            'subjects': subjects,
+            'results_data': results_data,
+            'is_approved': all(r['is_approved'] for r in results_data),  # Check if all results in the class are approved
+        })
 
     context = {
-        'class_instance': class_instance,
-        'subject_results': subject_results,
+        'term': term,
+        'broadsheets': broadsheets,
     }
-    return render(request, 'approve_results.html', context)
+    return render(request, 'setup/view_broadsheet.html', context)
+
+
+@login_required
+def approve_broadsheet(request, term_id, class_id):
+    term = get_object_or_404(Term, id=term_id)
+    class_obj = get_object_or_404(Class, id=class_id)
+    results = Result.objects.filter(student__in=class_obj.enrolled_students.all(), term=term)
+
+    if request.method == "POST":
+        updated_status = results.update(is_approved=True)
+        print(f"Updated {updated_status} Results")
+        return JsonResponse({'message': f"Broadsheet for {class_obj.name} approved!"})
+
+    return JsonResponse({'error': "Invalid request"}, status=400)
+
+
+@login_required
+def archive_broadsheet(request, term_id):
+    term = get_object_or_404(Term, id=term_id)
+    results = Result.objects.filter(term=term)
+
+    if request.method == "POST":
+        results.update(is_archived=True)
+        return JsonResponse({'message': f"Broadsheet for {term.name} archived!"})
+
+    return JsonResponse({'error': "Invalid request"}, status=400)
+
 
 # Fee Assignment Views
 
@@ -686,7 +740,7 @@ class StudentFeeRecordListView(AdminRequiredMixin, ListView):
     model = StudentFeeRecord
     template_name = 'fee_assignment/student_fee_record_list.html'
     context_object_name = 'student_fee_records'
-    paginate_by = 20
+    paginate_by = 200
 
     def get_queryset(self):
         self.sync_fee_records()
@@ -861,56 +915,39 @@ class PaymentCreateView(CreateView):
 
     def form_valid(self, form):
         payment = form.save(commit=False)
-        
-        # Check if a FinancialRecord for this student and term exists
-        financial_record = FinancialRecord.objects.filter(
-            student_id=payment.student_id,
-            term_id=payment.term_id
-        ).first()
-        
-        if not financial_record:
-            # Create FinancialRecord with calculated fields and unique ID handling
-            try:
-                with transaction.atomic():
-                    # Ensure no duplicate ID by handling it manually
-                    max_id = FinancialRecord.objects.aggregate(max_id=Max('id'))['max_id'] or 0
-                    next_id = max_id + 1
+        student = payment.student
+        term = payment.term
 
-                    # Calculate fields for the FinancialRecord based on StudentFeeRecord data
-                    student_fee_record = StudentFeeRecord.objects.filter(
-                        student=payment.student,
-                        term=payment.term
-                    ).first()
-                    
-                    total_fee = student_fee_record.net_fee if student_fee_record else 0
-                    total_discount = student_fee_record.discount if student_fee_record else 0
+        # Get or create FinancialRecord using get_or_create to avoid race conditions
+        financial_record, created = FinancialRecord.objects.get_or_create(
+            student=student,
+            term=term,
+            defaults={
+                'total_fee': 0,
+                'total_discount': 0,
+                'total_paid': 0,
+                'outstanding_balance': 0
+            }
+        )
 
-                    financial_record = FinancialRecord(
-                        id=next_id,
-                        student=payment.student,
-                        term=payment.term,
-                        total_fee=total_fee,
-                        total_discount=total_discount,
-                        total_paid=0,
-                        outstanding_balance=total_fee  # Initially full amount is unpaid
-                    )
-                    financial_record.save()
-                    print("Debug: New FinancialRecord created.")
+        # Update FinancialRecord from StudentFeeRecord
+        student_fee_record = StudentFeeRecord.objects.filter(student=student, term=term).first()
 
-            except IntegrityError:
-                # Handle a case where the unique constraint fails again by retrying the process
-                messages.error(self.request, "Error creating Financial Record. Please try again.")
-                return redirect(self.get_success_url())
-        else:
-            print("Debug: Existing FinancialRecord retrieved.")
+        if student_fee_record:
+            financial_record.total_fee = student_fee_record.net_fee
+            financial_record.total_discount = student_fee_record.discount
+            financial_record.save()
 
-        # Link payment to financial record and save
         payment.financial_record = financial_record
-        payment.save()
+        
+        try:
+            payment.save()  
+        except ValidationError as e:
+            # Add the error message to the form so it displays nicely
+            form.add_error(None, e.messages)
+            return self.form_invalid(form)
 
-        # Update financial record totals after payment save
         self.update_financial_record(financial_record)
-
         messages.success(self.request, 'Payment recorded successfully.')
         return redirect(self.get_success_url())
 
@@ -932,7 +969,13 @@ class PaymentUpdateView(UpdateView):
     template_name = 'payment/update_payment.html'
 
     def form_valid(self, form):
-        payment = form.save()
+        payment = form.save(commit=False)
+
+        try:
+            payment.save()
+        except ValidationError as e:
+            form.add_error(None, e.message if hasattr(e, 'message') else e.messages)
+            return self.form_invalid(form)
         
         # Recalculate the financial record after updating the payment.
         self.update_financial_record(payment.financial_record)
@@ -965,17 +1008,13 @@ class PaymentDeleteView(DeleteView):
         # Delete the payment
         response = super().delete(request, *args, **kwargs)
         
-        # Update the financial record after the payment is deleted.
-        self.update_financial_record(financial_record)
+        financial_record.refresh_from_db()
+        financial_record.total_paid = financial_record.payments.aggregate(total=Sum('amount_paid'))['total'] or 0
+        financial_record.outstanding_balance = max(financial_record.total_fee - financial_record.total_paid, 0)
+        financial_record.save()
 
         messages.success(request, 'Payment deleted successfully.')
         return response
-
-    def update_financial_record(self, financial_record):
-        total_paid = financial_record.payments.aggregate(total=Sum('amount_paid'))['total'] or 0
-        financial_record.total_paid = total_paid
-        financial_record.outstanding_balance = max(financial_record.total_fee - total_paid, 0)
-        financial_record.save()
 
     def get_success_url(self):
         return reverse_lazy('payment_list')  # Adjust the URL name as needed
@@ -987,21 +1026,20 @@ class FinancialRecordListView(ListView):
 
     def get_queryset(self):
         # Fetch financial records for all students with related fields preloaded for optimization
-        return FinancialRecord.objects.annotate(total_paid_amount=Sum('payments__amount_paid')).order_by('student__user__last_name')
-    
+        return FinancialRecord.objects.order_by('student__user__last_name')
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        qs = self.get_queryset()
         
         # Calculate summary statistics: total fee, discount, paid amount, and outstanding balance across all records
-        context['total_fee'] = self.get_queryset().aggregate(total_fee=Sum('total_fee'))['total_fee'] or 0
-        context['total_discount'] = self.get_queryset().aggregate(total_discount=Sum('total_discount'))['total_discount'] or 0
-        context['total_paid'] = self.get_queryset().aggregate(total_paid=Sum('total_paid'))['total_paid'] or 0
-        context['total_outstanding_balance'] = self.get_queryset().aggregate(
-            total_outstanding_balance=Sum('outstanding_balance')
-        )['total_outstanding_balance'] or 0
+        context['total_fee'] = qs.aggregate(total_fee=Sum('total_fee'))['total_fee'] or 0
+        context['total_discount'] = qs.aggregate(total_discount=Sum('total_discount'))['total_discount'] or 0
+        context['total_paid'] = Payment.objects.aggregate(total=Sum('amount_paid'))['total'] or 0
+        print(context['total_paid'])
+        context['total_outstanding_balance'] = qs.aggregate(total_outsanding_balance=Sum('outstanding_balance'))['total_outsanding_balance'] or 0
 
         return context
-
 
 def update_result(request, student_id, term_id):
     student = get_object_or_404(Student, pk=student_id)
