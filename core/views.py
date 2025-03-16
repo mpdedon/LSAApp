@@ -575,14 +575,27 @@ class AssignClassSubjectView(CreateView, AdminRequiredMixin):
         return render(request, self.template_name, {'form': form, 'class_instance': class_instance})
 
 
-def class_subjects(request):
+def class_subjects(request): 
     classes = Class.objects.all()
+    current_session = Session.objects.filter(is_active=True).first()
+    current_term = Term.objects.filter(is_active=True).first()
 
-    # Retrieve subjects for each class
+    class_subjects_data = []
+
     for class_instance in classes:
-        subjects = class_instance.subjects.all() # This uses the @property defined earlier
+        subjects = Subject.objects.filter(
+            class_assignments__class_assigned=class_instance,
+            class_assignments__session=current_session,
+            class_assignments__term=current_term
+        ).distinct()
 
-    return render(request, 'setup/class_subjects.html', {'classes': classes})
+        class_subjects_data.append({
+            'class': class_instance,
+            'subjects': subjects
+        })
+
+    return render(request, 'setup/class_subjects.html', {'class_subjects_data': class_subjects_data})
+
 
 class DeleteClassSubjectAssigmentView(DeleteView, AdminRequiredMixin):
     def post(self, request, pk):

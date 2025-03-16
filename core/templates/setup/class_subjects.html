@@ -4,17 +4,17 @@
 <div class="container mt-5">
     <h4 class="mb-4 text-center">Class Subjects Overview</h4>
     <div class="row">
-        {% for class_instance in classes %}
-        <div class="col-md-2 mb-4">
+        {% for class_data in class_subjects_data %}
+        <div class="col-md-4 mb-4">
             <div class="card">
                 <div class="card-header text-center">
-                    <h5>{{ class_instance.name }}</h5>
-                    <small>Total Subjects: {{ class_instance.subjects.count }}</small>
+                    <h5>{{ class_data.class.name }}</h5>
+                    <small>Total Subjects: {{ class_data.subjects|length }}</small>
                 </div>
                 <div class="card-body">
-                    {% if class_instance.subjects.exists %}
+                    {% if class_data.subjects %}
                     <ul class="list-group">
-                        {% for subject in class_instance.subjects.all %}
+                        {% for subject in class_data.subjects %}
                         <li class="list-group-item">{{ subject.name }}</li>
                         {% endfor %}
                     </ul>
@@ -23,7 +23,7 @@
                     {% endif %}
                 </div>
                 <div class="card-footer text-center">
-                    <a href="{% url 'assign_class_subject' class_instance.id %}" class="btn btn-primary mt-3"></a>
+                    <a href="{% url 'assign_class_subject' class_data.class.id %}" class="btn btn-primary mt-3"></a>
                 </div>
             </div>
         </div>
