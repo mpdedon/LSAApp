@@ -362,7 +362,7 @@ def guardian_dashboard(request):
 
         # Get results if the guardian can access them
         if can_access_results:
-            result = Result.objects.filter(student=student, term=current_term).first()
+            result = Result.objects.filter(student=student, term=current_term, is_approved=True).first()
             if result:
                 result_data[student.user.id] = {
                     'id': result.id,
@@ -374,7 +374,13 @@ def guardian_dashboard(request):
         
         # Fetch archived results (past terms)
         for term in archived_terms:
-            archived_result = Result.objects.filter(student=student, term=term).first()
+            archived_result = Result.objects.filter(
+                student=student, 
+                term=term, 
+                is_approved=True,  
+                is_archived=True   
+            ).first()
+            
             if archived_result:
                 archived_results_data[student.user.id].append({
                     'term_name': term.name,

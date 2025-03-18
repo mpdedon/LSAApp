@@ -3,7 +3,7 @@ from django.core.validators import MaxValueValidator
 from django.core.exceptions import ValidationError
 from django.contrib.auth.models import AbstractUser
 from django.conf import settings
-from django.db.models import Sum, Avg
+from django.db.models import Sum, Avg, Q
 from django.utils import timezone
 from datetime import date, timedelta, datetime
 from decimal import Decimal
@@ -286,9 +286,18 @@ class Teacher(models.Model):
 
     def form_class_subjects(self):
         """Retrieve subjects assigned to the class where the teacher is the form teacher."""
+
+        current_session = Session.objects.filter(is_active=True).first()
+        current_term = Term.objects.filter(is_active=True).first()
         form_classes = self.current_classes()
+
         if form_classes:
-            subjects = Subject.objects.filter(class_set__in=form_classes).distinct()
+            for class_instance in form_classes:
+                subjects = Subject.objects.filter(
+                        class_assignments__class_assigned=class_instance,
+                        class_assignments__session=current_session,
+                        class_assignments__term=current_term
+                    ).distinct()
             return subjects
         return Subject.objects.none()
     
@@ -737,7 +746,14 @@ class Result(models.Model):
         return f"{self.student.user.get_full_name()} - {self.term}"
     
     def calculate_gpa(self):
-        subject_results = self.subjectresult_set.all()
+        subject_results = self.subjectresult_set.filter(
+                Q(continuous_assessment_1__isnull=False) |
+                Q(continuous_assessment_2__isnull=False) |
+                Q(continuous_assessment_3__isnull=False) |
+                Q(assignment__isnull=False) |
+                Q(oral_test__isnull=False) |
+                Q(exam_score__isnull=False)
+            )
         total_weighted_grade_points = 0
         total_weights = 0
 

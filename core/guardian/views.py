@@ -13,7 +13,7 @@ from django.core.paginator import Paginator
 from django.db.models import Q
 import reportlab
 from .forms import GuardianRegistrationForm
-from core.models import Guardian, Term, FinancialRecord, Student, Result, SubjectResult, Attendance
+from core.models import Guardian, Term, Session, FinancialRecord, Student, Result, Subject, SubjectResult, Attendance
 from core.models import Assignment, Assessment, Exam, AssessmentSubmission, ExamSubmission, AcademicAlert
 from core.assignment.forms import AssignmentSubmission, AssignmentSubmissionForm
 
@@ -189,6 +189,8 @@ def financial_record_detail(request, student_id):
 def view_student_result(request, student_id, term_id):
     student = get_object_or_404(Student, user_id=student_id)
     term = get_object_or_404(Term, id=term_id)
+    session = term.session 
+    class_obj = student.current_class
     result = get_object_or_404(Result, student=student, term=term)
 
     # Correctly define the attendance data variables
@@ -212,22 +214,40 @@ def view_student_result(request, student_id, term_id):
     if not financial_record or not financial_record.can_access_results:
         return HttpResponse("You do not have permission to view this result.", status=403)
 
-    # Get subject results for the student's term
-    subject_results = SubjectResult.objects.filter(result=result).select_related('subject')
+    # Filter only subjects assigned to the class for this session & term
+    subjects = Subject.objects.filter(
+        class_assignments__class_assigned=class_obj,
+        class_assignments__session=session,
+        class_assignments__term=term
+    ).distinct()
+
+    # Fetch subject results and class averages
+    subject_results = SubjectResult.objects.filter(result=result, subject__in=subjects, is_finalized=True)
+    
+    # Build JSON data for Chart.js
+    subject_results_data = []
+    for sr in subject_results:
+        class_average = sr.get_class_average(sr.subject)
+        subject_results_data.append({
+            'subject': sr.subject.name,
+            'total_score': float(sr.total_score()),  #  Convert Decimal to float
+            'class_average': float(class_average) if class_average else 0.0   # Fetch class average correctly
+        })
 
     context = {
         'student': student,
         'result': result,
         'term': term,
         'subject_results': subject_results,
+        'subject_results_json': json.dumps(subject_results_data),
         'attendance_data': attendance_data,
         'teacher_comment': teacher_remarks,
         'principal_comment': principal_remarks,
     }
     
     # Handle PDF download request
-    if request.GET.get('download') == 'true':
-        html_string = render_to_string('guardian/view_result.html', context)
+    if request.GET.get('download') == 'pdf':
+        html_string = render_to_string('guardian/view_result_pdf.html', context)
         pdf = reportlab.HTML(string=html_string).write_pdf()
 
         response = HttpResponse(pdf, content_type='application/pdf')
