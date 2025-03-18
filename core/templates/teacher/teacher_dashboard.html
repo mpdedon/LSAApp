@@ -30,6 +30,7 @@
                 <p class="mb-1"><i class="fa fa-phone-square me-2"></i><strong>Phone Number:</strong> {{ teacher.contact }}</p>
             </div>
         </div>
+<<<<<<< HEAD
     </div>
 
     <!-- Main Content -->
@@ -57,6 +58,112 @@
                                 </li>
                                 <div class="collapse" id="allSubjects">
                                     {% for subject in class_subjects|slice:"5:" %}
+=======
+        <div class="profile-info col-md-9">
+            <div class="panel shadow-sm mb-4">
+                <div class="panel-body">
+                    <form>
+                        <!-- Textarea for post content -->
+                        <div class="input-group mb-3">
+                            <textarea placeholder="What's on your mind today?" rows="2" class="form-control p-text-area" aria-label="What's on your mind today?"></textarea>
+                            
+                        </div>
+            
+                        <!-- Icons for microphone, camera, or file uploads -->
+                        <div class="d-flex align-items-center justify-content-between">
+                            <!-- Icons on the left with little space between -->
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-sm btn-light">
+                                    <i class="fa fa-microphone"></i> 
+                                </button>
+                                <button class="btn btn-sm btn-light">
+                                    <i class="fa fa-camera"></i>
+                                </button>
+                                <button class="btn btn-sm btn-light">
+                                    <i class="fa fa-upload"></i>
+                                </button>
+                            </div>
+                            
+                            <!-- Post Button aligned to the right -->
+                            <button class="btn btn-warning btn-sm" type="submit" id="postButton">
+                                <i class="fa fa-paper-plane"></i> Post
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+            <!-- Notifications -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-light text-dark p-2">
+                    <h5 class="mb-0">Notifications</h5>
+                </div>
+                <div class="card-body p-3">
+                    {% if notifications %}
+                        <div class="list-group">
+                            {% for notification in notifications %}
+                                <a href="#" class="list-group-item list-group-item-action {% if notification.is_new %}bg-light{% endif %}">
+                                    <div class="d-flex justify-content-between align-items-center">
+                                        <!-- Notification Icon -->
+                                        <div class="me-2">
+                                            <i class="fa fa-bell"></i>
+                                        </div>
+                                        <div class="flex-grow-1">
+                                            <span>{{ notification.message }}</span>
+                                        </div>
+                                        <small class="text-muted">{{ notification.created_at|date:"M d, Y H:i A" }}</small>
+                                    </div>
+                                </a>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="alert alert-warning" role="alert">
+                            No notifications available.
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            <!-- Teacher Info Section -->
+            <div class="card mb-5 shadow-lg">
+                <div class="card-header bg-light text-dark">
+                    <h3 class="mb-0 text-center">Welcome, {{ teacher.user.get_full_name }}</h3>
+                </div>
+                <div class="card-body row">
+                    <!-- Left Column -->
+                    <div class="col-md-6 mb-3">
+                        <p class="mb-1"><i class="fa fa-user me-2"></i><strong>Name:</strong> {{ teacher.user.get_full_name }}</p>
+                        <p class="mb-1"><i class="fa fa-id-badge me-2"></i><strong>Employment Number:</strong> {{ teacher.employee_id }}</p>
+                        <p class="mb-1"><i class="fa fa-graduation-cap me-2"></i><strong>Assigned Class:</strong> {{ assigned_classes|join:", " }}</p>
+                        <p class="mb-1"><i class="fa fa-hourglass me-2"></i><strong>Date of Birth:</strong> {{ teacher.date_of_birth }}</p>
+                    </div>
+                    <!-- Right Column -->
+                    <div class="col-md-6">
+                        <p class="mb-1"><i class="fa fa-check-circle me-2"></i><strong>Status:</strong> 
+                            {% if teacher.status %}
+                                <span class="badge bg-success">Active</span>
+                            {% else %}
+                                <span class="badge bg-danger">Inactive</span>
+                            {% endif %}
+                        </p>
+                        <p class="mb-1"><i class="fa fa-user-circle me-2"></i><strong>Username:</strong> {{ teacher.user.username }}</p>
+                        <p class="mb-1"><i class="fa fa-envelope me-2"></i><strong>Email:</strong> {{ teacher.user.email }}</p>
+                        <p class="mb-1"><i class="fa fa-phone-square me-2"></i><strong>Phone Number:</strong> {{ teacher.contact }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Content -->
+            <div class="row">
+                <!-- First Column: Subjects in Assigned Classes -->
+                <div class="col-md-6">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-light">
+                            <h4 class="mb-2">Subjects in Assigned Classes</h4>
+                        </div>
+                        <div class="card-body">
+                            {% if class_subjects %}
+                                <ul class="list-group list-group-flush">
+                                    {% for subject in class_subjects|slice:":5" %}
+>>>>>>> 282effb8 (Scores & Broadsheet Issues)
                                         <li class="list-group-item d-flex justify-content-between align-items-center">
                                             {{ subject.name }}
                                             <span class="badge bg-success rounded-pill">{{ subject.subject_weight }} units</span>
@@ -70,6 +177,7 @@
                     {% endif %}
                 </div>
             </div>
+<<<<<<< HEAD
         </div>
 
         <!-- Second Column: Classes and Subjects Taught -->
@@ -77,6 +185,13 @@
             <div class="card shadow-sm">
                 <div class="card-header bg-light">
                     <h4 class="mb-2 text-center">Classes & Subjects You Teach</h4>
+=======
+            <br>
+            <!-- Students Table --> 
+            <div class="card mb-4 shadow-sm">
+                <div class="card-header bg-light text-dark">
+                    <h4 class="mb-0">Students in Assigned Class {{current_class.name}} </h4>
+>>>>>>> 282effb8 (Scores & Broadsheet Issues)
                 </div>
                 <div class="card-body">
                     {% if classes_subjects_taught %}
@@ -269,11 +384,43 @@
                                 <tr>
                                     <td>{{ assigned_class.name }}</td>
                                     <td>
+<<<<<<< HEAD
                                         {% for subject in class_subjects %}
                                             <a href="{% url 'input_scores' assigned_class.id subject.id current_term.id %}" class="btn btn-info btn-sm">
                                                 Input Scores for {{ subject.name }}
                                             </a>
                                         {% endfor %}
+=======
+                                        {% if student.student_guardian %}
+                                            <div>
+                                                <strong>{{ student.student_guardian.user.get_full_name }}</strong>
+                                                <br>
+                                                <small class="text-muted">{{ student.student_guardian.user.email }}</small>
+                                            </div>
+                                        {% else %}
+                                            <span class="badge bg-secondary">No Guardian Assigned</span>
+                                        {% endif %}
+                                    </td>
+
+                                    <!-- Actions -->
+                                    <td class="text-center">
+                                        <a href="{% url 'mark_attendance' student.current_class.id %}" class="btn btn-outline-primary btn-sm mb-1">
+                                            <i class="fa fa-calendar-check"></i> Attendance
+                                        </a>
+                                        {% if student.student_guardian %}
+                                            <a href="{% url 'message_guardian' student.student_guardian.user.id %}" class="btn btn-outline-warning btn-sm mb-1">
+                                                <i class="fa fa-envelope"></i> Message
+                                            </a>
+                                            {% if message_counts|get_item:student.user.id|default:0 %}
+                                                <span class="badge bg-info text-dark">
+                                                    {{ message_counts|get_item:student.user.id|default:0 }} Messages
+                                                </span>
+                                            {% endif %}
+                                        {% endif %}
+                                        <a href="{% url 'student_detail' student.user.id %}" class="btn btn-outline-info btn-sm">
+                                            <i class="fa fa-info-circle"></i> Info
+                                        </a>
+>>>>>>> 282effb8 (Scores & Broadsheet Issues)
                                     </td>
                                 </tr>
                             {% empty %}

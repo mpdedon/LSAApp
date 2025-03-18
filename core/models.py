@@ -6,8 +6,12 @@ from django.core.validators import MaxValueValidator
 from django.core.exceptions import ValidationError
 from django.contrib.auth.models import AbstractUser, BaseUserManager
 from django.conf import settings
+<<<<<<< HEAD
 from django.db.models.signals import pre_save
 from django.db.models import Sum, Avg
+=======
+from django.db.models import Sum, Avg, Q
+>>>>>>> 282effb8 (Scores & Broadsheet Issues)
 from django.utils import timezone
 from datetime import date, timedelta, datetime
 from decimal import Decimal
@@ -271,6 +275,51 @@ class Teacher(models.Model):
     current_class = models.ForeignKey('Class', on_delete=models.SET_NULL, null=True, blank=True, related_name='enrolled_class', default=None)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='active')
 
+<<<<<<< HEAD
+=======
+    def current_classes(self):
+        """Retrieve all classes where the teacher is a form teacher."""
+        form_teacher_assignments = TeacherAssignment.objects.filter(teacher=self, is_form_teacher=True)
+        return Class.objects.filter(teacherassignment__in=form_teacher_assignments) if form_teacher_assignments.exists() else Class.objects.none()
+
+
+    def assigned_classes(self):
+        """Retrieve all classes the teacher is assigned to, including form classes and subject-teaching classes."""
+        form_classes = Class.objects.filter(teacherassignment__teacher=self).distinct()
+        subject_classes = Class.objects.filter(subjectassignment__teacher=self).distinct()
+        # Combine the two QuerySets, removing duplicates
+        all_classes = form_classes | subject_classes
+        return all_classes
+
+    def subjects_taught(self):
+        """Retrieve all subjects taught by the teacher across all classes."""
+        return Subject.objects.filter(subjectassignment__teacher=self).distinct()
+
+    def form_class_subjects(self):
+        """Retrieve subjects assigned to the class where the teacher is the form teacher."""
+
+        current_session = Session.objects.filter(is_active=True).first()
+        current_term = Term.objects.filter(is_active=True).first()
+        form_classes = self.current_classes()
+
+        if form_classes:
+            for class_instance in form_classes:
+                subjects = Subject.objects.filter(
+                        class_assignments__class_assigned=class_instance,
+                        class_assignments__session=current_session,
+                        class_assignments__term=current_term
+                    ).distinct()
+            return subjects
+        return Subject.objects.none()
+    
+    def assigned_subjects(self):
+        """Retrieve all subjects in form classes and other classes for assignments etc."""
+        subject_teaching = self.subjects_taught()
+        class_teaching = self.form_class_subjects()
+        all_subjects = subject_teaching | class_teaching
+        return all_subjects
+    
+>>>>>>> 282effb8 (Scores & Broadsheet Issues)
 
     def __str__(self):
 <<<<<<< HEAD
@@ -658,7 +707,14 @@ class Result(models.Model):
         return f"{self.student.user.get_full_name()} - {self.term}"
     
     def calculate_gpa(self):
-        subject_results = self.subjectresult_set.all()
+        subject_results = self.subjectresult_set.filter(
+                Q(continuous_assessment_1__isnull=False) |
+                Q(continuous_assessment_2__isnull=False) |
+                Q(continuous_assessment_3__isnull=False) |
+                Q(assignment__isnull=False) |
+                Q(oral_test__isnull=False) |
+                Q(exam_score__isnull=False)
+            )
         total_weighted_grade_points = 0
         total_weights = 0
 
