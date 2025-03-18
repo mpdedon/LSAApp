@@ -6,7 +6,7 @@
 <div class="container" style="max-width: 1000px; border: 2px solid #333; border-radius: 10px; padding: 20px; background: #fafafa;">
     <!-- School Header Section -->
     <div class="text-center mb-5">
-        <img src="{% static 'images/school-logo.jpg' %}" alt="LearnSwift Academia Logo" class="mb-3" style="max-width: 120px;">
+        <img src="{% static 'images/logo.jpg' %}" alt="LearnSwift Academia Logo" class="mb-3" style="max-width: 120px;">
         <h1 class="display-4 fw-bold text-dark" style="font-family: 'Poppins', sans-serif;">LearnSwift Academia</h1>
         <p class="lead text-muted" style="font-family: 'Roboto', sans-serif;">Term: {{ result.term }} | Session: {{ result.session }}</p>
     </div>
@@ -107,7 +107,7 @@
 
         <!-- Psychomotor Skills Section -->
         <div class="col-md-4">
-            <div class="card shadow-lg border-0" style="background: #dc9ce9; border-radius: 10px; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);">
+            <div class="card shadow-lg border-0" style="background: #e7bdddce; border-radius: 10px; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);">
                 <div class="card-header bg-lemon text-white">
                     <h5 class="h6 mb-0">Psychomotor Skills (Physical)</h5>
                 </div>
@@ -222,6 +222,12 @@
     </a>
 </div>
 
+<!-- JSON Data for Chart.js (Placed before the script to be available in JS) -->
+<script type="application/json" id="subject_results_json">
+    {{ subject_results_json|safe }}
+</script>
+
+<!-- Chart.js Script -->
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
     var subjectResults = JSON.parse(document.getElementById('subject_results_json').textContent);
@@ -230,16 +236,16 @@
     var performanceChart = new Chart(ctx, {
         type: 'bar',
         data: {
-            labels: subjectResults.map(sr => sr.subject.name),
+            labels: subjectResults.map(sr => sr.subject),  // Fix label reference
             datasets: [{
                 label: 'Student Score',
-                data: subjectResults.map(sr => parseFloat(sr.total_score)),
+                data: subjectResults.map(sr => sr.total_score),  // Fix data reference
                 backgroundColor: '#0072ff',
                 borderColor: '#0056b3',
                 borderWidth: 1
             }, {
                 label: 'Class Average',
-                data: subjectResults.map(sr => parseFloat(sr.class_average)),
+                data: subjectResults.map(sr => sr.class_average),  // Fix class average reference
                 backgroundColor: '#ff9a8b',
                 borderColor: '#ff5e62',
                 borderWidth: 1

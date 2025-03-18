@@ -411,7 +411,6 @@ def input_scores(request, class_id, subject_id, term_id):
                 all_forms_valid = False
 
         if all_forms_valid:
-            print(subject_result.total_score())
             return redirect('broadsheet', class_id=class_id, term_id=term_id)
 
     forms = {student: SubjectResultForm(instance=subject_result, prefix=str(student.user.id)) for student, subject_result in subject_results.items()}
@@ -425,28 +424,48 @@ def input_scores(request, class_id, subject_id, term_id):
     }
     return render(request, 'teacher/input_scores.html', context)
 
+
 @login_required
 def broadsheet(request, class_id, term_id):
     class_obj = get_object_or_404(Class, id=class_id)
+    session = Session.objects.get(is_active=True)
     term = get_object_or_404(Term, id=term_id)
     students = class_obj.enrolled_students.all()
-    subjects = class_obj.subjects.all()
+
+    # Get subjects that are still assigned to this class in this term/session
+    subjects = Subject.objects.filter(
+        class_assignments__class_assigned=class_obj,
+        class_assignments__session=session,
+        class_assignments__term=term
+    ).distinct()
 
     results_data = []
+
     for student in students:
         result = Result.objects.filter(student=student, term=term).first()
         if result:
-            subject_results = result.subjectresult_set.all()
-            gpa = result.calculate_gpa()
-            total_score = sum(sr.total_score() for sr in subject_results)
-            results_data.append({
-                'student': student,
-                'subject_results': subject_results,
-                'gpa': gpa,
-                'total_score': total_score,
-            })
-            print("Subject Results:", subject_results)
-    # Sort students by total score and then by GPA
+            #  Only get subjects where scores have been inputted
+            subject_results = result.subjectresult_set.filter(
+                Q(continuous_assessment_1__isnull=False) |
+                Q(continuous_assessment_2__isnull=False) |
+                Q(continuous_assessment_3__isnull=False) |
+                Q(assignment__isnull=False) |
+                Q(oral_test__isnull=False) |
+                Q(exam_score__isnull=False)
+            )
+
+            if subject_results.exists():
+                total_score = sum(sr.total_score() for sr in subject_results)
+                gpa = result.calculate_gpa()
+
+                results_data.append({
+                    'student': student,
+                    'subject_results': subject_results,
+                    'gpa': gpa,
+                    'total_score': total_score,
+                })
+
+    # Sort students by total score, then by GPA
     results_data.sort(key=lambda x: (-x['total_score'], -x['gpa']))
 
     context = {
@@ -457,6 +476,7 @@ def broadsheet(request, class_id, term_id):
         'subjects': subjects,
     }
     return render(request, 'teacher/broadsheet.html', context)
+
 
 @login_required
 def update_result(request, student_id, term_id):
