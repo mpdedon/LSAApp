@@ -657,9 +657,11 @@ def view_broadsheet(request, term_id):
                 gpa = result.calculate_gpa()
                 total_score = sum(sr.total_score() for sr in subject_results)
 
+                subject_results_dict = {sr.subject.id: sr for sr in subject_results}
+
                 results_data.append({
                     'student': student,
-                    'subject_results': subject_results,
+                    'subject_results': subject_results_dict,
                     'gpa': gpa,
                     'total_score': total_score,
                     'is_approved': result.is_approved,
