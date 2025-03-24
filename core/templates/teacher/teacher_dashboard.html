@@ -15,7 +15,7 @@
                 <!-- Profile Heading -->
                 <div class="user-heading text-center py-3 bg-light rounded-top">
                     {% if teacher.profile_image %}
-                        <img src="{{ teacher.profile_image.url }}" class="img-fluid rounded-circle mb-2" alt="{{ teacher.user.get_full_name }}" style="max-height: 150px; object-fit: cover;">
+                        <img src="{{ teacher.profile_image.url.0 }}" class="img-fluid rounded-circle mb-2" alt="{{ teacher.user.get_full_name }}" style="max-height: 150px; object-fit: cover;">
                     {% else %}
                         <img src="{% static 'images/profile_images/default.jpg' %}" class="img-fluid rounded-circle mb-2" alt="Default Profile Image" style="max-height: 150px; object-fit: cover;">
                     {% endif %}

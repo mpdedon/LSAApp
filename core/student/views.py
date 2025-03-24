@@ -145,7 +145,7 @@ class StudentUpdateView(View):
 
     def post(self, request, pk, *args, **kwargs):
         student = get_object_or_404(Student, pk=pk)
-        form = StudentRegistrationForm(request.POST, request.FILES, instance=student.user)
+        form = StudentRegistrationForm(request.POST, request.FILES, instance=student.user, student_instance=student)
 
         # Ensure the student fields are updated correctly
         if form.is_valid():
