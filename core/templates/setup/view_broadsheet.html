@@ -41,7 +41,7 @@
                                     
                                             {% for subject in broadsheet.subjects %}
                                                 {% with subject_result=result.subject_results|dict_key:subject.id %}
-                                                    <td>{{ subject_result.total_score|default:"-" }}</td>
+                                                    <td>{{ subject_result.total_score|default_if_none:"-" }}</td>
                                                 {% endwith %}
                                             {% endfor %}
                                     
@@ -56,7 +56,9 @@
                                             </td>
                                         </tr>
                                         {% endfor %}
-                                    </tbody>                                    
+                                    </tbody>
+                                    
+                                                                        
                                 </table>
                             </div>
                             <div class="text-center mt-3">

@@ -456,13 +456,15 @@ def broadsheet(request, class_id, term_id):
                 Q(exam_score__isnull=False)
             )
 
-            if subject_results.exists():
+            subject_results_dict = {sr.subject.id: sr for sr in subject_results}
+
+            if subject_results:
                 total_score = sum(sr.total_score() for sr in subject_results)
                 gpa = result.calculate_gpa()
-
+                
                 results_data.append({
                     'student': student,
-                    'subject_results': subject_results,
+                    'subject_results': subject_results_dict,  # Store as dictionary
                     'gpa': gpa,
                     'total_score': total_score,
                 })
