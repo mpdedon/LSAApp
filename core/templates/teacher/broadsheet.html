@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-
+{% load custom_filters %}
 {% block content %}
 <div class="container mt-5">
     <h1 class="text-center mb-4">Broadsheet for {{ class.name }} : {{ term.name }}</h1>
@@ -26,18 +26,23 @@
             </tr>
         </thead>
         <tbody>
-            {% for data in results_data %}
-            <tr>
-                <td>{{ data.student.user.get_full_name }}</td>
-                    {% for subject_result in data.subject_results %}
-                        <td>{{ subject_result.total_score }}</td>
-                    {% endfor %}
-                <td>{{ data.total_score }}</td>
-                <td>{{ data.subject_results.0.calculate_grade }}</td>  <!-- Assuming all subjects have the same grading scale -->
-                <td>{{ data.gpa }}</td>
-            </tr>
-            {% endfor %}
-        </tbody>
+          {% for data in results_data %}
+          <tr>
+              <td>{{ data.student.user.get_full_name }}</td>
+      
+              {% for subject in subjects %}  {# Ensures all subjects have a column #}
+                  {% with subject_result=data.subject_results|dict_key:subject.id %}
+                      <td>{{ subject_result.total_score|default:"-" }}</td>
+                  {% endwith %}
+              {% endfor %}
+      
+              <td>{{ data.total_score }}</td>
+              <td>{{ data.subject_results.0.calculate_grade }}</td>  <!-- Assuming grading is consistent -->
+              <td>{{ data.gpa }}</td>
+          </tr>
+          {% endfor %}
+      </tbody>
+      
     </table>
   </div>
 </div>
