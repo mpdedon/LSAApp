@@ -22,25 +22,38 @@
                 <h2 class="text-center mb-4">Login</h2>
                 <form method="POST" action="{% url 'login' %}" class="needs-validation" novalidate>
                     {% csrf_token %}
-                    <!-- Username Field -->
+                    {% if form.non_field_errors %}
+                        <div class="alert alert-danger">
+                            {{ form.non_field_errors }}
+                        </div>
+                    {% endif %}
+
                     <div class="mb-3 position-relative">
                         <label for="username" class="form-label">Username</label>
                         <div class="input-group">
                             <span class="input-group-text bg-light border-0 rounded-start"><i class="bi bi-person"></i></span>
                             {{ form.username|add_class:"form-control border-start-0 rounded-end" }}
                         </div>
+                        {% if form.username.errors %}
+                            <div class="text-danger">
+                                {{ form.username.errors.0 }}
+                            </div>
+                        {% endif %}
                     </div>
-                    <!-- Password Field with Eye Toggle -->
+
                     <div class="mb-3 position-relative">
                         <label for="password" class="form-label">Password</label>
                         <div class="input-group">
                             <span class="input-group-text bg-light border-0 rounded-start"><i class="bi bi-lock"></i></span>
-                            <input type="password" id="password" class="form-control border-start-0 rounded-0" name="password">
-                            <button type="button" class="input-group-text bg-light border-0 rounded-end" onclick="togglePassword()">
-                                <i id="password-icon" class="bi bi-eye"></i>
-                            </button>
+                            {{ form.password|add_class:"form-control border-start-0 rounded-end" }}
                         </div>
+                        {% if form.password.errors %}
+                            <div class="text-danger">
+                                {{ form.password.errors.0 }}
+                            </div>
+                        {% endif %}
                     </div>
+
                     <!-- Forgot Password -->
                     <div class="d-flex justify-content-between align-items-center mb-3">
                         <div>

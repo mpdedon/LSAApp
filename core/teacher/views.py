@@ -149,6 +149,7 @@ class TeacherUpdateView(View):
             user = form.save(commit=False)
             user.save()
 
+            teacher.gender = form.cleaned_data['gender']
             teacher.date_of_birth = form.cleaned_data['date_of_birth']
             teacher.contact = form.cleaned_data['contact']
             teacher.profile_image = form.cleaned_data['profile_image']
@@ -284,9 +285,10 @@ def mark_attendance(request, class_id):
         'week_days': week_days,
         'attendance_dict': attendance_dict,
         'current_week': current_week,
-        'total_weeks': len(weeks),  # Total number of weeks for navigation
-        'max_week': max_week,  # New variable to control navigation
+        'total_weeks': len(weeks),  
+        'max_week': max_week,  
     }
+
     return render(request, 'teacher/mark_attendance.html', context)
 
 @login_required

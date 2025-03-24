@@ -82,14 +82,22 @@ class TeacherRegistrationForm(UserCreationForm):
 
     def clean_username(self):
         username = self.cleaned_data.get('username')
-        if username and CustomUser.objects.filter(username=username).exists():
-            raise ValidationError("A user with this username already exists.")
+        if username:
+            user_qs = CustomUser.objects.filter(username=username)
+            if self.instance:  # If updating, exclude the current user
+                user_qs = user_qs.exclude(pk=self.instance.pk)
+            if user_qs.exists():
+                raise ValidationError("A user with this username already exists.")
         return username
 
     def clean_email(self):
         email = self.cleaned_data.get('email')
-        if email and CustomUser.objects.filter(email=email).exists():
-            raise ValidationError("A user with this email already exists.")
+        if email:
+            email_qs = CustomUser.objects.filter(email=email)
+            if self.instance:  # If updating, exclude the current user
+                email_qs = email_qs.exclude(pk=self.instance.pk)
+            if email_qs.exists():
+                raise ValidationError("A user with this email already exists.")
         return email
 
     def save(self, commit=True):

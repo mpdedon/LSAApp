@@ -1,5 +1,6 @@
 # views.py
 
+import os
 import json
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login
@@ -11,7 +12,7 @@ from django.http import HttpResponse
 from django.views import View
 from django.core.paginator import Paginator
 from django.db.models import Q
-import reportlab
+from playwright.sync_api import sync_playwright
 from .forms import GuardianRegistrationForm
 from core.models import Guardian, Term, Session, FinancialRecord, Student, Result, Subject, SubjectResult, Attendance
 from core.models import Assignment, Assessment, Exam, AssessmentSubmission, ExamSubmission, AcademicAlert
@@ -134,7 +135,7 @@ class GuardianUpdateView(View):
     
     def post(self, request, pk, *args, **kwargs):
         guardian = get_object_or_404(Guardian, pk=pk)
-        form = GuardianRegistrationForm(request.POST, request.FILES, instance=guardian.user)
+        form = GuardianRegistrationForm(request.POST, request.FILES, instance=guardian.user, guardian_instance=guardian)
 
         if form.is_valid():
             user = form.save(commit=False)
@@ -144,9 +145,12 @@ class GuardianUpdateView(View):
             guardian.profile_image = form.cleaned_data['profile_image']
             guardian.contact = form.cleaned_data['contact']
             guardian.address= form.cleaned_data['address']
+
             guardian.save()
             
-            return redirect('guardian_dashboard', pk=guardian.pk)
+            return redirect('guardian_detail', pk=guardian.pk)
+            
+        print(f"Form Errors: {form.errors}")
         return render(request, self.template_name, {'form': form, 'is_update': True, 'guardian': guardian})
   
 class GuardianDetailView(View):
@@ -186,13 +190,27 @@ def financial_record_detail(request, student_id):
     }
     return render(request, 'guardian/financial_record_detail.html', context)
 
+
+def generate_pdf_from_html(html_content, output_path):
+    """Generate a PDF from an HTML string using Playwright"""
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        page = browser.new_page()
+        page.set_content(html_content)
+        
+        # Generate PDF
+        page.pdf(path=output_path, format="A4", print_background=True)
+        
+        browser.close()
+
 def view_student_result(request, student_id, term_id):
     student = get_object_or_404(Student, user_id=student_id)
     term = get_object_or_404(Term, id=term_id)
     session = term.session 
     class_obj = student.current_class
     result = get_object_or_404(Result, student=student, term=term)
-
+    profile_image_url = request.build_absolute_uri(student.profile_image.url) if student.profile_image else None
+    print(profile_image_url)
     # Correctly define the attendance data variables
     total_days = Attendance.objects.filter(student=student).count()
     present_days = Attendance.objects.filter(student=student, is_present=True).count()
@@ -243,12 +261,42 @@ def view_student_result(request, student_id, term_id):
         'attendance_data': attendance_data,
         'teacher_comment': teacher_remarks,
         'principal_comment': principal_remarks,
+        'profile_image_url': profile_image_url,
     }
     
     # Handle PDF download request
-    if request.GET.get('download') == 'pdf':
-        html_string = render_to_string('guardian/view_result_pdf.html', context)
-        pdf = reportlab.HTML(string=html_string).write_pdf()
+    options = {
+        'enable-local-file-access': '',  
+        'load-error-handling': 'ignore', 
+        'page-size': 'A4',
+        'no-stop-slow-scripts': '',  
+        'disable-smart-shrinking': '', 
+        'debug-javascript': '' 
+    }
+
+    config = pdfkit.configuration(wkhtmltopdf=r"C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe")
+
+    if "download" in request.GET and request.GET["download"] == "pdf":
+        # Render HTML to a string
+        html_string = render_to_string('guardian/view_result.html', context)
+        # Define a temp file path
+        pdf_path = f"/tmp/{student.user.first_name}_result_{term.name}.pdf"
+        # Generate PDF
+        generate_pdf_from_html(html_string, pdf_path)
+        # Read PDF file
+        with open(pdf_path, "rb") as pdf_file:
+            pdf_content = pdf_file.read()
+        # Serve as an HTTP response
+        response = HttpResponse(pdf_content, content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="{student.user.first_name}_result_{term.name}.pdf"'
+        # Clean up temporary file
+        os.remove(pdf_path)
+
+        return response
+    if "download" in request.GET and request.GET["download"] == "pdf":
+        html_string = render_to_string('guardian/view_result.html', context)
+        print(html_string)
+        pdf = pdfkit.from_string(html_string, False, configuration=config, options=options)
 
         response = HttpResponse(pdf, content_type='application/pdf')
         response['Content-Disposition'] = f'attachment; filename="{student.user.first_name}_result_{term.name}.pdf"'

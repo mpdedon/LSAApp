@@ -100,18 +100,28 @@ class StudentRegistrationForm(UserCreationForm):
         if commit:
             user.save()
 
-        student = Student.objects.create(
-        user=user,
-        date_of_birth=self.cleaned_data.get('date_of_birth'),  
-        gender=self.cleaned_data.get('gender'),
-        student_guardian=self.cleaned_data.get('student_guardian'),
-        profile_image=self.cleaned_data.get('profile_image'),
-        relationship=self.cleaned_data.get('relationship'),
-        current_class=self.cleaned_data.get('current_class')
-    )
+        if hasattr(self, 'student_instance'):
+            student = self.student_instance
+            student.date_of_birth = self.cleaned_data['date_of_birth']
+            student.gender = self.cleaned_data['gender']
+            student.student_guardian = self.cleaned_data['student_guardian']
+            student.profile_image = self.cleaned_data['profile_image']
+            student.relationship = self.cleaned_data['relationship']
+            student.current_class = self.cleaned_data['current-class']
+
+        else:
+
+            student = Student.objects.create(
+            user=user,
+            date_of_birth=self.cleaned_data.get('date_of_birth'),  
+            gender=self.cleaned_data.get('gender'),
+            student_guardian=self.cleaned_data.get('student_guardian'),
+            profile_image=self.cleaned_data.get('profile_image'),
+            relationship=self.cleaned_data.get('relationship'),
+            current_class=self.cleaned_data.get('current_class')
+        )
 
         if commit:
             student.save()
 
         return student
-

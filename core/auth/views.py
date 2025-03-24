@@ -13,7 +13,7 @@ from django.utils import timezone
 from django.urls import reverse_lazy
 from django.db.models import Count, Q
 from collections import defaultdict
-from core.models import Student, Teacher, Guardian, Assignment, Result, Attendance
+from core.models import Student, Teacher, Guardian, Assignment, Result, Attendance, Subject
 from core.models import Session, Term, Message, Assessment, Exam, Notification, AssignmentSubmission, AcademicAlert
 from core.models import FinancialRecord, StudentFeeRecord, AssessmentSubmission
 from django.db.models import Sum
@@ -34,8 +34,8 @@ class RegisterView(TemplateView):
     # You can override get_context_data if you need to pass additional context
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        # Add any custom context if needed
         return context
+
 # Custom Guardian Registration
 class GuardianRegisterView(FormView):
     template_name = 'auth/guardian_register.html'
@@ -73,6 +73,9 @@ class TeacherRegisterView(FormView):
             return redirect('login')
         return render(request, self.template_name, {'form': form})
     
+    def form_invalid(self, form):
+        messages.error(self.request, "There was an error with the registration. Please try again.")
+        return super().form_invalid(form)
 
 # Login view
 class CustomLoginView(LoginView):
@@ -97,9 +100,10 @@ class CustomLoginView(LoginView):
             return reverse_lazy('login')
 
     def form_invalid(self, form):
-        # Log the invalid login attempt
-        username = form.cleaned_data.get('username')
+        username = form.cleaned_data.get('username', 'Unknown')
         logger.warning(f"Invalid login attempt: {username}")
+
+        # Add a generic error message  
         return super().form_invalid(form)
 
     def form_valid(self, form):
@@ -132,9 +136,15 @@ def student_dashboard(request):
     
     student = Student.objects.select_related('current_class').get(user=request.user)
     current_class = student.current_class
-    subjects = current_class.subjects.prefetch_related('assignments').all()
+    session = Session.objects.get(is_active=True)
+    term = Term.objects.filter(session=session, is_active=True).order_by('-start_date').first()
+    subjects = Subject.objects.filter(
+        class_assignments__class_assigned=current_class,
+        class_assignments__session=session,
+        class_assignments__term=term
+    ).distinct()
     assignments = Assignment.objects.filter(class_assigned=current_class).select_related('teacher')
-    assessments = Assessment.objects.filter(class_assigned=current_class).select_related('teacher')
+    assessments = Assessment.objects.filter(class_assigned=current_class)
     exams = Exam.objects.filter(class_assigned=current_class).select_related('teacher')
     results = Result.objects.filter(student=student).select_related('term')
     attendance = Attendance.objects.filter(student=student).order_by('-date')
