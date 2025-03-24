@@ -1,38 +1,47 @@
-# Include any files or directories that you don't want to be copied to your
-# container here (e.g., local build artifacts, temporary files, etc.).
-#
-# For more help, visit the .dockerignore file reference guide at
-# https://docs.docker.com/go/build-context-dockerignore/
-
-**/.DS_Store
-**/.pyc
-**/__pycache__
-**/.venv
-**/.classpath
-**/.dockerignore
-**/.env
-**/.git
-**/.gitignore
-**/.project
-**/.settings
-**/.toolstarget
-**/.vs
-**/.vscode
-**/*.*proj.user
-**/*.dbmdl
-**/*.jfm
-**/bin
-**/charts
-**/docker-compose*
-**/compose.y*ml
-**/Dockerfile*
-**/node_modules
-**/npm-debug.log
-**/obj
-**/secrets.dev.yaml
-**/values.dev.yaml
-LICENSE
-README.md
+# System files
+.DS_Store
 *.pyc
 __pycache__/
+*.dbmdl
+*.jfm
+*.log
+
+# Python environments
+lsa_env/
+.venv/
+.env
+
+# Git
+.git/
+.gitignore
+
+# IDEs and tools
+.vscode/
+.vs/
+.classpath
+.project
+.settings/
+.toolstarget
+
+# Docker and deployment
+.dockerignore
+docker-compose*
+compose.y*ml
+Dockerfile*
+secrets.dev.yaml
+values.dev.yaml
+
+# Node.js
+node_modules/
+npm-debug.log
+
+# Build artifacts
+bin/
+obj/
+charts/
+*.csproj.user
+
+# Docs
+LICENSE
+README.md
 *.pyc

@@ -73,31 +73,46 @@ class GuardianRegistrationForm(UserCreationForm):
 
     def clean_username(self):
         username = self.cleaned_data.get('username')
-        if username and CustomUser.objects.filter(username=username).exists():
-            raise ValidationError("A user with this username already exists.")
+        if username:
+            user_qs = CustomUser.objects.filter(username=username)
+            if self.instance:  # If updating, exclude the current user
+                user_qs = user_qs.exclude(pk=self.instance.pk)
+            if user_qs.exists():
+                raise ValidationError("A user with this username already exists.")
         return username
 
     def clean_email(self):
         email = self.cleaned_data.get('email')
-        if email and CustomUser.objects.filter(email=email).exists():
-            raise ValidationError("A user with this email already exists.")
+        if email:
+            email_qs = CustomUser.objects.filter(email=email)
+            if self.instance:  # If updating, exclude the current user
+                email_qs = email_qs.exclude(pk=self.instance.pk)
+            if email_qs.exists():
+                raise ValidationError("A user with this email already exists.")
         return email
 
     def save(self, commit=True):
         user = super().save(commit=False)
-        if not self.is_update:
-            user.role = 'guardian'  # Assign the 'student' role only for new users
+        user.role = 'guardian'  # Assign the 'guardian' role
 
         if commit:
             user.save()
 
-        guardian = Guardian.objects.create(
-        user=user,
-        gender=self.cleaned_data.get('gender'),
-        profile_image=self.cleaned_data.get('profile_image'),
-        contact=self.cleaned_data.get('contact'),
-        address=self.cleaned_data.get('address')
-    )
+        # Handle guardian instance
+        if hasattr(self, 'guardian_instance') and self.guardian_instance:
+            guardian = self.guardian_instance  # Use the existing guardian instance
+            guardian.contact = self.cleaned_data['contact']
+            guardian.address = self.cleaned_data['address']
+            guardian.gender = self.cleaned_data['gender']
+            guardian.profile_image = self.cleaned_data.get('profile_image')
+        else:
+            guardian = Guardian(
+                user=user,
+                contact=self.cleaned_data['contact'],
+                address=self.cleaned_data['address'],
+                gender=self.cleaned_data['gender'],
+                profile_image=self.cleaned_data.get('profile_image')
+            )
 
         if commit:
             guardian.save()

@@ -14,7 +14,7 @@
     <!-- Student Information Section -->
     <div class="row mb-5 justify-content-center align-items-center">
         <div class="col-md-4 text-center mb-4 mb-md-0">
-            <img src="{{ student.profile_image.url }}" alt="{{ student.user.get_full_name }}'s Profile Image" class="rounded-circle shadow-lg" style="width: 150px; height: 150px; object-fit: cover;">
+            <img src="{{ profile_image_url }}" alt="{{ student.user.get_full_name }}'s Profile Image" class="rounded-circle shadow-lg" style="width: 150px; height: 150px; object-fit: cover;">
         </div>
         <div class="col-md-8 text-center">
             <h2 class="fw-bold text-dark" style="font-family: 'Poppins', sans-serif;">{{ student.user.get_full_name }}</h2>
@@ -217,11 +217,11 @@
 
 <!-- Button to Download as PDF -->
 <div class="text-center mt-4">
-    <a href="{% url 'view_student_result' student.user.id result.term.id %}?download=pdf" class="btn btn-primary btn-lg shadow-sm">
+    <a href="?download=pdf" class="btn btn-primary btn-lg shadow-sm">
         <i class="bi bi-file-earmark-pdf"></i> Download as PDF
     </a>
 </div>
-
+<br>
 <!-- JSON Data for Chart.js (Placed before the script to be available in JS) -->
 <script type="application/json" id="subject_results_json">
     {{ subject_results_json|safe }}
@@ -274,5 +274,5 @@
         }
     });
 </script>
-
+<br>
 {% endblock %}

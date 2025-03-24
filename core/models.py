@@ -130,7 +130,7 @@ class Student(models.Model):
  
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, primary_key=True, related_name='student')    
     LSA_number = models.CharField(max_length=20, unique=True, null=True)
-    profile_image = models.ImageField(upload_to='media/profile_images/', default='profile_images/default.jpg')
+    profile_image = models.ImageField(upload_to='profile_images/', default='profile_images/default.jpg')
     date_of_birth = models.DateField()
     gender = models.CharField(max_length=1, choices=GENDER_CHOICES)
     student_guardian = models.ForeignKey('Guardian', on_delete=models.SET_NULL, null=True, related_name='students')
@@ -240,7 +240,7 @@ class Guardian(models.Model):
 
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, primary_key=True, related_name='guardian')
     gender = models.CharField(max_length=1, choices=GENDER_CHOICES, default='M')
-    profile_image = models.ImageField(upload_to='media/profile_images/', default='profile_images/default.jpg')
+    profile_image = models.ImageField(upload_to='profile_images/', default='profile_images/default.jpg')
     contact = models.CharField(max_length=15, null=True)
     address = models.TextField()
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='active')
@@ -319,8 +319,11 @@ class Teacher(models.Model):
         all_subjects = subject_teaching | class_teaching
         return all_subjects
     
+<<<<<<< HEAD
 >>>>>>> 282effb8 (Scores & Broadsheet Issues)
 
+=======
+>>>>>>> 6039c117 (Results, Update Users, Login Error & Profile Image)
     def __str__(self):
 <<<<<<< HEAD
         return self.user.get_full_name()

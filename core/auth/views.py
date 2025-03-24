@@ -14,8 +14,12 @@ from django.utils.log import AdminEmailHandler
 from django.urls import reverse_lazy
 from django.db.models import Count, Q
 from collections import defaultdict
+<<<<<<< HEAD
 from django.utils.timezone import localdate
 from core.models import CustomUser, Student, Teacher, Guardian, Class, Subject, Assignment, Result, Attendance, Payment
+=======
+from core.models import Student, Teacher, Guardian, Assignment, Result, Attendance, Subject
+>>>>>>> 6039c117 (Results, Update Users, Login Error & Profile Image)
 from core.models import Session, Term, Message, Assessment, Exam, Notification, AssignmentSubmission, AcademicAlert
 from core.models import FeeAssignment, Payment, FinancialRecord, StudentFeeRecord, SubjectAssignment
 from django.db.models import Sum
@@ -37,8 +41,8 @@ class RegisterView(TemplateView):
     # You can override get_context_data if you need to pass additional context
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        # Add any custom context if needed
         return context
+
 # Custom Guardian Registration
 class GuardianRegisterView(FormView):
     template_name = 'auth/guardian_register.html'
@@ -76,6 +80,9 @@ class TeacherRegisterView(FormView):
             return redirect('login')
         return render(request, self.template_name, {'form': form})
     
+    def form_invalid(self, form):
+        messages.error(self.request, "There was an error with the registration. Please try again.")
+        return super().form_invalid(form)
 
 # Login view
 class CustomLoginView(LoginView):
@@ -100,9 +107,10 @@ class CustomLoginView(LoginView):
             return reverse_lazy('login')
 
     def form_invalid(self, form):
-        # Log the invalid login attempt
-        username = form.cleaned_data.get('username')
+        username = form.cleaned_data.get('username', 'Unknown')
         logger.warning(f"Invalid login attempt: {username}")
+
+        # Add a generic error message  
         return super().form_invalid(form)
 
     def form_valid(self, form):
@@ -135,11 +143,21 @@ def student_dashboard(request):
     
     student = Student.objects.select_related('current_class').get(user=request.user)
     current_class = student.current_class
-    subjects = current_class.subjects.prefetch_related('assignments').all()
+    session = Session.objects.get(is_active=True)
+    term = Term.objects.filter(session=session, is_active=True).order_by('-start_date').first()
+    subjects = Subject.objects.filter(
+        class_assignments__class_assigned=current_class,
+        class_assignments__session=session,
+        class_assignments__term=term
+    ).distinct()
     assignments = Assignment.objects.filter(class_assigned=current_class).select_related('teacher')
+<<<<<<< HEAD
 <<<<<<< HEAD
 =======
     assessments = Assessment.objects.filter(class_assigned=current_class).select_related('teacher')
+=======
+    assessments = Assessment.objects.filter(class_assigned=current_class)
+>>>>>>> 6039c117 (Results, Update Users, Login Error & Profile Image)
     exams = Exam.objects.filter(class_assigned=current_class).select_related('teacher')
 >>>>>>> aa6c4766 (Profile Pictures & Student Fee Records)
     results = Result.objects.filter(student=student).select_related('term')
