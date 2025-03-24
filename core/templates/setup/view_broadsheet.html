@@ -1,5 +1,8 @@
 {% extends 'base.html' %}
+
 {% load static %}
+{% load custom_filters %}
+
 {% block content %}
 <div class="container mt-4">
     <div class="card shadow-sm">
@@ -35,9 +38,13 @@
                                         {% for result in broadsheet.results_data %}
                                         <tr>
                                             <td><strong>{{ result.student.user.get_full_name }}</strong></td>
-                                            {% for subject_result in result.subject_results %}
-                                                <td>{{ subject_result.total_score }}</td>
+                                    
+                                            {% for subject in broadsheet.subjects %}
+                                                {% with subject_result=result.subject_results|dict_key:subject.id %}
+                                                    <td>{{ subject_result.total_score|default:"-" }}</td>
+                                                {% endwith %}
                                             {% endfor %}
+                                    
                                             <td><strong>{{ result.total_score }}</strong></td>
                                             <td><span class="badge bg-info">{{ result.gpa }}</span></td>
                                             <td>
@@ -49,7 +56,7 @@
                                             </td>
                                         </tr>
                                         {% endfor %}
-                                    </tbody>
+                                    </tbody>                                    
                                 </table>
                             </div>
                             <div class="text-center mt-3">

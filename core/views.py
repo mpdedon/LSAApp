@@ -633,6 +633,7 @@ def broadsheets(request):
 
 @login_required
 def view_broadsheet(request, term_id):
+    session = Session.objects.get(is_active=True)
     term = get_object_or_404(Term, id=term_id)
 
     # Check which classes these students belong to
@@ -641,7 +642,12 @@ def view_broadsheet(request, term_id):
     broadsheets = []
     for class_obj in classes:
         students = class_obj.enrolled_students.all()
-        subjects = class_obj.subjects.all()
+        subjects = Subject.objects.filter(
+            class_assignments__class_assigned=class_obj,
+            class_assignments__session=session,
+            class_assignments__term=term
+        ).distinct()
+
         results_data = []
 
         for student in students:
