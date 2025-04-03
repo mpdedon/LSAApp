@@ -12,6 +12,7 @@ from django.utils import timezone
 from django.db.models import Q, Count, F
 from django.http import HttpResponseForbidden
 from datetime import date
+from decimal import Decimal 
 from core.teacher.forms import TeacherRegistrationForm, MessageForm
 from core.models import Teacher, Student, Guardian, Class, Subject, Attendance, Assessment, Exam
 from core.models import Assignment, Question, AssignmentSubmission, AssessmentSubmission, ExamSubmission, AcademicAlert
@@ -384,100 +385,154 @@ def attendance_log(request, class_id):
     }
     return render(request, 'teacher/attendance_log.html', context)
 
+
 @login_required
 def input_scores(request, class_id, subject_id, term_id):
     class_obj = get_object_or_404(Class, id=class_id)
     subject = get_object_or_404(Subject, id=subject_id)
     term = get_object_or_404(Term, id=term_id)
-    students = Student.objects.filter(current_class=class_obj).distinct()
+    # Ensure we only get students currently enrolled in THIS class
+    students = Student.objects.filter(current_class=class_obj).order_by('user__last_name', 'user__first_name').distinct()
 
-    # Collect all subject results for the term
+    # Prepare instances and forms
     subject_results = {}
+    forms_dict = {}
     for student in students:
-        result, _ = Result.objects.get_or_create(student=student, term=term)
-        subject_result, _ = SubjectResult.objects.get_or_create(result=result, subject=subject)
-        subject_results[student] = subject_result  # Store results by student
+        # Ensure a Result object exists for the student and term
+        result_obj, _ = Result.objects.get_or_create(student=student, term=term)
+        # Get or create the specific SubjectResult
+        subject_result, _ = SubjectResult.objects.get_or_create(result=result_obj, subject=subject)
+        subject_results[student.user.id] = subject_result # Store by user ID for easier POST lookup
 
     if request.method == 'POST':
-        final_submit = request.POST.get('final_submit', '') == 'true'
         all_forms_valid = True
+        forms_to_save = []
 
-        for student, subject_result in subject_results.items():
+        for student in students:
+            subject_result = subject_results.get(student.user.id)
+            if not subject_result:
+                 # Should not happen with get_or_create, but good to check
+                 continue
+
+            # Create form instance with POST data, files, instance, and prefix
             form = SubjectResultForm(request.POST, instance=subject_result, prefix=str(student.user.id))
+            forms_dict[student] = form # Store the bound form for rendering
 
             if form.is_valid():
-                subject_result = form.save(commit=False)
-                subject_result.is_finalized = final_submit
-                subject_result.save()  # Save the updated scores
+                forms_to_save.append(form) # Add valid forms to list
             else:
                 all_forms_valid = False
+                # Optional: Log errors for debugging
+                # print(f"Validation errors for student {student.user.id} ({form.prefix}): {form.errors.as_json()}")
 
         if all_forms_valid:
+            # Save all valid forms
+            for form in forms_to_save:
+                form.save()
+            messages.success(request, f"{subject.name} scores for {class_obj.name} submitted successfully.")
+            # Redirect to broadsheet or another appropriate page
             return redirect('broadsheet', class_id=class_id, term_id=term_id)
+        else:
+            # If any form is invalid, display errors
+            messages.error(request, "Please correct the errors below.")
+            # The view will fall through to render the template with the forms_dict containing bound, invalid forms
+            # Django templates will automatically display errors next to fields if form is rendered correctly
 
-    forms = {student: SubjectResultForm(instance=subject_result, prefix=str(student.user.id)) for student, subject_result in subject_results.items()}
+    else: # GET request
+        # Create unbound forms with instances for initial display
+        for student in students:
+            subject_result = subject_results.get(student.user.id)
+            forms_dict[student] = SubjectResultForm(instance=subject_result, prefix=str(student.user.id))
 
     context = {
-        'forms': forms,
+        'forms': forms_dict, # Pass the dictionary of forms
         'class': class_obj,
         'subject': subject,
         'term': term,
-        'students': students,
+        'students': students, # Pass students if needed separately (e.g., ordering)
     }
     return render(request, 'teacher/input_scores.html', context)
 
-
+# --- Broadsheet View (Minor Refinements) ---
 @login_required
 def broadsheet(request, class_id, term_id):
     class_obj = get_object_or_404(Class, id=class_id)
-    session = Session.objects.get(is_active=True)
-    term = get_object_or_404(Term, id=term_id)
-    students = class_obj.enrolled_students.all()
+    # Ensure active session logic is robust if needed elsewhere too
+    try:
+        session = Session.objects.get(is_active=True)
+    except Session.DoesNotExist:
+        messages.error(request, "No active session found.")
+        return redirect('teacher_dashboard') # Or appropriate error page
+    except Session.MultipleObjectsReturned:
+        messages.error(request, "Multiple active sessions found. Please resolve.")
+        return redirect('teacher_dashboard')
 
-    # Get subjects that are still assigned to this class in this term/session
+    term = get_object_or_404(Term, id=term_id)
+    # Get students enrolled in the class for this specific term/session if possible
+    # If enrollment changes, current_class might not be enough for historical terms
+    students = Student.objects.filter(current_class=class_obj).order_by('user__last_name', 'user__first_name') # Or filter based on historical enrollment if needed
+
+    # Get subjects assigned to this class in this term/session
     subjects = Subject.objects.filter(
         class_assignments__class_assigned=class_obj,
         class_assignments__session=session,
         class_assignments__term=term
-    ).distinct()
+    ).distinct().order_by('name')
 
     results_data = []
 
     for student in students:
+        # Get the main Result object for this student/term
         result = Result.objects.filter(student=student, term=term).first()
+        student_subject_results = {}
+        total_score_sum = Decimal('0.0')
+        gpa_points_sum = Decimal('0.0')
+        subject_count = 0
+
         if result:
-            #  Only get subjects where scores have been inputted
-            subject_results = result.subjectresult_set.filter(
-                Q(continuous_assessment_1__isnull=False) |
-                Q(continuous_assessment_2__isnull=False) |
-                Q(continuous_assessment_3__isnull=False) |
-                Q(assignment__isnull=False) |
-                Q(oral_test__isnull=False) |
-                Q(exam_score__isnull=False)
-            )
+            # Get all SubjectResult entries for this Result (student/term)
+            # Filter only for subjects relevant to *this* broadsheet view
+            subject_results_qs = result.subjectresult_set.filter(subject__in=subjects)
 
-            subject_results_dict = {sr.subject.id: sr for sr in subject_results}
+            for sr in subject_results_qs:
+                 # Check if any score has been entered to consider it 'active'
+                 if (sr.continuous_assessment_1 is not None or
+                     sr.continuous_assessment_2 is not None or
+                     sr.continuous_assessment_3 is not None or
+                     sr.assignment is not None or
+                     sr.oral_test is not None or
+                     sr.exam_score is not None):
 
-            if subject_results:
-                total_score = sum(sr.total_score() for sr in subject_results)
-                gpa = result.calculate_gpa()
-                
-                results_data.append({
-                    'student': student,
-                    'subject_results': subject_results_dict,  # Store as dictionary
-                    'gpa': gpa,
-                    'total_score': total_score,
-                })
+                     student_subject_results[sr.subject.id] = sr
+                     total_score_sum += sr.total_score()
+                     gpa_points_sum += Decimal(sr.calculate_grade_point()) # Ensure Decimal for precision
+                     subject_count += 1
 
-    # Sort students by total score, then by GPA
+        # Calculate overall GPA for the student based *only* on subjects shown on this broadsheet
+        # Note: Result.calculate_gpa() might calculate based on *all* subjects in the Result,
+        # which might differ from the broadsheet's context if not all subjects are shown.
+        # Here we calculate GPA based on the subjects included in `student_subject_results`.
+        student_gpa = (gpa_points_sum / subject_count) if subject_count > 0 else Decimal('0.0')
+        grade = sr.calculate_grade()
+
+        results_data.append({
+            'student': student,
+            'subject_results': student_subject_results, # Dict: {subject_id: SubjectResult instance}
+            'gpa': student_gpa.quantize(Decimal('0.01')), # Format GPA
+            'total_score': total_score_sum.quantize(Decimal('0.1')), # Sum of total_scores across subjects
+            'grade': grade,
+        })
+
+    # Sort students: Primary by Total Score (desc), Secondary by GPA (desc)
     results_data.sort(key=lambda x: (-x['total_score'], -x['gpa']))
 
     context = {
-        'students': students,
+        # 'students': students, # Already part of results_data
         'class': class_obj,
         'term': term,
-        'results_data': results_data,
-        'subjects': subjects,
+        'results_data': results_data, # This contains student info and their results
+        'subjects': subjects, # List of subjects for table headers
+        'session': session,
     }
     return render(request, 'teacher/broadsheet.html', context)
 
