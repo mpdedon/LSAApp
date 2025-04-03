@@ -767,58 +767,81 @@ class Result(models.Model):
         return 0.0
     
 
+# models.py
+from django.db import models
+from django.core.validators import MaxValueValidator
+from django.db.models import Avg, F # Import F
+
+# Assume other models (Student, Subject, Term, Result, Session, Class) exist
+
 class SubjectResult(models.Model):
     subject = models.ForeignKey(Subject, on_delete=models.CASCADE)
     result = models.ForeignKey(Result, on_delete=models.CASCADE)
-    continuous_assessment_1 = models.DecimalField(max_digits=2, validators=[MaxValueValidator(10.0)], decimal_places=1, null=True, blank=True)
-    continuous_assessment_2 = models.DecimalField(max_digits=2, validators=[MaxValueValidator(10.0)], decimal_places=1, null=True, blank=True)
-    continuous_assessment_3 = models.DecimalField(max_digits=2, validators=[MaxValueValidator(10.0)], decimal_places=1, null=True, blank=True)
-    assignment = models.DecimalField(max_digits=2, validators=[MaxValueValidator(10.0)], decimal_places=1, null=True, blank=True)
+    # Use max_digits=3, decimal_places=1 for scores up to 99.9
+    continuous_assessment_1 = models.DecimalField(max_digits=3, validators=[MaxValueValidator(10.0)], decimal_places=1, null=True, blank=True)
+    continuous_assessment_2 = models.DecimalField(max_digits=3, validators=[MaxValueValidator(10.0)], decimal_places=1, null=True, blank=True)
+    continuous_assessment_3 = models.DecimalField(max_digits=3, validators=[MaxValueValidator(10.0)], decimal_places=1, null=True, blank=True)
+    assignment = models.DecimalField(max_digits=3, validators=[MaxValueValidator(10.0)], decimal_places=1, null=True, blank=True)
     oral_test = models.DecimalField(max_digits=3, validators=[MaxValueValidator(20.0)], decimal_places=1, null=True, blank=True)
-    exam_score = models.DecimalField(max_digits=4, validators=[MaxValueValidator(40.0)], decimal_places=1, null=True, blank=True)
-    is_finalized = models.BooleanField(default=True)  # New field to track if the scores are finalized
+    exam_score = models.DecimalField(max_digits=3, validators=[MaxValueValidator(40.0)], decimal_places=1, null=True, blank=True)
+    is_finalized = models.BooleanField(default=False) # Default to False initially
 
     def __str__(self):
-        return f"{self.result.student} - {self.subject.name} ({'Finalized' if self.is_finalized else 'Draft'})"
+        student_name = self.result.student.user.get_full_name() if self.result.student else "Unknown Student"
+        subject_name = self.subject.name if self.subject else "Unknown Subject"
+        status = 'Finalized' if self.is_finalized else 'Draft'
+        return f"{student_name} - {subject_name} ({status})"
 
     def total_score(self):
+        # Ensure Decimal conversion for consistent arithmetic
         ca1 = self.continuous_assessment_1 or 0
         ca2 = self.continuous_assessment_2 or 0
         ca3 = self.continuous_assessment_3 or 0
         assignment = self.assignment or 0
         oral_test = self.oral_test or 0
         exam_score = self.exam_score or 0
-
-        total = ca1 + ca2 + ca3 + assignment + oral_test + exam_score
-        return total
+        # Cast to Decimal if they are not already, although model fields should be
+        total = Decimal(ca1) + Decimal(ca2) + Decimal(ca3) + Decimal(assignment) + Decimal(oral_test) + Decimal(exam_score)
+        return total.quantize(Decimal('0.1')) # Keep one decimal place
 
     @classmethod
-    def get_class_average(cls, subject):
-        # Calculate the average of total scores for all results associated with this subject
-        total_scores = cls.objects.filter(subject=subject).aggregate(avg_total=Avg(models.F('continuous_assessment_1') + models.F('continuous_assessment_2') + models.F('continuous_assessment_3') + models.F('assignment') + models.F('oral_test') + models.F('exam_score')))
-        return total_scores['avg_total'] or 0
-    
+    def get_class_average(cls, subject, term, class_obj):
+        # More specific filtering is needed for a meaningful class average
+        results_in_term = Result.objects.filter(term=term, student__current_class=class_obj)
+        subject_results = cls.objects.filter(subject=subject, result__in=results_in_term)
+
+        # Aggregate sum of components, handling NULLs
+        aggregation = subject_results.aggregate(
+            avg_total=Avg(
+                F('continuous_assessment_1') + F('continuous_assessment_2') +
+                F('continuous_assessment_3') + F('assignment') +
+                F('oral_test') + F('exam_score'),
+                # Provide default=0 if a component is NULL before summing
+                # Note: Direct sum with F objects handles NULLs reasonably in newer Django versions
+                # but explicit Coalesce might be safer if issues arise
+                output_field=models.DecimalField()
+            )
+        )
+        avg = aggregation['avg_total']
+        return avg.quantize(Decimal('0.1')) if avg is not None else Decimal('0.0')
+
     def calculate_grade(self):
         score = self.total_score()
-        if score >= 80:
-            return 'A'
-        elif score >= 65:
-            return 'B'
-        elif score >= 55:
-            return 'C'
-        elif score >= 45:
-            return 'D'
-        elif score >= 40:
-            return 'E'
-        else:
-            return 'F'
+        if score >= 80: return 'A'
+        elif score >= 65: return 'B'
+        elif score >= 55: return 'C'
+        elif score >= 45: return 'D'
+        elif score >= 40: return 'E'
+        else: return 'F'
 
     def calculate_grade_point(self):
-        grade = self.calculate_grade()
-        grade_points = {
-            'A': 5, 'B': 4, 'C': 3, 'D': 2, 'E': 1, 'F': 0,
-        }
-        return grade_points.get(grade, 0)
+        score = self.total_score() # Use total score for points calculation
+        if score >= 80: return 5.0
+        elif score >= 65: return 4.0
+        elif score >= 55: return 3.0
+        elif score >= 45: return 2.0
+        elif score >= 40: return 1.0
+        else: return 0.0
     
 
 class Message(models.Model):

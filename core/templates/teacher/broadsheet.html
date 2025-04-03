@@ -2,47 +2,50 @@
 {% load custom_filters %}
 {% block content %}
 <div class="container mt-5">
-    <h1 class="text-center mb-4">Broadsheet for {{ class.name }} : {{ term.name }}</h1>
+    <h1 class="text-center mb-4">Broadsheet for {{ class.name }} : {{ term.name }} ({{ session.name }})</h1> {# Added session name #}
 
     <div class="mb-3 text-end">
         <a href="{% url 'teacher_dashboard' %}" class="btn btn-secondary">Back to Dashboard</a>
     </div>
-    
-  </div>
+
     <div class="table-responsive">
-      <table class="table table-striped">
+      <table class="table table-striped table-bordered"> {# Added table-bordered for clarity #}
         <thead>
             <tr>
+                <th>S/N</th> {# Added Serial Number #}
                 <th>Student</th>
                 {% for subject in subjects %}
-                  <th>{{ subject.name }}</th>
+                  <th class="text-center">{{ subject.name }}</th> {# Centered header #}
                 {% endfor %}
-                <th>Total Score</th>
-                <th>Grade</th>
-                <th>GPA</th>
-
-                <!-- Loop through each subject for headers -->
-
+                <th class="text-center">Total Score</th> {# Centered header #}
+                <th class="text-center">GPA</th> {# Centered header #}
+                <th class="text-center">Grade</th> {# Centered header #}
             </tr>
         </thead>
         <tbody>
           {% for data in results_data %}
           <tr>
+              <td>{{ forloop.counter }}</td> {# Display serial number #}
               <td>{{ data.student.user.get_full_name }}</td>
-      
-              {% for subject in subjects %}  {# Ensures all subjects have a column #}
+
+              {% for subject in subjects %}
               {% with data.subject_results|dict_key:subject.id as subject_result %}
-                  <td>{{ subject_result.total_score|default_if_none:"-" }}</td>
+                  <td class="text-center"> {# Centered score #}
+                      {{ subject_result.total_score|default_if_none:"-" }}
+                  </td>
               {% endwith %}
               {% endfor %}
-      
-              <td>{{ data.total_score }}</td>
-              <td>{{ data.subject_results.0.calculate_grade }}</td>  <!-- Assuming grading is consistent -->
-              <td>{{ data.gpa }}</td>
+
+              <td class="text-center">{{ data.total_score }}</td> {# Centered total #}
+              <td class="text-center">{{ data.gpa }}</td> {# Centered GPA #}
+              <td class="text-center">{{ data.grade }}</td> {# USE THE NEW KEY #}
+          </tr>
+          {% empty %}
+          <tr>
+              <td colspan="{{ subjects|length|add:4 }}" class="text-center">No student results found for this class, term, and session.</td> {# Improved empty message #}
           </tr>
           {% endfor %}
       </tbody>
-      
     </table>
   </div>
 </div>
