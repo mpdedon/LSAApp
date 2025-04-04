@@ -3,7 +3,7 @@ from django.core.validators import MaxValueValidator
 from django.core.exceptions import ValidationError
 from django.contrib.auth.models import AbstractUser
 from django.conf import settings
-from django.db.models import Sum, Avg, Q
+from django.db.models import Sum, Avg, Q, F
 from django.utils import timezone
 from datetime import date, timedelta, datetime
 from decimal import Decimal
@@ -766,14 +766,7 @@ class Result(models.Model):
             return round(total_weighted_grade_points / total_weights, 2)
         return 0.0
     
-
-# models.py
-from django.db import models
-from django.core.validators import MaxValueValidator
-from django.db.models import Avg, F # Import F
-
-# Assume other models (Student, Subject, Term, Result, Session, Class) exist
-
+    
 class SubjectResult(models.Model):
     subject = models.ForeignKey(Subject, on_delete=models.CASCADE)
     result = models.ForeignKey(Result, on_delete=models.CASCADE)
