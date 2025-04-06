@@ -770,7 +770,6 @@ class Result(models.Model):
 class SubjectResult(models.Model):
     subject = models.ForeignKey(Subject, on_delete=models.CASCADE)
     result = models.ForeignKey(Result, on_delete=models.CASCADE)
-    # Use max_digits=3, decimal_places=1 for scores up to 99.9
     continuous_assessment_1 = models.DecimalField(max_digits=3, validators=[MaxValueValidator(10.0)], decimal_places=1, null=True, blank=True)
     continuous_assessment_2 = models.DecimalField(max_digits=3, validators=[MaxValueValidator(10.0)], decimal_places=1, null=True, blank=True)
     continuous_assessment_3 = models.DecimalField(max_digits=3, validators=[MaxValueValidator(10.0)], decimal_places=1, null=True, blank=True)
