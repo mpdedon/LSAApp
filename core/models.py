@@ -770,12 +770,12 @@ class Result(models.Model):
 class SubjectResult(models.Model):
     subject = models.ForeignKey(Subject, on_delete=models.CASCADE)
     result = models.ForeignKey(Result, on_delete=models.CASCADE)
-    continuous_assessment_1 = models.DecimalField(max_digits=3, validators=[MaxValueValidator(10.0)], decimal_places=1, null=True, blank=True)
-    continuous_assessment_2 = models.DecimalField(max_digits=3, validators=[MaxValueValidator(10.0)], decimal_places=1, null=True, blank=True)
-    continuous_assessment_3 = models.DecimalField(max_digits=3, validators=[MaxValueValidator(10.0)], decimal_places=1, null=True, blank=True)
-    assignment = models.DecimalField(max_digits=3, validators=[MaxValueValidator(10.0)], decimal_places=1, null=True, blank=True)
-    oral_test = models.DecimalField(max_digits=3, validators=[MaxValueValidator(20.0)], decimal_places=1, null=True, blank=True)
-    exam_score = models.DecimalField(max_digits=3, validators=[MaxValueValidator(40.0)], decimal_places=1, null=True, blank=True)
+    continuous_assessment_1 = models.DecimalField(max_digits=4, validators=[MaxValueValidator(10.0)], decimal_places=1, null=True, blank=True)
+    continuous_assessment_2 = models.DecimalField(max_digits=4, validators=[MaxValueValidator(10.0)], decimal_places=1, null=True, blank=True)
+    continuous_assessment_3 = models.DecimalField(max_digits=4, validators=[MaxValueValidator(10.0)], decimal_places=1, null=True, blank=True)
+    assignment = models.DecimalField(max_digits=4, validators=[MaxValueValidator(10.0)], decimal_places=1, null=True, blank=True)
+    oral_test = models.DecimalField(max_digits=4, validators=[MaxValueValidator(20.0)], decimal_places=1, null=True, blank=True)
+    exam_score = models.DecimalField(max_digits=4, validators=[MaxValueValidator(40.0)], decimal_places=1, null=True, blank=True)
     is_finalized = models.BooleanField(default=False) # Default to False initially
 
     def __str__(self):
