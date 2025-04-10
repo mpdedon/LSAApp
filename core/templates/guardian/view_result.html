@@ -1,78 +1,96 @@
-{% extends 'base.html' %}
+{% extends 'base.html' %} {# Or a minimal base_print.html if preferred for PDF #}
 {% load static %}
 
+{% block title %}Result for {{ student.user.get_full_name }} - {{ term }}{% endblock %}
+
+{% block extra_head %} {# Load dedicated CSS #}
+  <link rel="stylesheet" href="{% static 'css/result_styles.css' %}">
+  {# Include Bootstrap if base doesn't, needed for grid #}
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet"> #}
+{% endblock %}
+
+
 {% block content %}
-<!-- Framing the entire document -->
-<div class="container" style="max-width: 1000px; border: 2px solid #333; border-radius: 10px; padding: 20px; background: #fafafa;">
+{# Remove outer container from base if it exists, let this container control width #}
+<div class="result-container">
     <!-- School Header Section -->
-    <div class="text-center mb-5">
-        <img src="{% static 'images/logo.jpg' %}" alt="LearnSwift Academia Logo" class="mb-3" style="max-width: 120px;">
-        <h1 class="display-4 fw-bold text-dark" style="font-family: 'Poppins', sans-serif;">LearnSwift Academia</h1>
-        <p class="lead text-muted" style="font-family: 'Roboto', sans-serif;">Term: {{ result.term }} | Session: {{ result.session }}</p>
+    <div class="result-header">
+        {# Use absolute URL from context for PDF #}
+        <img src="{{ school_logo_url }}" alt="LearnSwift Academia Logo" class="logo">
+        <h1>LearnSwift Academia</h1>
+        <p class="lead">Term: {{ term }} | Session: {{ session }}</p>
     </div>
 
     <!-- Student Information Section -->
-    <div class="row mb-5 justify-content-center align-items-center">
-        <div class="col-md-4 text-center mb-4 mb-md-0">
-            <img src="{{ profile_image_url }}" alt="{{ student.user.get_full_name }}'s Profile Image" class="rounded-circle shadow-lg" style="width: 150px; height: 150px; object-fit: cover;">
+    <div class="student-info-section row mb-5 align-items-center">
+        <div class="col-md-4 text-center text-md-start mb-3 mb-md-0">
+            {# Use absolute URL from context for PDF #}
+            {% if profile_image_url %}
+              <img src="{{ profile_image_url }}" alt="{{ student.user.get_full_name }}'s Profile Image" class="student-profile-img">
+            {% else %}
+              <div class="student-profile-img bg-secondary d-flex align-items-center justify-content-center text-white fs-1 rounded-circle">
+                  {{ student.user.first_name.0 }}{{ student.user.last_name.0 }} {# Initials Placeholder #}
+              </div>
+            {% endif %}
         </div>
-        <div class="col-md-8 text-center">
-            <h2 class="fw-bold text-dark" style="font-family: 'Poppins', sans-serif;">{{ student.user.get_full_name }}</h2>
-            <p class="text-muted" style="font-family: 'Roboto', sans-serif;">Class: {{ student.current_class }}  |   Roll No: {{ student.LSA_number }}</p>
+        <div class="col-md-8 student-details text-center text-md-start">
+            <h2>{{ student.user.get_full_name }}</h2>
+            <p>
+                <strong>Class:</strong> {{ class_obj }} <span class="mx-2">|</span>
+                <strong>Roll No:</strong> {{ student.LSA_number }} <span class="mx-2">|</span>
+                <strong>Term:</strong> {{ term.name }} ({{ session.name }})
+            </p>
         </div>
     </div>
-   
-    <div class="row mb-5">
-        <!-- Teacher's Comment Column -->
-        <div class="col-md-6">
-            <div class="card shadow-lg border-0" style="background: #f9f9f9; border-radius: 10px;">
-                <div class="card-header bg-warning text-white">
-                    <h5 class="h6 mb-0">Teacher's Remarks</h5>
+
+    <!-- Remarks Section -->
+    <div class="remarks-section row mb-5">
+        <div class="col-md-6 mb-3 mb-md-0">
+            <div class="remarks-card">
+                <div class="card-header teacher-remarks-header">
+                    <h5>Teacher's Remarks</h5>
                 </div>
                 <div class="card-body">
-                    <p>{{ result.teacher_remarks|default:"No comments yet." }}</p>
+                    <p>{{ teacher_comment|default:"No comments provided." }}</p>
                 </div>
             </div>
         </div>
-    
-        <!-- Principal's Comment Column -->
         <div class="col-md-6">
-            <div class="card shadow-lg border-0" style="background: #f9f9f9; border-radius: 10px;">
-                <div class="card-header bg-secondary text-white">
-                    <h5 class="h6 mb-0">Principal's Remarks</h5>
+            <div class="remarks-card">
+                <div class="card-header principal-remarks-header">
+                    <h5>Principal's Remarks</h5>
                 </div>
                 <div class="card-body">
-                    <p>{{ result.principal_remarks|default:"No comments yet." }}</p>
+                    <p>{{ principal_comment|default:"No comments provided." }}</p>
                 </div>
             </div>
         </div>
     </div>
-    
 
     <!-- Attendance, Affective Skills, and Psychomotor Skills Section -->
-    <div class="row mb-5">
+    <div class="skills-attendance-section row mb-5 g-4"> {# Use grid gap #}
         <!-- Attendance Section -->
         <div class="col-md-4">
-            <div class="card shadow-lg border-0" style="background: #f4f4f4; border-radius: 10px; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);">
-                <div class="card-header bg-primary text-white">
-                    <h5 class="h6 mb-0">Attendance Records</h5>
+            <div class="info-card attendance-card">
+                <div class="card-header">
+                    <h5>Attendance</h5>
                 </div>
                 <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center" style="font-family: 'Roboto', sans-serif;">
-                        <div><strong>Total Days:</strong></div>
-                        <div class="digital-number">{{ attendance_data.total_days }}</div>
+                    <div class="info-item">
+                        <span class="info-label">Total Days:</span>
+                        <span class="info-value">{{ attendance_data.total_days }}</span>
                     </div>
-                    <div class="d-flex justify-content-between align-items-center" style="font-family: 'Roboto', sans-serif;">
-                        <div><strong>Days Present:</strong></div>
-                        <div class="digital-number">{{ attendance_data.present_days }}</div>
+                    <div class="info-item">
+                        <span class="info-label">Days Present:</span>
+                        <span class="info-value">{{ attendance_data.present_days }}</span>
                     </div>
-                    <div class="d-flex justify-content-between align-items-center" style="font-family: 'Roboto', sans-serif;">
-                        <div><strong>Days Absent:</strong></div>
-                        <div class="digital-number">{{ attendance_data.absent_days }}</div>
+                    <div class="info-item">
+                        <span class="info-label">Days Absent:</span>
+                        <span class="info-value">{{ attendance_data.absent_days }}</span>
                     </div>
-                    <div class="d-flex justify-content-between align-items-center" style="font-family: 'Roboto', sans-serif;">
-                        <div><strong>Attendance Percentage:</strong></div>
-                        <div class="digital-number">{{ attendance_data.attendance_percentage|floatformat:1 }}%</div>
+                    <div class="info-item">
+                        <span class="info-label">Attendance %:</span>
+                        <span class="info-value">{{ attendance_data.attendance_percentage }}%</span>
                     </div>
                 </div>
             </div>
@@ -80,26 +98,26 @@
 
         <!-- Affective Skills Section -->
         <div class="col-md-4">
-            <div class="card shadow-lg border-0" style="background: #e0f7fa; border-radius: 10px; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);">
-                <div class="card-header bg-info text-white">
-                    <h5 class="h6 mb-0">Affective Skills (Character)</h5>
+            <div class="info-card affective-card">
+                 <div class="card-header">
+                    <h5>Affective Skills</h5>
                 </div>
                 <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center" style="font-family: 'Roboto', sans-serif;">
-                        <div><strong>Punctuality:</strong></div>
-                        <div class="digital-number">{{ result.punctuality }}</div>
+                     <div class="info-item">
+                        <span class="info-label">Punctuality:</span>
+                        <span class="info-value">{{ result.punctuality|default:'N/A' }}</span> {# Add default #}
                     </div>
-                    <div class="d-flex justify-content-between align-items-center" style="font-family: 'Roboto', sans-serif;">
-                        <div><strong>Diligence:</strong></div>
-                        <div class="digital-number">{{ result.diligence }}</div>
+                     <div class="info-item">
+                        <span class="info-label">Diligence:</span>
+                        <span class="info-value">{{ result.diligence|default:'N/A' }}</span>
                     </div>
-                    <div class="d-flex justify-content-between align-items-center" style="font-family: 'Roboto', sans-serif;">
-                        <div><strong>Cooperation:</strong></div>
-                        <div class="digital-number">{{ result.cooperation }}</div>
+                     <div class="info-item">
+                        <span class="info-label">Cooperation:</span>
+                        <span class="info-value">{{ result.cooperation|default:'N/A' }}</span>
                     </div>
-                    <div class="d-flex justify-content-between align-items-center" style="font-family: 'Roboto', sans-serif;">
-                        <div><strong>Respectfulness:</strong></div>
-                        <div class="digital-number">{{ result.respectfulness }}</div>
+                     <div class="info-item">
+                        <span class="info-label">Respectfulness:</span>
+                        <span class="info-value">{{ result.respectfulness|default:'N/A' }}</span>
                     </div>
                 </div>
             </div>
@@ -107,26 +125,26 @@
 
         <!-- Psychomotor Skills Section -->
         <div class="col-md-4">
-            <div class="card shadow-lg border-0" style="background: #e7bdddce; border-radius: 10px; box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);">
-                <div class="card-header bg-lemon text-white">
-                    <h5 class="h6 mb-0">Psychomotor Skills (Physical)</h5>
+             <div class="info-card psychomotor-card">
+                 <div class="card-header">
+                    <h5>Psychomotor Skills</h5>
                 </div>
                 <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center" style="font-family: 'Roboto', sans-serif;">
-                        <div><strong>Sportsmanship:</strong></div>
-                        <div class="digital-number">{{ result.sportsmanship }}</div>
+                    <div class="info-item">
+                        <span class="info-label">Sportsmanship:</span>
+                        <span class="info-value">{{ result.sportsmanship|default:'N/A' }}</span>
                     </div>
-                    <div class="d-flex justify-content-between align-items-center" style="font-family: 'Roboto', sans-serif;">
-                        <div><strong>Agility:</strong></div>
-                        <div class="digital-number">{{ result.agility }}</div>
+                    <div class="info-item">
+                        <span class="info-label">Agility:</span>
+                        <span class="info-value">{{ result.agility|default:'N/A' }}</span>
                     </div>
-                    <div class="d-flex justify-content-between align-items-center" style="font-family: 'Roboto', sans-serif;">
-                        <div><strong>Creativity:</strong></div>
-                        <div class="digital-number">{{ result.creativity }}</div>
+                    <div class="info-item">
+                        <span class="info-label">Creativity:</span>
+                        <span class="info-value">{{ result.creativity|default:'N/A' }}</span>
                     </div>
-                    <div class="d-flex justify-content-between align-items-center" style="font-family: 'Roboto', sans-serif;">
-                        <div><strong>Hand-Eye Coordination:</strong></div>
-                        <div class="digital-number">{{ result.hand_eye_coordination }}</div>
+                    <div class="info-item">
+                        <span class="info-label">Hand-Eye Coord.:</span> {# Abbreviate if long #}
+                        <span class="info-value">{{ result.hand_eye_coordination|default:'N/A' }}</span>
                     </div>
                 </div>
             </div>
@@ -134,145 +152,240 @@
     </div>
 
     <!-- Academic Records Section -->
-    <div class="card shadow-lg mb-5 border-0" style="background: linear-gradient(145deg, #333c53, #2a3442);">
-        <div class="card-header bg-success text-white">
-            <h3 class="h5 mb-0">Academic Records</h3>
-        </div>
-        <div class="card-body">
-            <table class="table table-hover table-bordered text-white">
-                <thead class="bg-success text-white">
-                    <tr>
-                        <th>Subject</th>
-                        <th>Test 1</th>
-                        <th>Test 2</th>
-                        <th>Test 3</th>
-                        <th>Assgt.</th>
-                        <th>Oral</th>
-                        <th>Exam</th>
-                        <th>Total</th>
-                        <th>Grade</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for subject_result in subject_results %}
-                    <tr>
-                        <td>{{ subject_result.subject.name }}</td>
-                        <td>{{ subject_result.continuous_assessment_1|default:0 }}</td>
-                        <td>{{ subject_result.continuous_assessment_2|default:0 }}</td>
-                        <td>{{ subject_result.continuous_assessment_3|default:0 }}</td>
-                        <td>{{ subject_result.assignment|default:0 }}</td>
-                        <td>{{ subject_result.oral_test|default:0 }}</td>
-                        <td>{{ subject_result.exam_score|default:0 }}</td>
-                        <td>{{ subject_result.total_score }}</td>
-                        <td>{{ subject_result.calculate_grade }}</td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+    <div class="academic-records-section mb-5">
+        <div class="academic-records-card">
+            <div class="card-header">
+                <h3>Academic Performance</h3>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive"> {# Add responsive wrapper #}
+                    <table class="table academic-table">
+                        <thead>
+                            <tr>
+                                <th>Subject</th>
+                                <th>Test 1</th>
+                                <th>Test 2</th>
+                                <th>Test 3</th>
+                                <th>Assgt.</th>
+                                <th>Oral</th>
+                                <th>Exam</th>
+                                <th>Total (100)</th>
+                                <th>Grade</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for subject_result in subject_results %}
+                            <tr>
+                                <td>{{ subject_result.subject.name }}</td>
+                                <td>{{ subject_result.continuous_assessment_1|default:"-" }}</td> {# Use hyphen for missing #}
+                                <td>{{ subject_result.continuous_assessment_2|default:"-" }}</td>
+                                <td>{{ subject_result.continuous_assessment_3|default:"-" }}</td>
+                                <td>{{ subject_result.assignment|default:"-" }}</td>
+                                <td>{{ subject_result.oral_test|default:"-" }}</td>
+                                <td>{{ subject_result.exam_score|default:"-" }}</td>
+                                <td>{{ subject_result.total_score|floatformat:1|default:"-" }}</td> {# Format total #}
+                                <td>{{ subject_result.calculate_grade|default:"-" }}</td> {# Assumes method exists #}
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="9" class="text-center text-muted py-4">No academic records finalized for this term.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
     </div>
 
     <!-- GPA, Chart, and Signatures Section -->
-    <div class="row mb-5">
-        <!-- GPA and Digital Signature Section -->
-        <div class="col-md-4">
-            <div class="card shadow-lg border-0" style="background: #e8f5e9; border-radius: 10px;">
-                <div class="card-header bg-success text-white">
-                    <h5 class="h6 mb-0">Grade Point Average (GPA)</h5>
+    <div class="summary-section row mb-4 g-4">
+        <!-- GPA and Signature Column -->
+        <div class="col-md-4 d-flex flex-column">
+            <div class="gpa-card mb-4">
+                 <div class="card-header">
+                    <h5>Term GPA</h5>
                 </div>
                 <div class="card-body text-center">
-                    <p class="h4 text-dark" style="font-family: 'Roboto', sans-serif;">{{ result.calculate_gpa }}</p>
+                    <p class="gpa-value">{{ result.calculate_gpa|floatformat:2|default:"N/A" }}</p> {# Format GPA #}
                 </div>
             </div>
-            <br>
-            <br>
-            <div class="card shadow-lg border-0" style="background: #f5f5f5; border-radius: 10px;">
-                <div class="card-header bg-dark text-white">
-                    <h5 class="h6 mb-0">Digital Signature</h5>
+             <div class="signature-card mt-auto"> {# Push signature to bottom #}
+                 <div class="card-header">
+                    <h5>Principal's Signature</h5>
                 </div>
                 <div class="card-body text-center">
-                    <div class="signature-box" style="width: 200px; height: 80px; border: 2px solid #333; background-color: #fff; border-radius: 10px; overflow: hidden;">
-                        <img src="{% static 'images/signature.png' %}" alt="Principal's Signature" class="img-fluid" style="max-height: 100%; max-width: 100%; object-fit: contain;">
+                    <div class="signature-box">
+                        {# Use absolute URL from context for PDF #}
+                        {% if signature_url %}
+                        <img src="{{ signature_url }}" alt="Principal's Signature" >
+                        {% else %}
+                        <span class="text-muted small">(Signature Placeholder)</span>
+                        {% endif %}
                     </div>
-                    <p class="text-dark mt-2">Principal's Signature</p>
+                    <p class="signature-caption">Principal</p>
                 </div>
             </div>
-          
         </div>
 
         <!-- Performance vs Class Average Chart Section -->
         <div class="col-md-8">
-            <div class="card shadow-lg border-0" style="background: #f3f4f6; border-radius: 10px;">
-                <div class="card-header bg-info text-white">
-                    <h5 class="h6 mb-0">Performance vs Class Average</h5>
+            <div class="chart-card">
+                <div class="card-header">
+                    <h5>Performance vs Class Average</h5>
                 </div>
                 <div class="card-body">
-                    <canvas id="performanceChart"></canvas>
+                     {# Conditional rendering: Show canvas for HTML, placeholder for PDF #}
+                     {# NOTE: For PDF, you'd ideally generate this chart as an IMAGE server-side #}
+                     {#       and pass the image URL to embed here instead of the canvas. #}
+                     {% if not is_pdf_render %}
+                        <canvas id="performanceChart"></canvas>
+                     {% else %}
+                        <div class="chart-placeholder">
+                            Chart data is available in the online view.
+                            <br>(PDF rendering of dynamic charts requires image generation)
+                        </div>
+                     {% endif %}
                 </div>
             </div>
         </div>
     </div>
 
-</div>
+</div> {# End result-container #}
 
-<!-- Button to Download as PDF -->
-<div class="text-center mt-4">
+<!-- Button to Download as PDF (Only shown in HTML view) -->
+{% if not is_pdf_render %}
+<div class="download-button-container">
     <a href="?download=pdf" class="btn btn-primary btn-lg shadow-sm">
-        <i class="bi bi-file-earmark-pdf"></i> Download as PDF
+        <i class="fas fa-file-pdf me-2"></i> Download Result PDF
     </a>
 </div>
 <br>
-<!-- JSON Data for Chart.js (Placed before the script to be available in JS) -->
-<script type="application/json" id="subject_results_json">
-    {{ subject_results_json|safe }}
+{% endif %}
+
+
+{# Chart.js Setup (Only include if not PDF render OR if chart library needed for image gen fallback) #}
+{% if not is_pdf_render %}
+<!-- JSON Data for Chart.js -->
+<script type="application/json" id="chart_data_json">
+    {{ chart_data_json|safe }}
 </script>
 
-<!-- Chart.js Script -->
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<!-- Chart.js Library & Initialization -->
+{# Use a specific Chart.js version for stability or latest via cdnjs/jsdelivr #}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
 <script>
-    var subjectResults = JSON.parse(document.getElementById('subject_results_json').textContent);
+    document.addEventListener('DOMContentLoaded', function() {
+        const chartDataElement = document.getElementById('chart_data_json');
+        const canvasElement = document.getElementById('performanceChart');
 
-    var ctx = document.getElementById('performanceChart').getContext('2d');
-    var performanceChart = new Chart(ctx, {
-        type: 'bar',
-        data: {
-            labels: subjectResults.map(sr => sr.subject),  // Fix label reference
-            datasets: [{
-                label: 'Student Score',
-                data: subjectResults.map(sr => sr.total_score),  // Fix data reference
-                backgroundColor: '#0072ff',
-                borderColor: '#0056b3',
-                borderWidth: 1
-            }, {
-                label: 'Class Average',
-                data: subjectResults.map(sr => sr.class_average),  // Fix class average reference
-                backgroundColor: '#ff9a8b',
-                borderColor: '#ff5e62',
-                borderWidth: 1
-            }]
-        },
-        options: {
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    max: 100,
-                    ticks: {
-                        stepSize: 10
+        if (chartDataElement && canvasElement) {
+            try {
+                const subjectResultsData = JSON.parse(chartDataElement.textContent);
+
+                // Prepare labels and datasets from the parsed data
+                const labels = subjectResultsData.map(sr => sr.subject);
+                const studentScores = subjectResultsData.map(sr => sr.total_score);
+                const classAverages = subjectResultsData.map(sr => sr.class_average);
+
+                const ctx = canvasElement.getContext('2d');
+                const performanceChart = new Chart(ctx, {
+                    type: 'bar', // Bar chart type
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Student Score',
+                            data: studentScores,
+                            backgroundColor: 'rgba(25, 135, 84, 0.7)', // Use primary color with opacity
+                            borderColor: 'rgba(25, 135, 84, 1)',
+                            borderWidth: 1,
+                            barPercentage: 0.6, // Adjust bar width
+                            categoryPercentage: 0.7 // Adjust spacing between categories
+                        }, {
+                            label: 'Class Average',
+                            data: classAverages,
+                            backgroundColor: 'rgba(255, 193, 7, 0.7)', // Example: Warning color with opacity
+                            borderColor: 'rgba(255, 193, 7, 1)',
+                            borderWidth: 1,
+                            barPercentage: 0.6,
+                            categoryPercentage: 0.7
+                        }]
+                    },
+                    options: {
+                        responsive: true, // Make chart responsive
+                        maintainAspectRatio: false, // Allow chart to fill container height better
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                max: 100, // Assuming max score is 100
+                                ticks: {
+                                    stepSize: 10,
+                                    color: '#6c757d' // Y-axis label color
+                                },
+                                grid: {
+                                    color: '#e9ecef' // Lighter grid lines
+                                }
+                            },
+                            x: {
+                                ticks: {
+                                    color: '#495057' // X-axis label color
+                                },
+                                grid: {
+                                    display: false // Hide vertical grid lines
+                                }
+                            }
+                        },
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Student Performance vs Class Average',
+                                padding: {
+                                    top: 10,
+                                    bottom: 20 // Add more padding below title
+                                },
+                                font: {
+                                    size: 16, // Title font size
+                                    family: "'Poppins', sans-serif", // Match heading font
+                                },
+                                color: '#343a40' // Title color
+                            },
+                            tooltip: {
+                                mode: 'index', // Show tooltips for both bars on hover
+                                intersect: false,
+                                backgroundColor: 'rgba(0, 0, 0, 0.8)', // Tooltip background
+                                titleFont: {
+                                     family: "'Poppins', sans-serif"
+                                },
+                                bodyFont: {
+                                     family: "'Roboto', sans-serif"
+                                }
+                            },
+                            legend: {
+                                position: 'bottom', // Place legend at the bottom
+                                labels: {
+                                    color: '#495057', // Legend label color
+                                    font: {
+                                        family: "'Roboto', sans-serif"
+                                    },
+                                    padding: 20 // Add padding to legend items
+                                }
+                            }
+                        }
                     }
-                }
-            },
-            plugins: {
-                title: {
-                    display: true,
-                    text: 'Student Performance vs Class Average'
-                },
-                tooltip: {
-                    mode: 'index',
-                    intersect: false,
+                });
+            } catch (e) {
+                console.error("Error parsing chart data or initializing chart:", e);
+                // Optionally display an error message to the user near the chart area
+                const chartContainer = canvasElement.parentElement;
+                if(chartContainer){
+                    chartContainer.innerHTML = '<p class="text-danger text-center small">Could not load performance chart.</p>';
                 }
             }
+        } else {
+             console.warn("Chart canvas or data element not found.");
         }
     });
 </script>
-<br>
-{% endblock %}
+{% endif %} {# End of {% if not is_pdf_render %} for scripts #}
+
+{% endblock %} {# End of block content #}
