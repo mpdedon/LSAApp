@@ -371,16 +371,16 @@ def guardian_dashboard(request):
         can_access_results = financial_data[student.user.id]['can_access_results']
 
         # Get results if the guardian can access them
-        if can_access_results:
-            result = Result.objects.filter(student=student, term=current_term, is_approved=True).first()
-            if result:
-                result_data[student.user.id] = {
-                    'id': result.id,
-                    'term_id': result.term.id,
-                    'student_id': result.student.user.id,
-                }
-            else:
-                result_data[student.user.id] = None
+        #if can_access_results:
+        result = Result.objects.filter(student=student, term=current_term, is_approved=True).first()
+        if result:
+            result_data[student.user.id] = {
+                'id': result.id,
+                'term_id': result.term.id,
+                'student_id': result.student.user.id,
+            }
+        else:
+            result_data[student.user.id] = None
         
         # Fetch archived results (past terms)
         for term in archived_terms:
