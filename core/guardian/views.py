@@ -565,7 +565,7 @@ def view_student_result(request, student_id, term_id):
 
     # --- Permissions Check ---
     financial_record = FinancialRecord.objects.filter(student=student, term=term).first()
-    can_view_result = (not financial_record) or (financial_record and financial_record.can_access_results)
+    can_view_result = (not financial_record) or (financial_record and financial_record.can_access_results) 
 
     # --- Prepare Data for Template ---
     profile_image_url = None
@@ -603,7 +603,6 @@ def view_student_result(request, student_id, term_id):
     subject_results_query = SubjectResult.objects.filter(
         result=result,
         subject__in=subjects_in_class_term,
-        is_finalized=True
     ).select_related('subject') # Optimize subject name lookup
 
     # Prepare data for Chart.js and potentially for PDF (if chart is rendered as image later)
