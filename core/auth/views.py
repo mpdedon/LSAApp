@@ -353,6 +353,17 @@ def guardian_dashboard(request):
             is_fully_paid = False
             can_access_results = False
 
+        has_waiver = student_fee_record and student_fee_record.waiver
+
+        if has_waiver:
+            can_access_results = True
+        
+        elif financial_record:
+            can_access_results = financial_record.can_access_results
+        
+        else:
+            can_access_results = False
+        
         if total_fee > 0:
             payment_percentage = (total_paid / total_fee) * 100
         else:
@@ -366,9 +377,8 @@ def guardian_dashboard(request):
             'can_access_results': can_access_results,
             'is_fully_paid': is_fully_paid,
             'payment_percenage': payment_percentage,
+            'has_waiver': has_waiver,
         }
-
-        can_access_results = financial_data[student.user.id]['can_access_results']
 
         # Get results if the guardian can access them
         #if can_access_results:
@@ -381,7 +391,7 @@ def guardian_dashboard(request):
             }
         else:
             result_data[student.user.id] = None
-        
+        print(result)
         # Fetch archived results (past terms)
         for term in archived_terms:
             archived_result = Result.objects.filter(
