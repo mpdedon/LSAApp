@@ -1,57 +1,66 @@
 <!DOCTYPE html>
+{% load static %}
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <meta name="description"
-    content="LSA School Management App - A comprehensive platform for managing school operations"
-  />
+
+  <!-- SEO Meta Tags - Dynamic -->
+  <title>{% block title %}LearnSwift Academia | Islamic School for Holistic Development{% endblock %}</title>
+  <meta name="description" content="{% block meta_description %}Discover LearnSwift Academia, a leading Islamic school in Lagos, Nigeria, focusing on holistic development, intellectual growth, tech skills, and strong moral character.{% endblock %}"/>
   <meta name="author" content="LearnSwift Academia" />
-  <meta name="csrf-token" content="{{ csrf_token }}" />
-  <title>{% block title %}LSA School Management App{% endblock %}</title>
+  <link rel="canonical" href="{{ request.build_absolute_uri }}" /> {# Assumes correct domain setup #}
+  {% block meta_robots %}<meta name="robots" content="index, follow"/>{% endblock %} {# Allow indexing by default #}
+
+  <!-- Open Graph / Facebook -->
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="{{ request.build_absolute_uri }}" />
+  <meta property="og:title" content="{% block og_title %}LearnSwift Academia | Islamic School for Holistic Development{% endblock %}" />
+  <meta property="og:description" content="{% block og_description %}Discover LearnSwift Academia, a leading Islamic school in Lagos, Nigeria, focusing on holistic development, intellectual growth, tech skills, and strong moral character.{% endblock %}" />
+  <meta property="og:image" content="{% block og_image %}{% static 'images/lsa_social_1.png' %}{% endblock %}" />
+
+  <!-- Twitter -->
+  <meta property="twitter:card" content="summary_large_image" />
+  <meta property="twitter:url" content="{{ request.build_absolute_uri }}" />
+  <meta property="twitter:title" content="{% block twitter_title %}LearnSwift Academia | Islamic School for Holistic Development{% endblock %}" />
+  <meta property="twitter:description" content="{% block twitter_description %}Discover LearnSwift Academia, a leading Islamic school in Lagos, Nigeria, focusing on holistic development, intellectual growth, tech skills, and strong moral character.{% endblock %}" />
+  <meta property="twitter:image" content="{% block twitter_image %}{% static 'images/lsa_social_2.png' %}{% endblock %}" />
+  
+  <!-- Favicon -->
+  <link rel="icon" href="{% static 'images/favicon.ico' %}" type="image/x-icon"> {# Add your favicon #}
+  <link rel="apple-touch-icon" href="{% static 'images/apple-touch-icon.png' %}"> {# Add apple touch icon #}
+
 
   <!-- Bootstrap CSS -->
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet"/>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
   <!-- Font Awesome -->
-  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet"/>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet" integrity="sha512-z3gLpd7yknf1YoNbCzqRKc4qyor8gaKU1qmn+CShxbuBusANI9QpRohGBreCFkKxLhei6S9CQXFEbbKuqLg0DA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
   <!-- Google Fonts -->
-  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Poppins:wght@500;600;700&display=swap" rel="stylesheet">
+
   <!-- Custom CSS -->
-  {% load static %}
-  <!-- <link rel="stylesheet" href="{% static 'css/style.css' %}" /> -->
+  <link rel="stylesheet" href="{% static 'css/custom.css' %}" />
 
-  <style>
-    /* Make sure html/body take full height */
-    html,
-    body {
-      height: 100%;
-      margin: 0; /* Remove default body margin */
-      font-family: "Roboto", sans-serif;
-    }
+  <!-- CSRF Token for AJAX -->
+  <meta name="csrf-token" content="{{ csrf_token }}" />
 
-    /* Use flex layout on body in column direction */
-    body {
-      display: flex;
-      flex-direction: column;
-    }
+  <!-- Schema.org Placeholder -->
+  {% block schema_org %}{% endblock %}
+  {% block extra_head %}{% endblock %}
 
-    /* Main content should grow to fill available space */
-    main {
-      flex: 1 0 auto;
-    }
-
-    /* Footer should stay at bottom */
-    footer {
-      flex-shrink: 0;
-    }
-  </style>
 </head>
 <body>
+  {% load static %}
   <!-- Navbar -->
-  <nav class="navbar navbar-expand-lg navbar-dark bg-success shadow-sm">
+  {# Use fixed-top for overlay, navbar-dark for light text initially, add custom class 'navbar-transparent' #}
+  <nav class="navbar navbar-expand-lg navbar-dark fixed-top shadow-sm main-navbar navbar-transparent py-3">
     <div class="container">
+      {# Ensure logo works on dark/transparent backgrounds initially, maybe use a white/light version #}
       <a class="navbar-brand fw-bold" href="{% url 'home' %}">
-        <i class="fas fa-school me-2"></i>LearnSwift Academia
+        <img src="{% static 'images/logo.jpg' %}" alt="LearnSwift Academia Logo" height="35" class="me-2 d-inline-block align-text-top"> {# Use white logo version #}
+        LearnSwift Academia
       </a>
       <button
         class="navbar-toggler"
@@ -60,85 +69,71 @@
         data-bs-target="#navbarNav"
         aria-controls="navbarNav"
         aria-expanded="false"
-        aria-label="Toggle navigation"
-      >
-        <span class="navbar-toggler-icon"></span>
+        aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span> {# Toggler icon color might need adjustment via CSS #}
       </button>
       <div class="collapse navbar-collapse" id="navbarNav">
-        <ul class="navbar-nav ms-auto">
+        {# Links remain structurally similar, but styling will change via CSS #}
+        <ul class="navbar-nav ms-auto align-items-center">
           <li class="nav-item">
-            <a class="nav-link" href="{% url 'home' %}">
-              <i class="fas fa-home me-1"></i>Home
-            </a>
+            {# Consider adding 'active' class dynamically based on current URL #}
+            <a class="nav-link" aria-current="page" href="{% url 'home' %}">Home</a>
           </li>
           <li class="nav-item">
-            <a class="nav-link" href="{% url 'programs' %}">
-              <i class="fas fa-pencil me-1"></i>Programs
-            </a>
+            <a class="nav-link" href="#">About Us</a> {# ADD URL #}
           </li>
+          <li class="nav-item">
+            <a class="nav-link" href="{% url 'programs' %}">Programs</a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#">Blog</a> {# ADD URL #}
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="#">Contact</a> {# ADD URL #}
+          </li>
+
           {% if user.is_authenticated %}
-            {% if user.is_superuser %}
-              <li class="nav-item">
-                <a class="nav-link" href="{% url 'student_list' %}">
-                  <i class="fas fa-users me-1"></i>Students
-                </a>
-              </li>
-              <li class="nav-item">
-                <a class="nav-link" href="{% url 'teacher_list' %}">
-                  <i class="fas fa-chalkboard-teacher me-1"></i>Teachers
-                </a>
-              </li>
-              <li class="nav-item">
-                <a class="nav-link" href="{% url 'guardian_list' %}">
-                  <i class="fas fa-user-friends me-1"></i>Guardians
-                </a>
-              </li>
-              <li class="nav-item">
-                <a class="nav-link" href="{% url 'class_list' %}">
-                  <i class="fas fa-user-friends me-1"></i>Classes
-                </a>
-              </li>
-              <li class="nav-item">
-                <a class="btn btn-outline-light btn-sm ms-2" href="{% url 'school_setup' %}">
-                  <i class="fas fa-cogs me-1"></i>School Setup
-                </a>
-              </li>
-            {% elif user.role == 'teacher' %}
-              <li class="nav-item">
-                <a class="btn btn-outline-light btn-sm ms-2" href="{% url 'teacher_dashboard' %}">
-                  <i class="fas fa-cogs me-1"></i>Dashboard
-                </a>
-              </li>
-            {% elif user.role == 'guardian' %}
-              <li class="nav-item">
-                <a class="btn btn-outline-light btn-sm ms-2" href="{% url 'guardian_dashboard' %}">
-                  <i class="fas fa-cogs me-1"></i>Dashboard
-                </a>
-              </li>
-            {% elif user.role == 'student' %}
-              <li class="nav-item">
-                <a class="btn btn-outline-light btn-sm ms-2" href="{% url 'student_dashboard' %}">
-                  <i class="fas fa-cogs me-1"></i>Dashboard
-                </a>
-              </li>
-            {% endif %}
-            <li class="nav-item">
-              <form method="POST" action="{% url 'logout' %}">
-                {% csrf_token %}
-                <button type="submit" class="btn btn-danger btn-sm ms-3">
-                  <i class="fas fa-sign-out-alt me-1"></i>Logout
-                </button>
-              </form>
+            <li class="nav-item dropdown">
+              <a class="nav-link dropdown-toggle" href="#" id="dashboardDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="fas fa-user-circle me-1"></i> My Account {# More generic text #}
+              </a>
+              <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="dashboardDropdown"> {# Align dropdown to the right #}
+                {# Dashboard links... (keep as before or refine) #}
+                {% if user.is_superuser %}
+                    <li><span class="dropdown-header small text-muted">Admin Dashboard</span></li>
+                    <li><a class="dropdown-item" href="{% url 'student_list' %}"><i class="fas fa-users fa-fw me-2"></i>Students</a></li>
+                    <li><a class="dropdown-item" href="{% url 'teacher_list' %}"><i class="fas fa-chalkboard-teacher fa-fw me-2"></i>Teachers</a></li>
+                    <li><a class="dropdown-item" href="{% url 'guardian_list' %}"><i class="fas fa-user-friends fa-fw me-2"></i>Guardians</a></li>
+                    <li><a class="dropdown-item" href="{% url 'class_list' %}"><i class="fas fa-school fa-fw me-2"></i>Classes</a></li>
+                    <li><a class="dropdown-item" href="{% url 'school_setup' %}"><i class="fas fa-cogs fa-fw me-2"></i>School Setup</a></li>
+                {% elif user.role == 'teacher' %}
+                      <li><a class="dropdown-item" href="{% url 'teacher_dashboard' %}"><i class="fas fa-chalkboard-teacher fa-fw me-2"></i>Teacher Dashboard</a></li>
+                {% elif user.role == 'guardian' %}
+                      <li><a class="dropdown-item" href="{% url 'guardian_dashboard' %}"><i class="fas fa-child fa-fw me-2"></i>Guardian Dashboard</a></li>
+                {% elif user.role == 'student' %}
+                      <li><a class="dropdown-item" href="{% url 'student_dashboard' %}"><i class="fas fa-user-graduate fa-fw me-2"></i>Student Dashboard</a></li>
+                {% endif %}
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                  <form method="POST" action="{% url 'logout' %}" class="d-inline">
+                    {% csrf_token %}
+                    <button type="submit" class="dropdown-item text-danger">
+                      <i class="fas fa-sign-out-alt fa-fw me-2"></i>Logout
+                    </button>
+                  </form>
+                </li>
+              </ul>
             </li>
           {% else %}
-            <li class="nav-item">
-              <a class="btn btn-light btn-sm ms-2" href="{% url 'login' %}">
-                <i class="fas fa-sign-in-alt me-1"></i>Login
+            {# Use styled buttons #}
+            <li class="nav-item ms-lg-2">
+              <a class="btn btn-outline-light btn-sm nav-btn" href="{% url 'login' %}">
+                Login
               </a>
             </li>
-            <li class="nav-item">
-              <a class="btn btn-light btn-sm ms-2" href="{% url 'register' %}">
-                <i class="fas fa-address-book me-1"></i>Sign Up
+            <li class="nav-item ms-lg-2 mt-2 mt-lg-0">
+              <a class="btn btn-light btn-sm nav-btn nav-btn-primary" href="{% url 'register' %}"> {# Primary accent color button #}
+                Register
               </a>
             </li>
           {% endif %}
@@ -147,52 +142,101 @@
     </div>
   </nav>
 
-  <!-- Main Content -->
-  <main>
-    <div class="container mt-5">
-      {% block content %}
-      {% endblock %}
-    </div>
+{# CRUCIAL: Add padding to the top of the main content area to prevent overlap #}
+<div class="main-content-padding"></div>
 
-    <!-- Messages -->
-    {% if messages %}
-      <div class="container mt-4">
-        {% for message in messages %}
-          <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
-            <i class="fas fa-info-circle me-2"></i>{{ message }}
-            <button
-              type="button"
-              class="btn-close"
-              data-bs-dismiss="alert"
-              aria-label="Close"
-            ></button>
-          </div>
-        {% endfor %}
-      </div>
-    {% endif %}
+  <!-- Main Content -->
+  {# Removed container here - let child templates decide if they need full width or container #}
+  <main>
+    {% block content %}
+    {% endblock %}
   </main>
 
   <!-- Footer -->
-  <footer class="bg-success text-white py-3">
-    <div class="container text-center">
-      <p class="mb-1">&copy; 2024 LearnSwift Academia. All Rights Reserved.</p>
-      <div class="mt-2">
-        <a href="{% url 'home' %}" class="text-white text-decoration-none me-3">
-          <i class="fas fa-home me-1"></i>Home
-        </a>
-        <a href="#" class="text-white text-decoration-none me-3">
-          <i class="fas fa-envelope me-1"></i>Contact Us
-        </a>
-        <a href="#" class="text-white text-decoration-none">
-          <i class="fas fa-info-circle me-1"></i>About
-        </a>
+  <footer class="footer-section bg-dark text-white pt-5 pb-4"> {# More padding, darker background #}
+    <div class="container">
+      <div class="row">
+        <!-- Column 1: About -->
+        <div class="col-md-4 mb-4">
+          <h5 class="text-uppercase mb-3 footer-heading"><img src="{% static 'images/logo.jpg' %}" alt="LearnSwift Academia Logo" height="25" class="me-2">LearnSwift Academia</h5> {# Use white logo version #}
+          <p class="footer-text">Nurturing faith, intellect, and practical skills for a balanced life. Preparing future leaders grounded in Islamic values.</p>
+          <address class="footer-text">
+            <i class="fas fa-map-marker-alt fa-fw me-2"></i>5 Bode Tobun Street, off Oniwaya Road, Agege, Lagos, Nigeria.<br>
+            <i class="fas fa-phone fa-fw me-2"></i><a href="tel:+2347034858160" class="text-white text-decoration-none">+234 703 485 8160</a><br>
+             <i class="fas fa-envelope fa-fw me-2"></i><a href="mailto:learnswift2020@gmail.com" class="text-white text-decoration-none">learnswift2020@gmail.com</a>
+          </address>
+        </div>
+
+        <!-- Column 2: Quick Links -->
+        <div class="col-md-2 col-6 mb-4">
+          <h5 class="text-uppercase mb-3 footer-heading">Quick Links</h5>
+          <ul class="list-unstyled footer-links">
+            <li><a href="{% url 'home' %}">Home</a></li>
+            <li><a href="#">About Us</a></li> {# Add URL #}
+            <li><a href="{% url 'programs' %}">Programs</a></li>
+            <li><a href="#">Blog</a></li> {# Add URL #}
+            <li><a href="#">Admissions</a></li> {# Add URL #}
+            <li><a href="#">Contact Us</a></li> {# Add URL #}
+          </ul>
+        </div>
+
+        <!-- Column 3: Programs -->
+        <div class="col-md-3 col-6 mb-4">
+           <h5 class="text-uppercase mb-3 footer-heading">Our Focus</h5>
+           <ul class="list-unstyled footer-links">
+             <li><a href="{% url 'programs' %}">Islamic & Western Ed.</a></li>
+             <li><a href="{% url 'programs' %}">Arabic & Quran</a></li>
+             <li><a href="{% url 'programs' %}">Vocational Skills</a></li>
+             <li><a href="{% url 'programs' %}">Coding Academy</a></li>
+             <li><a href="{% url 'programs' %}">Online Learning</a></li>
+           </ul>
+        </div>
+
+         <!-- Column 4: Connect -->
+        <div class="col-md-3 mb-4">
+            <h5 class="text-uppercase mb-3 footer-heading">Connect With Us</h5>
+            {# Add actual links to your social media profiles #}
+            <a href="#" class="text-white me-3 fs-5"><i class="fab fa-facebook-f"></i></a>
+            <a href="#" class="text-white me-3 fs-5"><i class="fab fa-instagram"></i></a>
+            <a href="#" class="text-white me-3 fs-5"><i class="fab fa-twitter"></i></a>
+            <a href="#" class="text-white fs-5"><i class="fab fa-linkedin-in"></i></a>
+
+            <h5 class="text-uppercase my-3 footer-heading">Newsletter</h5>
+            <form action="#" method="post"> {# Add your newsletter signup form action #}
+                 {% csrf_token %}
+                 <div class="input-group mb-3">
+                    <input type="email" class="form-control form-control-sm" placeholder="Your Email" aria-label="Your Email" required>
+                    <button class="btn btn-success btn-sm" type="submit">Subscribe</button>
+                 </div>
+             </form>
+        </div>
+      </div>
+      <hr class="footer-divider">
+      <div class="row">
+        <div class="col-md-6 text-center text-md-start">
+          <p class="small mb-0">© {% now "Y" %} LearnSwift Academia. All Rights Reserved.</p>
+        </div>
+        <div class="col-md-6 text-center text-md-end">
+            <ul class="list-inline small mb-0">
+                <li class="list-inline-item"><a href="#" class="text-white text-decoration-none">Privacy Policy</a></li> {# Add URL #}
+                <li class="list-inline-item">|</li>
+                <li class="list-inline-item"><a href="#" class="text-white text-decoration-none">Terms of Service</a></li> {# Add URL #}
+            </ul>
+        </div>
       </div>
     </div>
   </footer>
 
   <!-- Scripts -->
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/js/all.min.js"></script>
-  <script src="{% static 'js/script.js' %}"></script>
+  {# Place jQuery here if needed by older Bootstrap plugins, otherwise Bootstrap 5 doesn't require it #}
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
+  {# Font Awesome JS is generally not needed if using CSS version, unless using specific JS features #}
+  {# <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/js/all.min.js" integrity="sha512-uKQ39gEGiyUJl4AI6L+ekBdGKpGw4xJ55+cprOpSoOTEUyL0T+sfC3t2IsA+WYTRRn4Tb9J7B8ayfAUHRTz8fQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script> #}
+
+  <!-- Custom JS -->
+  <script src="{% static 'js/script.js' %}"></script> {# Your custom scripts #}
+
+  {% block extra_js %}{% endblock %} {# Placeholder for page-specific JS #}
+
 </body>
 </html>

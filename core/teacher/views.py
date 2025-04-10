@@ -264,11 +264,6 @@ def mark_attendance(request, class_id):
                         defaults={'is_present': is_present}
                     )
 
-                    if created:
-                        print(f"Created attendance record for {student}: {attendance_record}")
-                    else:
-                        print(f"Updated attendance record for {student}: {attendance_record}")
-
         messages.success(request, "Attendance marked successfully.")
         return redirect('attendance_log', class_id=class_instance.id)  # Redirect to the attendance log
 

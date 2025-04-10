@@ -1,14 +1,16 @@
 # views.py
 
-import os
+import io 
 import json
+import pathlib
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login
 from django.contrib.auth.mixins import UserPassesTestMixin
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
+from django.conf import settings
 from django.template.loader import render_to_string
-from django.http import HttpResponse
+from django.http import HttpResponse, Http404
 from django.views import View
 from django.core.paginator import Paginator
 from django.db.models import Q
@@ -17,6 +19,15 @@ from .forms import GuardianRegistrationForm
 from core.models import Guardian, Term, Session, FinancialRecord, Student, Result, Subject, SubjectResult, Attendance
 from core.models import Assignment, Assessment, Exam, AssessmentSubmission, ExamSubmission, AcademicAlert
 from core.assignment.forms import AssignmentSubmission, AssignmentSubmissionForm
+
+
+try:
+    from weasyprint import HTML, CSS
+    from weasyprint.text.fonts import FontConfiguration
+except ImportError:
+    HTML = None # Handle case where WeasyPrint might not be installed
+    CSS = None
+    FontConfiguration = None
 
 
 # Guardian Views
@@ -203,106 +214,6 @@ def generate_pdf_from_html(html_content, output_path):
         
         browser.close()
 
-def view_student_result(request, student_id, term_id):
-    student = get_object_or_404(Student, user_id=student_id)
-    term = get_object_or_404(Term, id=term_id)
-    session = term.session 
-    class_obj = student.current_class
-    result = get_object_or_404(Result, student=student, term=term)
-    profile_image_url = request.build_absolute_uri(student.profile_image.url) if student.profile_image else None
-    print(profile_image_url)
-    # Correctly define the attendance data variables
-    total_days = Attendance.objects.filter(student=student).count()
-    present_days = Attendance.objects.filter(student=student, is_present=True).count()
-
-    # Create the attendance data dictionary
-    attendance_data = {
-        'total_days': total_days,
-        'present_days': present_days,
-        'absent_days': total_days - present_days,
-        'attendance_percentage': (present_days / total_days * 100) if total_days > 0 else 0
-    }
-
-    # Extract teacher and principal comments from the result
-    teacher_remarks = result.teacher_remarks
-    principal_remarks = result.principal_remarks
-
-    # Check permission to view results
-    financial_record = FinancialRecord.objects.filter(student=student, term=term).first()
-    if not financial_record or not financial_record.can_access_results:
-        return HttpResponse("You do not have permission to view this result.", status=403)
-
-    # Filter only subjects assigned to the class for this session & term
-    subjects = Subject.objects.filter(
-        class_assignments__class_assigned=class_obj,
-        class_assignments__session=session,
-        class_assignments__term=term
-    ).distinct()
-
-    # Fetch subject results and class averages
-    subject_results = SubjectResult.objects.filter(result=result, subject__in=subjects, is_finalized=True)
-    
-    # Build JSON data for Chart.js
-    subject_results_data = []
-    for sr in subject_results:
-        class_average = sr.get_class_average(sr.subject)
-        subject_results_data.append({
-            'subject': sr.subject.name,
-            'total_score': float(sr.total_score()),  #  Convert Decimal to float
-            'class_average': float(class_average) if class_average else 0.0   # Fetch class average correctly
-        })
-
-    context = {
-        'student': student,
-        'result': result,
-        'term': term,
-        'subject_results': subject_results,
-        'subject_results_json': json.dumps(subject_results_data),
-        'attendance_data': attendance_data,
-        'teacher_comment': teacher_remarks,
-        'principal_comment': principal_remarks,
-        'profile_image_url': profile_image_url,
-    }
-    
-    # Handle PDF download request
-    options = {
-        'enable-local-file-access': '',  
-        'load-error-handling': 'ignore', 
-        'page-size': 'A4',
-        'no-stop-slow-scripts': '',  
-        'disable-smart-shrinking': '', 
-        'debug-javascript': '' 
-    }
-
-    config = pdfkit.configuration(wkhtmltopdf=r"C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe")
-
-    if "download" in request.GET and request.GET["download"] == "pdf":
-        # Render HTML to a string
-        html_string = render_to_string('guardian/view_result.html', context)
-        # Define a temp file path
-        pdf_path = f"/tmp/{student.user.first_name}_result_{term.name}.pdf"
-        # Generate PDF
-        generate_pdf_from_html(html_string, pdf_path)
-        # Read PDF file
-        with open(pdf_path, "rb") as pdf_file:
-            pdf_content = pdf_file.read()
-        # Serve as an HTTP response
-        response = HttpResponse(pdf_content, content_type="application/pdf")
-        response["Content-Disposition"] = f'attachment; filename="{student.user.first_name}_result_{term.name}.pdf"'
-        # Clean up temporary file
-        os.remove(pdf_path)
-
-        return response
-    if "download" in request.GET and request.GET["download"] == "pdf":
-        html_string = render_to_string('guardian/view_result.html', context)
-        print(html_string)
-        pdf = pdfkit.from_string(html_string, False, configuration=config, options=options)
-
-        response = HttpResponse(pdf, content_type='application/pdf')
-        response['Content-Disposition'] = f'attachment; filename="{student.user.first_name}_result_{term.name}.pdf"'
-        return response
-
-    return render(request, 'guardian/view_result.html', context)
 
 @login_required
 def assignment_list(request):
@@ -616,3 +527,180 @@ def export_guardians(request):
 def guardian_reports(request):
     # Implement report generation logic here
     pass
+
+
+# Helper function to build absolute URLs for static/media files
+def build_absolute_uri(request, path):
+    """Builds an absolute URI for static or media files."""
+    if path.startswith('http'): # Already absolute
+        return path
+    # This assumes default /static/ and /media/ URLs
+    if path.startswith(settings.STATIC_URL) or path.startswith(settings.MEDIA_URL):
+        return request.build_absolute_uri(path)
+    # Fallback for potentially relative paths (less ideal)
+    return request.build_absolute_uri(settings.STATIC_URL + path.lstrip('/'))
+
+
+def view_student_result(request, student_id, term_id):
+    """
+    Displays a student's result for a specific term and allows PDF download.
+    """
+    if HTML is None:
+        # WeasyPrint not installed, handle gracefully (e.g., disable PDF download)
+        pass
+
+    try:
+        student = get_object_or_404(Student.objects.select_related('user', 'current_class'), user_id=student_id)
+        term = get_object_or_404(Term.objects.select_related('session'), id=term_id)
+        session = term.session
+        class_obj = student.current_class
+        result = get_object_or_404(Result.objects.select_related('term__session'), student=student, term=term)
+
+    except Http404 as e:
+        print(f"Error fetching result data: {e}")
+        return HttpResponse("Result data not found.", status=404)
+    except Exception as e:
+        print(f"Unexpected error fetching data: {e}")
+        return HttpResponse("An error occurred while retrieving result data.", status=500)
+
+    # --- Permissions Check ---
+    financial_record = FinancialRecord.objects.filter(student=student, term=term).first()
+    can_view_result = (not financial_record) or (financial_record and financial_record.can_access_results)
+
+    # --- Prepare Data for Template ---
+    profile_image_url = None
+    if student.profile_image:
+        try:
+            profile_image_url = build_absolute_uri(request, student.profile_image.url)
+        except Exception as e:
+            print(f"Error building profile image URL: {e}") # Log error but continue
+
+    # Attendance Data
+    total_days = Attendance.objects.filter(student=student, term=term).count() # Filter by term too? Adjust if needed.
+    present_days = Attendance.objects.filter(student=student, term=term, is_present=True).count() # Filter by term too?
+    absent_days = total_days - present_days
+    attendance_percentage = (present_days / total_days * 100) if total_days > 0 else 0
+
+    attendance_data = {
+        'total_days': total_days,
+        'present_days': present_days,
+        'absent_days': absent_days,
+        'attendance_percentage': round(attendance_percentage, 1), # Round for display
+    }
+
+    # Teacher and Principal Remarks
+    teacher_remarks = result.teacher_remarks
+    principal_remarks = result.principal_remarks
+
+    # Fetch Subject Results and Class Averages
+    subjects_in_class_term = Subject.objects.filter(
+        class_assignments__class_assigned=class_obj,
+        class_assignments__session=session,
+        class_assignments__term=term
+    ).distinct()
+
+    # Fetch finalized results for these subjects only
+    subject_results_query = SubjectResult.objects.filter(
+        result=result,
+        subject__in=subjects_in_class_term,
+        is_finalized=True
+    ).select_related('subject') # Optimize subject name lookup
+
+    # Prepare data for Chart.js and potentially for PDF (if chart is rendered as image later)
+    chart_data = []
+    subject_results_list = [] # Keep the queryset for the main template table
+    for sr in subject_results_query:
+        class_average = sr.get_class_average(sr.subject, term, class_obj) 
+        total_score_val = sr.total_score() 
+
+        # Append full object for template table
+        subject_results_list.append(sr)
+
+        # Append data for JSON chart (convert Decimals to float here)
+        chart_data.append({
+            'subject': sr.subject.name,
+            'total_score': float(total_score_val) if total_score_val is not None else 0.0,
+            'class_average': float(class_average) if class_average is not None else 0.0
+        })
+
+    # --- Context for Template Rendering ---
+    school_logo_url = build_absolute_uri(request, 'images/logo.jpg') # Use your actual logo path
+    signature_url = build_absolute_uri(request, 'images/signature.png') # Use your actual signature path
+
+    context = {
+        'student': student,
+        'result': result,
+        'term': term,
+        'session': session, 
+        'class_obj': class_obj,
+        'subject_results': subject_results_list, 
+        'chart_data_json': json.dumps(chart_data), 
+        'attendance_data': attendance_data,
+        'teacher_comment': teacher_remarks,
+        'principal_comment': principal_remarks,
+        'profile_image_url': profile_image_url,
+        'school_logo_url': school_logo_url,
+        'signature_url': signature_url,
+        'is_pdf_render': False, # Flag for conditional rendering in template (optional)
+    }
+
+    # --- PDF Download Handling ---
+    if "download" in request.GET and request.GET["download"] == "pdf":
+        if HTML is None:
+            return HttpResponse("PDF generation library (WeasyPrint) is not installed or configured correctly.", status=501) # 501 Not Implemented
+
+        context['is_pdf_render'] = True # Set flag for PDF context
+
+        # Render HTML to string using the SAME template
+        html_string = render_to_string('guardian/view_result.html', context)
+
+        try:
+            # Assume STATICFILES_DIRS contains at least one path
+            base_static_dir = pathlib.Path(settings.STATICFILES_DIRS[0])
+            css_path = base_static_dir / 'css' / 'result_styles.css' # Use / operator with Path objects
+
+            # Check if the file actually exists before trying to load it
+            if not css_path.is_file():
+                 raise FileNotFoundError(f"Result CSS file not found at calculated path: {css_path}")
+
+            font_config = FontConfiguration()
+            css = CSS(filename=css_path, font_config=font_config)
+
+        except IndexError:
+            print("Error: settings.STATICFILES_DIRS is empty. Cannot locate static files.")
+            return HttpResponse("Error generating PDF: Static file configuration missing.", status=500)
+        except FileNotFoundError as e:
+             print(f"Error: {e}")
+             return HttpResponse("Error generating PDF: Required styles missing.", status=500)
+        except Exception as e:
+             print(f"Error loading CSS for PDF: {e}")
+             return HttpResponse("Error generating PDF: Could not load styles.", status=500)
+
+
+        try:
+            # Create HTML object
+            html = HTML(string=html_string, base_url=request.build_absolute_uri('/'))
+            # Generate PDF in memory
+            pdf_file = io.BytesIO()
+            html.write_pdf(
+                target=pdf_file,
+                stylesheets=[css], # Pass the loaded CSS object or list of paths
+                font_config=font_config # Needed if using CSS object method
+            )
+            pdf_file.seek(0) # Rewind the buffer
+
+        except Exception as e:
+            # Catch WeasyPrint errors
+            print(f"Error generating PDF with WeasyPrint: {e}")
+            return HttpResponse(f"An error occurred during PDF generation: {e}", status=500)
+
+        # Create HTTP response with PDF
+        response = HttpResponse(pdf_file, content_type='application/pdf')
+        # Sanitize filename
+        student_name_safe = "".join(c if c.isalnum() else "_" for c in student.user.get_full_name())
+        term_name_safe = "".join(c if c.isalnum() else "_" for c in term.name)
+        response['Content-Disposition'] = f'attachment; filename="{student_name_safe}_result_{term_name_safe}.pdf"'
+
+        return response
+
+    return render(request, 'guardian/view_result.html', context)
