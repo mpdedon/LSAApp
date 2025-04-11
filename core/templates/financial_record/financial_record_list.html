@@ -1,98 +1,114 @@
 {% extends 'base.html' %}
 {% load humanize %}
 
-{% block content %}
-<div class="container">
-    <h2 class="mt-4 mb-3 text-center">Financial Records Overview</h2>
+{% block title %}Financial Records Overview{% endblock %}
 
-    <!-- Statistics Section -->
-    <div class="row mb-3">
-        <div class="col-md-3">
-            <div class="card bg-light">
-                <div class="card-body text-center">
-                    <h5 class="card-title">Total Fees</h5>
-                    <p class="card-text display-6">₦{{ total_fee|floatformat:2|intcomma }}</p>
+{% block content %}
+<div class="container mt-4 mb-5">
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap">
+        <h2 class="mb-0">Financial Records Overview</h2>
+         <div class="d-flex gap-2 mt-2 mt-md-0">
+            <a href="{% url 'payment_list' %}" class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-receipt me-1"></i> View Payments
+            </a>
+            {# Add other relevant actions if needed #}
+         </div>
+    </div>
+    <hr>
+
+    <!-- Statistics Section (Same as payment list) -->
+    <div class="row g-3 mb-4">
+         <div class="col-md-6 col-lg-3">
+            <div class="card shadow-sm text-center h-100">
+                <div class="card-body">
+                    <h5 class="card-title text-muted mb-2 fs-6">Total Fees (Net)</h5>
+                    <p class="card-text display-6 fw-bold text-primary mb-0">₦{{ total_fee|floatformat:2|intcomma }}</p>
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="card bg-light">
-                <div class="card-body text-center">
-                    <h5 class="card-title">Total Discounts</h5>
-                    <p class="card-text display-6">₦{{ total_discount|floatformat:2|intcomma }}</p>
+         <div class="col-md-6 col-lg-3">
+            <div class="card shadow-sm text-center h-100">
+                <div class="card-body">
+                     <h5 class="card-title text-muted mb-2 fs-6">Total Paid</h5>
+                     <p class="card-text display-6 fw-bold text-success mb-0">₦{{ total_paid|floatformat:2|intcomma }}</p>
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="card bg-light">
-                <div class="card-body text-center">
-                    <h5 class="card-title">Total Payments</h5>
-                    <p class="card-text display-6">₦{{ total_paid|floatformat:2|intcomma }}</p>
+         <div class="col-md-6 col-lg-3">
+            <div class="card shadow-sm text-center h-100">
+                <div class="card-body">
+                     <h5 class="card-title text-muted mb-2 fs-6">Total Discounts</h5>
+                     <p class="card-text display-6 fw-bold text-info mb-0">₦{{ total_discount|floatformat:2|intcomma }}</p>
                 </div>
             </div>
         </div>
-        <div class="col-md-3">
-            <div class="card bg-light">
-                <div class="card-body text-center">
-                    <h5 class="card-title">Total Balance</h5>
-                    <p class="card-text display-6">₦{{ total_outstanding_balance|floatformat:2|intcomma }}</p>
+        <div class="col-md-6 col-lg-3">
+            <div class="card shadow-sm text-center h-100">
+                <div class="card-body">
+                     <h5 class="card-title text-muted mb-2 fs-6">Total Outstanding</h5>
+                     <p class="card-text display-6 fw-bold text-danger mb-0">₦{{ total_outstanding_balance|floatformat:2|intcomma }}</p>
                 </div>
             </div>
         </div>
     </div>
 
     <!-- Financial Records Table -->
-    <div class="container">
-        <h2 class="mt-4 mb-3 text-center">Financial Records Overview</h2>
-        <a href="{% url 'payment_list' %}" class="btn btn-secondary mb-3">Back to Payment List</a>
-    
-        <div class="card">
-            <div class="card-body">
-                <table class="table table-bordered table-striped">
-                    <thead class="thead-dark">
+    <div class="card shadow-sm">
+        <div class="card-header bg-light">
+             <h5 class="mb-0">Student Financial Summaries</h5>
+        </div>
+         <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover table-striped mb-0 align-middle">
+                    <thead class="table-light">
                         <tr>
-                            <th>S/N</th>
+                            <th style="width: 5%;">S/N</th>
                             <th>Student</th>
                             <th>Term</th>
-                            <th>Total Fee</th>
-                            <th>Total Discount</th>
-                            <th>Total Paid</th>
-                            <th>Total Balance</th>
-                            <th>Status</th>
+                            <th class="text-end">Net Fee</th>
+                            <th class="text-end">Discount</th>
+                            <th class="text-end">Paid</th>
+                            <th class="text-end">Balance</th>
+                            <th class="text-center">Status</th>
+                            {# Add actions if needed, e.g., link to payment history for student #}
                         </tr>
                     </thead>
                     <tbody>
-                        {% for record in financial_records %}
+                        {% for record in financial_records %} {# financial_records comes from pagination #}
                             <tr>
-                                <td>{{ forloop.counter }}</td>
+                                <td class="text-muted ps-3">{{ forloop.counter0|add:page_obj.start_index }}</td>
                                 <td>{{ record.student.user.get_full_name }}</td>
                                 <td>{{ record.term }}</td>
-                                <td>₦{{ record.total_fee|floatformat:2|intcomma }}</td>
-                                <td>₦{{ record.total_discount|floatformat:2|intcomma }}</td>
-                                <td>
-                                    {% if record.total_paid %}
-                                        ₦{{ record.total_paid|floatformat:2|intcomma }}
-                                    {% else %}
-                                        ₦0.00
-                                    {% endif %}
+                                <td class="text-end">₦{{ record.total_fee|floatformat:2|intcomma }}</td>
+                                <td class="text-end text-info">₦{{ record.total_discount|floatformat:2|intcomma }}</td>
+                                <td class="text-end text-success">₦{{ record.total_paid|floatformat:2|intcomma }}</td>
+                                <td class="text-end fw-bold {% if record.outstanding_balance > 0 %}text-danger{% endif %}">
+                                    ₦{{ record.outstanding_balance|floatformat:2|intcomma }}
                                 </td>
-                                <td>₦{{ record.outstanding_balance|floatformat:2|intcomma }}</td>
-                                <td>
-                                    {% if record.is_fully_paid %}
-                                        <span class="badge bg-success">Fully Paid</span>
+                                <td class="text-center">
+                                    {% if record.has_waiver %}
+                                        <span class="badge bg-secondary">Waiver</span>
+                                    {% elif record.is_fully_paid %}
+                                        <span class="badge bg-success">Paid</span>
                                     {% else %}
-                                        <span class="badge bg-warning">Outstanding</span>
+                                        <span class="badge bg-warning text-dark">Outstanding</span>
                                     {% endif %}
                                 </td>
                             </tr>
                         {% empty %}
                             <tr>
-                                <td colspan="8" class="text-center">No financial records available.</td>
+                                <td colspan="8" class="text-center text-muted py-4">No financial records available.</td>
                             </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
         </div>
+         {% if is_paginated %}
+         <div class="card-footer bg-light py-2">
+             {% include 'partials/pagination.html' %}
+         </div>
+         {% endif %}
     </div>
-    {% endblock %}
+</div>
+{% endblock %}

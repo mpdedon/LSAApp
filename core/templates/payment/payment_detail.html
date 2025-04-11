@@ -1,34 +1,66 @@
 {% extends 'base.html' %}
 {% load humanize %}
+
+{% block title %}Payment Details{% endblock %}
+
 {% block content %}
-<div class="container">
-    <h2 class="mt-4">Payment Details</h2>
-    <table class="table table-bordered mt-3">
-        <tbody>
-            <tr>
-                <th>Student</th>
-                <td>{{ payment.student.user.get_full_name }}</td>
-            </tr>
-            <tr>
-                <th>Term</th>
-                <td>{{ payment.term }}</td>
-            </tr>
-            <tr>
-                <th>Amount Paid</th>
-                <td>₦{{ payment.amount_paid|floatformat:2|intcomma }}</td>
-            </tr>
-            <tr>
-                <th>Payment Date</th>
-                <td>{{ payment.payment_date }}</td>
-            </tr>
-            <tr>
-                <th>Financial Record</th>
-                <td>{{ payment.financial_record }}</td>
-            </tr>
-        </tbody>
-    </table>
-    <a href="{% url 'payment_list' %}" class="btn btn-secondary mt-3">Back to Payments</a>
-    <a href="{% url 'update_payment' payment.pk %}" class="btn btn-primary mt-3">Edit Payment</a>
-    <a href="{% url 'delete_payment' payment.pk %}" class="btn btn-danger mt-3">Delete Payment</a>
-</div>
+<div class="container mt-4 mb-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-9">
+            <div class="card shadow-sm">
+                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                    <h4 class="mb-0">Payment Details</h4>
+                    <span class="text-muted small">ID: {{ payment.pk }}</span>
+                </div>
+                <div class="card-body">
+                    <dl class="row">
+                        <dt class="col-sm-4">Student:</dt>
+                        <dd class="col-sm-8">{{ payment.student.user.get_full_name|default:"N/A" }}</dd>
+
+                        <dt class="col-sm-4">Term:</dt>
+                        <dd class="col-sm-8">{{ payment.term|default:"N/A" }} ({{ payment.term.session.name|default:"N/A" }})</dd>
+
+                        <dt class="col-sm-4">Financial Record:</dt>
+                        <dd class="col-sm-8">
+                            {# Optional: Link to financial record detail view if you have one #}
+                            <a href="#">View Record (ID: {{ payment.financial_record.pk }})</a>
+                        </dd>
+
+                        <hr class="my-3">
+
+                        <dt class="col-sm-4">Amount Paid:</dt>
+                        <dd class="col-sm-8 fw-bold text-success">₦{{ payment.amount_paid|floatformat:2|intcomma }}</dd>
+
+                        <dt class="col-sm-4">Payment Date:</dt>
+                        <dd class="col-sm-8">{{ payment.payment_date|date:"F j, Y" }}</dd>
+
+                        <hr class="my-3">
+
+                        {# Display related financial status AT THE TIME or CURRENT #}
+                        <dt class="col-sm-4">Current Outstanding Balance for Term:</dt>
+                        <dd class="col-sm-8">₦{{ payment.financial_record.outstanding_balance|floatformat:2|intcomma }}</dd>
+
+                        <dt class="col-sm-4">Current Total Paid for Term:</dt>
+                        <dd class="col-sm-8">₦{{ payment.financial_record.total_paid|floatformat:2|intcomma }}</dd>
+
+                        <dt class="col-sm-4">Net Fee for Term:</dt>
+                        <dd class="col-sm-8">₦{{ payment.financial_record.total_fee|floatformat:2|intcomma }}</dd>
+
+                    </dl>
+                </div> {# End card-body #}
+                <div class="card-footer bg-light text-end">
+                     <a href="{% url 'payment_list' %}" class="btn btn-secondary btn-sm me-2">
+                        <i class="fas fa-list me-1"></i>Back to List
+                    </a>
+                     <a href="{% url 'update_payment' payment.pk %}" class="btn btn-warning btn-sm me-2">
+                        <i class="fas fa-edit me-1"></i>Edit
+                    </a>
+                     <a href="{% url 'delete_payment' payment.pk %}" class="btn btn-danger btn-sm">
+                        <i class="fas fa-trash-alt me-1"></i>Delete
+                    </a>
+                </div> {# End card-footer #}
+            </div> {# End card #}
+        </div> {# End col #}
+    </div> {# End row #}
+</div> {# End container #}
 {% endblock %}

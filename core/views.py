@@ -13,7 +13,8 @@ from django.http import HttpResponseBadRequest, JsonResponse
 from django.core.mail import send_mail
 from django.shortcuts import HttpResponse
 from django.utils import timezone
-from decimal import Decimal
+from django.core.exceptions import ObjectDoesNotExist
+from decimal import Decimal, InvalidOperation
 from datetime import timedelta
 from core.models import Session, Term, Student, Teacher, Guardian, Notification
 from core.models import Class, Subject, FeeAssignment, Enrollment, Payment, Assessment, Exam
@@ -756,309 +757,516 @@ class FeeAssignmentDeleteView(AdminRequiredMixin, DeleteView):
         messages.success(self.request, 'Fee assignment deleted successfully.')
         return super().delete(request, *args, **kwargs)
 
-
 class StudentFeeRecordListView(AdminRequiredMixin, ListView):
     model = StudentFeeRecord
-    template_name = 'fee_assignment/student_fee_record_list.html'
-    context_object_name = 'student_fee_records'
-    paginate_by = 200
+    template_name = 'fee_assignment/student_fee_record_list.html' # Use new template name
+    context_object_name = 'all_records_grouped_by_class'
+    # No pagination at the ListView level
 
-    def get_queryset(self):
-        self.sync_fee_records()
-        # IMPORTANT: Provide an order_by to avoid UnorderedObjectListWarning
-        return super().get_queryset() \
-            .select_related('student', 'term', 'fee_assignment', 'student__current_class') \
-            .order_by('student__current_class__name', 'student__user__last_name')
-
-    def post(self, request, *args, **kwargs):
-        # 1) Check if 'save_all' button was clicked
-        if 'save_all' in request.POST:
-            self.handle_save_all(request)
-            return redirect('fee_assignment_list')  
-        
-        else:
-            # 2) Otherwise, handle single-row updates
-            action = request.POST.get('action')
-            record_id = request.POST.get('record_id')
-            if action == 'update_discount':
-                discount_str = request.POST.get('discount', '0')
-                self.update_discount(record_id, discount_str)
-            elif action == 'update_waiver':
-                self.update_waiver(record_id, 'waiver' in request.POST)
-            # After single update, redirect or re-display the page
-            return redirect(request.path)
-
-    def handle_save_all(self, request):
-        """
-        Handle bulk saving of discount/waiver changes for all rows in the form.
-        """
-        # We'll parse all record_id and discount fields from the POST
-        record_ids = request.POST.getlist('record_id')
-        actions = request.POST.getlist('action')
-        discounts = request.POST.getlist('discount')
-        waived_ids = request.POST.getlist('waiver')
-
-        # Each row has the same 'name' attributes, so they appear as parallel lists
-        discount_index = 0  # We'll only increment this when we see a discount action
-
-        for i, rid in enumerate(record_ids):
-            record = StudentFeeRecord.objects.get(pk=rid)
-            if actions[i] == 'update_discount':
-                # Use the next discount value
-                discount_str = discounts[discount_index] if discount_index < len(discounts) else '0'
-                discount_index += 1
-                record.discount = Decimal(discount_str)
-            elif actions[i] == 'update_waiver':
-                # Check if this record_id was submitted in 'waiver'
-                waived_ids = request.POST.getlist('waiver')
-                record.waiver = (rid in waived_ids)
-                record.save()
-
-            record.net_fee = record.calculate_net_fee()
-            record.save()
-
-    def update_discount(self, record_id, discount_str):
-        """Handle a single discount update for a specific record."""
+    def get_active_term(self):
+        # (Keep the existing get_active_term method from previous version)
         try:
-            record = StudentFeeRecord.objects.get(pk=record_id)
-        except StudentFeeRecord.DoesNotExist:
+            active_session = Session.objects.filter(is_active=True).first()
+            if not active_session:
+                 raise Session.DoesNotExist("No active session found.")
+            # Adjust filter if multiple terms can be active per session (unlikely)
+            active_term = Term.objects.filter(session=active_session, is_active=True).first()
+            if not active_term:
+                 raise Term.DoesNotExist(f"No active term found for session {active_session}.")
+            return active_term
+        except (Session.DoesNotExist, Term.DoesNotExist) as e:
+            # Use specific request object if available, otherwise log
+            logger.error(f"Configuration Error fetching active term: {e}") # Assuming logger is configured
+            if hasattr(self, 'request'):
+                 messages.error(self.request, f"Configuration Error: {e}")
+            return None
+
+    @transaction.atomic # Keep the transaction
+    def sync_fee_records(self, active_term):
+        """
+        Ensure fee records exist for the active term.
+        Pre-calculates net_fee for bulk_create.
+        Manually ensures FinancialRecord consistency after bulk_create.
+        Updates existing records via save() to trigger signals if amount changes.
+        """
+        if not active_term:
+            print("Sync aborted: No active term provided.") # Use logging in production
             return
-        record.discount = Decimal(discount_str or '0.00')
-        record.net_fee = record.calculate_net_fee()
-        record.save()
 
-    def update_waiver(self, record_id, waiver_checked):
-        """Handle a single waiver update for a specific record."""
-        try:
-            record = StudentFeeRecord.objects.get(pk=record_id)
-        except StudentFeeRecord.DoesNotExist:
-            return
-        record.waiver = waiver_checked
-        record.net_fee = record.calculate_net_fee()
-        record.save()
+        term_assignments = FeeAssignment.objects.filter(term=active_term).select_related('class_instance')
+        if not term_assignments.exists():
+            print(f"Sync Info: No fee assignments found for active term {active_term}.")
+            return # Nothing to assign
 
-    def sync_fee_records(self):
-        """Ensure fee records exist for all students and update if necessary."""
-        all_students = Student.objects.filter(current_class__isnull=False)
+        assignments_by_class_id = {fa.class_instance_id: fa for fa in term_assignments}
 
-        for student in all_students:
-            fee_assignments = FeeAssignment.objects.filter(class_instance=student.current_class)
-            
-            for assignment in fee_assignments:
-                record, created = StudentFeeRecord.objects.get_or_create(
-                    student=student,
-                    term=assignment.term,
-                    defaults={
-                        'fee_assignment': assignment,
-                        'amount': assignment.amount,
-                        'discount': Decimal('0.00'),
-                        'waiver': False,
-                        'net_fee': assignment.calculate_net_fee(assignment.amount, Decimal('0.00'), False),
-                    }
+        # Use Student PK ('id') for clarity and robustness
+        students_in_assigned_classes = Student.objects.filter(
+            current_class_id__in=assignments_by_class_id.keys(),
+            status='active' # Optional: Only sync for active students?
+        ).values_list('user_id', 'current_class_id') # Get Student PK
+
+        student_map = {s_id: c_id for s_id, c_id in students_in_assigned_classes}
+        if not student_map:
+            print(f"Sync Info: No active students found in classes with assignments for term {active_term}.")
+            return # No students to process
+
+        # Fetch existing SFRs for these specific students and term
+        existing_records = StudentFeeRecord.objects.filter(
+            term=active_term,
+            student_id__in=student_map.keys()
+        ).select_related('fee_assignment') # Select related assignment for comparison
+
+        # Use Student PK for the map key
+        existing_map = {record.student_id: record for record in existing_records}
+        # Note: This assumes one fee record per student per term.
+
+        records_to_create_instances = []
+        records_to_update_pks = [] # Track PKs needing potential update via save()
+
+        for student_id, class_id in student_map.items():
+            # Find the relevant assignment for the student's class
+            assignment = assignments_by_class_id.get(class_id)
+            if not assignment: continue # Should not happen due to initial filter
+
+            record = existing_map.get(student_id) # Check if record exists using Student PK
+
+            if not record:
+                # --- Prepare NEW record instance ---
+                initial_amount = assignment.amount or Decimal('0.00')
+                initial_discount = Decimal('0.00')
+                initial_waiver = False
+
+                # Calculate net_fee directly
+                if initial_waiver:
+                    calculated_net_fee = Decimal('0.00')
+                else:
+                    applied_discount = min(initial_amount, initial_discount)
+                    calculated_net_fee = max(initial_amount - applied_discount, Decimal('0.00'))
+
+                records_to_create_instances.append(
+                    StudentFeeRecord(
+                        student_id=student_id,
+                        term=active_term,
+                        fee_assignment=assignment,
+                        amount=initial_amount,
+                        discount=initial_discount,
+                        waiver=initial_waiver,
+                        net_fee=calculated_net_fee # Assign pre-calculated value
+                    )
+                )
+            else:
+                # --- Check EXISTING record for updates ---
+                needs_save = False # Use save() to trigger signals if amount/assignment changes
+                if record.fee_assignment_id != assignment.id:
+                    record.fee_assignment = assignment
+                    needs_save = True
+                if record.amount != assignment.amount:
+                    record.amount = assignment.amount
+                    needs_save = True
+                # Note: Discount/Waiver are user-set, don't override them here.
+                # If amount changed, net_fee needs recalc *during save*.
+
+                if needs_save:
+                    # Don't use .update() here if signals are important for amount change
+                    # Instead, call save() on the individual instance later
+                    records_to_update_pks.append(record.pk)
+
+        # --- Perform Database Operations ---
+        created_records = []
+        if records_to_create_instances:
+            try:
+                created_records = StudentFeeRecord.objects.bulk_create(records_to_create_instances)
+                # Use print for dev, logging for prod
+                print(f"Sync: Created {len(created_records)} new StudentFeeRecords.")
+                # messages.info(self.request, f"Created {len(created_records)} new fee records.") # Avoid messages in sync logic
+            except IntegrityError as e:
+                 # Handle potential unique constraint violations if sync runs concurrently (unlikely here)
+                 print(f"Sync Error during bulk_create: {e}")
+                 # Optionally re-fetch or handle differently
+                 pass
+
+        # --- Update Existing Records Needing Save (Triggers Signals) ---
+        if records_to_update_pks:
+            records_needing_save = StudentFeeRecord.objects.filter(pk__in=records_to_update_pks)
+            updated_count = 0
+            for record in records_needing_save:
+                 # Refetch assignment just in case (might be overkill)
+                assignment = assignments_by_class_id.get(record.student.current_class_id)
+                if assignment: # Check if assignment still exists for the class
+                    record.fee_assignment = assignment
+                    record.amount = assignment.amount
+                    # The save method will calculate net_fee and trigger signals
+                    record.save()
+                    updated_count +=1
+            print(f"Sync: Updated {updated_count} existing StudentFeeRecords via save().")
+
+        # --- Manually Ensure FinancialRecord Consistency for BULK_CREATED records ---
+        if created_records:
+            print(f"Sync: Ensuring FinancialRecord consistency for {len(created_records)} bulk-created records.")
+            for record in created_records:
+                # Use get_or_create for FinancialRecord
+                fin_record, fr_created = FinancialRecord.objects.get_or_create(
+                    student_id=record.student_id,
+                    term=record.term
+                    # REMOVE 'defaults' dictionary completely here
                 )
 
-                # If the record already existed, update fields if necessary
-                if not created:
-                    updated = False
-                    if record.fee_assignment != assignment:
-                        record.fee_assignment = assignment
-                        updated = True
-                    if record.amount != assignment.amount:
-                        record.amount = assignment.amount
-                        updated = True
-                    if record.net_fee != record.calculate_net_fee():
-                        record.net_fee = record.calculate_net_fee()
-                        updated = True
-                    
-                    if updated:
-                        record.save()
+                # --- Explicitly set fields AFTER get_or_create ---
+                # This ensures fields are updated whether the FR was created or just fetched.
+                needs_fr_update = False
+                if fin_record.total_fee != record.net_fee:
+                    fin_record.total_fee = record.net_fee; needs_fr_update = True
+                if fin_record.total_discount != record.discount:
+                    fin_record.total_discount = record.discount; needs_fr_update = True
+                if fin_record.has_waiver != record.waiver: # Now check against the SFR waiver
+                    fin_record.has_waiver = record.waiver; needs_fr_update = True
 
-                
+                # If newly created, total_paid should be 0 initially
+                if fr_created and fin_record.total_paid != Decimal('0.00'):
+                    fin_record.total_paid = Decimal('0.00')
+                    needs_fr_update = True
+                # Note: We don't recalculate total_paid from payments here;
+
+                # Always recalculate balance based on current values
+                new_outstanding = max(fin_record.total_fee - fin_record.total_paid, Decimal('0.00'))
+                if fin_record.outstanding_balance != new_outstanding:
+                    fin_record.outstanding_balance = new_outstanding
+                    needs_fr_update = True
+
+                # Always update archived status
+                term_is_inactive = not record.term.is_active
+                if fin_record.archived != term_is_inactive:
+                    fin_record.archived = term_is_inactive
+                    needs_fr_update = True
+
+                # Save only if necessary
+                if needs_fr_update:
+                    # Define all potentially updated fields
+                    update_fields_list = [
+                        'total_fee', 'total_discount',
+                        'total_paid', 'outstanding_balance', 'archived'
+                    ]
+                    fin_record.save(update_fields=update_fields_list)
+
+            print(f"Sync: FinancialRecord consistency check complete.")
+    def get_queryset(self):
+        # (Keep the existing get_queryset method from previous version - it fetches and groups)
+        active_term = self.get_active_term()
+        if not active_term:
+            return {}
+
+        self.sync_fee_records(active_term)
+
+        queryset = StudentFeeRecord.objects.filter(term=active_term) \
+            .select_related('student__user', 'term', 'student__current_class') \
+            .order_by('student__current_class__name', 'student__user__last_name')
+
+        class_records_grouped = {}
+        for record in queryset:
+            if record.student.current_class:
+                class_obj = record.student.current_class
+                class_id = class_obj.id
+                class_name = class_obj.name
+                if class_id not in class_records_grouped:
+                    class_records_grouped[class_id] = {'name': class_name, 'records': []}
+                class_records_grouped[class_id]['records'].append(record)
+
+        return class_records_grouped
+
+
     def get_context_data(self, **kwargs):
+        # (Keep the existing get_context_data method from previous version)
         context = super().get_context_data(**kwargs)
-        student_fee_records = context['student_fee_records']
-
-        # Group records by class and sort classes by name
-        class_records = {}
-        for record in student_fee_records:
-            class_name = record.student.current_class.name
-            if class_name not in class_records:
-                class_records[class_name] = []
-            class_records[class_name].append(record)
-
-        # Sort the classes in ascending order
-        sorted_class_records = dict(sorted(class_records.items(), key=lambda item: item[0]))
-
-        # Paginate each class group
-        paginated_class_records = {}
-        for class_name, records in sorted_class_records.items():
-            paginator = Paginator(records, self.paginate_by)
-            page_number = self.request.GET.get(f'page_{class_name}', 1)
-            paginated_class_records[class_name] = paginator.get_page(page_number)
-
-        # Include session and term in the context
-        context['paginated_class_records'] = paginated_class_records
-        context['term'] = Term.objects.first()  # Replace with logic to retrieve the current term
-        context['session'] = context['term'].session if context['term'] else None  # Assumes Term has a 'session' field
+        active_term = self.get_active_term()
+        context['term'] = active_term
+        context['session'] = active_term.session if active_term else None
+        context.pop('object_list', None) # Remove default ListView context if present
         return context
+
+    @transaction.atomic # Process all updates for a class atomically
+    def post(self, request, *args, **kwargs):
+        """Handle saving changes for a specific class submitted via its form."""
+        submitted_class_id_str = request.POST.get('submitted_class_id')
+        active_term = self.get_active_term() # Needed for context if redirecting on error
+
+        if not active_term:
+             messages.error(request, "Cannot process submission: Active term not found.")
+             return redirect(request.path_info)
+
+        if not submitted_class_id_str:
+            messages.error(request, "Invalid submission: Missing class identifier.")
+            return redirect(request.path_info)
+
+        try:
+            submitted_class_id = int(submitted_class_id_str)
+            target_class = Class.objects.get(pk=submitted_class_id)
+        except (ValueError, ObjectDoesNotExist):
+            messages.error(request, "Invalid class specified in submission.")
+            return redirect(request.path_info)
+
+        # --- Process using parallel lists ---
+        # Get all relevant data lists from the POST request for THIS specific form
+        record_ids = request.POST.getlist('record_id') # IDs for all rows shown in the submitted form
+        discounts = request.POST.getlist('discount')   # All discount values in order
+        # Waivers list contains the 'value' (which is the record_id) of CHECKED boxes ONLY
+        waiver_ids_checked = request.POST.getlist('waiver')
+
+        # Ensure lists have expected lengths (basic sanity check)
+        if len(record_ids) != len(discounts):
+            messages.error(request, "Form data mismatch (discounts). Please try again.")
+            # Re-render form potentially highlighting errors - more complex
+            # For now, redirect back
+            return redirect(request.path_info + f'#collapse-{submitted_class_id}')
+
+
+        updated_count = 0
+        error_count = 0
+        records_to_update = [] # For potential bulk_update
+
+        # Fetch all relevant records for this class and term in one query
+        records_in_db = StudentFeeRecord.objects.filter(
+            pk__in=record_ids, # Only process IDs submitted
+            student__current_class_id=submitted_class_id, # Security check
+            term=active_term # Ensure correct term
+        ).in_bulk() # Fetch as a dictionary {id: record_obj}
+
+        # Convert waiver_ids_checked to a set for efficient lookup
+        waiver_ids_set = set(waiver_ids_checked)
+
+        for i, record_id_str in enumerate(record_ids):
+            try:
+                record_id = int(record_id_str)
+                record = records_in_db.get(record_id)
+
+                if not record:
+                    messages.warning(request, f"Record ID {record_id_str} not found or doesn't belong to class {target_class.name}. Skipped.")
+                    error_count += 1
+                    continue
+
+                # Get submitted values for this row
+                discount_str = discounts[i]
+                # Check if this record's ID is in the set of checked waiver IDs
+                waiver_checked = str(record_id) in waiver_ids_set # Compare as strings
+
+                # Compare with current values and update if needed
+                needs_save = False
+                try:
+                    new_discount = Decimal(discount_str or '0.00')
+                    # Use tolerance for decimal comparison
+                    if abs(record.discount - new_discount) > Decimal('0.001'):
+                        record.discount = new_discount
+                        needs_save = True
+                except InvalidOperation:
+                     messages.warning(request, f"Invalid discount format '{discount_str}' for {record.student}. Skipped discount update.")
+                     error_count += 1
+                     # Continue processing other fields for this record
+
+                if record.waiver != waiver_checked:
+                    record.waiver = waiver_checked
+                    needs_save = True
+
+                if needs_save:
+                    # Recalculate net_fee before saving (save() method does this too, but explicit is fine)
+                    record.net_fee = record.calculate_net_fee()
+                    # Option 1: Save individually (triggers signals immediately) - Simpler
+                    record.save()
+                    # Option 2: Prepare for bulk_update (more complex, skips signals) - Faster for HUGE classes
+                    # records_to_update.append(record)
+                    updated_count += 1
+
+            except ValueError:
+                 messages.warning(request, f"Invalid Record ID {record_id_str} found in submission. Skipped.")
+                 error_count += 1
+            except Exception as e:
+                 messages.error(request, f"Error updating record ID {record_id_str}: {e}")
+                 error_count += 1
+
+        # If using bulk_update (Option 2):
+        # if records_to_update:
+        #     try:
+        #         StudentFeeRecord.objects.bulk_update(records_to_update, ['discount', 'waiver', 'net_fee'])
+        #         updated_count = len(records_to_update)
+        #         # !!! IMPORTANT: bulk_update DOES NOT trigger signals.
+        #         # You would need to manually trigger FinancialRecord updates for affected students AFTER bulk_update.
+        #         # For simplicity, sticking with individual save() is often better unless performance is dire.
+        #     except Exception as e:
+        #          messages.error(request, f"Bulk update failed: {e}")
+        #          error_count += len(records_to_update)
+
+
+        # --- Feedback Messages ---
+        if updated_count > 0:
+            messages.success(request, f"Successfully updated {updated_count} fee records for {target_class.name}.")
+        if error_count == 0 and updated_count == 0:
+             messages.info(request, f"No changes detected or saved for {target_class.name}.")
+        elif error_count > 0:
+             messages.warning(request, f"Finished processing for {target_class.name} with {error_count} errors/warnings.")
+
+        # Redirect back to the list view, appending hash to open the correct accordion item
+        redirect_url = reverse('student_fee_record_list') + f'#collapse-{submitted_class_id}'
+        return redirect(redirect_url)
 
 # Payment Record Management
 class PaymentListView(AdminRequiredMixin, ListView):
     model = Payment
     template_name = 'payment/payment_list.html'
     context_object_name = 'payments'
-    ordering = ['-payment_date']  # Order by payment date descending
+    ordering = ['-payment_date', '-pk'] # Order by date then pk
+    paginate_by = 50 # Add pagination
+
+    def get_queryset(self):
+        # Prefetch related financial record and student details for efficiency
+        return super().get_queryset().select_related(
+            'financial_record__student__user',
+            'financial_record__term__session'
+        )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-
-        # Calculate total payments
-        context['total_payment'] = Payment.objects.aggregate(total=Sum('amount_paid'))['total'] or 0
-
-        # Calculate total outstanding balance by summing balances from all financial records
-        context['total_outstanding_balance'] = (
-            FinancialRecord.objects.aggregate(total=Sum('outstanding_balance'))['total'] or 0
-        )
-
-        # Prepare payment list with outstanding balance for each payment
-        for payment in context['payments']:
-            payment.outstanding_balance = (
-                payment.financial_record.outstanding_balance 
-                if payment.financial_record else None
-            )
-
+        active_term = Term.objects.filter(is_active=True).first() # Get current term for summary
+        # Recalculate totals based on ALL records for overall summary
+        all_records = FinancialRecord.objects.all()
+        context['total_fee'] = all_records.aggregate(total=Sum('total_fee'))['total'] or Decimal('0.00')
+        context['total_discount'] = all_records.aggregate(total=Sum('total_discount'))['total'] or Decimal('0.00')
+        # Total paid sum from financial records is more reliable than summing all payments directly
+        context['total_paid'] = all_records.aggregate(total=Sum('total_paid'))['total'] or Decimal('0.00')
+        context['total_outstanding_balance'] = all_records.aggregate(total=Sum('outstanding_balance'))['total'] or Decimal('0.00')
+        context['active_term'] = active_term # Pass active term if needed for display/filtering
+        
         return context
 
-class PaymentCreateView(CreateView):
+class PaymentCreateView(AdminRequiredMixin, CreateView):
     model = Payment
     form_class = PaymentForm
     template_name = 'payment/create_payment.html'
+    success_url = reverse_lazy('payment_list') # Use reverse_lazy
 
     def form_valid(self, form):
         payment = form.save(commit=False)
-        student = payment.student
-        term = payment.term
 
-        # Get or create FinancialRecord using get_or_create to avoid race conditions
+        # Determine the student and term from the form
+        student = form.cleaned_data.get('student') 
+        term = form.cleaned_data.get('term')       \
+
+        if not student or not term:
+            # Handle case where student/term might not be directly on payment form
+             financial_record_selected = form.cleaned_data.get('financial_record')
+             if financial_record_selected:
+                 student = financial_record_selected.student
+                 term = financial_record_selected.term
+             else:
+                  form.add_error(None, "Could not determine Student and Term for payment.")
+                  return self.form_invalid(form)
+
+        # Get or create FinancialRecord
+        # The signal on StudentFeeRecord should have already created it if a fee exists.
         financial_record, created = FinancialRecord.objects.get_or_create(
             student=student,
             term=term,
+            # Defaults might be needed if StudentFeeRecord signal didn't run yet
             defaults={
-                'total_fee': 0,
-                'total_discount': 0,
-                'total_paid': 0,
-                'outstanding_balance': 0
+                'total_fee': Decimal('0.00'),
+                'total_discount': Decimal('0.00'),
+                'total_paid': Decimal('0.00'),
+                'outstanding_balance': Decimal('0.00')
             }
         )
-
-        # Update FinancialRecord from StudentFeeRecord
-        student_fee_record = StudentFeeRecord.objects.filter(student=student, term=term).first()
-
-        if student_fee_record:
-            financial_record.total_fee = student_fee_record.net_fee
-            financial_record.total_discount = student_fee_record.discount
-            financial_record.save()
-
+        # If created here, it might not have the correct total_fee yet.
         payment.financial_record = financial_record
-        
+
         try:
-            payment.save()  
+            # Save the payment instance - this will trigger the post_save signal
+            # The signal handler will update the financial_record
+            payment.save()
+            messages.success(self.request, 'Payment recorded successfully.')
+            return redirect(self.get_success_url())
         except ValidationError as e:
-            # Add the error message to the form so it displays nicely
-            form.add_error(None, e.messages)
+            # Catch validation errors from Payment.clean()
+            form.add_error(None, e) # Add validation errors back to the form
+            return self.form_invalid(form)
+        except Exception as e:
+            # Catch other unexpected errors during save
+            messages.error(self.request, f"An unexpected error occurred: {e}")
             return self.form_invalid(form)
 
-        self.update_financial_record(financial_record)
-        messages.success(self.request, 'Payment recorded successfully.')
-        return redirect(self.get_success_url())
-
-    def update_financial_record(self, financial_record):
-        """
-        Updates the financial record with the current payment information.
-        """
-        total_paid = financial_record.payments.aggregate(total=Sum('amount_paid'))['total'] or 0
-        financial_record.total_paid = total_paid
-        financial_record.outstanding_balance = max(financial_record.total_fee - total_paid, 0)
-        financial_record.save()
-
-    def get_success_url(self):
-        return reverse_lazy('payment_list')  # Adjust this URL to match your view names
-    
-class PaymentUpdateView(UpdateView):
+class PaymentUpdateView(AdminRequiredMixin, UpdateView):
     model = Payment
     form_class = PaymentForm
     template_name = 'payment/update_payment.html'
+    success_url = reverse_lazy('payment_list')
 
     def form_valid(self, form):
-        payment = form.save(commit=False)
-
         try:
-            payment.save()
+            # Saving the form will trigger the post_save signal on Payment
+            # which updates the FinancialRecord
+            payment = form.save()
+            messages.success(self.request, 'Payment updated successfully.')
+            return redirect(self.get_success_url())
         except ValidationError as e:
-            form.add_error(None, e.message if hasattr(e, 'message') else e.messages)
+            form.add_error(None, e)
             return self.form_invalid(form)
-        
-        # Recalculate the financial record after updating the payment.
-        self.update_financial_record(payment.financial_record)
+        except Exception as e:
+            messages.error(self.request, f"An unexpected error occurred: {e}")
+            return self.form_invalid(form)
 
-        messages.success(self.request, 'Payment updated successfully.')
-        return redirect(self.get_success_url())
-
-    def update_financial_record(self, financial_record):
-        total_paid = financial_record.payments.aggregate(total=Sum('amount_paid'))['total'] or 0
-        financial_record.total_paid = total_paid
-        financial_record.outstanding_balance = max(financial_record.total_fee - total_paid, 0)
-        financial_record.save()
-
-    def get_success_url(self):
-        return reverse('payment_list')  # Adjust the URL name as needed
-    
-class PaymentDetailView(DetailView):
+class PaymentDetailView(AdminRequiredMixin, DetailView):
     model = Payment
     template_name = 'payment/payment_detail.html'
     context_object_name = 'payment'
 
-class PaymentDeleteView(DeleteView):
+    def get_queryset(self):
+         # Optimize detail view query
+        return super().get_queryset().select_related(
+            'financial_record__student__user',
+            'financial_record__term__session'
+        )
+
+class PaymentDeleteView(AdminRequiredMixin, DeleteView):
     model = Payment
     template_name = 'payment/delete_payment.html'
+    success_url = reverse_lazy('payment_list')
 
-    def delete(self, request, *args, **kwargs):
-        payment = self.get_object()
-        financial_record = payment.financial_record
-        
-        # Delete the payment
-        response = super().delete(request, *args, **kwargs)
-        
-        financial_record.refresh_from_db()
-        financial_record.total_paid = financial_record.payments.aggregate(total=Sum('amount_paid'))['total'] or 0
-        financial_record.outstanding_balance = max(financial_record.total_fee - financial_record.total_paid, 0)
-        financial_record.save()
+    def form_valid(self, form): # Use form_valid for DeleteView POST handling
+        try:
+            # The post_delete signal will handle updating the FinancialRecord
+            response = super().form_valid(form)
+            messages.success(self.request, 'Payment deleted successfully.')
+            return response
+        except Exception as e:
+             messages.error(self.request, f"An error occurred while deleting the payment: {e}")
+             # Redirect back to list or detail view on error
+             return redirect('payment_list')
 
-        messages.success(request, 'Payment deleted successfully.')
-        return response
-
-    def get_success_url(self):
-        return reverse_lazy('payment_list')  # Adjust the URL name as needed
-    
-class FinancialRecordListView(ListView):
+# --- Financial Record List View (Refactored) ---
+class FinancialRecordListView(AdminRequiredMixin, ListView):
     model = FinancialRecord
     template_name = 'financial_record/financial_record_list.html'
     context_object_name = 'financial_records'
+    paginate_by = 50 # Add pagination
 
     def get_queryset(self):
-        # Fetch financial records for all students with related fields preloaded for optimization
-        return FinancialRecord.objects.order_by('student__user__last_name')
+        # Preload related fields for optimization
+        return FinancialRecord.objects.select_related(
+            'student__user',
+            'term__session'
+        ).order_by('-term__start_date', 'student__user__last_name') # Order by term then name
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        qs = self.get_queryset()
-        
-        # Calculate summary statistics: total fee, discount, paid amount, and outstanding balance across all records
-        context['total_fee'] = qs.aggregate(total_fee=Sum('total_fee'))['total_fee'] or 0
-        context['total_discount'] = qs.aggregate(total_discount=Sum('total_discount'))['total_discount'] or 0
-        context['total_paid'] = Payment.objects.aggregate(total=Sum('amount_paid'))['total'] or 0
-        print(context['total_paid'])
-        context['total_outstanding_balance'] = qs.aggregate(total_outsanding_balance=Sum('outstanding_balance'))['total_outsanding_balance'] or 0
+        # Use the paginated queryset for calculations if needed, or all records for global totals
+        all_records = FinancialRecord.objects.all() # For global totals
+
+        # Calculate summary statistics using the reliable values from FinancialRecord
+        context['total_fee'] = all_records.aggregate(total=Sum('total_fee'))['total'] or Decimal('0.00')
+        context['total_discount'] = all_records.aggregate(total=Sum('total_discount'))['total'] or Decimal('0.00')
+        context['total_paid'] = all_records.aggregate(total=Sum('total_paid'))['total'] or Decimal('0.00')
+        context['total_outstanding_balance'] = all_records.aggregate(total=Sum('outstanding_balance'))['total'] or Decimal('0.00')
+
+        # Add active term/session if needed for filtering/display
+        active_term = Term.objects.filter(is_active=True).first()
+        context['active_term'] = active_term
+        context['active_session'] = active_term.session if active_term else None
 
         return context
 

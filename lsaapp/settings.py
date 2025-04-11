@@ -100,8 +100,14 @@ else:
             'OPTIONS': {
             'options': '-c search_path=lsaapp_schema'
         },
+        'TEST': {
+            'OPTIONS': {
+                'options': f'-c search_path=lsaapp_schema,public',
+            }
+        
         }
     }
+}
 
 AUTH_USER_MODEL = 'core.CustomUser'
 

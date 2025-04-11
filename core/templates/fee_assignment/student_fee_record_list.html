@@ -1,138 +1,181 @@
 {% extends 'base.html' %}
-
 {% load humanize %}
+{% load query_params_tags %}
+
+{% block title %}Student Fee Records - {{ term.name }} {{ session.name }}{% endblock %}
 
 {% block content %}
-<div class="container">
-    <h2 class="mt-4">Student Fee Records - {{ session.name }} ({{ term.name }})</h2>
+<div class="container mt-4 mb-5">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2>Student Fee Records</h2>
+        {% if term and session %}
+            <span class="badge bg-secondary fs-6">{{ term.name }} | {{ session.name }}</span>
+        {% else %}
+            <span class="badge bg-danger fs-6">Error: Active Term/Session Not Found</span>
+        {% endif %}
+    </div>
+    <hr>
 
-    <form method="post" enctype="multipart/form-data" id="student-fee-form">
-        {% csrf_token %}
-        
-        {% for class_name, page_obj in paginated_class_records.items %}
-            <h3 class="mt-4">Class: {{ class_name }}</h3>
-            <table class="table table-bordered mt-3">
-                <thead class="table-light">
-                    <tr>
-                        <th style="width: 5%;">S/N</th>
-                        <th style="width: 25%;">Student</th>
-                        <th style="width: 15%;">Amount</th>
-                        <th style="width: 15%;">Discount</th>
-                        <th style="width: 25%;">Set Discount</th>
-                        <th style="width: 5%;">Waiver</th>
-                        <th style="width: 15%;">Net Fee</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for record in page_obj %}
-                        <tr data-record-id="{{ record.id }}">
-                            <td>{{ forloop.counter }}</td>
-                            <td>{{ record.student.user.get_full_name }}</td>
-                            <td>₦{{ record.amount|floatformat:2|intcomma }}</td>
-                            <td>₦{{ record.discount|floatformat:2|intcomma }}</td>
-                            <td>
-                                <div class="input-group">
-                                    <input type="number" step="1000" name="discount" value="{{ record.discount }}" class="form-control form-control-sm discount-input" style="min-width: 80px;">
-                                    <input type="hidden" name="record_id" value="{{ record.id }}">
-                                    <input type="hidden" name="action" value="update_discount">
-                                    <button type="submit" class="btn btn-primary btn-sm ms-2">Update</button>
-                                </div>
-                            </td>
-                            <td>
-                                <div class="form-check">
-                                    <input type="checkbox" name="waiver" class="form-check-input waiver-input" value="{{ record.id }}" {% if record.waiver %}checked{% endif %}>
-                                    <input type="hidden" name="record_id" value="{{ record.id }}">
-                                    <input type="hidden" name="action" value="update_waiver">
-                                    <button type="submit" class="btn btn-primary btn-sm ms-2">Update</button>
-                                </div>
-                            </td>
-                            <td class="net-fee">₦{{ record.net_fee|floatformat:2|intcomma }}</td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-
-            <!-- Pagination controls for this class -->
-            <div class="d-flex justify-content-center">
-                <nav aria-label="Page navigation">
-                    <ul class="pagination">
-                        {% if page_obj.has_previous %}
-                            <li class="page-item">
-                                <a class="page-link" href="?page_{{ class_name }}={{ page_obj.previous_page_number }}" aria-label="Previous">
-                                    <span aria-hidden="true">&laquo;</span>
-                                </a>
-                            </li>
-                        {% else %}
-                            <li class="page-item disabled">
-                                <span class="page-link">&laquo;</span>
-                            </li>
-                        {% endif %}
-
-                        {% for page_num in page_obj.paginator.page_range %}
-                            <li class="page-item {% if page_num == page_obj.number %}active{% endif %}">
-                                <a class="page-link" href="?page_{{ class_name }}={{ page_num }}">{{ page_num }}</a>
-                            </li>
-                        {% endfor %}
-
-                        {% if page_obj.has_next %}
-                            <li class="page-item">
-                                <a class="page-link" href="?page_{{ class_name }}={{ page_obj.next_page_number }}" aria-label="Next">
-                                    <span aria-hidden="true">&raquo;</span>
-                                </a>
-                            </li>
-                        {% else %}
-                            <li class="page-item disabled">
-                                <span class="page-link">&raquo;</span>
-                            </li>
-                        {% endif %}
-                    </ul>
-                </nav>
-            </div>
-        {% endfor %}
-        
-        <div class="d-flex justify-content-end mt-4">
-            <button type="submit" name="save_all" class="btn btn-success">Save All and Return to Fee Assignments</button>
+    {% if not all_records_grouped_by_class %}
+        <div class="alert alert-warning mt-3" role="alert">
+            No student fee records found for the active term{% if term %} ({{ term }}){% endif %}. Ensure fee assignments exist and records have been synced, or check active term configuration.
         </div>
-    </form>
-</div>
-<br>
-<!-- Add JavaScript for dynamic updates (remains unchanged) -->
+    {% else %}
+        <div class="accordion" id="classFeeAccordion">
+            {% for class_id, data in all_records_grouped_by_class.items %}
+                {% with class_name=data.name records=data.records %}
+                <div class="accordion-item mb-2"> {# Add some margin between items #}
+                    <h2 class="accordion-header" id="heading-{{ class_id }}">
+                        <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-{{ class_id }}" aria-expanded="false" aria-controls="collapse-{{ class_id }}">
+                            <strong>Class: {{ class_name }}</strong> <span class="badge bg-primary rounded-pill ms-2">{{ records|length }} Student{{ records|length|pluralize }}</span>
+                        </button>
+                    </h2>
+                    {# Add 'show' class if fragment identifier matches this class_id #}
+                    <div id="collapse-{{ class_id }}" class="accordion-collapse collapse {% if request.resolver_match.kwargs.hash == 'collapse-'|add:class_id|stringformat:'s' or request.GET.open == class_id|stringformat:'s' %}show{% endif %}" aria-labelledby="heading-{{ class_id }}" data-bs-parent="#classFeeAccordion">
+                        <div class="accordion-body">
+
+                            {% if not records %}
+                                <p class="text-muted">No students found in this class for the active term.</p>
+                            {% else %}
+                                {# FORM START - One form per class #}
+                                <form method="post">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="submitted_class_id" value="{{ class_id }}">
+
+                                    <div class="table-responsive">
+                                        <table class="table table-sm table-bordered table-striped table-hover mt-2 align-middle caption-top">
+                                             <caption>Fee records for {{ class_name }}</caption>
+                                            <thead class="table-light sticky-top"> {# Make header sticky within scrollable area? #}
+                                                <tr>
+                                                    <th style="width: 4%;">S/N</th>
+                                                    <th style="width: 22%;">Student</th>
+                                                    <th style="width: 12%;" class="text-end">Assigned Fee</th>
+                                                    <th style="width: 25%;">Set Discount (₦)</th>
+                                                    <th style="width: 10%;" class="text-center">Waiver</th>
+                                                    <th style="width: 17%;" class="text-end">Net Fee (Payable)</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for record in records %}
+                                                    <tr>
+                                                        <td>{{ forloop.counter }}</td>
+                                                        <td>
+                                                            {{ record.student.user.get_full_name }}
+                                                            {# Hidden ID for this record - Crucial for POST processing #}
+                                                            <input type="hidden" name="record_id" value="{{ record.id }}">
+                                                        </td>
+                                                        <td class="text-end">₦{{ record.amount|floatformat:2|intcomma }}</td>
+                                                        <td>
+                                                            <input
+                                                                type="number"
+                                                                step="100"
+                                                                name="discount" {# COMMON name 'discount' #}
+                                                                value="{{ record.discount|floatformat:0 }}"
+                                                                class="form-control form-control-sm discount-input text-end" {# Align text right #}
+                                                                placeholder="0"
+                                                                aria-label="Discount for {{ record.student.user.get_full_name }}">
+                                                        </td>
+                                                        <td class="text-center">
+                                                            <div class="form-check form-switch d-flex justify-content-center"> {# Center switch #}
+                                                                <input
+                                                                    type="checkbox"
+                                                                    name="waiver" {# COMMON name 'waiver' #}
+                                                                    class="form-check-input waiver-input"
+                                                                    value="{{ record.id }}" {# Value IS the record_id #}
+                                                                    id="waiver_check_{{ record.id }}"
+                                                                    role="switch"
+                                                                    {% if record.waiver %}checked{% endif %}
+                                                                    aria-label="Waiver for {{ record.student.user.get_full_name }}">
+                                                            </div>
+                                                        </td>
+                                                        <td class="text-end fw-bold net-fee" data-initial-amount="{{ record.amount }}">
+                                                            ₦{{ record.net_fee|floatformat:2|intcomma }}
+                                                        </td>
+                                                    </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    {# Submit button specific to this class form #}
+                                    <div class="text-end mt-3 border-top pt-3">
+                                        <button type="submit" class="btn btn-success btn-lg"> {# Make button larger #}
+                                            <i class="fas fa-save me-2"></i>Save ALL Changes for {{ class_name }}
+                                        </button>
+                                    </div>
+                                </form>
+                                {# FORM END #}
+                            {% endif %} {# End if records exist #}
+                        </div> {# End accordion-body #}
+                    </div> {# End accordion-collapse #}
+                </div> {# End accordion-item #}
+                {% endwith %}
+            {% endfor %} {# End loop through classes #}
+        </div> {# End accordion #}
+    {% endif %} {# End if grouped records exist #}
+
+     <div class="mt-4 mb-3 text-end">
+         <a href="{% url 'fee_assignment_list' %}" class="btn btn-secondary">
+             <i class="fas fa-arrow-left me-1"></i> Return to Fee Assignments
+        </a>
+    </div>
+
+</div> {# End container #}
+
+{# Client-side JS for dynamic net fee update - Keep as before #}
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        // Handle discount changes
-        document.querySelectorAll('.discount-input').forEach(function(input) {
-            input.addEventListener('input', function() {
+document.addEventListener('DOMContentLoaded', function() {
+    const formatCurrency = (value) => {
+        return `₦${value.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
+    };
+
+    document.querySelectorAll('.accordion-body form').forEach(form => {
+        form.querySelectorAll('.discount-input, .waiver-input').forEach(input => {
+            // Use 'input' for number fields, 'change' for checkboxes
+            const eventType = input.type === 'checkbox' ? 'change' : 'input';
+
+            input.addEventListener(eventType, function() {
                 const row = input.closest('tr');
-                const recordId = row.dataset.recordId;
-                const discount = parseFloat(input.value) || 0;
-                const amount = parseFloat(row.querySelector('.net-fee').dataset.amount);
+                if (!row) return;
+
+                const discountInput = row.querySelector('.discount-input');
                 const waiverInput = row.querySelector('.waiver-input');
-                
-                let netFee = waiverInput.checked ? 0 : Math.max(amount - discount, 0);
-                row.querySelector('.net-fee').textContent = `₦${netFee.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
+                const netFeeCell = row.querySelector('.net-fee');
+                // Ensure initialAmount is retrieved correctly - use data attribute
+                const initialAmount = parseFloat(netFeeCell.dataset.initialAmount || '0');
 
-                // Update hidden inputs for saving later
-                input.nextElementSibling.value = recordId;
-                input.nextElementSibling.nextElementSibling.value = 'update_discount';
-            });
-        });
+                const discount = parseFloat(discountInput.value) || 0;
+                const waiver = waiverInput.checked;
 
-        // Handle waiver changes
-        document.querySelectorAll('.waiver-input').forEach(function(checkbox) {
-            checkbox.addEventListener('change', function() {
-                const row = checkbox.closest('tr');
-                const recordId = row.dataset.recordId;
-                const discount = parseFloat(row.querySelector('.discount-input').value) || 0;
-                const amount = parseFloat(row.querySelector('.net-fee').dataset.amount);
-
-                let netFee = checkbox.checked ? 0 : Math.max(amount - discount, 0);
-                row.querySelector('.net-fee').textContent = `₦${netFee.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`;
-
-                // Update hidden inputs for saving later
-                checkbox.nextElementSibling.value = recordId;
-                checkbox.nextElementSibling.nextElementSibling.value = 'update_waiver';
+                let netFee = 0;
+                if (!waiver) {
+                    // Ensure discount doesn't exceed amount for calculation display
+                    const appliedDiscount = Math.min(initialAmount, discount);
+                    netFee = Math.max(initialAmount - appliedDiscount, 0);
+                }
+                // Update the cell text content
+                netFeeCell.textContent = formatCurrency(netFee);
             });
         });
     });
+
+    // Auto-scroll logic (Keep as before, might need slight adjustment based on final hash format)
+    if(window.location.hash && window.location.hash.startsWith('#collapse-')) {
+        const element = document.querySelector(window.location.hash);
+        if(element) {
+            // Check if it's already expanded, might need Bootstrap's JS events for perfect sync
+            // Simple scroll for now
+            setTimeout(() => {
+                // Scroll accordion header into view rather than the body start
+                const header = document.getElementById(element.getAttribute('aria-labelledby'));
+                 if (header) {
+                     header.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                 } else {
+                     element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                 }
+            }, 300); // Delay allows collapse animation
+        }
+    }
+});
 </script>
 {% endblock %}

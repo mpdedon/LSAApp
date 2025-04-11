@@ -1,79 +1,119 @@
 {% extends 'base.html' %}
 {% load humanize %}
 
+{% block title %}Payments Overview{% endblock %}
+
 {% block content %}
-<div class="container">
-    <h2 class="mt-4 mb-3 text-center">Payments Overview</h2>
-    
+<div class="container mt-4 mb-5">
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap">
+        <h2 class="mb-0">Payments Overview</h2>
+        <div class="d-flex gap-2 mt-2 mt-md-0">
+             <a href="{% url 'financial_record_list' %}" class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-file-invoice-dollar me-1"></i> View Financial Records
+            </a>
+            <a href="{% url 'create_payment' %}" class="btn btn-success btn-sm">
+                <i class="fas fa-plus me-1"></i> Record New Payment
+            </a>
+        </div>
+    </div>
+    <hr>
+
     <!-- Statistics Section -->
-    <div class="row mb-3">
-        <div class="col-md-6">
-            <div class="card bg-light">
-                <div class="card-body text-center">
-                    <h5 class="card-title">Total Payments Received</h5>
-                    <p class="card-text display-6">₦{{ total_payment|floatformat:2|intcomma }}</p>
+    <div class="row g-3 mb-4">
+        <div class="col-md-6 col-lg-3">
+            <div class="card shadow-sm text-center h-100">
+                <div class="card-body">
+                    <h5 class="card-title text-muted mb-2 fs-6">Total Fees (Net)</h5>
+                    <p class="card-text display-6 fw-bold text-primary mb-0">₦{{ total_fee|floatformat:2|intcomma }}</p>
                 </div>
             </div>
         </div>
-        <div class="col-md-6">
-            <div class="card bg-light">
-                <div class="card-body text-center">
-                    <h5 class="card-title">Total Outstanding Balance</h5>
-                    <p class="card-text display-6">₦{{ total_outstanding_balance|floatformat:2|intcomma }}</p>
+        <div class="col-md-6 col-lg-3">
+            <div class="card shadow-sm text-center h-100">
+                <div class="card-body">
+                     <h5 class="card-title text-muted mb-2 fs-6">Total Paid</h5>
+                     <p class="card-text display-6 fw-bold text-success mb-0">₦{{ total_paid|floatformat:2|intcomma }}</p>
+                </div>
+            </div>
+        </div>
+         <div class="col-md-6 col-lg-3">
+            <div class="card shadow-sm text-center h-100">
+                <div class="card-body">
+                     <h5 class="card-title text-muted mb-2 fs-6">Total Discounts</h5>
+                     <p class="card-text display-6 fw-bold text-info mb-0">₦{{ total_discount|floatformat:2|intcomma }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6 col-lg-3">
+            <div class="card shadow-sm text-center h-100">
+                <div class="card-body">
+                     <h5 class="card-title text-muted mb-2 fs-6">Total Outstanding</h5>
+                     <p class="card-text display-6 fw-bold text-danger mb-0">₦{{ total_outstanding_balance|floatformat:2|intcomma }}</p>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Record New Payment Button -->
-    <div class="d-flex justify-content-center gap-2 mb-3">
-        <a href="{% url 'create_payment' %}" class="btn btn-success">Record New Payment</a>
-        <a href="{% url 'financial_record_list' %}" class="btn btn-primary">View Financial Records</a>
-    </div>
     <!-- Payments Table -->
-    <div class="card">
-        <div class="card-body">
-            <table class="table table-bordered table-striped">
-                <thead class="thead-dark">
-                    <tr>
-                        <th>S/N</th>
-                        <th>Student</th>
-                        <th>Term</th>
-                        <th>Amount Paid</th>
-                        <th>Payment Date</th>
-                        <th>Balance</th>
-                        <th>Actions</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for payment in payments %}
-                        <tr>
-                            <td>{{ forloop.counter }}</td>
-                            <td>{{ payment.student.user.get_full_name }}</td>
-                            <td>{{ payment.term }}</td>
-                            <td>₦{{ payment.amount_paid|floatformat:2|intcomma }}</td>
-                            <td>{{ payment.payment_date }}</td>
-                            <td>
-                                {% if payment.outstanding_balance is not None %}
-                                    ₦{{ payment.outstanding_balance|floatformat:2|intcomma }}
-                                {% else %}
-                                    <span class="text-muted">No Financial Record</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                <a href="{% url 'payment_detail' payment.pk %}" class="btn btn-info btn-sm">View</a>
-                                <a href="{% url 'update_payment' payment.pk %}" class="btn btn-primary btn-sm">Edit</a>
-                                <a href="{% url 'delete_payment' payment.pk %}" class="btn btn-danger btn-sm">Delete</a>
-                            </td>
-                        </tr>
-                    {% empty %}
-                        <tr>
-                            <td colspan="7" class="text-center">No payments recorded.</td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+    <div class="card shadow-sm">
+        <div class="card-header bg-light">
+            <h5 class="mb-0">Recent Payments</h5>
         </div>
+        <div class="card-body p-0"> {# Remove padding to let table fit edge-to-edge #}
+            <div class="table-responsive">
+                <table class="table table-hover table-striped mb-0 align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th style="width: 5%;">S/N</th>
+                            <th>Student</th>
+                            <th>Term</th>
+                            <th class="text-end">Amount Paid</th>
+                            <th class="text-center">Payment Date</th>
+                            <th class="text-end">Record Balance</th>
+                            <th class="text-center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for payment in payments %} {# payments comes from pagination context #}
+                            <tr>
+                                <td class="text-muted ps-3">{{ forloop.counter0|add:page_obj.start_index }}</td>
+                                <td>{{ payment.financial_record.student.user.get_full_name }}</td>
+                                <td>{{ payment.financial_record.term }}</td>
+                                <td class="text-end fw-semibold">₦{{ payment.amount_paid|floatformat:2|intcomma }}</td>
+                                <td class="text-center">{{ payment.payment_date|date:"d M Y" }}</td>
+                                <td class="text-end">
+                                    {% if payment.financial_record %}
+                                        ₦{{ payment.financial_record.outstanding_balance|floatformat:2|intcomma }}
+                                    {% else %}
+                                        <span class="text-muted small">N/A</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-center">
+                                    <a href="{% url 'payment_detail' payment.pk %}" class="btn btn-outline-info btn-sm" title="View Details">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                    <a href="{% url 'update_payment' payment.pk %}" class="btn btn-outline-primary btn-sm mx-1" title="Edit Payment">
+                                        <i class="fas fa-edit"></i>
+                                    </a>
+                                    <a href="{% url 'delete_payment' payment.pk %}" class="btn btn-outline-danger btn-sm" title="Delete Payment">
+                                         <i class="fas fa-trash-alt"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="7" class="text-center text-muted py-4">No payments recorded yet.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+         {% if is_paginated %}
+         <div class="card-footer bg-light py-2">
+             {% include 'partials/pagination.html' %} {# Assuming you have a pagination partial #}
+         </div>
+         {% endif %}
     </div>
 </div>
 {% endblock %}
