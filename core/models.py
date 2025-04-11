@@ -921,16 +921,16 @@ class FeeAssignment(models.Model):
 
 
 class StudentFeeRecord(models.Model):
-    student = models.ForeignKey('Student', on_delete=models.CASCADE)
-    term = models.ForeignKey('Term', on_delete=models.CASCADE)
+    student = models.ForeignKey('Student', on_delete=models.CASCADE, related_name='fee_records')
+    term = models.ForeignKey('Term', on_delete=models.CASCADE, related_name='student_fee_records')
     fee_assignment = models.ForeignKey('FeeAssignment', on_delete=models.CASCADE)
-    amount = models.DecimalField(max_digits=10, decimal_places=2)
-    discount = models.DecimalField(max_digits=8, decimal_places=2, default=0)
+    amount = models.DecimalField(max_digits=10, decimal_places=2) 
+    discount = models.DecimalField(max_digits=10, decimal_places=2, default=0) 
     waiver = models.BooleanField(default=False)
-    net_fee = models.DecimalField(max_digits=10, decimal_places=2)
+    net_fee = models.DecimalField(max_digits=10, decimal_places=2, editable=False)
+    class Meta:
+        unique_together = ('student', 'term', 'fee_assignment')
 
-    def __str__(self):
-        return f"{self.student.user.get_full_name()} - {self.term} - {self.net_fee}"
 
     def calculate_net_fee(self):
         """Calculate the net fee after applying discount or waiver."""
@@ -942,6 +942,7 @@ class StudentFeeRecord(models.Model):
             return Decimal('0.00')
 
         # Calculate the net fee, ensuring it's never negative
+        discount = min(amount, discount)
         return max(amount - discount, Decimal('0.00'))
     
     def save(self, *args, **kwargs):
@@ -949,112 +950,143 @@ class StudentFeeRecord(models.Model):
         self.net_fee = self.calculate_net_fee()
         super().save(*args, **kwargs)
 
-class Payment(models.Model):
-    student = models.ForeignKey('Student', on_delete=models.CASCADE)
-    term = models.ForeignKey('Term', on_delete=models.CASCADE)
-    amount_paid = models.DecimalField(max_digits=10, decimal_places=2)
-    payment_date = models.DateField(default=timezone.now)
-    financial_record = models.ForeignKey('FinancialRecord', related_name='payments', on_delete=models.CASCADE, default=None)
-
-    def save(self, *args, **kwargs):
-
-        self.full_clean()  
-        super().save(*args, **kwargs)
-
-        # Only save the financial record if it exists
-        if self.financial_record:
-            self.financial_record.save()
-
-        # Get the latest StudentFeeRecord to calculate net fee
-        student_fee_record = StudentFeeRecord.objects.filter(student=self.student, term=self.term).first()
-        if not student_fee_record:
-            raise ValidationError("No fee record exists for this student and term.")
-
-        net_fee = student_fee_record.net_fee
-        if self.amount_paid > net_fee:
-            raise ValidationError(f"Payment exceeds the Total Fees for the student: {self.student}")
-        
-        if student_fee_record.waiver:
-            raise ValidationError("Payment not allowed for waived fees.")
-
-        # Calculate total paid including this payment
-        existing_payments = Payment.objects.filter(financial_record=self.financial_record).exclude(pk=self.pk)
-        total_paid = existing_payments.aggregate(total=Sum('amount_paid'))['total'] or 0
-        new_total = total_paid + (self.amount_paid or 0)
-
-        if new_total > net_fee:
-            raise ValidationError(f"Total payments ({new_total}) exceed net fee ({net_fee}).")
-
-
     def __str__(self):
-        return f"{self.student.user.get_full_name()} - {self.term} - {self.amount_paid} on {self.payment_date}"
-
+        # Use student's name if available, otherwise student ID
+        student_name = self.student.user.get_full_name() if hasattr(self.student, 'user') and self.student.user else f"Student {self.student.pk}"
+        return f"{student_name} - {self.term} - Net: {self.net_fee}"
 
 class FinancialRecord(models.Model):
-    student = models.ForeignKey('Student', on_delete=models.CASCADE)
-    term = models.ForeignKey('Term', on_delete=models.CASCADE)
-    total_fee = models.DecimalField(max_digits=10, decimal_places=2)
-    total_discount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    total_paid = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    outstanding_balance = models.DecimalField(max_digits=10, decimal_places=2, default=0)
-    archived = models.BooleanField(default=False)
-    
+    student = models.ForeignKey('Student', on_delete=models.CASCADE, related_name='financial_records')
+    term = models.ForeignKey('Term', on_delete=models.CASCADE, related_name='financial_records')
+    total_fee = models.DecimalField(max_digits=10, decimal_places=2, default=0, editable=False) 
+    total_discount = models.DecimalField(max_digits=10, decimal_places=2, default=0, editable=False) 
+    total_paid = models.DecimalField(max_digits=10, decimal_places=2, default=0, editable=False)
+    outstanding_balance = models.DecimalField(max_digits=10, decimal_places=2, default=0, editable=False)
+    archived = models.BooleanField(default=False, editable=False) 
+
     class Meta:
         unique_together = ('student', 'term')
-        # Add check constraint to prevent negative values
+        ordering = ['term__start_date', 'student__user__last_name'] 
         constraints = [
-            models.CheckConstraint(
-                check=models.Q(total_fee__gte=0),
-                name='positive_total_fee'
-            ),
-            models.CheckConstraint(
-                check=models.Q(total_paid__gte=0),
-                name='positive_total_paid'
-            ),
+            models.CheckConstraint(check=Q(total_fee__gte=0), name='financial_record_positive_total_fee'),
+            models.CheckConstraint(check=Q(total_discount__gte=0), name='financial_record_positive_total_discount'),
+            models.CheckConstraint(check=Q(total_paid__gte=0), name='financial_record_positive_total_paid'),
         ]
 
-    def __str__(self):
-        return f"{self.student.user.get_full_name()} - {self.term}"
+    def update_record(self):
+        """Calculates and updates fields based on related data. Called by signals."""
+        # 1. Get fee details
+        fee_record = StudentFeeRecord.objects.filter(student=self.student, term=self.term).first()
+        current_net_fee = fee_record.net_fee if fee_record else Decimal('0.00')
+        current_discount = fee_record.discount if fee_record else Decimal('0.00')
+
+        # 2. Calculate total paid
+        # Ensure pk exists before accessing reverse relation
+        current_total_paid = Decimal('0.00')
+        if self.pk: # Check if instance has been saved
+            current_total_paid = self.payments.aggregate(total=Sum('amount_paid'))['total'] or Decimal('0.00')
+        # else: If pk is None, total_paid must be 0 as no payments can exist yet
+
+        # 3. Calculate outstanding balance
+        current_outstanding = max(current_net_fee - current_total_paid, Decimal('0.00'))
+
+        # 4. Check archived status
+        term_is_inactive = not self.term.is_active
+
+        # Update fields directly - save() will be called by the signal handler
+        self.total_fee = current_net_fee
+        self.total_discount = current_discount
+        self.total_paid = current_total_paid
+        self.outstanding_balance = current_outstanding
+        self.archived = term_is_inactive
 
     def save(self, *args, **kwargs):
-        """Automatically update outstanding balance and archive if term ends."""
-        # Calculate net fee from FeeAssignment
-        student_fee_record = StudentFeeRecord.objects.filter(student=self.student, term=self.term).first()
-        
-        if student_fee_record:
-            self.total_fee = student_fee_record.net_fee
-            self.total_discount = student_fee_record.discount
-        else:
-            self.total_fee = 0
-            self.total_discount = 0
-
-        # Calculate total paid based on linked payments and update total_paid if the record already exists in the database
-        if self.pk:
-            self.total_paid = self.payments.aggregate(total=Sum('amount_paid'))['total'] or 0
-        else:
-            self.total_paid = 0  
-        
-        self.outstanding_balance = max(self.total_fee - self.total_paid, 0)
-
-        # Archive if the term has ended
-        if self.term.is_active:
-            self.archived = True
-
-        # Save changes without `update_fields` argument
-        super(FinancialRecord, self).save(*args, **kwargs)
+        """
+        Save the FinancialRecord. Calculation logic moved to update_record
+        and primarily triggered by signals.
+        """
+        # Rely on signals to call update_record and then save with update_fields
+        super().save(*args, **kwargs)
 
     @property
     def is_fully_paid(self):
         """Check if the student has fully paid the fee for this term."""
-        return self.outstanding_balance == 0
+        # Use a small tolerance for floating point issues if calculations were complex
+        return self.outstanding_balance <= Decimal('0.01')
+
+    @property
+    def has_waiver(self):
+        """Check if the corresponding fee record has a waiver."""
+        fee_record = StudentFeeRecord.objects.filter(student=self.student, term=self.term).first()
+        return fee_record and fee_record.waiver
 
     @property
     def can_access_results(self):
-        """Determine if the student can access results based on financial status."""
-        # Restrict access if there is an outstanding balance
-        return self.is_fully_paid or self.outstanding_balance < self.total_fee * Decimal('0.2')  # Allow access if at least 80% is paid
+        """Determine if the student can access results based on financial status or waiver."""
+        if self.has_waiver:
+            return True
+        # Allow access if fully paid or at least 80% paid (adjust percentage as needed)
+        eighty_percent_paid = self.total_paid >= (self.total_fee * Decimal('0.8'))
+        # Ensure total_fee is not zero before calculating percentage
+        if self.total_fee <= Decimal('0.00'):
+             return True # If fee is zero or less, allow access
+        return self.is_fully_paid or eighty_percent_paid
+
+    def __str__(self):
+        student_name = self.student.user.get_full_name() if hasattr(self.student, 'user') and self.student.user else f"Student {self.student.pk}"
+        return f"{student_name} - {self.term}" 
 
 
+class Payment(models.Model):
+    financial_record = models.ForeignKey('FinancialRecord', related_name='payments', on_delete=models.CASCADE)
+    amount_paid = models.DecimalField(max_digits=10, decimal_places=2)
+    payment_date = models.DateField(default=timezone.now)
+
+    def clean(self):
+        """ Add validation logic here, checked before save()."""
+        super().clean()
+        if not self.financial_record:
+            raise ValidationError("Payment must be associated with a Financial Record.")
+
+        # Get net fee and waiver status from the related StudentFeeRecord via FinancialRecord
+        fee_record = StudentFeeRecord.objects.filter(
+            student=self.financial_record.student,
+            term=self.financial_record.term
+        ).first()
+
+        if not fee_record:
+            # This case should ideally be prevented by ensuring FinancialRecord/StudentFeeRecord exist first
+            raise ValidationError(f"No fee record found for {self.financial_record.student} in {self.financial_record.term}.")
+
+        if fee_record.waiver and self.amount_paid > 0:
+             raise ValidationError("Payment not allowed for waived fees.")
+
+        # Check for overpayment *considering other payments for the same record*
+        # We need the state *before* this payment is saved if it's an update
+        current_total_paid = self.financial_record.payments.exclude(pk=self.pk).aggregate(total=Sum('amount_paid'))['total'] or Decimal('0.00')
+        prospective_total_paid = current_total_paid + self.amount_paid
+
+        if prospective_total_paid > fee_record.net_fee + Decimal('0.01'): # Add tolerance
+             raise ValidationError(f"Total payments (₦{prospective_total_paid:.2f}) would exceed net fee (₦{fee_record.net_fee:.2f}).")
+
+    def save(self, *args, **kwargs):
+        # Run validation before saving
+        self.full_clean()
+        super().save(*args, **kwargs)
+        # Signal will handle FinancialRecord update
+
+    @property
+    def student(self):
+        return self.financial_record.student
+
+    @property
+    def term(self):
+        return self.financial_record.term
+
+    def __str__(self):
+        student_name = self.student.user.get_full_name() if hasattr(self.student, 'user') and self.student.user else f"Student {self.student.pk}"
+        return f"{student_name} - {self.term} - {self.amount_paid} on {self.payment_date}"
+    
 class Expense(models.Model):
     description = models.CharField(max_length=255)
     amount = models.DecimalField(max_digits=10, decimal_places=2)

@@ -1,76 +1,88 @@
 {% extends 'base.html' %}
-{% load form_extras %}  <!-- Load the custom filter -->
+
+{% block title %}Record New Payment{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-    <h2 class="text-center mb-4">Record New Payment</h2>
-    <form method="post" class="p-4 bg-light rounded shadow-sm">
-        {% csrf_token %}
-        
-        <div class="mb-3">
-            <label for="{{ form.student.id_for_label }}" class="form-label">Student</label>
-            {{ form.student|add_class:"form-select" }}  <!-- Use the custom filter -->
-            {% if form.student.errors %}
-                <div class="text-danger small">{{ form.student.errors }}</div>
-            {% endif %}
+<div class="container mt-4 mb-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8 col-md-10">
+            <div class="card shadow-sm">
+                <div class="card-header bg-success text-white">
+                    <h4 class="mb-0"><i class="fas fa-plus-circle me-2"></i>Record New Payment</h4>
+                </div>
+                <div class="card-body p-4">
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+
+                        {% if form.non_field_errors %}
+                            <div class="alert alert-danger py-2">
+                                {% for error in form.non_field_errors %}
+                                    {{ error }}<br>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+
+                        <div class="mb-3">
+                            <label for="{{ form.financial_record.id_for_label }}" class="form-label">{{ form.financial_record.label }}<span class="text-danger">*</span></label>
+                            {{ form.financial_record }} {# Render the field - classes applied in form #}
+                            {% if form.financial_record.errors %}
+                                <div class="invalid-feedback d-block">{{ form.financial_record.errors|first }}</div>
+                            {% endif %}
+                            {% if form.financial_record.help_text %}
+                                <div class="form-text">{{ form.financial_record.help_text }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="row g-3">
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.amount_paid.id_for_label }}" class="form-label">{{ form.amount_paid.label }} (₦)<span class="text-danger">*</span></label>
+                                {{ form.amount_paid }}
+                                {% if form.amount_paid.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.amount_paid.errors|first }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6 mb-3">
+                                <label for="{{ form.payment_date.id_for_label }}" class="form-label">{{ form.payment_date.label }}<span class="text-danger">*</span></label>
+                                {{ form.payment_date }}
+                                {% if form.payment_date.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.payment_date.errors|first }}</div>
+                                {% endif %}
+                             </div>
+                        </div>
+
+                        <hr class="my-4">
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="{% url 'payment_list' %}" class="btn btn-outline-secondary">
+                                <i class="fas fa-times me-1"></i>Cancel
+                            </a>
+                            <button type="submit" class="btn btn-success">
+                               <i class="fas fa-check me-1"></i> Record Payment
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
         </div>
-        
-        <div class="mb-3">
-            <label for="{{ form.term.id_for_label }}" class="form-label">Term</label>
-            {{ form.term|add_class:"form-select" }}  <!-- Use the custom filter -->
-            {% if form.term.errors %}
-                <div class="text-danger small">{{ form.term.errors }}</div>
-            {% endif %}
-        </div>
-        
-        <div class="mb-3">
-            <label for="{{ form.amount_paid.id_for_label }}" class="form-label">Amount Paid (₦)</label>
-            {{ form.amount_paid|add_class:"form-control" }}  <!-- Use the custom filter -->
-            {% if form.amount_paid.errors %}
-                <div class="text-danger small">{{ form.amount_paid.errors }}</div>
-            {% endif %}
-        </div>
-        
-        <div class="mb-3">
-            <label for="{{ form.payment_date.id_for_label }}" class="form-label">Payment Date</label>
-            {{ form.payment_date|add_class:"form-control datepicker" }}  <!-- Use the custom filter -->
-            {% if form.payment_date.errors %}
-                <div class="text-danger small">{{ form.payment_date.errors }}</div>
-            {% endif %}
-        </div>
-        
-        <button type="submit" class="btn btn-success w-100">Record Payment</button>
-        <a href="{% url 'payment_list' %}" class="btn btn-secondary w-100 mt-2">Cancel</a>
-    </form>
+    </div>
 </div>
+
+{# Add JS for datepicker if needed, assumes jQuery available #}
+{% block extra_js %}
+<script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+{# Link to your datepicker JS/CSS if not globally included #}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/css/bootstrap-datepicker.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datepicker/1.9.0/js/bootstrap-datepicker.min.js"></script>
 <script>
     $(document).ready(function(){
         $('.datepicker').datepicker({
-            format: 'yyyy-mm-dd', // Set the date format
-            autoclose: true, // Automatically close the picker after selection
-            todayHighlight: true // Highlight today's date
+            format: 'yyyy-mm-dd', // Matches Django default DateField format
+            autoclose: true,
+            todayHighlight: true,
+            orientation: 'bottom' // Adjust orientation if needed
         });
     });
 </script>
-<style>
-    .form-select, .form-control {
-        border-radius: 0.25rem; /* Rounded corners */
-        box-shadow: none; /* Remove shadow */
-    }
-    
-    .form-select:focus, .form-control:focus {
-        border-color: #5cb85c; /* Custom border color */
-        box-shadow: 0 0 0 0.2rem rgba(92, 184, 92, 0.25); /* Focus shadow */
-    }
-    
-    .btn-success {
-        background-color: #5cb85c; /* Custom success color */
-        border-color: #5cb85c; /* Ensure the border matches */
-    }
-    
-    .btn-success:hover {
-        background-color: #4cae4c; /* Darker shade on hover */
-    }
-</style>
+{% endblock %}
 
 {% endblock %}
