@@ -1,10 +1,11 @@
-from django.db import models
+from django.db import models, transaction
 from django.core.validators import MaxValueValidator
 from django.core.exceptions import ValidationError
 from django.contrib.auth.models import AbstractUser
 from django.conf import settings
 from django.db.models import Sum, Avg, Q, F
 from django.utils import timezone
+from django.utils.functional import cached_property
 from datetime import date, timedelta, datetime
 from decimal import Decimal
 import json
@@ -45,17 +46,38 @@ class Term(models.Model):
     start_date = models.DateField()
     end_date = models.DateField()
     is_active = models.BooleanField(default=True)
+    original_is_active = None
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Store the initial state when the model instance is loaded
+        self._original_is_active = self.is_active
+
+    @transaction.atomic # Ensure deactivation and activation are atomic
     def save(self, *args, **kwargs):
+        # Check if 'is_active' is being set to True AND it was False before
+        if self.is_active and not self._original_is_active:
+            Term.objects.filter(
+                session=self.session, # Only affect terms in the same session
+                is_active=True
+            ).exclude(pk=self.pk).update(is_active=False)
 
-        if self.is_active:
-            Term.objects.filter(is_active=True).update(is_active=False)
         super().save(*args, **kwargs)
-        # Generate SchoolDay entries for the term
-        current_date = self.start_date
-        while current_date <= self.end_date:
-            SchoolDay.objects.get_or_create(term=self, date=current_date)
-            current_date += timedelta(days=1)
+
+        # Update the original state after saving
+        self._original_is_active = self.is_active
+
+    def activate(self):
+        """Explicit method to activate this term and deactivate others in the session."""
+        if not self.is_active:
+            self.is_active = True
+            self.save() # The save method now contains the deactivation logic
+
+    def deactivate(self):
+        """Explicit method to deactivate this term."""
+        if self.is_active:
+            self.is_active = False
+            self.save() # Save method handles simple False -> False transition
     
     def get_term_weeks(term):
         term_days = []
@@ -67,6 +89,51 @@ class Term(models.Model):
         # Group by weeks
         weeks = [term_days[i:i+7] for i in range(0, len(term_days), 7)]
         return weeks
+
+    @cached_property # Calculate once per instance, cache the result
+    def actual_school_days_count(self):
+        """
+        Calculates the number of actual school days (Mon-Fri, excluding holidays)
+        within this term's date range.
+        """
+        start_date = self.start_date
+        end_date = self.end_date
+
+        if not start_date or not end_date or start_date > end_date:
+            return 0 # Invalid range
+
+        # Fetch holidays for this term ONCE
+        term_holidays = set(Holiday.objects.filter(term=self).values_list('date', flat=True))
+
+        count = 0
+        current_date = start_date
+        while current_date <= end_date:
+            # Check weekday and not a holiday
+            if current_date.weekday() < 5 and current_date not in term_holidays:
+                count += 1
+            current_date += timedelta(days=1)
+        return count
+
+    # --- Optional: Method to get the list of school day dates ---
+    @cached_property
+    def get_actual_school_day_dates(self):
+        """
+        Returns a list of actual school day dates (Mon-Fri, excluding holidays)
+        within this term's date range.
+        """
+        start_date = self.start_date
+        end_date = self.end_date
+        dates = []
+        if not start_date or not end_date or start_date > end_date:
+            return dates
+
+        term_holidays = set(Holiday.objects.filter(term=self).values_list('date', flat=True))
+        current_date = start_date
+        while current_date <= end_date:
+            if current_date.weekday() < 5 and current_date not in term_holidays:
+                dates.append(current_date)
+            current_date += timedelta(days=1)
+        return dates
 
     def __str__(self):
         return f"{self.name} ({self.session.name})"
@@ -854,8 +921,16 @@ class Message(models.Model):
     
 
 class SchoolDay(models.Model):
-    term = models.ForeignKey(Term, on_delete=models.CASCADE)
-    date = models.DateField(unique=True)
+    term = models.ForeignKey('Term', on_delete=models.CASCADE, related_name='school_days')
+    date = models.DateField()
+
+    class Meta:
+        # CRITICAL: Ensure uniqueness for DATE within a specific TERM
+        unique_together = ('term', 'date')
+        ordering = ['date'] # Order naturally
+
+    def __str__(self):
+        return f"{self.date.strftime('%Y-%m-%d')} ({self.term.name})"
 
 
 class Holiday(models.Model):

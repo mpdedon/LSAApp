@@ -263,6 +263,26 @@ class TermUpdateView(AdminRequiredMixin, UpdateView):
             return redirect('term_list')
         return render(request, self.template_name, {'form': form})
 
+def admin_required(login_url=None):
+    return user_passes_test(lambda u: u.is_superuser, login_url=login_url)
+
+@admin_required(login_url='/login/') # Protect the view
+def activate_term_view(request, pk):
+    """Activates the selected term and deactivates others in the same session."""
+    term_to_activate = get_object_or_404(Term, pk=pk)
+    if term_to_activate.is_active:
+        messages.info(request, f"{term_to_activate} is already active.")
+    else:
+        try:
+            # Use the model's activate method which now handles the logic
+            term_to_activate.activate()
+            messages.success(request, f"{term_to_activate} has been activated.")
+        except Exception as e:
+            # Catch potential errors during save/update
+            messages.error(request, f"An error occurred while activating the term: {e}")
+
+    return redirect('term_list') 
+
 class TermDeleteView(AdminRequiredMixin, DeleteView):
     template_name = 'term/term_confirm_delete.html'
 
@@ -951,16 +971,58 @@ class StudentFeeRecordListView(AdminRequiredMixin, ListView):
 
             print(f"Sync: FinancialRecord consistency check complete.")
     def get_queryset(self):
-        # (Keep the existing get_queryset method from previous version - it fetches and groups)
-        active_term = self.get_active_term()
-        if not active_term:
-            return {}
+        """Fetch and group records by class based on filters."""
+        # Get term and class from query params
+        selected_term_id = self.request.GET.get('term_id')
+        selected_class_id = self.request.GET.get('class_id')
 
-        self.sync_fee_records(active_term)
+        active_term = self.get_active_term() # Get active for default/sync trigger
+        target_term = None
 
-        queryset = StudentFeeRecord.objects.filter(term=active_term) \
-            .select_related('student__user', 'term', 'student__current_class') \
-            .order_by('student__current_class__name', 'student__user__last_name')
+        # Determine the term to display
+        if selected_term_id:
+            try:
+                target_term = Term.objects.select_related('session').get(pk=selected_term_id)
+            except (Term.DoesNotExist, ValueError):
+                messages.warning(self.request, "Invalid Term specified, showing active term.")
+                target_term = active_term
+        else:
+            target_term = active_term # Default to active if not specified
+
+        if not target_term:
+            messages.error(self.request, "Cannot determine term to display records for.")
+            return {} # Return empty dict
+
+        # --- Run sync ONLY for the active term if needed ---
+        # Syncing historical terms might be complex/undesirable on every load
+        # Consider a separate sync mechanism if needed for old terms.
+        if target_term == active_term:
+             print(f"Running sync for ACTIVE term: {active_term}")
+             self.sync_fee_records(active_term)
+        else:
+            print(f"Displaying records for INACTIVE term: {target_term}. Sync skipped.")
+
+
+        # Base queryset filtered by the target term
+        queryset = StudentFeeRecord.objects.filter(term=target_term)
+
+        # Further filter by class if specified
+        target_class = None
+        if selected_class_id:
+            try:
+                target_class = Class.objects.get(pk=selected_class_id)
+                queryset = queryset.filter(student__current_class_id=selected_class_id)
+                print(f"Filtering records for Class: {target_class.name} (ID: {selected_class_id})")
+            except (Class.DoesNotExist, ValueError):
+                 messages.warning(self.request, "Invalid Class specified, showing all classes for the term.")
+                 target_class = None # Reset if class is invalid
+
+        # Select related and order
+        queryset = queryset.select_related(
+                'student__user',
+                'term', # Already filtered, but good practice
+                'student__current_class'
+            ).order_by('student__current_class__name', 'student__user__last_name')
 
         class_records_grouped = {}
         for record in queryset:
@@ -972,27 +1034,44 @@ class StudentFeeRecordListView(AdminRequiredMixin, ListView):
                     class_records_grouped[class_id] = {'name': class_name, 'records': []}
                 class_records_grouped[class_id]['records'].append(record)
 
+        # Store target term/class in context for template display/filtering
+        self.target_term = target_term
+        self.target_class = target_class # Might be None if no class filter applied
+
         return class_records_grouped
 
 
     def get_context_data(self, **kwargs):
-        # (Keep the existing get_context_data method from previous version)
         context = super().get_context_data(**kwargs)
-        active_term = self.get_active_term()
-        context['term'] = active_term
-        context['session'] = active_term.session if active_term else None
-        context.pop('object_list', None) # Remove default ListView context if present
+        # Pass the determined target term and class to the template
+        context['term'] = getattr(self, 'target_term', None)
+        context['session'] = context['term'].session if context.get('term') else None
+        context['target_class'] = getattr(self, 'target_class', None) # Pass target class if filtered
+        # Allow selecting other terms/classes (for dropdowns in template perhaps)
+        context['all_terms'] = Term.objects.select_related('session').order_by('-start_date')
+        context['all_classes'] = Class.objects.order_by('name')
+        context.pop('object_list', None)
         return context
+
 
     @transaction.atomic # Process all updates for a class atomically
     def post(self, request, *args, **kwargs):
         """Handle saving changes for a specific class submitted via its form."""
         submitted_class_id_str = request.POST.get('submitted_class_id')
-        active_term = self.get_active_term() # Needed for context if redirecting on error
+        # Refetch target term to ensure POST operates on the intended term
+        selected_term_id = request.GET.get('term_id') # Get from query param
+        target_term = None
+        if selected_term_id:
+             try:
+                 target_term = Term.objects.get(pk=selected_term_id)
+             except (Term.DoesNotExist, ValueError):
+                 pass # Error handled below
+        else:
+              target_term = self.get_active_term() # Fallback to active
 
-        if not active_term:
-             messages.error(request, "Cannot process submission: Active term not found.")
-             return redirect(request.path_info)
+        if not target_term:
+             messages.error(request, "Cannot process submission: Term could not be determined.")
+             return redirect(request.path_info) 
 
         if not submitted_class_id_str:
             messages.error(request, "Invalid submission: Missing class identifier.")
@@ -1028,7 +1107,7 @@ class StudentFeeRecordListView(AdminRequiredMixin, ListView):
         records_in_db = StudentFeeRecord.objects.filter(
             pk__in=record_ids, # Only process IDs submitted
             student__current_class_id=submitted_class_id, # Security check
-            term=active_term # Ensure correct term
+            term=target_term # Ensure correct term
         ).in_bulk() # Fetch as a dictionary {id: record_obj}
 
         # Convert waiver_ids_checked to a set for efficient lookup
@@ -1104,7 +1183,10 @@ class StudentFeeRecordListView(AdminRequiredMixin, ListView):
              messages.warning(request, f"Finished processing for {target_class.name} with {error_count} errors/warnings.")
 
         # Redirect back to the list view, appending hash to open the correct accordion item
-        redirect_url = reverse('student_fee_record_list') + f'#collapse-{submitted_class_id}'
+        query_params = request.GET.copy()
+        redirect_url_base = reverse('student_fee_record_list')
+        redirect_url_params = query_params.urlencode()
+        redirect_url = f"{redirect_url_base}?{redirect_url_params}#collapse-{submitted_class_id}"
         return redirect(redirect_url)
 
 # Payment Record Management
