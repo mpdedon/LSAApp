@@ -391,7 +391,6 @@ def guardian_dashboard(request):
             }
         else:
             result_data[student.user.id] = None
-        print(result)
         # Fetch archived results (past terms)
         for term in archived_terms:
             archived_result = Result.objects.filter(

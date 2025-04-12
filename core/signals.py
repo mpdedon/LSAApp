@@ -4,14 +4,16 @@ from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 
 from core.models import Student, Term, SchoolDay, Student, Result, FeeAssignment, StudentFeeRecord
-from core.models import StudentFeeRecord, Payment, FinancialRecord, Term, Student
+from core.models import StudentFeeRecord, Payment, FinancialRecord, Term, Student, Holiday
 
 from django.core.mail import send_mail, EmailMultiAlternatives
+from django.db import IntegrityError
+from django.db import transaction
 from django.template.loader import render_to_string
 from core.models import CustomUser
 from core.tasks import send_email_task
 from decimal import Decimal
-
+from datetime import timedelta
 
 # @receiver(post_save, sender=CustomUser)
 # def send_welcome_email(sender, instance, created, **kwargs):
@@ -24,74 +26,133 @@ from decimal import Decimal
 #        )
 
 
+# --- Signal to Manage SchoolDay Entries ---
 @receiver(post_save, sender=Term)
-def generate_attendance_records(sender, instance, created, **kwargs):
-    if created:
-        # Replace this with your actual logic to get the list of school days for the term
-        school_days = calculate_school_days(instance)
+def manage_schoolday_entries_for_term(sender, instance, created, **kwargs):
+    """
+    Creates/updates/deletes SchoolDay entries when a Term is saved.
+    Handles date range changes.
+    """
+    print(f"Signal: Managing SchoolDays for Term {instance.pk}...") # Debug/Log
 
-        for school_day in school_days:
-            SchoolDay.objects.create(term=instance, date=school_day)
+    # Use update_fields if available to detect date changes specifically
+    update_fields = kwargs.get('update_fields')
+    dates_changed = (update_fields is None or
+                     'start_date' in update_fields or
+                     'end_date' in update_fields)
 
-        students = Student.objects.all()
+    if created or dates_changed:
+        # We need to adjust SchoolDay entries
+        term = instance # The saved term instance
+        start_date = term.start_date
+        end_date = term.end_date
+
+        if not start_date or not end_date or start_date > end_date:
+            print(f"Signal Warning: Invalid date range for Term {term.pk}. Skipping SchoolDay update.")
+            return # Avoid processing if dates are invalid
+
+        # Define the set of dates that *should* exist for this term
+        required_dates = set()
+        current_date = start_date
+        while current_date <= end_date:
+            required_dates.add(current_date)
+            current_date += timedelta(days=1)
+
+        with transaction.atomic(): # Perform operations atomically
+            # Find existing dates for THIS term
+            existing_dates = set(SchoolDay.objects.filter(term=term).values_list('date', flat=True))
+
+            # Dates to add
+            dates_to_add = required_dates - existing_dates
+            # Dates to delete (exist in DB for this term but are no longer required)
+            dates_to_delete = existing_dates - required_dates
+
+            # Bulk create missing SchoolDay entries
+            if dates_to_add:
+                school_days_to_create = [
+                    SchoolDay(term=term, date=d) for d in dates_to_add
+                ]
+                try:
+                    SchoolDay.objects.bulk_create(school_days_to_create, ignore_conflicts=False) # Don't ignore conflicts with new constraint
+                    print(f"Signal: Created {len(school_days_to_create)} SchoolDays for Term {term.pk}.")
+                except IntegrityError as e:
+                    # This might happen in very rare race conditions, log it
+                    print(f"Signal Error: Integrity error creating SchoolDays for Term {term.pk}: {e}")
+
+
+            # Delete SchoolDay entries that are no longer in the term's date range
+            if dates_to_delete:
+                deleted_count, _ = SchoolDay.objects.filter(term=term, date__in=dates_to_delete).delete()
+                print(f"Signal: Deleted {deleted_count} SchoolDays for Term {term.pk}.")
+
+    print(f"Signal: Finished SchoolDay management for Term {instance.pk}.")
+
+
+# --- Remove any *other* signals that might also be creating SchoolDay entries ---
+# e.g., if generate_attendance_records in your signals.py was doing this, remove that part.
+
+@receiver(post_save, sender=Term)
+def generate_initial_result_records(sender, instance, created, **kwargs): # Rename for clarity
+    """
+    Creates initial Result records for students when a NEW Term is created.
+    """
+    if created: # Only run when a Term is first created
+        print(f"Signal: Generating initial Result records for NEW Term {instance.pk}...")
+
+        # Get students (filter if needed, e.g., only active students)
+        students = Student.objects.filter(status='active') # Example filter
+
+        results_to_create = []
         for student in students:
-            total_school_days = school_days.count()
-            present_days = school_days.filter(attendance__student=student, attendance__is_present=True).count()
-            attendance_percentage = (present_days / total_school_days) * 100 if total_school_days > 0 else 0
-
-            Result.objects.create(
-                student=student,
-                term=instance,
-                attendance_percentage=attendance_percentage,
+            # Create a Result record with default/zero values
+            # Attendance percentage might be calculated later or defaulted to 0 here
+            results_to_create.append(
+                Result(
+                    student=student,
+                    term=instance,
+                    attendance_percentage=Decimal('0.00'), # Default to 0 initially
+                    # Set other defaults for Result fields if necessary
+                    # e.g., teacher_remarks="", principal_remarks="", is_approved=False etc.
+                )
             )
 
-def calculate_school_days(term):
-    # Replace this with your actual logic to calculate the school days for the term
-    # This is a simplified example using a list of dates
-    from datetime import timedelta, date
+        if results_to_create:
+            try:
+                Result.objects.bulk_create(results_to_create, ignore_conflicts=True) # Ignore if result somehow exists
+                print(f"Signal: Created {len(results_to_create)} initial Result records for Term {instance.pk}.")
+            except Exception as e:
+                 print(f"Signal Error: Failed to bulk_create initial Result records for Term {instance.pk}: {e}")
 
-    start_date = term.start_date
-    end_date = term.end_date
+@receiver(post_save, sender=Holiday)
+def remove_schoolday_on_holiday_creation(sender, instance, created, **kwargs):
+    """
+    When a Holiday is created or its date changes, delete the corresponding SchoolDay
+    if it exists for that term and date.
+    """
+    if created or (kwargs.get('update_fields') and 'date' in kwargs['update_fields']):
+        term = instance.term
+        holiday_date = instance.date
+        # Delete SchoolDay if it exists for this term and date
+        deleted_count, _ = SchoolDay.objects.filter(term=term, date=holiday_date).delete()
+        if deleted_count:
+             print(f"Signal: Deleted SchoolDay on {holiday_date} for Term {term.pk} because Holiday '{instance.name}' was added/updated.")
 
-    delta = end_date - start_date
-    return [start_date + timedelta(days=i) for i in range(delta.days + 1)]
+@receiver(post_delete, sender=Holiday)
+def add_schoolday_on_holiday_deletion(sender, instance, **kwargs):
+    """
+    When a Holiday is deleted, create the corresponding SchoolDay if the date
+    is within the term's range and is a weekday.
+    """
+    term = instance.term
+    holiday_date = instance.date
 
+    # Check if the date is still within the term's range and is a weekday
+    if term.start_date <= holiday_date <= term.end_date and holiday_date.weekday() < 5:
+        # Use get_or_create to safely add it back only if it doesn't exist
+        sd, created = SchoolDay.objects.get_or_create(term=term, date=holiday_date)
+        if created:
+             print(f"Signal: Re-created SchoolDay on {holiday_date} for Term {term.pk} because Holiday '{instance.name}' was deleted.")
 
-@receiver(post_save, sender=Term)
-def generate_attendance_records(sender, instance, created, **kwargs):
-    if created:
-        students = Student.objects.all()
-        for student in students:
-            school_days = SchoolDay.objects.filter(date__range=(instance.start_date, instance.end_date))
-            total_school_days = school_days.count()
-            present_days = school_days.filter(attendance__student=student, attendance__is_present=True).count()
-            attendance_percentage = (present_days / total_school_days) * 100 if total_school_days > 0 else 0
-
-            Result.objects.create(
-                student=student,
-                term=instance,
-                attendance_percentage=attendance_percentage,
-            )
-
-
-@receiver(post_save, sender=Term)
-def create_fee_assignments(sender, instance, created, **kwargs):
-    if created:
-        students = Student.objects.all()
-        for student in students:
-            FeeAssignment.objects.create(term=instance, student=student, amount=calculate_class_fee(student.class_name))
-
-def calculate_class_fee(class_name):
-    # Add your logic to calculate the fee for each class
-    # For example, you might have a predefined fee for each class
-    # Adjust this function based on your actual requirements
-    class_fee_mapping = {
-        'ClassA': 1000,
-        'ClassB': 1200,
-        'ClassC': 1500,
-        # Add more classes as needed
-    }
-    return class_fee_mapping.get(class_name, 0)
 
 
 @receiver(post_save, sender=Student)

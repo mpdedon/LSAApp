@@ -595,7 +595,7 @@
                                         <h5 class="card-title"><i class="bi bi-file-earmark-text me-2"></i>Results Section</h5>
                                         <div class="row">
                                             <!-- Check if the user can access the results -->
-                                            {% if financial_data|get_item:student.user.id|get_item:'can_access_results' %}          
+                                            {# {% if financial_data|get_item:student.user.id|get_item:'can_access_results' %} #}         
                                             <div class="col-md-9">
                                                 <div class="card shadow-sm py-3">
                                                     <div class="card-body text-center">
@@ -620,7 +620,7 @@
                                                     </div>
                                                 </div>
                                             </div>
-                                            {% else %}
+                                            {# {% else %}
                                             <div class="row">
                                                 <div class="col-md-12">
                                                     <div class="card shadow-sm py-3">
@@ -631,7 +631,7 @@
                                                     </div>
                                                 </div>
                                             </div>
-                                            {% endif %}
+                                            {% endif %} #}
                                             <!-- Archived Results Accordion -->
                                             <div class="col-md-12">
                                                 <div class="card shadow-sm border-1">
