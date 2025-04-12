@@ -229,8 +229,10 @@ def guardian_dashboard(request):
     students = guardian.students.all()
     current_session = Session.objects.get(is_active=True)
     current_term = Term.objects.filter(session=current_session, is_active=True).order_by('-start_date').first()
+    print(f"DEBUG: Current Term identified as: {current_term} - {current_term.id}")
     teachers = Teacher.objects.filter(subjectassignment__subject__students__in=students).distinct()
     archived_terms = Term.objects.filter(is_active=False).order_by('-start_date')
+    print(f"DEBUG: Archived Terms found: {[str(t) for t in archived_terms]}")
 
     assignments_data = {}
     assessments_data = {}
