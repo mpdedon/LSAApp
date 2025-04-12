@@ -37,7 +37,7 @@ from core.auth.views import teacher_dashboard, student_dashboard, guardian_dashb
 from core.views import AdminDashboardView, PromoteStudentView, programs
 from core.views import CreateNotificationView, NotificationListView
 from core.views import SessionListView, SessionDetailView, SessionCreateView, SessionUpdateView, SessionDeleteView
-from core.views import TermListView, TermDetailView, TermCreateView, TermUpdateView, TermDeleteView
+from core.views import TermListView, TermDetailView, TermCreateView, TermUpdateView, TermDeleteView, activate_term_view
 from core.views import promote_student, repeat_student, demote_student, mark_dormant_student, mark_left_student, mark_active
 <<<<<<< HEAD
 =======
@@ -98,6 +98,7 @@ urlpatterns = [
     path('terms/update/<int:pk>/', TermUpdateView.as_view(), name='term_update'),
     path('terms/<int:pk>', TermDetailView.as_view(), name='term_detail'),
     path('terms/<int:pk>/delete/', TermDeleteView.as_view(), name='term_delete'),
+    path('terms/<int:pk>/activate/', activate_term_view, name='term_activate'), 
 
     # Enrollment URLs
     path('setup/enrol_student/', StudentClassEnrollmentView, name='enrol_student'),
