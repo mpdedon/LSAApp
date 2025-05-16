@@ -414,11 +414,10 @@ def input_scores(request, class_id, subject_id, term_id):
             forms_dict[student] = form # Store the bound form for rendering
 
             if form.is_valid():
-                forms_to_save.append(form) # Add valid forms to list
+                forms_to_save.append(form) 
             else:
                 all_forms_valid = False
                 # Optional: Log errors for debugging
-                # print(f"Validation errors for student {student.user.id} ({form.prefix}): {form.errors.as_json()}")
 
         if all_forms_valid:
             # Save all valid forms
@@ -431,10 +430,8 @@ def input_scores(request, class_id, subject_id, term_id):
             # If any form is invalid, display errors
             messages.error(request, "Please correct the errors below.")
             # The view will fall through to render the template with the forms_dict containing bound, invalid forms
-            # Django templates will automatically display errors next to fields if form is rendered correctly
 
     else: # GET request
-        # Create unbound forms with instances for initial display
         for student in students:
             subject_result = subject_results.get(student.user.id)
             forms_dict[student] = SubjectResultForm(instance=subject_result, prefix=str(student.user.id))
@@ -464,7 +461,6 @@ def broadsheet(request, class_id, term_id):
 
     term = get_object_or_404(Term, id=term_id)
     # Get students enrolled in the class for this specific term/session if possible
-    # If enrollment changes, current_class might not be enough for historical terms
     students = Student.objects.filter(current_class=class_obj).order_by('user__last_name', 'user__first_name') # Or filter based on historical enrollment if needed
 
     # Get subjects assigned to this class in this term/session

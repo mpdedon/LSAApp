@@ -1,0 +1,265 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+
+    <title>{% block title %}LSA Admin{% endblock %}</title>
+    <meta name="description" content="LearnSwift Academia Admin Area"/>
+    <meta name="author" content="LearnSwift Academia" />
+    <link rel="canonical" href="{{ request.build_absolute_uri }}" />
+    <meta name="robots" content="noindex, nofollow"/> {# Prevent indexing of admin areas #}
+
+    <!-- Favicon -->
+    <link rel="icon" href="{% static 'images/favicon.ico' %}" type="image/x-icon">
+    <link rel="apple-touch-icon" href="{% static 'images/apple-touch-icon.png' %}">
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet" integrity="sha512-z3gLpd7yknf1YoNbCzqRKc4qyor8gaKU1qmn+CShxbuBusANI9QpRohGBreCFkKxLhei6S9CQXFEbbKuqLg0DA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Poppins:wght@500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Custom Admin CSS -->
+    <link rel="stylesheet" href="{% static 'css/custom-admin.css' %}">
+    {% block extra_head %}{% endblock %}
+</head>
+<body class="admin-body bg-light">
+
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-danger sticky-top shadow-sm main-admin-navbar">
+        <div class="container-fluid">
+            {# Sidebar Toggle Button #}
+            <button class="btn btn-dark me-2" type="button" data-bs-toggle="offcanvas" data-bs-target="#adminSidebar" aria-controls="adminSidebar" aria-label="Toggle sidebar">
+                <i class="fas fa-bars"></i>
+            </button>
+
+            {# Brand #}
+            <a class="navbar-brand fw-bold" href="{% url 'school-setup' %}"> {# Link to admin dashboard home #}
+                <img src="{% static 'images/logo.jpg' %}" alt="LSA Logo" height="30" class="d-inline-block align-text-top me-2">
+                LSA Admin Panel
+            </a>
+
+             {# Optional: Mobile Toggler for right-side items if needed #}
+             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#adminNavbarRight" aria-controls="adminNavbarRight" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            {# Right side items #}
+            <div class="collapse navbar-collapse" id="adminNavbarRight">
+                <ul class="navbar-nav ms-auto mb-2 mb-lg-0 align-items-center">
+                     {# Example: Notifications Dropdown #}
+                     <li class="nav-item dropdown">
+                        <a class="nav-link position-relative" href="#" id="navbarDropdownNotif" role="button" data-bs-toggle="dropdown" aria-expanded="false" title="Notifications">
+                            <i class="fas fa-bell"></i>
+                            {# Example Badge - Replace with dynamic count #}
+                            {% with unread_notif_count=0 %} {# Get this from context #}
+                            {% if unread_notif_count > 0 %}
+                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 0.6em; padding: .25em .4em;">
+                                {{ unread_notif_count }}
+                                <span class="visually-hidden">unread notifications</span>
+                            </span>
+                            {% endif %}
+                            {% endwith %}
+                        </a>
+                         <ul class="dropdown-menu dropdown-menu-end shadow border-0 mt-2" aria-labelledby="navbarDropdownNotif" style="min-width: 300px;">
+                            <li class="px-3 py-2 border-bottom">
+                                <h6 class="mb-0 fw-bold">Notifications</h6>
+                            </li>
+                            {# Loop through recent notifications from context #}
+                            {% with recent_notifications=None %} {# Get this from context #}
+                            {% for notif in recent_notifications|slice:":4" %}
+                                <li>
+                                    <a class="dropdown-item py-2 d-flex align-items-start small" href="#"> {# Link to notification detail #}
+                                         <i class="fas fa-info-circle text-primary me-2 mt-1 fa-fw"></i> {# Example icon #}
+                                         <div>
+                                             <div class="fw-semibold">{{ notif.title|truncatechars:50 }}</div>
+                                             <div class="text-muted" style="font-size: 0.8em;">{{ notif.created_at|timesince }} ago</div>
+                                         </div>
+                                    </a>
+                                </li>
+                            {% empty %}
+                                 <li><p class="dropdown-item text-muted text-center small py-3 mb-0">No new notifications.</p></li>
+                            {% endfor %}
+                            {% endwith %}
+                            <li><hr class="dropdown-divider my-0"></li>
+                            <li><a class="dropdown-item text-center small py-2 text-primary fw-semibold" href="#">View All Notifications</a></li> {# Link to notification list #}
+                         </ul>
+                    </li
+
+                    {# User Dropdown #}
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownUser" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                           <i class="fas fa-user-circle me-1"></i> {{ request.user.username }}
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdownUser">
+                            <li><a class="dropdown-item" href="#">My Profile</a></li>
+                            <li><a class="dropdown-item" href="#">Settings</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <form method="POST" action="{% url 'logout' %}" class="d-inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="dropdown-item text-danger">
+                                        <i class="fas fa-sign-out-alt fa-fw me-2"></i>Logout
+                                    </button>
+                                </form>
+                            </li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Sidebar (Offcanvas) -->
+    <div class="offcanvas offcanvas-start bg-dark text-white sidebar" data-bs-scroll="true" data-bs-backdrop="false" tabindex="-1" id="adminSidebar" aria-labelledby="adminSidebarLabel">
+        <div class="offcanvas-header">
+            <h5 class="offcanvas-title" id="adminSidebarLabel">Admin Menu</h5>
+            <button type="button" class="btn-close btn-close-white text-reset" data-bs-dismiss="offcanvas" aria-label="Close"></button>
+        </div>
+        <div class="offcanvas-body">
+            {# === SIDEBAR NAVIGATION LINKS === #}
+            {# Mirror the structure from the card links, possibly with nesting #}
+            <ul class="list-unstyled ps-0">
+                 <li class="mb-1">
+                    <a href="{% url 'school-setup' %}" class="btn btn-toggle align-items-center rounded text-white {% if request.resolver_match.url_name == 'admin_dashboard' %}active{% endif %}">
+                         <i class="fas fa-tachometer-alt fa-fw me-2"></i> Dashboard Home
+                    </a>
+                </li>
+                <li class="mb-1">
+                    <button class="btn btn-toggle align-items-center rounded collapsed text-white" data-bs-toggle="collapse" data-bs-target="#users-collapse" aria-expanded="false">
+                       <i class="fas fa-users-cog fa-fw me-2"></i> Users & Setup
+                    </button>
+                    <div class="collapse" id="users-collapse">
+                        <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ms-4">
+                            <li><a href="{% url 'student_list' %}" class="link-light rounded">Students</a></li>
+                            <li><a href="{% url 'teacher_list' %}" class="link-light rounded">Teachers</a></li>
+                            <li><a href="{% url 'guardian_list' %}" class="link-light rounded">Guardians</a></li>
+                            <li><a href="{% url 'enrol_student' %}" class="link-light rounded">Enrol Students</a></li>
+                             {# <li><a href="#" class="link-light rounded">User Accounts</a></li> #}
+                        </ul>
+                    </div>
+                </li>
+                 <li class="mb-1">
+                    <button class="btn btn-toggle align-items-center rounded collapsed text-white" data-bs-toggle="collapse" data-bs-target="#academics-collapse" aria-expanded="false">
+                       <i class="fas fa-sitemap fa-fw me-2"></i> Academics
+                    </button>
+                    <div class="collapse" id="academics-collapse">
+                        <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ms-4">
+                            <li><a href="{% url 'session_list' %}" class="link-light rounded">Sessions</a></li>
+                            <li><a href="{% url 'term_list' %}" class="link-light rounded">Terms</a></li>
+                            <li><a href="{% url 'class_list' %}" class="link-light rounded">Classes</a></li>
+                            <li><a href="{% url 'subject_list' %}" class="link-light rounded">Subjects</a></li>
+                            <li><a href="{% url 'assign_teacher' %}" class="link-light rounded">Assign Class Teachers</a></li>
+                            <li><a href="{% url 'subject_assignment_list' %}" class="link-light rounded">Assign Subject Teachers</a></li>
+                        </ul>
+                    </div>
+                </li>
+                <li class="mb-1">
+                    <button class="btn btn-toggle align-items-center rounded collapsed text-white" data-bs-toggle="collapse" data-bs-target="#financials-collapse" aria-expanded="false">
+                        <i class="fas fa-dollar-sign fa-fw me-2"></i> Financials
+                    </button>
+                    <div class="collapse" id="financials-collapse">
+                        <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ms-4">
+                            <li><a href="{% url 'fee_assignment_list' %}" class="link-light rounded">Set Fees</a></li>
+                            <li><a href="{% url 'student_fee_record_list' %}" class="link-light rounded">Discounts/Waivers</a></li>
+                            <li><a href="{% url 'payment_list' %}" class="link-light rounded">Payments</a></li>
+                            <li><a href="{% url 'financial_record_list' %}" class="link-light rounded">Financial Summaries</a></li>
+                             {# <li><a href="#" class="link-light rounded">Reports</a></li> #}
+                        </ul>
+                    </div>
+                </li>
+                <li class="mb-1">
+                     <button class="btn btn-toggle align-items-center rounded collapsed text-white" data-bs-toggle="collapse" data-bs-target="#results-collapse" aria-expanded="false">
+                        <i class="fas fa-clipboard-check fa-fw me-2"></i> Assessments & Results
+                    </button>
+                    <div class="collapse" id="results-collapse">
+                        <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ms-4">
+                            <li><a href="{% url 'admin_assessment_list' %}" class="link-light rounded">Assessments (CA)</a></li>
+                            <li><a href="{% url 'admin_exam_list' %}" class="link-light rounded">Exams</a></li>
+                            <li><a href="#" class="link-light rounded">Enter/Approve Results</a></li>
+                            <li><a href="{% url 'all_broadsheets' %}" class="link-light rounded">Broadsheets</a></li>
+                        </ul>
+                    </div>
+                </li>
+                 <li class="mb-1">
+                     <button class="btn btn-toggle align-items-center rounded collapsed text-white" data-bs-toggle="collapse" data-bs-target="#comm-collapse" aria-expanded="false">
+                        <i class="fas fa-bullhorn fa-fw me-2"></i> Communication & System
+                    </button>
+                    <div class="collapse" id="comm-collapse">
+                        <ul class="btn-toggle-nav list-unstyled fw-normal pb-1 small ms-4">
+                             <li><a href="{% url 'notification_list' %}" class="link-light rounded">Notifications</a></li>
+                             {# <li><a href="#" class="link-light rounded">Messaging</a></li> #}
+                             {# <li><a href="#" class="link-light rounded">System Settings</a></li> #}
+                             {# <li><a href="#" class="link-light rounded">Activity Log</a></li> #}
+                        </ul>
+                    </div>
+                </li>
+
+                 <li class="border-top my-3"></li>
+
+                 <li class="mb-1">
+                    <a href="{% url 'home' %}" class="btn btn-toggle align-items-center rounded text-white">
+                        <i class="fas fa-globe fa-fw me-2"></i> Visit Main Site
+                    </a>
+                </li>
+            </ul>
+        </div>
+    </div>
+
+    <!-- Main Content Area -->
+    <div class="main-content">
+        <div class="main-content">
+            <div class="container-fluid py-4 px-md-4">
+                {# Optional: Breadcrumbs #}
+                {# If using breadcrumbs, define ONLY breadcrumb_page here #}
+                <nav aria-label="breadcrumb" class="mb-3"> {# Added margin #}
+                   <ol class="breadcrumb">
+                       <li class="breadcrumb-item"><a href="{% url 'school-setup' %}">Dashboard</a></li>
+                       {# Let child templates define the final breadcrumb item #}
+                       <li class="breadcrumb-item active" aria-current="page">{% block breadcrumb_page %}Page Title{% endblock %}</li>
+                   </ol>
+               </nav>
+   
+               {# Main Page Title - THIS is where child templates override the H3 content #}
+               <h3 class="mb-4">{% block page_title %}Dashboard Overview{% endblock %}</h3>
+
+            {# Display messages passed from views #}
+             {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+             {% endif %}
+
+            {% block content %}
+                {# Default content if child template doesn't override #}
+                <p>Welcome to the Admin Dashboard.</p>
+            {% endblock %}
+        </div>
+    </div>
+
+    <!-- Footer (Optional for Admin) -->
+    {# <footer class="footer mt-auto py-3 bg-light">
+        <div class="container text-center">
+            <span class="text-muted small">© {% now "Y" %} LearnSwift Academia Admin.</span>
+        </div>
+    </footer> #}
+
+
+    <!-- Bootstrap Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
+     <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+    <!-- Custom Admin JS -->
+    <script src="{% static 'js/custom-admin.js' %}"></script>
+    {% block extra_js %}{% endblock %}
+
+</body>
+</html>

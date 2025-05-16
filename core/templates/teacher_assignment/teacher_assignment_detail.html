@@ -1,12 +1,62 @@
-<!-- teacher_assignment_detail.html -->
-
 {% extends 'base.html' %}
+{% load static %}
 
-{% block title %}Teacher Assignment Detail{% endblock %}
+{% block title %}Teacher Assignment Details{% endblock %}
 
 {% block content %}
-<h2>Teacher Assignment Detail</h2>
-<p>Teacher: {{ assignment.teacher.name }}</p>
-<p>Subject: {{ assignment.subject }}</p>
-<!-- Add more details here -->
+<div class="container my-4">
+    <div class="card shadow-sm">
+        <div class="card-header bg-light d-flex justify-content-between align-items-center flex-wrap">
+            <h4 class="card-title mb-0 h5"><i class="fas fa-user-tag me-2"></i>Assignment Details</h4>
+            <a href="{% url 'teacher_assignment_list' %}" class="btn btn-outline-secondary btn-sm mt-2 mt-md-0">
+                <i class="fas fa-list me-1"></i> Back to List
+            </a>
+        </div>
+        <div class="card-body">
+            <dl class="row">
+                <dt class="col-sm-3">Teacher:</dt>
+                <dd class="col-sm-9">
+                    {% if teacher_assignment.teacher.user %}
+                        {{ teacher_assignment.teacher.user.get_full_name }}
+                    {% else %}
+                        {{ teacher_assignment.teacher }} {# Fallback #}
+                    {% endif %}
+                </dd>
+
+                <dt class="col-sm-3">Class Assigned:</dt>
+                <dd class="col-sm-9">{{ teacher_assignment.class_assigned.name }}</dd>
+
+                <dt class="col-sm-3">Session:</dt>
+                <dd class="col-sm-9">{{ teacher_assignment.session }}</dd>
+
+                <dt class="col-sm-3">Term:</dt>
+                <dd class="col-sm-9">{{ teacher_assignment.term.name }}</dd>
+
+                <dt class="col-sm-3">Is Form Teacher:</dt>
+                <dd class="col-sm-9">
+                    {% if teacher_assignment.is_form_teacher %}
+                        <span class="badge bg-success"><i class="fas fa-check me-1"></i>Yes</span>
+                    {% else %}
+                        <span class="badge bg-secondary">No</span>
+                    {% endif %}
+                </dd>
+
+                {# Add other relevant fields from TeacherAssignment if needed #}
+
+            </dl>
+        </div>
+        <div class="card-footer bg-light text-end">
+             {# Edit Button #}
+             <a href="{% url 'teacher_assignment_update' teacher_assignment.pk %}"
+                class="btn btn-warning btn-sm me-2" title="Edit Assignment">
+                 <i class="fas fa-edit me-1"></i> Edit
+             </a>
+             {# Delete Button #}
+             <a href="{% url 'teacher_assignment_delete' teacher_assignment.pk %}"
+                class="btn btn-danger btn-sm" title="Delete Assignment">
+                 <i class="fas fa-trash-alt me-1"></i> Delete
+             </a>
+        </div>
+    </div>
+</div>
 {% endblock %}

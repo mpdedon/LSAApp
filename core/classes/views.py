@@ -3,22 +3,44 @@
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse
 from django.views import View
+from django.views.generic import ListView
 from django.views.generic import DetailView, FormView
-from django.db.models import Count
+from django.db.models import Count, Prefetch, OuterRef, Subquery, Q
 from .forms import ClassForm
 from core.enrollment.forms import EnrollmentForm
-from core.models import Class, Enrollment
+from core.models import Class, Enrollment, TeacherAssignment
 
-class ClassListView(View):
+class ClassListView(ListView): # Inherit from ListView
+    model = Class
     template_name = 'class/class_list.html'
+    context_object_name = 'classes' 
+    paginate_by = 15
 
-    def get(self, request, *args, **kwargs):
-        classes = Class.objects.all()
-        return render(request, self.template_name, {'classes': classes})
-    
     def get_queryset(self):
-        return Class.objects.annotate(subject_count=Count('class_assignments')).all()
+        queryset = Class.objects.annotate(
+            # --- Use the correct related_name from Student.current_class ---
+            student_count=Count('enrolled_students', distinct=True),
+            subject_count=Count('subjects', distinct=True),
+        ).prefetch_related(
+             Prefetch(
+                'teacherassignment_set',
+                queryset=TeacherAssignment.objects.select_related('teacher__user').filter(is_form_teacher=True),
+                to_attr='form_teacher_assignments'
+            )
+        ).order_by('order', 'name')
 
+
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Process the prefetched data to easily access the form teacher in the template
+        for class_instance in context['classes']:
+            form_assignment = class_instance.form_teacher_assignments[0] if class_instance.form_teacher_assignments else None
+            class_instance.form_teacher_obj = form_assignment.teacher if form_assignment else None
+
+        return context
+    
 class ClassCreateView(View):
     template_name = 'class/class_form.html'
 
@@ -64,6 +86,10 @@ class ClassDetailView(DetailView):
         class_instance = self.get_object()
         context['class_instance'] = class_instance
         context['enrollment_form'] = EnrollmentForm(class_instance=class_instance)
+        subject_assignments = class_instance.subject_assignments.select_related(
+            'subject', 'session', 'term'
+        ).all()      
+        context['optimized_subject_assignments'] = subject_assignments
         return context
 
 

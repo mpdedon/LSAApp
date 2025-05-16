@@ -1,0 +1,13 @@
+User-agent: *
+Allow: / 
+Allow: /about/
+Allow: /programs/
+Allow: /contacts/
+Allow: /blog/ 
+Disallow: /admin/
+Disallow: /dashboard/ 
+Disallow: /student_dashboard/
+Disallow: /guardian_dashboard/
+Disallow: /teacher_dashboard/
+Disallow: /lsaapp/ 
+Sitemap: https://learnswift.icu/sitemap.xml
