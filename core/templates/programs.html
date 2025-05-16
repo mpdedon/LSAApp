@@ -1,116 +1,243 @@
 {% extends 'base.html' %}
-
-{% block title %}Our Programs{% endblock %}
 {% load static %}
 
+{% block title %}Our Unique Educational Programs | LearnSwift Academia{% endblock %}
+{% block meta_description %}Explore the diverse programs at LearnSwift Academia, Lagos: Integrated Islamic/Western, Arabic/Quran, Vocational Training, Coding Academy, and Online Learning.{% endblock %}
+
+{% block schema_org %}
+{# Schema for the main EducationalOrganization (can inherit from base or repeat if needed) #}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "ItemList",
+  "name": "LearnSwift Academia Programs",
+  "description": "Overview of educational programs offered by LearnSwift Academia.",
+  "itemListElement": [
+    {
+      "@type": "ListItem",
+      "position": 1,
+      "item": {
+        "@type": "Course",
+        "name": "LearnSwift Academia (Primary & Secondary)",
+        "description": "Integrated Western and Islamic curriculum for primary and secondary levels, focusing on academics, character, and faith.",
+        "provider": {
+          "@type": "EducationalOrganization",
+          "name": "LearnSwift Academia",
+          "url": "https://learnswift.icu/"
+        },
+        "educationalCredentialAwarded": ["Primary School Certificate", "Basic Education Certificate", "Senior Secondary Certificate (WAEC, NECO)"]
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 2,
+      "item": {
+        "@type": "Course",
+        "name": "Swift Aleem Academy (Arabic & Islamic Studies)",
+        "description": "Intensive program focused on Arabic language mastery, Quran memorization (Hifz), and core Islamic sciences.",
+         "provider": {
+          "@type": "EducationalOrganization",
+          "name": "LearnSwift Academia",
+          "url": "https://learnswift.icu/"
+        },
+         "educationalCredentialAwarded": ["Quran Memorization Certificate", "Certificate of Proficiency in Arabic Language"]
+      }
+    },
+     {
+      "@type": "ListItem",
+      "position": 3,
+      "item": {
+        "@type": "Course",
+        "name": "LearnSwift Vocational Academy",
+        "description": "Hands-on vocational training in trades like fashion design, carpentry, culinary arts, empowering students with practical, entrepreneurial skills.",
+         "provider": {
+          "@type": "EducationalOrganization",
+          "name": "LearnSwift Academia",
+          "url": "https://learnswift.icu/"
+        },
+         "educationalCredentialAwarded": "Vocational Skills Certificate"
+      }
+    },
+    {
+      "@type": "ListItem",
+      "position": 4,
+      "item": {
+        "@type": "Course",
+        "name": "LearnSwift Coding Academy",
+        "description": "Specialized training in modern coding languages, web development, app creation, and in-demand digital technologies.",
+         "provider": {
+          "@type": "EducationalOrganization",
+          "name": "LearnSwift Academia",
+          "url": "https://learnswift.icu/"
+        },
+         "educationalCredentialAwarded": ["Coding Certificate (Frontend, Backend, Full-stack)", "Digital Skills Accreditation"]
+      }
+    },
+     {
+      "@type": "ListItem",
+      "position": 5,
+      "item": {
+        "@type": "Course",
+        "name": "LearnSwift Online Academy",
+        "description": "Flexible online platform offering our core programs, allowing students to learn Islamic and academic subjects from anywhere.",
+         "provider": {
+          "@type": "EducationalOrganization",
+          "name": "LearnSwift Academia",
+          "url": "https://learnswift.icu/"
+        },
+        "courseMode": "online"
+      }
+    }
+  ]
+}
+</script>
+{% endblock %}
+
+
 {% block content %}
-<!-- Programs Section -->
-<section class="py-5 bg-light">
-  <div class="container style-container py-5">
-
-    <!-- School Logo -->
-    <div class="text-center mb-4">
-      <img src="{% static 'images/logo.jpg' %}" 
-           alt="LearnSwift Academia Logo" 
-           class="img-fluid" 
-           style="max-width: 150px;">
+<section class="page-header py-5 text-center text-white bg-success">
+    <div class="container">
+        <h1 class="display-5 fw-bold">Our Educational Programs</h1>
+        <p class="lead col-lg-8 mx-auto">Discover how LearnSwift Academia nurtures well-rounded individuals through a unique blend of faith-based values, academic rigor, and practical skills.</p>
     </div>
+</section>
 
-    <h2 class="text-center mb-4 fw-bold">Our Programs</h2>
-    <p class="text-muted text-center mx-auto" style="max-width: 600px;">
-      At LearnSwift Academia, we believe in nurturing strong character, Islamic values, and practical skills to prepare students for success in every aspect of life.
-    </p>
+<section class="py-5">
+  <div class="container programs-container">
 
-    <!-- Program 1: LearnSwift Academia -->
-    <div class="row align-items-center my-5">
-      <div class="col-md-6">
-        <img src="{% static 'images/madrasah.jpeg' %}" alt="LearnSwift Academia" class="img-fluid rounded shadow-sm" />
-      </div>
-      <div class="col-md-6">
-        <h3 class="fw-bold">1. LearnSwift Academia</h3>
-        <p class="text-muted">
-          Primary and Secondary Western and Islamic School. Here, students excel in core academic subjects while grounding themselves in strong Islamic values. We integrate faith, character-building, and 21st-century skills to ensure holistic growth.
-        </p>
-        <ul>
-          <li>Certificates/Outcomes: Primary School Certifiate (Common Entrance), Basic Education Certificate (Junior), Senior Secondary Certificate (WAEC, NECO etc), Strong Moral Foundation.</li>
-          <li>Students' Achievement: Students develop a balanced worldview, academic excellence, and ethical leadership skills.</li>
-          <li>Parents' Rewards: Parents see their children grow into confident, responsible individuals.</li>
-        </ul>
-      </div>
-    </div>
-
-    <!-- Program 2: Swift Aleem Academy -->
-    <div class="row align-items-center my-5 flex-md-row-reverse">
-      <div class="col-md-6">
-        <img src="{% static 'images/school.jpeg' %}" alt="Swift Aleem Academy" class="img-fluid rounded shadow-sm" />
-      </div>
-      <div class="col-md-6">
-        <h3 class="fw-bold">2. Swift Aleem Academy</h3>
-        <p class="text-muted">
-          A strictly Arabic and Islamic school focused on Arabic language mastery, Quran memorization, and Islamic sciences. Perfect for those who wish to deepen their faith-based knowledge.
-        </p>
-        <ul>
-          <li>Certificates/Outcomes: Quran Memorization Certificate, Proficiency in Arabic Language, Islamic Sciences Mastery.</li>
-          <li>Students' Achievement: Students gain profound spiritual growth and command of Arabic, while mastering Islamic sciences.</li>
-          <li>Parents' Rewards: Parents witness the strengthening of their child’s faith and moral compass.</li>
-        </ul>
+    {# Program 1: LearnSwift Academia #}
+    <div class="program-item card mb-5 shadow-sm overflow-hidden">
+      <div class="row g-0">
+        <div class="col-md-5">
+           {# IMAGE PROMPT: "Students in uniform engaged in a combined Islamic and Western studies class at LearnSwift Academia" #}
+           <img src="{% static 'images/school.jpeg' %}" alt="LearnSwift Academia Primary and Secondary School students learning" class="img-fluid program-image"/>
+        </div>
+        <div class="col-md-7 d-flex align-items-center">
+          <div class="card-body p-4">
+            <h3 class="fw-bold card-title text-success mb-3">1. LearnSwift Academia (Primary & Secondary)</h3>
+            <p class="card-text text-muted">
+              Our core program integrates a standard Western curriculum with comprehensive Islamic studies. Students excel academically while strengthening their identity and moral compass through Quran, Hadith, and Fiqh.
+            </p>
+            <h6 class="fw-semibold mt-3">Key Outcomes:</h6>
+            <ul class="list-styled">
+              <li><i class="fas fa-certificate text-primary me-2"></i>Official Certificates (Common Entrance, BECE, WAEC, NECO).</li>
+              <li><i class="fas fa-brain text-primary me-2"></i>Strong academic foundation & critical thinking skills.</li>
+              <li><i class="fas fa-heart text-primary me-2"></i>Solid grounding in Islamic values and character (Akhlaq).</li>
+              <li><i class="fas fa-users text-primary me-2"></i>Development of leadership potential and social responsibility.</li>
+            </ul>
+            <a href="#" class="btn btn-outline-success mt-3">Learn More & Apply</a> {# Link to specific page/admission #}
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- Program 3: Vocational Academy -->
-    <div class="row align-items-center my-5">
-      <div class="col-md-6">
-        <img src="{% static 'images/vocational.jpg' %}" alt="Vocational Academy" class="img-fluid rounded shadow-sm" />
-      </div>
-      <div class="col-md-6">
-        <h3 class="fw-bold">3. Vocational Academy</h3>
-        <p class="text-muted">
-          An embedded program within LearnSwift, offering hands-on vocational training. Students gain practical skills in trades such as carpentry, fashion design, culinary arts, or other local crafts, empowering them with entrepreneurial abilities.
-        </p>
-        <ul>
-          <li>Certificates/Outcomes: Vocational Skills Certificate, Portfolio of Practical Projects.</li>
-          <li>Students' Transformation: Students become resourceful and self-reliant. They excel in their chosen trades and become future entrepreneurs.</li>
-          <li>Parents' Rewards: Parents witness their children becoming productive and self-sustaining.</li>
-        </ul>
-      </div>
-    </div>
-
-    <!-- Program 4: Coding Academy -->
-    <div class="row align-items-center my-5 flex-md-row-reverse">
-      <div class="col-md-6">
-        <img src="{% static 'images/coding.jpg' %}" alt="Coding Academy" class="img-fluid rounded shadow-sm" />
-      </div>
-      <div class="col-md-6">
-        <h3 class="fw-bold">4. Coding Academy</h3>
-        <p class="text-muted">
-          A specialized program that imparts coding skills in various stacks and in-demand digital technologies. Students learn problem-solving, web development, app creation, and more.
-        </p>
-        <ul>
-          <li>Certificates/Outcomes: Coding Certificates (Frontend, Backend, Full-stack), Tech Portfolio.</li>
-          <li>Students' Transformation: Graduates are ready for the digital workforce, building apps and websites.</li>
-          <li>Parents' Rewards: Parents witness their children becoming future-ready innovators and success in the digital world.</li>
-        </ul>
+    {# Program 2: Swift Aleem Academy #}
+    <div class="program-item card mb-5 shadow-sm overflow-hidden">
+      <div class="row g-0 flex-md-row-reverse"> {# Reversed layout #}
+        <div class="col-md-5">
+          {# IMAGE PROMPT: "Students diligently studying Quran or Arabic texts in a traditional Madrasah setting within LearnSwift" #}
+           <img src="{% static 'images/madrasah.jpeg' %}" alt="Swift Aleem Academy students studying Arabic and Islamic Sciences" class="img-fluid program-image"/>
+        </div>
+        <div class="col-md-7 d-flex align-items-center">
+          <div class="card-body p-4">
+            <h3 class="fw-bold card-title text-success mb-3">2. Swift Aleem Academy (Arabic & Islamic Studies)</h3>
+            <p class="card-text text-muted">
+              For students seeking deeper religious knowledge, this track offers intensive study of Arabic language (Nahw, Sarf, Balagha), Quran memorization (Hifz) and recitation (Tajweed), Hadith, Fiqh, and Seerah.
+            </p>
+             <h6 class="fw-semibold mt-3">Key Outcomes:</h6>
+             <ul class="list-styled">
+                <li><i class="fas fa-quran text-primary me-2"></i>Proficiency in Quran memorization and Tajweed.</li>
+                <li><i class="fas fa-language text-primary me-2"></i>Mastery of classical and modern standard Arabic.</li>
+                <li><i class="fas fa-book-open text-primary me-2"></i>In-depth understanding of core Islamic sciences.</li>
+                <li><i class="fas fa-mosque text-primary me-2"></i>Strengthened spiritual connection and practice.</li>
+             </ul>
+            <a href="#" class="btn btn-outline-success mt-3">Explore This Track</a>
+          </div>
+        </div>
       </div>
     </div>
 
-    <!-- Program 5: LearnSwift Online Academy -->
-    <div class="row align-items-center my-5">
-      <div class="col-md-6">
-        <img src="{% static 'images/online.jpg' %}" alt="LearnSwift Online Academy" class="img-fluid rounded shadow-sm" />
+    {# Program 3: Vocational Academy #}
+     <div class="program-item card mb-5 shadow-sm overflow-hidden">
+      <div class="row g-0">
+        <div class="col-md-5">
+          {# IMAGE PROMPT: "Students learning a vocational skill like fashion design or electronics repair at LearnSwift Academy" #}
+           <img src="{% static 'images/vocational.jpg' %}" alt="Students learning hands-on vocational skills at LearnSwift" class="img-fluid program-image"/>
+        </div>
+        <div class="col-md-7 d-flex align-items-center">
+          <div class="card-body p-4">
+            <h3 class="fw-bold card-title text-success mb-3">3. Vocational Academy (Embedded)</h3>
+            <p class="card-text text-muted">
+              Integrated within our main school, this program equips students with practical, income-generating skills. Choose from tracks like Fashion Design, ICT Essentials, Basic Electronics, Culinary Arts, and more.
+            </p>
+            <h6 class="fw-semibold mt-3">Key Outcomes:</h6>
+            <ul class="list-styled">
+                <li><i class="fas fa-tools text-primary me-2"></i>Certification in a chosen vocational trade.</li>
+                <li><i class="fas fa-lightbulb text-primary me-2"></i>Development of practical, hands-on expertise.</li>
+                <li><i class="fas fa-briefcase text-primary me-2"></i>Entrepreneurial skills and mindset.</li>
+                <li><i class="fas fa-hand-holding-usd text-primary me-2"></i>Pathways to self-reliance and job creation.</li>
+            </ul>
+             <a href="#" class="btn btn-outline-success mt-3">Discover Trade Options</a>
+          </div>
+        </div>
       </div>
-      <div class="col-md-6">
-        <h3 class="fw-bold">5. LearnSwift Online Academy</h3>
-        <p class="text-muted">
-          Offering all the above programs and more through a convenient online platform. Students can learn at their own pace from anywhere in the world while maintaining strong Islamic values.
-        </p>
-        <ul>
-          <li>Certificates/Outcomes: Flexible Online Completion Certificates, Digital Skills Accreditation.</li>
-          <li>Achievement: Families save time and resources, and students gain the freedom to learn in a flexible environment without compromising on educational quality.</li>
-        </ul>
+    </div>
+
+    {# Program 4: Coding Academy #}
+    <div class="program-item card mb-5 shadow-sm overflow-hidden">
+       <div class="row g-0 flex-md-row-reverse"> {# Reversed layout #}
+        <div class="col-md-5">
+           {# IMAGE PROMPT: "Teenage students looking focused while coding on laptops in a tech lab at LearnSwift Academy" #}
+           <img src="{% static 'images/coding.jpg' %}" alt="LearnSwift Coding Academy students learning programming" class="img-fluid program-image"/>
+        </div>
+        <div class="col-md-7 d-flex align-items-center">
+          <div class="card-body p-4">
+            <h3 class="fw-bold card-title text-success mb-3">4. Coding Academy (Specialized)</h3>
+            <p class="card-text text-muted">
+              Prepare for the digital future with our dedicated Coding Academy. We offer courses in web development (HTML, CSS, JavaScript, Python/Django), mobile app development, UI/UX design, and data basics.
+            </p>
+             <h6 class="fw-semibold mt-3">Key Outcomes:</h6>
+             <ul class="list-styled">
+                <li><i class="fas fa-code text-primary me-2"></i>Proficiency in multiple programming languages/stacks.</li>
+                <li><i class="fas fa-laptop-code text-primary me-2"></i>Ability to build websites and applications.</li>
+                <li><i class="fas fa-project-diagram text-primary me-2"></i>Strong problem-solving and logical thinking skills.</li>
+                <li><i class="fas fa-file-code text-primary me-2"></i>Portfolio of completed tech projects.</li>
+             </ul>
+            <a href="#" class="btn btn-outline-success mt-3">View Coding Courses</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {# Program 5: LearnSwift Online Academy #}
+     <div class="program-item card mb-5 shadow-sm overflow-hidden">
+      <div class="row g-0">
+        <div class="col-md-5">
+           {# IMAGE PROMPT: "Screenshot of the LearnSwift Online Academy interface or a student learning online happily" #}
+           <img src="{% static 'images/online.jpg' %}" alt="LearnSwift Online Academy virtual learning platform" class="img-fluid program-image"/>
+        </div>
+        <div class="col-md-7 d-flex align-items-center">
+          <div class="card-body p-4">
+            <h3 class="fw-bold card-title text-success mb-3">5. LearnSwift Online Academy</h3>
+            <p class="card-text text-muted">
+              Access quality Islamic and academic education from anywhere. Our online platform offers flexible, interactive learning experiences mirroring our on-campus programs, perfect for remote students.
+            </p>
+             <h6 class="fw-semibold mt-3">Key Outcomes:</h6>
+             <ul class="list-styled">
+                <li><i class="fas fa-globe text-primary me-2"></i>Access to quality education regardless of location.</li>
+                <li><i class="fas fa-clock text-primary me-2"></i>Flexible learning schedule and self-paced options.</li>
+                <li><i class="fas fa-video text-primary me-2"></i>Engaging virtual classrooms and resources.</li>
+                <li><i class="fas fa-check-double text-primary me-2"></i>Accredited online certificates.</li>
+            </ul>
+            <a href="#" class="btn btn-outline-success mt-3">Explore Online Learning</a>
+          </div>
+        </div>
       </div>
     </div>
 
   </div>
 </section>
-<br>
+
+{% include 'partials/cta_section.html' %} 
+
 {% endblock %}

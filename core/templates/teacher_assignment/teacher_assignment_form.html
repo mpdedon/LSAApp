@@ -1,14 +1,54 @@
-<!-- teacher_assignment_form.html -->
-
 {% extends 'base.html' %}
+{% load static %}
 
-{% block title %}Create or Update Teacher Assignment{% endblock %}
+{# Determine title based on whether we are updating (object exists) or creating #}
+{% block title %}{% if form.instance.pk %}Edit Assignment{% else %}Assign Teacher{% endif %}{% endblock %}
 
 {% block content %}
-<h2>Create or Update Teacher Assignment</h2>
-<form method="post">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <button type="submit">Save</button>
-</form>
+<div class="container my-4">
+     <div class="row justify-content-center"> {# Center the form card #}
+        <div class="col-md-8 col-lg-7">
+            <div class="card shadow-sm">
+                <div class="card-header bg-light d-flex justify-content-between align-items-center flex-wrap">
+                     <h4 class="card-title mb-0 h5">
+                         {% if form.instance.pk %}
+                             <i class="fas fa-edit me-2"></i>Edit Assignment
+                         {% else %}
+                              <i class="fas fa-plus me-2"></i>Assign New Teacher
+                         {% endif %}
+                     </h4>
+                      <a href="{% url 'teacher_assignment_list' %}" class="btn btn-outline-secondary btn-sm mt-2 mt-md-0">
+                         <i class="fas fa-times me-1"></i> Cancel
+                     </a>
+                </div>
+                <div class="card-body">
+                     <form method="post" novalidate> {# novalidate prevents browser validation if you prefer Django's #}
+                        {% csrf_token %}
+
+                        {# Display non-field errors if any #}
+                        {% if form.non_field_errors %}
+                            <div class="alert alert-danger" role="alert">
+                                {% for error in form.non_field_errors %}
+                                    <p class="mb-0">{{ error }}</p>
+                                {% endfor %}
+                            </div>
+                        {% endif %}
+
+                        {{ form.as_p }}
+
+                        <div class="mt-4 text-end"> {# Move save button to the right #}
+                             <button type="submit" class="btn btn-success">
+                                 <i class="fas fa-save me-1"></i> Save Assignment
+                             </button>
+                        </div>
+                    </form>
+                </div>
+                 {# Optional: Add a footer if needed, e.g., for extra notes #}
+                 {# <div class="card-footer bg-light text-muted small"> #}
+                 {#    Ensure all fields are correct before saving. #}
+                 {# </div> #}
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}

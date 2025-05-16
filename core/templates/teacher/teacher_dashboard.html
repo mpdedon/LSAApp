@@ -467,7 +467,7 @@
                                             <td>
                                                 {% for subject in class_subjects %}
                                                     <a href="{% url 'input_scores' assigned_class.id subject.id current_term.id %}" class="btn btn-info btn-sm">
-                                                        Input Scores for {{ subject.name }}
+                                                        Input Scores for {{ subject.name }} {{ current_term.name}}
                                                     </a>
                                                 {% endfor %}
                                             </td>

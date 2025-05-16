@@ -1,77 +1,290 @@
-<!-- templates/student/dashboard.html -->
-
 {% extends 'base.html' %}
+{% load static humanize message_filters %} 
 
-{% block content %}
-<div class="container mt-5">
-    <h2>Welcome, {{ student.user.get_full_name }}</h2>
-    <h4>Your Class: {{ class.name }}</h4>
+{% block title %}My Dashboard - {{ student.user.get_full_name }}{% endblock %}
 
-    <div class="row">
-        <!-- Subjects -->
-        <div class="col-md-6">
-            <h5>Subjects</h5>
-            <ul class="list-group">
-                {% for subject in subjects %}
-                <li class="list-group-item">{{ subject.name }}</li>
-                {% empty %}
-                <li class="list-group-item text-muted">No subjects assigned.</li>
-                {% endfor %}
-            </ul>
-        </div>
-        <!-- Assignments -->
-        <div class="col-md-6">
-            <h5>Assignments</h5>
-            <ul class="list-group">
-                {% for assignment in assignments %}
-                <li class="list-group-item">{{ assignment.title }} - Due: {{ assignment.due_date }}</li>
-                {% empty %}
-                <li class="list-group-item text-muted">No assignments available.</li>
-                {% endfor %}
-            </ul>
-        </div>
-    </div>
-    <!-- Assessments Sections -->
-    <div>
-        <h3>Pending Assessments</h3>
-        <ul>
-            {% for assessment in assessments %}
-                <li>
-                    {{ assessment.title }} (Due: {{ assessment.due_date }})
-                    <a href="{% url 'submit_assessment' assessment.id %}" class="btn btn-success">Submit</a>
-                </li>
-            {% endfor %}
-        </ul>
-    </div>
+{% block extra_head %}
+{# Add specific CSS if needed #}
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.3/font/bootstrap-icons.css" rel="stylesheet">
+<style>
+    .profile-header {
+        border-bottom: 1px solid #eee;
+        padding-bottom: 1rem;
+        margin-bottom: 1.5rem;
+    }
+    .profile-img {
+        width: 80px;
+        height: 80px;
+        object-fit: cover;
+    }
+    .info-card .card-body { padding: 1rem; }
+    .info-card .card-title { font-size: 1rem; font-weight: 600; margin-bottom: 0.75rem; }
+    .info-card .list-group-item {
+        padding: 0.6rem 0;
+        border: none;
+        font-size: 0.9rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+     .info-card .list-group-item + .list-group-item {
+         border-top: 1px dashed #eee;
+     }
+    .info-card .list-group-item strong { color: #333; }
+    .deadline { font-size: 0.8em; color: #dc3545; font-weight: 500; }
+    .status-badge { font-size: 0.8em; }
+    .action-btn { font-size: 0.85rem; }
 
-    <!-- Results -->
-    <h5 class="mt-4">Results</h5>
-    <table class="table table-bordered">
-        <thead>
-            <tr>
-                <th>Subject</th>
-                <th>Score</th>
-                <th>Grade</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for result in results %}
-            <tr>
-                <td>{{ result.subject.name }}</td>
-                <td>{{ result.score }}</td>
-                <td>{{ result.grade }}</td>
-            </tr>
-            {% empty %}
-            <tr>
-                <td colspan="3" class="text-muted">No results available.</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-
-    <!-- Attendance -->
-    <h5 class="mt-4">Attendance</h5>
-    <p>Total Days Present: {{ attendance|length }}</p>
-</div>
+    /* Adjust progress bar height for better visual */
+    .progress { height: 10px; }
+</style>
 {% endblock %}
 
+
+{% block content %}
+<div class="container py-4">
+
+    <!-- Welcome Header -->
+    <div class="profile-header d-flex align-items-center">
+        {% if student.profile_image and student.profile_image.url %}
+            <img src="{{ student.profile_image.url }}" class="rounded-circle me-3 profile-img shadow-sm" alt="Profile">
+        {% else %}
+            <img src="{% static 'images/profile_images/default.jpg' %}" class="rounded-circle me-3 profile-img shadow-sm" alt="Default Profile">
+        {% endif %}
+        <div>
+            <h2 class="mb-0 fw-bold">Welcome, {{ student.user.first_name }}!</h2>
+            <p class="text-muted mb-0">Class: {{ student.current_class|default:"N/A" }} | {{ term|default:"Current Term N/A" }}</p>
+        </div>
+         {# Optional: Quick links like Edit Profile or Logout can go top-right if no sidebar #}
+         {# <div class="ms-auto"> ... buttons ... </div> #}
+    </div>
+
+    {# Display Messages #}
+     {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        {% endfor %}
+     {% endif %}
+
+    <div class="row g-4">
+        <!-- === Left Column (Wider): Tasks & Academics === -->
+        <div class="col-lg-8">
+
+            <!-- Upcoming Tasks Card -->
+            <div class="card shadow-sm mb-4 info-card">
+                 <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="bi bi-list-check me-2"></i>Upcoming Tasks</h5>
+                 </div>
+                 <div class="card-body">
+                    {% with upcoming_assignments=assignments|slice:":3" upcoming_assessments=assessments|slice:":3" upcoming_exams=exams|slice:":3" %}
+                         {% if not upcoming_assignments and not upcoming_assessments and not upcoming_exams %}
+                            <p class="text-muted text-center py-3">No upcoming assignments, assessments, or exams found for the current term.</p>
+                         {% else %}
+                            <ul class="list-group list-group-flush">
+                                {# Assignments #}
+                                {% for assignment in upcoming_assignments %}
+                                     <li class="list-group-item">
+                                        <span>
+                                            <i class="bi bi-journal-text me-2 text-info"></i>
+                                            <strong>Assignment:</strong> {{ assignment.title }} ({{ assignment.subject.name }})
+                                        </span>
+                                         <div class="text-end">
+                                             <span class="deadline me-2">Due: {{ assignment.due_date|date:"d M Y" }}</span>
+                                             <a href="{% url 'submit_assignment' assignment.id %}" class="btn btn-sm btn-info action-btn">View/Submit</a>
+                                         </div>
+                                     </li>
+                                {% endfor %}
+                                {# Assessments #}
+                                {% for assessment in upcoming_assessments %}
+                                     <li class="list-group-item">
+                                         <span>
+                                            <i class="bi bi-pencil-square me-2 text-warning"></i>
+                                            <strong>Assessment:</strong> {{ assessment.title }} ({{ assessment.subject.name }})
+                                        </span>
+                                        <div class="text-end">
+                                             <span class="deadline me-2">Due: {{ assessment.due_date|date:"d M Y" }}</span>
+                                             <a href="{% url 'submit_assessment' assessment.id %}" class="btn btn-sm btn-warning action-btn">Start</a>
+                                         </div>
+                                     </li>
+                                {% endfor %}
+                                {# Exams #}
+                                {% for exam in upcoming_exams %}
+                                     <li class="list-group-item">
+                                         <span>
+                                            <i class="bi bi-file-earmark-check me-2 text-success"></i>
+                                            <strong>Exam:</strong> {{ exam.title }} ({{ exam.subject.name }})
+                                        </span>
+                                        <div class="text-end">
+                                             <span class="deadline me-2">Due: {{ exam.due_date|date:"d M Y" }}</span>
+                                             <a href="{% url 'submit_exam' exam.id %}" class="btn btn-sm btn-success action_btn">Start</a>
+                                         </div>
+                                     </li>
+                                {% endfor %}
+                            </ul>
+                         {% endif %}
+                    {% endwith %}
+                 </div>
+                 {# Optional Footer Link #}
+                 <div class="card-footer text-center bg-light border-top-0">
+                    <a href="#" class="text-muted small">View All Tasks »</a>
+                 </div>
+            </div>
+
+
+            <!-- Current Term Subjects -->
+            <div class="card shadow-sm mb-4 info-card">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><i class="bi bi-book me-2"></i>My Subjects This Term</h5>
+                </div>
+                 <div class="card-body">
+                     {% if subjects %}
+                        <div class="row row-cols-2 row-cols-md-3 g-2"> 
+                             {% for subject in subjects %}
+                                <div class="col">
+                                    <span class="badge bg-secondary-subtle text-secondary-emphasis p-2 w-100 text-start">
+                                        <i class="bi bi-dot me-1"></i>{{ subject.name }}
+                                    </span>
+                                </div>
+                             {% endfor %}
+                        </div>
+                    {% else %}
+                        <p class="text-muted">No subjects assigned for the current term.</p>
+                    {% endif %}
+                 </div>
+            </div>
+
+        </div>
+        <!-- === End Left Column === -->
+
+
+        <!-- === Right Column (Narrower): Quick Info & Results === -->
+        <div class="col-lg-4">
+
+            <!-- Attendance Summary -->
+            <div class="card shadow-sm mb-4 info-card">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><i class="bi bi-calendar-check me-2"></i>Attendance</h5>
+                </div>
+                <div class="card-body">
+                    {% with att_data=attendance_data|get_item:student.user.id %} {# Assuming view provides this #}
+                    {% if att_data %}
+                        <div class="d-flex justify-content-between mb-2">
+                            <span>Days Present:</span>
+                            <span class="fw-bold">{{ att_data.present_days|default:0 }} / {{ att_data.total_days|default:0 }}</span>
+                        </div>
+                        <div class="progress mb-2" style="height: 10px;">
+                            <div class="progress-bar {% if att_data.attendance_percentage >= 80 %}bg-success{% elif att_data.attendance_percentage >= 50 %}bg-warning{% else %}bg-danger{% endif %}" role="progressbar" style="width: {{ att_data.attendance_percentage|default:0 }}%" aria-valuenow="{{ att_data.attendance_percentage|default:0 }}" aria-valuemin="0" aria-valuemax="100"></div>
+                        </div>
+                        <div class="text-center small text-muted">
+                             {{ att_data.attendance_percentage|default:0|floatformat:1 }}% Present
+                        </div>
+                        <div class="text-center mt-2">
+                            <a href="#" class="btn btn-sm btn-outline-secondary action-btn">View Full Log</a>
+                        </div>
+                     {% else %}
+                         <p class="text-muted text-center">Attendance data not available.</p>
+                     {% endif %}
+                     {% endwith %}
+                </div>
+            </div>
+
+            <!-- Results -->
+             <div class="card shadow-sm mb-4 info-card">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><i class="bi bi-file-earmark-ruled me-2"></i>Results</h5>
+                </div>
+                 <div class="card-body">
+                    {# Current Term Result Link #}
+                    {% with current_res=result_data|get_item:student.user.id fin_data=financial_data|get_item:student.user.id %} 
+                        {% if current_res %}
+                             {# Always show link, access controlled in result view #}
+                             <a href="{% url 'view_student_result' student_id=current_res.student_id term_id=current_res.term_id %}"
+                                class="btn btn-primary w-100 mb-2 action-btn">
+                                 View {{ term.name|default:'Current Term' }} Result
+                             </a>
+                             {% if not fin_data.can_access_results and not fin_data.has_waiver %}
+                                <p class="small text-danger text-center mb-2"><i class="bi bi-exclamation-triangle me-1"></i>Access may be restricted due to outstanding fees.</p>
+                             {% endif %}
+                        {% else %}
+                             <p class="text-muted text-center small mb-2">Current term result not yet available or approved.</p>
+                        {% endif %}
+                    {% endwith %}
+
+                     <hr class="my-2">
+
+                     {# Link to Archived Results (Modal Trigger) #}
+                     {% with past_results=archived_results_data|get_item:student.user.id %} 
+                     {% if past_results %}
+                         <button type="button" class="btn btn-sm btn-outline-secondary w-100 action-btn" data-bs-toggle="modal" data-bs-target="#archivedResultsModal-{{ student.id }}">
+                             View Past Results ({{ past_results|length }})
+                         </button>
+                     {% else %}
+                          <p class="text-muted text-center small mb-0">No past results found.</p>
+                     {% endif %}
+                     {% endwith %}
+
+                 </div>
+            </div>
+
+            {# Suggestion: Quick Links Card #}
+            <div class="card shadow-sm mb-4 info-card">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0"><i class="bi bi-link-45deg me-2"></i>Quick Links</h5>
+                </div>
+                <div class="card-body">
+                    <div class="list-group list-group-flush">
+                        <a href="#" class="list-group-item list-group-item-action">School Calendar</a>
+                        <a href="#" class="list-group-item list-group-item-action">Library Resources</a>
+                        <a href="#" class="list-group-item list-group-item-action">Contact Support</a>
+                   </div>
+                </div>
+                
+            </div> 
+
+
+        </div>
+        <!-- === End Right Column === -->
+
+    </div> {# End main row #}
+</div> {# End container #}
+
+<!-- Archived Results Modal -->
+{% include 'partials/archived_results_modal.html' with student=student past_results=archived_results_data|get_item:student.user.id %} {# Include modal snippet #}
+
+{% endblock %}
+
+            <div class="panel shadow-sm mb-4">
+                <div class="panel-body">
+                    <form>
+                        <!-- Textarea for post content -->
+                        <div class="input-group mb-3">
+                            <textarea placeholder="What's on your mind today?" rows="2" class="form-control p-text-area" aria-label="What's on your mind today?"></textarea>
+                            
+                        </div>
+            
+                        <!-- Icons for microphone, camera, or file uploads -->
+                        <div class="d-flex align-items-center justify-content-between">
+                            <!-- Icons on the left with little space between -->
+                            <div class="d-flex gap-2">
+                                <button class="btn btn-sm btn-light">
+                                    <i class="fa fa-microphone"></i> 
+                                </button>
+                                <button class="btn btn-sm btn-light">
+                                    <i class="fa fa-camera"></i>
+                                </button>
+                                <button class="btn btn-sm btn-light">
+                                    <i class="fa fa-upload"></i>
+                                </button>
+                            </div>
+                            
+                            <!-- Post Button aligned to the right -->
+                            <button class="btn btn-warning btn-sm" type="submit" id="postButton">
+                                <i class="fa fa-paper-plane"></i> Post
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>

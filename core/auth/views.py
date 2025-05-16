@@ -13,7 +13,8 @@ from django.utils import timezone
 from django.urls import reverse_lazy
 from django.db.models import Count, Q
 from collections import defaultdict
-from core.models import Student, Teacher, Guardian, Assignment, Result, Attendance, Subject
+from decimal import Decimal
+from core.models import Student, Teacher, Guardian, Assignment, Result, Attendance, Subject, Class, Payment
 from core.models import Session, Term, Message, Assessment, Exam, Notification, AssignmentSubmission, AcademicAlert
 from core.models import FinancialRecord, StudentFeeRecord, AssessmentSubmission
 from django.db.models import Sum
@@ -88,7 +89,7 @@ class CustomLoginView(LoginView):
 
         # Redirection based on user roles
         if user.is_superuser:
-            return reverse_lazy('school_setup')
+            return reverse_lazy('school-setup')
         elif user.role == 'teacher':
             return reverse_lazy('teacher_dashboard')
         elif user.role == 'student':
@@ -119,46 +120,246 @@ class CustomLoginView(LoginView):
             return super().form_invalid(form)
 
 # Admin dashboard view
-@login_required
-def admin_dashboard(request):
-    if not request.user.is_superuser:
-        return redirect('login')
-    # Add any data you want to display on the dashboard
-    return render(request, 'setup/dashboard.html')
+def admin_required(login_url=None):
+    return user_passes_test(lambda u: u.is_superuser, login_url=login_url or '/login/')
 
-# Student Dashboard
+@login_required
+@admin_required() # Apply decorator
+def admin_dashboard(request):
+    # Fetch counts (use .count() for efficiency)
+    student_count = Student.objects.filter(status='active').count() # Count only active?
+    teacher_count = Teacher.objects.filter(status='active').count() # Count only active?
+    guardian_count = Guardian.objects.count()
+    class_count = Class.objects.count()
+    session_count = Session.objects.count()
+    term_count = Term.objects.count()
+    subject_count = Subject.objects.count()
+    payment_count = Payment.objects.count() # Total number of payment records
+
+    # Fetch recent enrollments (Example using Student's class assignment change)
+    recent_enrollments = Student.objects.select_related(
+        'user', 'current_class', 'current_class__term__session' # Adjust relations
+        ).order_by('-user__date_joined')[:5] # Example: recent student creations
+
+    # Fetch data for charts (Example: Students per class)
+    # Needs optimization for large datasets
+    class_counts_query = Class.objects.annotate(
+        num_students=Count('enrolled_students', filter=Q(enrolled_students__status='active'))
+    ).order_by('name')
+
+    student_counts_by_class_labels = [c.name for c in class_counts_query]
+    student_counts_by_class_data = [c.num_students for c in class_counts_query]
+
+
+    context = {
+        'student_count': student_count,
+        'teacher_count': teacher_count,
+        'guardian_count': guardian_count,
+        'class_count': class_count,
+        'session_count': session_count,
+        'term_count': term_count,
+        'subject_count': subject_count,
+        'payment_count': payment_count,
+        'recent_enrollments': recent_enrollments, # Pass recent enrollments
+        'student_counts_by_class_labels': student_counts_by_class_labels, # Data for JS chart
+        'student_counts_by_class_data': student_counts_by_class_data,   # Data for JS chart
+        # Add other analytics data needed
+    }
+    # Use the new base template for rendering
+    return render(request, 'setup/dashboard.html', context) # Adjust template path
+
 @login_required
 @user_passes_test(lambda u: u.role == 'student')
 def student_dashboard(request):
 
-    if request.user.role != 'student':
-        return redirect('login')  
-    
-    student = Student.objects.select_related('current_class').get(user=request.user)
+    # --- Fetch Core Objects Safely ---
+    try:
+        student = Student.objects.select_related(
+            'user', 'current_class' 
+        ).get(user=request.user)
+    except Student.DoesNotExist:
+        messages.error(request, "Student profile not found.")
+        return redirect('login') 
+
     current_class = student.current_class
-    session = Session.objects.get(is_active=True)
-    term = Term.objects.filter(session=session, is_active=True).order_by('-start_date').first()
+    active_term = Term.objects.filter(is_active=True).select_related('session').first()
+    active_session = active_term.session if active_term else None
+
+    if not current_class or not active_term:
+        # Handle case where student isn't assigned a class or no active term
+        messages.warning(request, "Class or active term information is currently unavailable.")
+        # Render template with minimal data or redirect
+        context = {'student': student, 'term': active_term}
+        return render(request, 'student/student_dashboard.html', context)
+
+    # --- Initialize Data Dictionaries (using student.id) ---
+    student_id = student.user.id 
+    attendance_data = {}
+    assignments_data = {} 
+    # assessments/exams can be passed as querysets filtered later
+    financial_data = {}
+    result_data = {}
+    archived_results_data = defaultdict(list) # Keep using defaultdict
+
+
+    # --- Fetch Data Efficiently ---
+    now = timezone.now()
+
+    # Subjects for the current class/term
     subjects = Subject.objects.filter(
         class_assignments__class_assigned=current_class,
-        class_assignments__session=session,
-        class_assignments__term=term
+        class_assignments__term=active_term # Filter by active term
+        # class_assignments__session=active_session # Redundant if filtering by active_term
     ).distinct()
-    assignments = Assignment.objects.filter(class_assigned=current_class).select_related('teacher')
-    assessments = Assessment.objects.filter(class_assigned=current_class)
-    exams = Exam.objects.filter(class_assigned=current_class).select_related('teacher')
-    results = Result.objects.filter(student=student).select_related('term')
-    attendance = Attendance.objects.filter(student=student).order_by('-date')
 
+    # Assignments for current class & term (show upcoming/recent?)
+    # Decide which assignments to show (e.g., only pending, or recent)
+    assignments = Assignment.objects.filter(
+        class_assigned=current_class,
+        term=active_term, # Filter by term
+        due_date__gte=now # Optionally filter only upcoming
+    ).select_related('subject', 'teacher__user').order_by('due_date')
+
+    # Fetch student's submissions for these assignments
+    assignment_submissions = AssignmentSubmission.objects.filter(
+        student=student,
+        assignment__in=assignments
+    ).values('assignment_id', 'is_completed') # Get IDs and completion status
+    submissions_dict = {sub['assignment_id']: sub['is_completed'] for sub in assignment_submissions}
+
+    # Calculate assignment summary
+    total_assign = assignments.count()
+    completed_assign = sum(1 for assign_id, completed in submissions_dict.items() if completed)
+    pending_assign = total_assign - completed_assign
+    completion_perc = round((completed_assign / total_assign * 100), 1) if total_assign > 0 else 0
+    assignments_data[student_id] = {
+        'total': total_assign,
+        'completed': completed_assign,
+        'pending': pending_assign,
+        'completion_percentage': completion_perc,
+        'details': assignments # Pass the queryset for iteration
+    }
+
+    # Assessments & Exams for current class & term
+    assessments = Assessment.objects.filter(
+        class_assigned=current_class,
+        term=active_term
+        # due_date__gte=now # Optional: Filter upcoming only
+        ).select_related('subject').order_by('due_date')
+
+    exams = Exam.objects.filter(
+        class_assigned=current_class,
+        term=active_term
+        # due_date__gte=now # Optional: Filter upcoming only
+        ).select_related('subject').order_by('due_date')
+
+    # Attendance Summary (for the active term is more relevant here)
+    attendance_summary = Attendance.objects.filter(
+        student=student,
+        term=active_term
+    ).aggregate(
+        total_days=Count('id'),
+        present_days=Count('id', filter=Q(is_present=True))
+    )
+    total_days = attendance_summary.get('total_days', 0) or 0
+    present_days = attendance_summary.get('present_days', 0) or 0
+    absent_days = total_days - present_days
+    att_percentage = round((present_days / total_days * 100), 1) if total_days > 0 else 0
+    attendance_data[student_id] = {
+        'total_days': total_days,
+        'present_days': present_days,
+        'absent_days': absent_days,
+        'attendance_percentage': att_percentage
+    }
+
+    # Financial Record for current term
+    financial_record = FinancialRecord.objects.filter(
+        student=student, term=active_term
+    ).first() # Use first() instead of get() to handle non-existence gracefully
+
+    if financial_record:
+        financial_data[student_id] = {
+            'total_fee': financial_record.total_fee,
+            'total_discount': financial_record.total_discount,
+            'total_paid': financial_record.total_paid,
+            'outstanding_balance': financial_record.outstanding_balance,
+            'can_access_results': financial_record.can_access_results,
+            'is_fully_paid': financial_record.is_fully_paid,
+            'payment_percentage': round((financial_record.total_paid / financial_record.total_fee * 100), 1) if financial_record.total_fee > 0 else (100 if financial_record.is_fully_paid else 0),
+            'has_waiver': financial_record.has_waiver,
+        }
+    else:
+        # Handle case where student might not have a financial record yet
+        # Check if a fee record exists to determine waiver/zero fee status
+        fee_record = StudentFeeRecord.objects.filter(student=student, term=active_term).first()
+        has_waiver = fee_record and fee_record.waiver
+        total_fee = fee_record.net_fee if fee_record else Decimal('0.00')
+        financial_data[student_id] = {
+            'total_fee': total_fee,
+            'total_discount': fee_record.discount if fee_record else Decimal('0.00'),
+            'total_paid': Decimal('0.00'),
+            'outstanding_balance': total_fee,
+            'can_access_results': has_waiver or (total_fee <= Decimal('0.01')), # Access if waived or fee is zero
+            'is_fully_paid': (total_fee <= Decimal('0.01')),
+            'payment_percentage': 100 if (total_fee <= Decimal('0.01')) else 0,
+            'has_waiver': has_waiver,
+        }
+
+    # Results (Current Term)
+    current_result = Result.objects.filter(
+        student=student, term=active_term, is_approved=True
+    ).first()
+    if current_result:
+         result_data[student_id] = {
+             'id': current_result.id,
+             'term_id': current_result.term_id,
+             'student_id': student_id,
+         }
+    else:
+         result_data[student_id] = None
+
+    # Results (Archived) - Fetch only necessary fields
+    archived_terms = Term.objects.filter(is_active=False, session=active_session).order_by('-start_date') # Filter by current session? Or all past?
+    archived_results_qs = Result.objects.filter(
+        student=student, term__in=archived_terms, is_approved=True, is_archived=True
+        ).select_related('term').values('id', 'term_id', 'term__name') # Fetch only needed fields
+
+    for res in archived_results_qs:
+        archived_results_data[student_id].append({
+            'term_name': res['term__name'],
+            'term_id': res['term_id'],
+            'student_id': student_id, # Already known
+            'result_id': res['id']
+        })
+
+    notifications = Notification.objects.filter(
+        Q(audience='guardian') | Q(audience='all'),
+        is_active=True
+    ).exclude(
+        expiry_date__lt=timezone.now().date()
+    ).order_by('-created_at')
+
+    # Fetch academic alerts for the students
+    academic_alerts = AcademicAlert.objects.filter(
+        student=student,
+        due_date__gte=timezone.now()
+    ).select_related('teacher', 'student').order_by('-due_date')
 
     context = {
         'student': student,
-        'class': current_class,
+        'current_class': current_class, # Renamed from 'class' to avoid conflict
+        'term': active_term,
+        'session': active_session,
         'subjects': subjects,
-        'assignments': assignments,
-        'assessments': assessments,
-        'exams': exams,
-        'results': results,
-        'attendance': attendance,
+        'assignments_data': assignments_data, 
+        'assessments': assessments, # Pass queryset
+        'exams': exams, # Pass queryset
+        'attendance_data': attendance_data,
+        'financial_data': financial_data,
+        'result_data': result_data,
+        'archived_results_data': dict(archived_results_data),
+        'notifications': notifications,
+        'academic_alerts': academic_alerts,
     }
     return render(request, 'student/student_dashboard.html', context)
 

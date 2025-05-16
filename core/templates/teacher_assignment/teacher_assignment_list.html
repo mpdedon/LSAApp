@@ -1,51 +1,176 @@
 {% extends 'base.html' %}
+{% load static %} {# Ensure static is loaded if base.html needs it #}
 
 {% block content %}
 <div class="container my-4">
 
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h4 class="mb-0">Teacher Assignment List</h4>
-        <a href="{% url 'assign_teacher' %}" class="btn btn-sm btn-primary">+ Assign New Teacher</a>
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap">
+        <h4 class="mb-0 me-3">Teacher Assignments by Term</h4>
+        <div class="d-flex align-items-center">
+            {# --- Rollover Button --- #}
+            {% if show_rollover_button and next_term and current_term %}
+                <form action="{% url 'rollover_teacher_assignments' %}" method="post" class="me-2">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-warning"
+                            title="Copy all assignments from {{ current_term }} to {{ next_term }}"
+                            onclick="return confirm('Are you sure you want to copy all assignments from {{ current_term }} to {{ next_term }}?\nThis cannot be undone easily and only works if the next term is empty.')">
+                        <i class="fas fa-copy me-1"></i> Rollover to {{ next_term.name }}
+                    </button>
+                </form>
+            {% elif not next_term and current_term %}
+                 {# Show N/A only if rollover isn't possible due to no next term #}
+                 {# If button is hidden due to conditions (next term not empty etc), don't show N/A #}
+                 {% comment %} <span class="badge bg-light text-dark me-2 border" title="No further term configured for rollover">Rollover N/A</span> {% endcomment %}
+            {% endif %}
+            {# --- Assign New Button --- #}
+            <a href="{% url 'assign_teacher' %}" class="btn btn-sm btn-primary">
+                <i class="fas fa-plus me-1"></i> Assign New Teacher
+            </a>
+        </div>
     </div>
 
-    <div class="table-responsive">
-        <table class="table table-hover table-sm align-middle">
-            <thead class="table-light">
-                <tr>
-                    <th>#</th>
-                    <th>Class</th>
-                    <th>Teacher</th>
-                    <th>Session</th>
-                    <th>Term</th>
-                    <th class="text-center">Form Teacher</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for assignment in teacher_assignments %}
-                    <tr>
-                        <td>{{ forloop.counter }}</td>
-                        <td>{{ assignment.class_assigned.name }}</td>
-                        <td>{{ assignment.teacher.user.get_full_name }}</td>
-                        <td>{{ assignment.session.name }}</td>
-                        <td>{{ assignment.term.name }}</td>
-                        <td class="text-center">
-                            {% if assignment.is_form_teacher %}
-                                <span class="badge bg-success">Yes</span>
-                            {% else %}
-                                <span class="badge bg-secondary">No</span>
-                            {% endif %}
-                        </td>
-                    </tr>
-                {% empty %}
-                    <tr>
-                        <td colspan="6" class="text-center text-muted py-3">
-                            No Teacher Assignments found.
-                        </td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+    {# --- Regroup assignments by Term --- #}
+    {% regroup teacher_assignments by term as assignments_by_term %}
 
-</div>
+    <div class="accordion" id="assignmentsAccordion">
+        {% for term_group in assignments_by_term %}
+            {# term_group.grouper is the Term object #}
+            {# term_group.list is the list of assignments for that term #}
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="term-header-{{ term_group.grouper.id }}">
+                    <button class="accordion-button {% if term_group.grouper != current_term %}collapsed{% endif %}"
+                            type="button" data-bs-toggle="collapse"
+                            data-bs-target="#term-collapse-{{ term_group.grouper.id }}"
+                            aria-expanded="{% if term_group.grouper == current_term %}true{% else %}false{% endif %}"
+                            aria-controls="term-collapse-{{ term_group.grouper.id }}">
+                        <span class="me-2 fw-bold">{{ term_group.grouper.name }}</span>
+                        <span class="text-muted small">({{ term_group.grouper.session }})</span>
+                        <span class="badge bg-primary rounded-pill ms-auto me-3">{{ term_group.list|length }} Assignment{{ term_group.list|length|pluralize }}</span>
+                        {% if term_group.grouper == current_term %}
+                            <span class="badge bg-success me-2">Current Term</span>
+                        {% endif %}
+                    </button>
+                </h2>
+                <div id="term-collapse-{{ term_group.grouper.id }}"
+                     class="accordion-collapse collapse {% if term_group.grouper == current_term %}show{% endif %}"
+                     aria-labelledby="term-header-{{ term_group.grouper.id }}"
+                     data-bs-parent="#assignmentsAccordion">
+                    <div class="accordion-body p-0"> {# Remove padding for table #}
+                        {% if term_group.list %}
+                            <div class="table-responsive">
+                                <table class="table table-hover table-sm align-middle mb-0">
+                                    <thead class="table-light" style="font-size: 0.9em;"> {# Slightly smaller header #}
+                                        <tr>
+                                            <th class="ps-3">#</th>
+                                            <th>Class</th>
+                                            <th>Teacher</th>
+                                            <th class="text-center">Form Teacher</th>
+                                            <!-- Action Header Added -->
+                                            <th class="text-center pe-3">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for assignment in term_group.list %}
+                                            <tr>
+                                                {# Use pagination-aware counter if paginated #}
+                                                {% if is_paginated %}
+                                                    <td class="ps-3">{{ page_obj.start_index|add:forloop.counter0 }}</td>
+                                                {% else %}
+                                                     <td class="ps-3">{{ forloop.counter }}</td>
+                                                {% endif %}
+                                                <td>{{ assignment.class_assigned.name }}</td>
+                                                <td>
+                                                    {% if assignment.teacher.user %}
+                                                        {{ assignment.teacher.user.get_full_name }}
+                                                    {% else %}
+                                                        {{ assignment.teacher }} {# Fallback #}
+                                                    {% endif %}
+                                                </td>
+                                                <td class="text-center"> {# Removed padding from here #}
+                                                    {% if assignment.is_form_teacher %}
+                                                        <span class="badge bg-success"><i class="fas fa-check"></i> Yes</span>
+                                                    {% else %}
+                                                        <span class="badge bg-secondary">No</span>
+                                                    {% endif %}
+                                                </td>
+                                                <!-- Action Buttons Added -->
+                                                <td class="text-center pe-3">
+                                                     <div class="btn-group btn-group-sm" role="group" aria-label="Assignment Actions">
+                                                        {# View Button - links to DetailView #}
+                                                        <a href="{% url 'teacher_assignment_detail' assignment.pk %}"
+                                                           class="btn btn-outline-info" title="View Details">
+                                                            <i class="fas fa-eye"></i>
+                                                        </a>
+                                                        {# Edit Button - links to UpdateView #}
+                                                        <a href="{% url 'teacher_assignment_update' assignment.pk %}"
+                                                           class="btn btn-outline-warning" title="Edit Assignment">
+                                                            <i class="fas fa-edit"></i>
+                                                        </a>
+                                                        {# Delete Button - links to DeleteView #}
+                                                        <a href="{% url 'teacher_assignment_delete' assignment.pk %}"
+                                                           class="btn btn-outline-danger" title="Delete Assignment">
+                                                            <i class="fas fa-trash-alt"></i>
+                                                        </a>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <p class="text-center text-muted p-3 mb-0">No assignments found for this specific term.</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        {% empty %}
+            <div class="card shadow-sm">
+                 <div class="card-body text-center text-muted p-5">
+                    <i class="fas fa-user-slash fa-3x mb-3 text-light"></i>
+                    <p class="lead mb-1">No Teacher Assignments Found</p>
+                    <p>You can start by assigning teachers to classes.</p>
+                    <a href="{% url 'assign_teacher' %}" class="btn btn-primary btn-sm mt-2">
+                         <i class="fas fa-plus me-1"></i> Assign First Teacher
+                     </a>
+                 </div>
+             </div>
+        {% endfor %}
+    </div> {# End Accordion #}
+
+    {# --- Pagination Controls --- #}
+    {% if is_paginated %}
+        <div class="mt-4">
+            <nav aria-label="Page navigation">
+                <ul class="pagination justify-content-center mb-0">
+                    {# Previous Page Link #}
+                    {% if page_obj.has_previous %}
+                        <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}" aria-label="Previous">«</a></li>
+                    {% else %}
+                        <li class="page-item disabled"><span class="page-link">«</span></li>
+                    {% endif %}
+
+                    {# Page Number Links #}
+                    {% for page_num in paginator.page_range %}
+                        {% if page_num == page_obj.number %}
+                            <li class="page-item active" aria-current="page"><span class="page-link">{{ page_num }}</span></li>
+                        {% elif page_num > page_obj.number|add:'-3' and page_num < page_obj.number|add:'3' %}
+                            <li class="page-item"><a class="page-link" href="?page={{ page_num }}">{{ page_num }}</a></li>
+                        {% elif page_num == page_obj.number|add:'-3' or page_num == page_obj.number|add:'3' %}
+                            <li class="page-item disabled"><span class="page-link">…</span></li>
+                        {% endif %}
+                    {% endfor %}
+
+                    {# Next Page Link #}
+                    {% if page_obj.has_next %}
+                        <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}" aria-label="Next">»</a></li>
+                    {% else %}
+                        <li class="page-item disabled"><span class="page-link">»</span></li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+    {% endif %}
+
+</div> {# End Container #}
 {% endblock %}

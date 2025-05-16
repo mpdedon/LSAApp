@@ -12,11 +12,55 @@
 }
 
 /* Ensure the page takes full height */
-html, body {
-    height: 100%;
+html,
+body {
+    height: 100%; /* Ensure both take full available height */
     margin: 0;
+    padding: 0;
+    overflow-x: hidden; /* Prevent horizontal scroll on body */
+    font-family: var(--bs-font-sans-serif); /* Set base font */
+    background-color: var(--bs-light); /* Set base background */
+    color: var(--bs-dark);
+}
+
+/* Container to hold main content and footer */
+#page-container {
+    position: relative; /* Establishes positioning context */
+    min-height: calc(100% - 70px); /* Crucial: Full height MINUS navbar height (adjust 70px) */
+                                   /* If navbar is NOT fixed, use min-height: 100%; */
     display: flex;
     flex-direction: column;
+}
+
+/* The area for the main page content */
+#content-wrap {
+    flex-grow: 1; /* Allows this area to expand */
+    /* Add padding needed AFTER the fixed navbar spacer */
+    /* padding-top: 1rem; REMOVE - main-content-padding handles this */
+    padding-bottom: 4rem; /* Add space ABOVE the footer */
+                           /* Adjust value as needed for footer height */
+    width: 100%; /* Ensure it takes full width */
+    overflow-y: auto; /* Allow internal scrolling if content exceeds viewport */
+}
+
+/* The actual footer element */
+#footer {
+    /* Footer is positioned normally within the flex flow */
+    width: 100%;
+    flex-shrink: 0; /* Prevent shrinking */
+    /* Add specific styles like background, padding */
+    background-color: #212529;
+    color: #ced4da;
+    padding-top: 1.5rem; /* Adjust padding as needed */
+    padding-bottom: 1rem;
+}
+
+
+/* Padding div for fixed navbar - Adjust height! */
+.main-content-padding {
+    height: 70px; /* MUST match your actual fixed/sticky navbar height */
+                  /* Inspect element to find real height */
+    flex-shrink: 0; /* Prevent it from shrinking */
 }
 
 /* Main content grows to fill available space */
@@ -24,15 +68,66 @@ html, body {
     flex: 1; /* This pushes the footer to the bottom */
 }
 
-/* Footer styling */
-footer {
-    background-color: #343a40;
-    color: white;
-    text-align: center;
-    padding: 1rem;
-    position: relative;
-    bottom: 0;
-    width: 100%;
+footer.footer-section {
+    width: 100%; /* Prevent footer from shrinking */
+}
+
+/* --- Footer --- */
+.footer-section {
+    background-color: #212529;
+    font-size: 0.9rem; /* Base size slightly smaller */
+}
+.footer-heading {
+    color: #adb5bd;
+    font-weight: 600;
+    font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+.footer-text {
+    color: #ced4da;
+}
+address.footer-text {
+    line-height: 1.6;
+}
+.footer-links {
+    padding-left: 0;
+    list-style: none;
+}
+.footer-links li {
+    margin-bottom: 0.4rem; /* Slightly less space */
+}
+.footer-links a, a.footer-link {
+    color: #ced4da;
+    text-decoration: none;
+    transition: color 0.2s ease;
+}
+.footer-links a:hover, a.footer-link:hover {
+    color: #fff;
+    text-decoration: underline; /* Simple underline on hover */
+}
+.footer-section hr.footer-divider {
+    border-top: 1px solid rgba(255, 255, 255, 0.15); /* Slightly more visible divider */
+}
+a.footer-social-link {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 1.1rem;
+    transition: color 0.2s ease, transform 0.2s ease;
+    display: inline-block; /* Allows transform */
+}
+a.footer-social-link:hover {
+    color: #fff;
+    transform: scale(1.2); /* Slight zoom effect */
+}
+
+/* Ensure input group looks okay on dark background */
+.footer-section .input-group input.form-control {
+    background-color: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
+    color: #fff;
+}
+.footer-section .input-group input.form-control::placeholder {
+    color: rgba(255, 255, 255, 0.5);
 }
 
 /* Example: Smooth button hover */
@@ -87,6 +182,44 @@ h1, h2, h3, h4, h5, h6 {
 footer {
     background-color: #f8f9fa;
     color: #6c757d;
+}
+
+.hero-section {
+    height: 85vh; /* Adjust height as needed */
+    min-height: 500px;
+    position: relative;
+    overflow: hidden;
+}
+.hero-section .carousel,
+.hero-section .carousel-inner,
+.hero-section .carousel-item {
+    height: 100%;
+}
+.hero-section .carousel-item {
+    background-size: cover;
+    background-position: center center;
+    position: relative; /* Needed for overlay */
+}
+/* Add overlay for better text contrast */
+.hero-section .carousel-item::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5); /* Dark overlay */
+    z-index: 1;
+}
+.hero-section .carousel-caption {
+    position: absolute;
+    bottom: 15%; /* Adjust vertical position */
+    left: 10%;
+    right: 10%;
+    text-align: center;
+    color: #fff;
+    z-index: 2; /* Above overlay */
+    text-shadow: 1px 1px 3px rgba(0, 0, 0, 0.7);
 }
 
 .carousel-caption {
@@ -278,7 +411,7 @@ footer {
   /* Add padding to main content area to avoid being hidden by fixed navbar */
   /* Adjust the padding value based on the CALCULATED height of your navbar */
   .main-content-padding {
-    padding-top: 80px; /* STARTING POINT - INSPECT YOUR NAVBAR'S HEIGHT AND ADJUST */
+    padding-top: 70px; /* STARTING POINT - INSPECT YOUR NAVBAR'S HEIGHT AND ADJUST */
   }
   
   /* Style for collapsed menu background */
@@ -309,3 +442,42 @@ footer {
           color: var(--lsa-primary, #198754);
       }
   }
+  
+.benefit-card .icon-circle i {
+    /* font-size: 1.8rem; /* Adjust if needed */
+}
+
+/* What Makes Us Different - Feature Cards */
+.feature-card {
+    border-left: 4px solid var(--bs-success);
+    background-color: #f8f9fa; /* Light background for cards */
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.feature-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 .5rem 1rem rgba(0,0,0,.1);
+}
+.feature-icon {
+    /* margin-bottom: 0.5rem; */
+}
+
+/* Team Member Cards */
+.team-member-card {
+    border: none;
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.team-member-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 .5rem 1rem rgba(0,0,0,.1);
+}
+.team-member-img {
+    width: 130px;
+    height: 130px;
+    object-fit: cover;
+    border-radius: 50%;
+    border: 4px solid #fff;
+    box-shadow: 0 0 15px rgba(0,0,0,0.15);
+}
+.bg-success-subtle { /* Already defined, used for team section */
+    /* background-color: #e2f5ea; */
+}

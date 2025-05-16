@@ -1,80 +1,142 @@
 {% extends 'base.html' %}
+{% load static %} {# Assuming you have a static tag for CSS/JS #}
+{% load add_class %} {# Your custom template tag #}
 
-{% load add_class %}
+{% block title %}Manage Subjects for {{ class_instance.name }}{% endblock %}
+
 {% block content %}
-<div class="container mt-5 d-flex justify-content-center">
-    <div class="card" style="width: 80%;">
-        <div class="card-header text-center">
-            <h4>Assign Subjects to {{ class_instance.name }}</h4>
-        </div>
-        <div class="card-body">
-            <!-- Form for assigning subjects -->
-            <form method="post" style="max-width: 60%; margin: 0 auto;">
-                {% csrf_token %}
-                <div class="mb-4">
-                    <label for="session" class="form-label"><strong>Session</strong></label>
-                    {{ form.session|add_class:"form-select" }}
+<div class="container my-4">
+
+    {# Centered card with controlled width #}
+    <div class="row justify-content-center">
+        <div class="col-lg-10 col-xl-9"> {# Wider columns for this form #}
+
+            <div class="card shadow-sm">
+                 <div class="card-header bg-light d-flex justify-content-between align-items-center flex-wrap">
+                    <h4 class="card-title mb-0 h5">
+                        <i class="fas fa-book-medical me-2"></i>Manage Subjects for: {{ class_instance.name }}
+                    </h4>
+                     <a href="{% url 'class_detail' class_instance.id %}" class="btn btn-outline-secondary btn-sm mt-1 mt-md-0">
+                        <i class="fas fa-arrow-left me-1"></i> Back to Class Detail
+                     </a>
                 </div>
-                <div class="mb-4">
-                    <label for="term" class="form-label"><strong>Term</strong></label>
-                    {{ form.term|add_class:"form-select" }}
-                </div>
-                <div class="mb-4">
-                    <label class="form-label"><strong>Subjects</strong></label>
-                    <div class="row">
-                        {% for subject in form.subjects.field.queryset %}
-                        <div class="col-md-4">
-                            <div class="form-check">
-                                <input 
-                                    type="checkbox" 
-                                    name="subjects" 
-                                    value="{{ subject.id }}" 
-                                    id="subject-{{ subject.id }}" 
-                                    class="form-check-input"
-                                    {% if subject.id in form.subjects.initial %}checked{% endif %}
-                                >
-                                <label for="subject-{{ subject.id }}" class="form-check-label">
-                                    {{ subject.name }}
-                                </label>
+
+                <div class="card-body p-4">
+
+                    <!-- Section 1: Assign New/Update Subjects Form -->
+                    <h5 class="mb-3 border-bottom pb-2"><i class="fas fa-plus-circle me-1 text-success"></i> Assign/Update Subjects for a Term</h5>
+                    <form method="post" action="{% url 'assign_class_subject' class_instance.id %}" novalidate> {# Assume current URL handles assignment #}
+                        {% csrf_token %}
+
+                        {# Display non-field errors #}
+                        {% if form.non_field_errors %}
+                            <div class="alert alert-danger py-2" role="alert">
+                                {% for error in form.non_field_errors %}{{ error }}{% endfor %}
+                            </div>
+                        {% endif %}
+
+                        <div class="row g-3 mb-4 align-items-center"> {# Use grid for Session/Term #}
+                            <div class="col-md-6">
+                                <div class="form-floating {% if form.session.errors %}is-invalid{% endif %}">
+                                    {{ form.session|add_class:"form-select" }}
+                                    <label for="{{ form.session.id_for_label }}">Session</label>
+                                </div>
+                                {% if form.session.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.session.errors|striptags }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                 <div class="form-floating {% if form.term.errors %}is-invalid{% endif %}">
+                                    {{ form.term|add_class:"form-select" }}
+                                    <label for="{{ form.term.id_for_label }}">Term</label>
+                                </div>
+                                {% if form.term.errors %}
+                                    <div class="invalid-feedback d-block">{{ form.term.errors|striptags }}</div>
+                                {% endif %}
                             </div>
                         </div>
-                        {% endfor %}
-                    </div>
-                </div>
-                <div class="d-flex justify-content-between">
-                    <button type="submit" class="btn btn-primary">Assign Subjects</button>
-                    <a href="{% url 'class_detail' class_instance.id %}" class="btn btn-secondary">Class Detail</a>
-                    <a href="{% url 'class_list' %}" class="btn btn-info">Back to Class List</a>
-                    <a href="{% url 'class_subjects' %}" class="btn btn-warning">View All Class Subjects</a>
-                </div>
-            </form>
 
-            <!-- Form for bulk deletion of subjects -->
-            <hr>
-            <h5>Remove Assigned Subjects</h5>
-            <form method="post" action="{% url 'delete_class_subjects' class_instance.pk %}">
-                {% csrf_token %}
-                <ul class="list-group">
-                    {% for assignment in class_instance.subject_assignments.all %}
-                    <li class="list-group-item d-flex justify-content-between align-items-center">
-                        <div>
-                            <input type="checkbox" name="subject_ids" value="{{ assignment.subject.id }}" class="form-check-input me-2">
-                            {{ assignment.subject.name }}
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Select Subjects for the chosen Term:</label>
+                            {# Improved checkbox layout #}
+                            <div class="row row-cols-2 row-cols-sm-3 row-cols-md-4 g-2 border rounded p-3 bg-light">
+                                {% for subject in form.subjects.field.queryset %}
+                                    <div class="col">
+                                        <div class="form-check">
+                                            <input
+                                                type="checkbox"
+                                                name="{{ form.subjects.name }}" {# Use form field name #}
+                                                value="{{ subject.id }}"
+                                                id="subject-assign-{{ subject.id }}" {# Unique ID #}
+                                                class="form-check-input"
+                                                {% if subject.id|stringformat:"s" in form.subjects.value or subject.id in form.subjects.initial %}checked{% endif %} {# Check against bound value or initial #}
+                                            >
+                                            <label for="subject-assign-{{ subject.id }}" class="form-check-label">
+                                                {{ subject.name }}
+                                            </label>
+                                        </div>
+                                    </div>
+                                {% empty %}
+                                    <div class="col-12 text-muted">No subjects available to assign.</div>
+                                {% endfor %}
+                            </div>
+                             {% if form.subjects.errors %}
+                                <div class="text-danger small mt-1">{{ form.subjects.errors|striptags }}</div>
+                            {% endif %}
                         </div>
-                        <span>{{ assignment.session.name }} - {{ assignment.term.name }}</span>
-                    </li>
-                    {% empty %}
-                    <li class="list-group-item text-center">
-                        No subjects assigned.
-                    </li>
-                    {% endfor %}
-                </ul>
-                <div class="mt-3">
-                    <button type="submit" class="btn btn-danger">Delete Selected Subjects</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-<br>
+
+                        <div class="text-center mt-3">
+                             <button type="submit" class="btn btn-success px-4">
+                                <i class="fas fa-check me-1"></i> Assign/Update Selected Subjects
+                             </button>
+                             {# Removed other buttons, back button is in header #}
+                        </div>
+                    </form>
+
+                    <hr class="my-4"> {# Separator #}
+
+                    <!-- Section 2: Remove Assigned Subjects Form -->
+                    <h5 class="mb-3 border-bottom pb-2"><i class="fas fa-trash-alt me-1 text-danger"></i> Remove Assigned Subjects</h5>
+                    {# This form POSTs to a *different* URL dedicated to deletion #}
+                    <form method="post" action="{% url 'delete_class_subjects' class_instance.pk %}">
+                        {% csrf_token %}
+
+                        {% with current_assignments=existing_assignments %}
+                            {% if current_assignments %}
+                                <p class="small text-muted">Select specific assignments to remove:</p>
+                                <ul class="list-group mb-3">
+                                    {% for assignment in current_assignments %}
+                                    <li class="list-group-item d-flex justify-content-between align-items-center flex-wrap">
+                                        <div>
+                                            <input type="checkbox" name="subject_assignment_ids" value="{{ assignment.id }}" class="form-check-input me-2" id="subject-remove-{{ assignment.id }}">
+                                            <label for="subject-remove-{{ assignment.id }}">{{ assignment.subject.name }}</label>
+                                        </div>
+                                        <small class="text-muted mt-1 mt-sm-0">
+                                            <span class="badge bg-secondary fw-normal me-1">{{ assignment.session }}</span>
+                                            <span class="badge bg-info text-dark fw-normal">{{ assignment.term.name }}</span>
+                                        </small>
+                                    </li>
+                                    {% endfor %}
+                                </ul>
+                                 <div class="text-center">
+                                    <button type="submit" class="btn btn-danger" onclick="return confirm('Are you sure you want to delete the selected subject assignments? This cannot be undone.')">
+                                       <i class="fas fa-times me-1"></i> Delete Selected Assignments
+                                    </button>
+                                </div>
+                            {% else %}
+                                <div class="alert alert-light text-center" role="alert">
+                                   <i class="fas fa-info-circle me-1"></i> No subjects are currently assigned to this class.
+                                </div>
+                            {% endif %}
+                        {% endwith %}
+
+                    </form>
+
+                </div> {# End card-body #}
+            </div> {# End card #}
+
+        </div> {# End col #}
+    </div> {# End row #}
+
+</div> {# End Container #}
 {% endblock %}

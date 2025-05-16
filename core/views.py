@@ -20,6 +20,7 @@ from core.models import Session, Term, Student, Teacher, Guardian, Notification
 from core.models import Class, Subject, FeeAssignment, Enrollment, Payment, Assessment, Exam
 from core.models import SubjectAssignment, TeacherAssignment, ClassSubjectAssignment
 from core.models import SubjectResult, Result, StudentFeeRecord, FinancialRecord, AcademicAlert
+from core.utils import get_current_term, get_next_term   
 from core.forms import ClassSubjectAssignmentForm, NonAcademicSkillsForm, NotificationForm
 from core.session.forms import SessionForm
 from core.term.forms import TermForm
@@ -40,7 +41,8 @@ logger = logging.getLogger(__name__)
 def home(request):
     return render(request, 'home.html')
 
-from django.views.generic import TemplateView
+def about(request):
+    return render(request, 'about.html')
 
 def programs(request):
     return render(request, 'programs.html')
@@ -460,11 +462,133 @@ def AssignTeacherView(request):
     return render(request, 'setup/assign_teacher.html', context)
 
 class TeacherAssignmentListView(AdminRequiredMixin, ListView):
+    model = TeacherAssignment
     template_name = 'teacher_assignment/teacher_assignment_list.html'
+    context_object_name = 'teacher_assignments'
+    paginate_by = 25
 
-    def get(self, request):
-        teacher_assignments = TeacherAssignment.objects.all()
-        return render(request, self.template_name, {'teacher_assignments': teacher_assignments})
+    def get_queryset(self):
+        return TeacherAssignment.objects.select_related(
+            'class_assigned',
+            'teacher__user',
+            'session',
+            'term'
+        ).order_by( 
+            'session__start_date',  
+            'term__order',          
+            'term_id', 
+            'class_assigned__name',
+            'teacher__user__last_name',
+            'teacher__user__first_name'  
+        )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        print("\n--- DEBUG: get_context_data ---") # Start marker
+        try:
+            # Assuming static methods or imported functions
+            current_term = Term.get_current_term()
+            next_term = Term.get_next_term(current_term)
+            print(f"DEBUG: current_term = {current_term} (ID: {getattr(current_term, 'id', 'N/A')}, Order: {getattr(current_term, 'order', 'N/A')})")
+            print(f"DEBUG: next_term = {next_term} (ID: {getattr(next_term, 'id', 'N/A')}, Order: {getattr(next_term, 'order', 'N/A')})")
+        except Exception as e:
+            current_term = None
+            next_term = None
+            print(f"DEBUG: EXCEPTION getting terms: {e}")
+            messages.error(self.request, "Could not determine current/next term information.")
+
+        context['current_term'] = current_term
+        context['next_term'] = next_term
+        context['show_rollover_button'] = False # Default
+
+        # Explicitly check attributes before using them
+        current_session = getattr(current_term, 'session', None)
+        next_session = getattr(next_term, 'session', None)
+        print(f"DEBUG: current_session = {current_session}")
+        print(f"DEBUG: next_session = {next_session}")
+
+        # Check if basic conditions are met
+        if current_term and next_term and current_session and next_session:
+            print("DEBUG: Basic conditions PASSED (current_term, next_term, sessions exist)")
+            try:
+                # CONDITION 4 CHECK: Assignments in NEXT term
+                assignments_in_next_term_count = TeacherAssignment.objects.filter(
+                    session=next_session, term=next_term
+                ).count()
+                print(f"DEBUG: [Condition 4] Assignments count in NEXT term ({next_term}): {assignments_in_next_term_count}")
+
+                if assignments_in_next_term_count == 0:
+                    print("DEBUG: [Condition 4] PASSED (Next term is empty)")
+
+                    # CONDITION 5 CHECK: Assignments in CURRENT term
+                    current_term_has_assignments = TeacherAssignment.objects.filter(
+                        session=current_session, term=current_term
+                    ).exists()
+                    print(f"DEBUG: [Condition 5] Assignments exist in CURRENT term ({current_term}): {current_term_has_assignments}")
+
+                    if current_term_has_assignments:
+                        print("DEBUG: [Condition 5] PASSED (Current term has assignments)")
+                        # *** Only set True if BOTH conditions passed ***
+                        context['show_rollover_button'] = True
+                        print("DEBUG: *** Setting show_rollover_button = True ***")
+                    else:
+                        print("DEBUG: [Condition 5] FAILED (Current term has NO assignments)")
+                else:
+                    print(f"DEBUG: [Condition 4] FAILED (Next term is NOT empty, count={assignments_in_next_term_count})")
+            except Exception as e:
+                print(f"DEBUG: EXCEPTION checking assignments: {e}")
+                # show_rollover_button remains False
+        else:
+            # This block executes if current_term, next_term, current_session, or next_session is None/invalid
+            print("DEBUG: Basic conditions FAILED (current_term, next_term, or sessions missing/invalid)")
+
+        print(f"DEBUG: Final context['show_rollover_button'] = {context['show_rollover_button']}")
+        print("--- END DEBUG: get_context_data ---\n") # End marker
+        return context
+
+class TeacherAssignmentRolloverView(AdminRequiredMixin, ListView):
+
+    def post(self, request, *args, **kwargs):
+        current_term = Term.get_current_term()
+        next_term = Term.get_next_term(current_term)
+
+        if not current_term or not next_term:
+            messages.error(request, "Cannot determine current or next term for rollover.")
+            return redirect('teacher_assignment_list') 
+
+        if TeacherAssignment.objects.filter(session=next_term.session, term=next_term).exists():
+             messages.warning(request, f"Assignments already exist for {next_term}. Rollover cancelled.")
+             return redirect('teacher_assignment_list')
+
+        assignments_to_copy = TeacherAssignment.objects.filter(
+            session=current_term.session, term=current_term
+        )
+
+        if not assignments_to_copy.exists():
+             messages.info(request, f"No assignments found in {current_term} to roll over.")
+             return redirect('teacher_assignment_list')
+
+        new_assignments = []
+        for assignment in assignments_to_copy:
+            new_assignments.append(
+                TeacherAssignment(
+                    class_assigned=assignment.class_assigned,
+                    teacher=assignment.teacher,
+                    session=next_term.session, 
+                    term=next_term,
+                    is_form_teacher=assignment.is_form_teacher
+                )
+            )
+
+        try:
+            # Requires PostgreSQL, SQLite >= 3.24, MySQL >= 8.0.19
+            with transaction.atomic():
+                TeacherAssignment.objects.bulk_create(new_assignments, ignore_conflicts=True)
+            messages.success(request, f"Successfully rolled over {len(new_assignments)} assignments from {current_term} to {next_term}.")
+        except Exception as e:
+            messages.error(request, f"An error occurred during rollover: {e}")
+
+        return redirect('teacher_assignment_list')
 
 class TeacherAssignmentDetailView(AdminRequiredMixin, DetailView):
     template_name = 'teacher_assignment/teacher_assignment_detail.html'
@@ -544,79 +668,187 @@ class SubjectAssignmentListView(ListView):
             'search_query': search_query,
         })
     
-class AssignClassSubjectView(CreateView, AdminRequiredMixin): 
-    template_name = 'setup/assign_class_subjects.html'
+class AssignClassSubjectView(AdminRequiredMixin, CreateView):
+    form_class = ClassSubjectAssignmentForm 
+    template_name = 'setup/assign_class_subjects.html' 
 
-    def get(self, request, pk):
-        """Display the form with pre-selected subjects for the class."""
+    def get(self, request, pk): # pk is likely the Class ID
         class_instance = get_object_or_404(Class, pk=pk)
-        current_session = Session.objects.filter(is_active=True).first()
-        current_term = Term.objects.filter(is_active=True).first()
-        assigned_subject_ids = ClassSubjectAssignment.objects.filter(
-            class_assigned=class_instance,
-            session=current_session,
-            term=current_term
-        ).values_list('subject_id', flat=True)
-        form = ClassSubjectAssignmentForm(initial={
+        # Fetch current session/term smartly
+        current_session = Session.objects.filter(is_active=True).first() or Session.objects.order_by('-start_date').first()
+        current_term = Term.objects.filter(is_active=True, session=current_session).first() or Term.objects.filter(session=current_session).order_by('-order').first()
+
+        assigned_subject_ids = []
+        if current_session and current_term:
+             assigned_subject_ids = ClassSubjectAssignment.objects.filter(
+                 class_assigned=class_instance,
+                 session=current_session,
+                 term=current_term
+             ).values_list('subject_id', flat=True)
+
+        form = self.form_class(initial={
             'subjects': list(assigned_subject_ids),
             'session': current_session,
             'term': current_term,
+            # 'class_assigned': class_instance # Usually not needed if URL provides pk
         })
-        return render(request, self.template_name, {'form': form, 'class_instance': class_instance, 'session': current_session, 'term': current_term})
+
+        existing_assignments = class_instance.subject_assignments.select_related(
+            'subject', 'session', 'term'
+        ).order_by('session__start_date', 'term__order', 'subject__name')
+
+        context = {
+            'form': form,
+            'class_instance': class_instance,
+            'existing_assignments': existing_assignments,
+            'is_update': False, # Or determine based on logic
+        }
+        return render(request, self.template_name, context)
 
     def post(self, request, pk):
-        """Handle the form submission to assign subjects."""
         class_instance = get_object_or_404(Class, pk=pk)
-        form = ClassSubjectAssignmentForm(request.POST)
+        form = self.form_class(request.POST)
 
         if form.is_valid():
             selected_subjects = form.cleaned_data['subjects']
             session = form.cleaned_data['session']
             term = form.cleaned_data['term']
 
-            # Remove unselected subjects for this session and term
-            ClassSubjectAssignment.objects.filter(
-                class_assigned=class_instance, session=session, term=term
-            ).exclude(subject__in=selected_subjects).delete()
+            # Use transaction for atomic update
+            with transaction.atomic():
+                # Remove assignments for subjects *not* selected in this term/session
+                ClassSubjectAssignment.objects.filter(
+                    class_assigned=class_instance, session=session, term=term
+                ).exclude(subject__in=selected_subjects).delete()
 
-            # Add new subjects
-            for subject in selected_subjects:
-                assignment, created = ClassSubjectAssignment.objects.get_or_create(
-                    class_assigned=class_instance,
-                    subject=subject,
-                    session=session,
-                    term=term
+                # Add or update assignments for selected subjects
+                assignments_to_create = []
+                existing_subject_ids = set(ClassSubjectAssignment.objects.filter(
+                     class_assigned=class_instance, session=session, term=term
+                ).values_list('subject_id', flat=True))
+
+                for subject in selected_subjects:
+                    # Only create if it doesn't already exist for this combo
+                    if subject.id not in existing_subject_ids:
+                         assignments_to_create.append(
+                             ClassSubjectAssignment(
+                                class_assigned=class_instance,
+                                subject=subject,
+                                session=session,
+                                term=term
+                            )
+                         )
+                if assignments_to_create:
+                    ClassSubjectAssignment.objects.bulk_create(assignments_to_create)
+
+            messages.success(request, f"Subject assignments updated successfully for {class_instance.name}, {term.name}, {session}.")
+            return redirect('class_detail', pk=class_instance.pk) # Redirect back to detail view
+        else:
+             # Re-fetch existing assignments if form is invalid
+             existing_assignments = class_instance.subject_assignments.select_related(
+                'subject', 'session', 'term'
+             ).order_by('session__start_date', 'term__order', 'subject__name')
+             messages.error(request, "Please correct the errors below.")
+             context = {
+                'form': form,
+                'class_instance': class_instance,
+                'existing_assignments': existing_assignments,
+                 'is_update': False,
+             }
+             return render(request, self.template_name, context)
+
+
+def class_subjects(request):
+
+    assignments = ClassSubjectAssignment.objects.select_related(
+        'class_assigned',
+        'subject',
+        'session',
+        'term'
+    ).order_by(
+        'term__session__start_date', 
+        'term__order',             
+        'class_assigned__name',    
+        'subject__name')           
+
+    # Rollover Button Logic
+    current_term = Term.get_current_term() # Assuming static method exists
+    next_term = Term.get_next_term(current_term) if current_term else None # Assuming static method exists
+    show_rollover_button = False
+
+    if current_term and next_term and hasattr(current_term, 'session') and hasattr(next_term, 'session'):
+         # Check if next term has any ClassSubjectAssignment records
+        next_term_is_empty = not ClassSubjectAssignment.objects.filter(
+            session=next_term.session, term=next_term
+        ).exists()
+
+        if next_term_is_empty:
+             # Check if current term has any ClassSubjectAssignment records
+             current_term_has_assignments = ClassSubjectAssignment.objects.filter(
+                 session=current_term.session, term=current_term
+             ).exists()
+             if current_term_has_assignments:
+                 show_rollover_button = True
+
+    context = {
+        'assignments': assignments, 
+        'current_term': current_term,
+        'next_term': next_term,
+        'show_rollover_button': show_rollover_button,
+    }
+
+    return render(request, 'setup/class_subjects.html', context)
+
+
+# --- NEW Rollover View ---
+class ClassSubjectRolloverView(AdminRequiredMixin, ListView):
+
+    def post(self, request, *args, **kwargs):
+        current_term = Term.get_current_term()
+        next_term = Term.get_next_term(current_term)
+
+        if not current_term or not next_term:
+            messages.error(request, "Cannot determine current or next term for rollover.")
+            return redirect('class_subjects_by_term') # Redirect to the accordion list
+
+        # Ensure terms and sessions are valid before proceeding
+        if not hasattr(current_term, 'session') or not current_term.session or \
+           not hasattr(next_term, 'session') or not next_term.session:
+            messages.error(request, "Term or session data is incomplete for rollover.")
+            return redirect('class_subjects_by_term')
+
+        # Double-check: Only proceed if the next term is empty
+        if ClassSubjectAssignment.objects.filter(session=next_term.session, term=next_term).exists():
+             messages.warning(request, f"Assignments already exist for {next_term}. Rollover cancelled.")
+             return redirect('class_subjects_by_term')
+
+        assignments_to_copy = ClassSubjectAssignment.objects.filter(
+            session=current_term.session, term=current_term
+        )
+
+        if not assignments_to_copy.exists():
+             messages.info(request, f"No subject assignments found in {current_term} to roll over.")
+             return redirect('class_subjects_by_term')
+
+        new_assignments = []
+        for assignment in assignments_to_copy:
+            new_assignments.append(
+                ClassSubjectAssignment(
+                    class_assigned=assignment.class_assigned,
+                    subject=assignment.subject,
+                    session=next_term.session, # Assign to the NEXT session/term
+                    term=next_term,
                 )
-                assignment.save()
-                # print(subject, 'assigned to', class_instance)
+            )
 
-            return redirect(reverse('class_subjects'))
+        try:
+            with transaction.atomic():
+                created_assignments = ClassSubjectAssignment.objects.bulk_create(new_assignments, ignore_conflicts=True)
+            messages.success(request, f"Successfully rolled over {len(created_assignments)} subject assignments from {current_term} to {next_term}.") # Count actual created
+        except Exception as e:
+            messages.error(request, f"An error occurred during rollover: {e}")
 
-        logger.error(f"Form is invalid: {form.errors}")
-        return render(request, self.template_name, {'form': form, 'class_instance': class_instance})
-
-
-def class_subjects(request): 
-    classes = Class.objects.all()
-    current_session = Session.objects.filter(is_active=True).first()
-    current_term = Term.objects.filter(is_active=True).first()
-
-    class_subjects_data = []
-
-    for class_instance in classes:
-        subjects = Subject.objects.filter(
-            class_assignments__class_assigned=class_instance,
-            class_assignments__session=current_session,
-            class_assignments__term=current_term
-        ).distinct()
-
-        class_subjects_data.append({
-            'class': class_instance,
-            'subjects': subjects
-        })
-
-    return render(request, 'setup/class_subjects.html', {'class_subjects_data': class_subjects_data})
-
+        return redirect('class_subjects_by_term')
 
 class DeleteClassSubjectAssigmentView(DeleteView, AdminRequiredMixin):
     def post(self, request, pk):

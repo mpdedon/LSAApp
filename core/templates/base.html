@@ -80,7 +80,7 @@
             <a class="nav-link" aria-current="page" href="{% url 'home' %}">Home</a>
           </li>
           <li class="nav-item">
-            <a class="nav-link" href="#">About Us</a> {# ADD URL #}
+            <a class="nav-link" href="{% url 'about_us' %}">About Us</a> 
           </li>
           <li class="nav-item">
             <a class="nav-link" href="{% url 'programs' %}">Programs</a>
@@ -105,7 +105,7 @@
                     <li><a class="dropdown-item" href="{% url 'teacher_list' %}"><i class="fas fa-chalkboard-teacher fa-fw me-2"></i>Teachers</a></li>
                     <li><a class="dropdown-item" href="{% url 'guardian_list' %}"><i class="fas fa-user-friends fa-fw me-2"></i>Guardians</a></li>
                     <li><a class="dropdown-item" href="{% url 'class_list' %}"><i class="fas fa-school fa-fw me-2"></i>Classes</a></li>
-                    <li><a class="dropdown-item" href="{% url 'school_setup' %}"><i class="fas fa-cogs fa-fw me-2"></i>School Setup</a></li>
+                    <li><a class="dropdown-item" href="{% url 'school-setup' %}"><i class="fas fa-cogs fa-fw me-2"></i>School Setup</a></li>
                 {% elif user.role == 'teacher' %}
                       <li><a class="dropdown-item" href="{% url 'teacher_dashboard' %}"><i class="fas fa-chalkboard-teacher fa-fw me-2"></i>Teacher Dashboard</a></li>
                 {% elif user.role == 'guardian' %}
@@ -146,87 +146,85 @@
 <div class="main-content-padding"></div>
 
   <!-- Main Content -->
-  {# Removed container here - let child templates decide if they need full width or container #}
-  <main>
-    {% block content %}
-    {% endblock %}
-  </main>
+  <div id="page-container">
+    <main id="content-wrap"> 
+        {% block content %}
+        {% endblock %}
+    </main>
 
-  <!-- Footer -->
-  <footer class="footer-section bg-dark text-white pt-5 pb-4"> {# More padding, darker background #}
+    <!-- Footer -->
+    <footer class="footer-section bg-dark text-white pt-4 pb-3"> 
     <div class="container">
-      <div class="row">
-        <!-- Column 1: About -->
-        <div class="col-md-4 mb-4">
-          <h5 class="text-uppercase mb-3 footer-heading"><img src="{% static 'images/logo.jpg' %}" alt="LearnSwift Academia Logo" height="25" class="me-2">LearnSwift Academia</h5> {# Use white logo version #}
-          <p class="footer-text">Nurturing faith, intellect, and practical skills for a balanced life. Preparing future leaders grounded in Islamic values.</p>
-          <address class="footer-text">
-            <i class="fas fa-map-marker-alt fa-fw me-2"></i>5 Bode Tobun Street, off Oniwaya Road, Agege, Lagos, Nigeria.<br>
-            <i class="fas fa-phone fa-fw me-2"></i><a href="tel:+2347034858160" class="text-white text-decoration-none">+234 703 485 8160</a><br>
-             <i class="fas fa-envelope fa-fw me-2"></i><a href="mailto:learnswift2020@gmail.com" class="text-white text-decoration-none">learnswift2020@gmail.com</a>
+      <div class="row gy-4"> {# Use gy-4 for vertical gap on smaller screens #}
+
+        <!-- Column 1: About & Contact -->
+        <div class="col-lg-5 col-md-6 mb-3 mb-md-0">
+          <h5 class="mb-3 footer-heading d-flex align-items-center">
+              <img src="{% static 'images/logo.jpg' %}" alt="LearnSwift Academia Logo" height="25" class="me-2"> {# Use white logo #}
+              LearnSwift Academia
+          </h5>
+          <p class="footer-text small mb-3">Nurturing faith, intellect, and practical skills for balanced, successful lives grounded in Islamic values.</p> {# Slightly shorter text #}
+          <address class="footer-text small mb-0"> {# Smaller font #}
+            <i class="fas fa-map-marker-alt fa-fw me-1 opacity-75"></i> 5 Bode Tobun St, Agege, Lagos<br>
+            <i class="fas fa-phone fa-fw me-1 opacity-75"></i> <a href="tel:+2347034858160" class="footer-link">+234 703 485 8160</a> |
+            <i class="fas fa-envelope fa-fw me-1 opacity-75 ms-1"></i> <a href="mailto:learnswift2020@gmail.com" class="footer-link">learnswift2020@gmail.com</a>
           </address>
         </div>
 
-        <!-- Column 2: Quick Links -->
-        <div class="col-md-2 col-6 mb-4">
-          <h5 class="text-uppercase mb-3 footer-heading">Quick Links</h5>
-          <ul class="list-unstyled footer-links">
-            <li><a href="{% url 'home' %}">Home</a></li>
-            <li><a href="#">About Us</a></li> {# Add URL #}
-            <li><a href="{% url 'programs' %}">Programs</a></li>
-            <li><a href="#">Blog</a></li> {# Add URL #}
-            <li><a href="#">Admissions</a></li> {# Add URL #}
-            <li><a href="#">Contact Us</a></li> {# Add URL #}
+        <!-- Column 2: Essential Links -->
+        <div class="col-lg-3 col-md-6 mb-3 mb-md-0">
+          <h5 class="mb-3 footer-heading">Explore</h5>
+          <ul class="list-unstyled footer-links small"> {# Smaller font #}
+            <div class="row"> {# Split links into two sub-columns for compactness #}
+                <div class="col-6">
+                     <li><a href="{% url 'home' %}">Home</a></li>
+                     <li><a href="#">About Us</a></li>
+                     <li><a href="{% url 'programs' %}">Programs</a></li>
+                     <li><a href="#">Admissions</a></li>
+                </div>
+                 <div class="col-6">
+                     <li><a href="#">Blog</a></li>
+                     <li><a href="#">Contact Us</a></li>
+                     <li><a href="#">Privacy Policy</a></li> {# Moved legal links here #}
+                     <li><a href="#">Terms of Service</a></li>
+                 </div>
+            </div>
           </ul>
         </div>
 
-        <!-- Column 3: Programs -->
-        <div class="col-md-3 col-6 mb-4">
-           <h5 class="text-uppercase mb-3 footer-heading">Our Focus</h5>
-           <ul class="list-unstyled footer-links">
-             <li><a href="{% url 'programs' %}">Islamic & Western Ed.</a></li>
-             <li><a href="{% url 'programs' %}">Arabic & Quran</a></li>
-             <li><a href="{% url 'programs' %}">Vocational Skills</a></li>
-             <li><a href="{% url 'programs' %}">Coding Academy</a></li>
-             <li><a href="{% url 'programs' %}">Online Learning</a></li>
-           </ul>
-        </div>
 
-         <!-- Column 4: Connect -->
-        <div class="col-md-3 mb-4">
-            <h5 class="text-uppercase mb-3 footer-heading">Connect With Us</h5>
-            {# Add actual links to your social media profiles #}
-            <a href="#" class="text-white me-3 fs-5"><i class="fab fa-facebook-f"></i></a>
-            <a href="#" class="text-white me-3 fs-5"><i class="fab fa-instagram"></i></a>
-            <a href="#" class="text-white me-3 fs-5"><i class="fab fa-twitter"></i></a>
-            <a href="#" class="text-white fs-5"><i class="fab fa-linkedin-in"></i></a>
+         <!-- Column 3: Connect & Newsletter -->
+        <div class="col-lg-4 col-md-12 text-md-start text-lg-end"> {# Align right on large screens #}
+             <h5 class="mb-3 footer-heading">Connect With Us</h5>
+             <div class="mb-3"> {# Social links #}
+                <a href="#" class="footer-social-link me-3" title="Facebook"><i class="fab fa-facebook-f"></i></a>
+                <a href="#" class="footer-social-link me-3" title="Instagram"><i class="fab fa-instagram"></i></a>
+                <a href="#" class="footer-social-link me-3" title="Twitter"><i class="fab fa-twitter"></i></a>
+                <a href="#" class="footer-social-link" title="LinkedIn"><i class="fab fa-linkedin-in"></i></a>
+             </div>
 
-            <h5 class="text-uppercase my-3 footer-heading">Newsletter</h5>
-            <form action="#" method="post"> {# Add your newsletter signup form action #}
+            {# Newsletter (Simplified) #}
+            <form action="#" method="post" class="mt-2">
                  {% csrf_token %}
-                 <div class="input-group mb-3">
-                    <input type="email" class="form-control form-control-sm" placeholder="Your Email" aria-label="Your Email" required>
-                    <button class="btn btn-success btn-sm" type="submit">Subscribe</button>
+                 <label for="footer-newsletter" class="form-label small visually-hidden">Newsletter</label> {# Hide label visually #}
+                 <div class="input-group input-group-sm">
+                    <input type="email" id="footer-newsletter" class="form-control" placeholder="Your Email for Newsletter" aria-label="Your Email for Newsletter" required>
+                    <button class="btn btn-success" type="submit" title="Subscribe"><i class="fas fa-paper-plane"></i></button>
                  </div>
              </form>
         </div>
-      </div>
-      <hr class="footer-divider">
-      <div class="row">
-        <div class="col-md-6 text-center text-md-start">
-          <p class="small mb-0">© {% now "Y" %} LearnSwift Academia. All Rights Reserved.</p>
-        </div>
-        <div class="col-md-6 text-center text-md-end">
-            <ul class="list-inline small mb-0">
-                <li class="list-inline-item"><a href="#" class="text-white text-decoration-none">Privacy Policy</a></li> {# Add URL #}
-                <li class="list-inline-item">|</li>
-                <li class="list-inline-item"><a href="#" class="text-white text-decoration-none">Terms of Service</a></li> {# Add URL #}
-            </ul>
-        </div>
-      </div>
-    </div>
-  </footer>
+      </div> {# End row #}
 
+      <hr class="footer-divider my-3"> {# Reduced margin my-3 #}
+
+      <div class="row">
+        <div class="col text-center">
+          <p class="small footer-text mb-0">© {% now "Y" %} LearnSwift Academia. All Rights Reserved.</p>
+        </div>
+      </div>
+    </div> {# End container #}
+    </footer>
+  </div>
   <!-- Scripts -->
   {# Place jQuery here if needed by older Bootstrap plugins, otherwise Bootstrap 5 doesn't require it #}
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>

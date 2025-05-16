@@ -1,14 +1,57 @@
-<!-- teacher_assignment_confirm_delete.html -->
-
 {% extends 'base.html' %}
+{% load static %}
 
-{% block title %}Confirm Delete Teacher Assignment{% endblock %}
+{% block title %}Confirm Deletion{% endblock %}
 
 {% block content %}
-<h2>Confirm Delete Teacher Assignment</h2>
-<p>Are you sure you want to delete the assignment for "{{ assignment.teacher.name }}"?</p>
-<form method="post">
-    {% csrf_token %}
-    <button type="submit">Delete</button>
-</form>
+<div class="container my-4">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-7">
+             <div class="card shadow-sm border-danger"> {# Added border-danger for visual cue #}
+                 <div class="card-header bg-danger text-white">
+                     <h4 class="card-title mb-0 h5"><i class="fas fa-exclamation-triangle me-2"></i>Confirm Deletion</h4>
+                 </div>
+                 <div class="card-body">
+                    <p class="lead">Are you sure you want to delete this teacher assignment?</p>
+                    <hr>
+                    <dl class="row mb-0">
+                        <dt class="col-sm-4">Teacher:</dt>
+                        <dd class="col-sm-8">
+                            {% if teacher_assignment.teacher.user %}
+                                {{ teacher_assignment.teacher.user.get_full_name }}
+                            {% else %}
+                                {{ teacher_assignment.teacher }}
+                            {% endif %}
+                        </dd>
+
+                        <dt class="col-sm-4">Class:</dt>
+                        <dd class="col-sm-8">{{ teacher_assignment.class_assigned.name }}</dd>
+
+                        <dt class="col-sm-4">Term:</dt>
+                        <dd class="col-sm-8">{{ teacher_assignment.term.name }} ({{ teacher_assignment.session }})</dd>
+
+                        <dt class="col-sm-4">Is Form Teacher:</dt>
+                        <dd class="col-sm-8">{% if teacher_assignment.is_form_teacher %}Yes{% else %}No{% endif %}</dd>
+                    </dl>
+                    <hr>
+                    <p class="text-danger fw-bold"><i class="fas fa-exclamation-circle me-1"></i>This action cannot be undone.</p>
+
+                 </div>
+                 <div class="card-footer bg-light d-flex justify-content-end"> {# Align buttons to the end #}
+                    {# The actual delete form #}
+                    <form method="post" class="me-2">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger">
+                           <i class="fas fa-trash-alt me-1"></i> Yes, Delete Permanently
+                        </button>
+                    </form>
+                    {# Cancel Button - Go back to the list or detail view #}
+                    <a href="{% url 'teacher_assignment_list' %}" class="btn btn-secondary">
+                        <i class="fas fa-times me-1"></i> Cancel
+                    </a>
+                 </div>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}
