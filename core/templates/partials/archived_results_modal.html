@@ -1,0 +1,35 @@
+{# templates/partials/archived_results_modal.html #}
+{% load message_filters %} {# Load filter if needed here too, or globally #}
+
+{% if past_results %}
+<div class="modal fade" id="archivedResultsModal-{{ student.id }}" tabindex="-1" aria-labelledby="archivedResultsModalLabel-{{ student.id }}" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-dialog-scrollable"> {# Added scrollable #}
+    <div class="modal-content">
+      <div class="modal-header">
+        <h5 class="modal-title" id="archivedResultsModalLabel-{{ student.id }}">Archived Results for {{ student.user.get_full_name }}</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+         {% if past_results %}
+         <p class="text-muted small">Select a term to view the result.</p>
+         <ul class="list-group">
+            {% for res_info in past_results %}
+                 <li class="list-group-item d-flex justify-content-between align-items-center">
+                    {{ res_info.term_name }} ({{ res_info.term.session.name|default:'' }}) {# Include session #}
+                    <a href="{% url 'view_student_result' student_id=res_info.student_id term_id=res_info.term_id %}" class="btn btn-sm btn-outline-primary py-1 px-2 action-btn">
+                        <i class="bi bi-eye me-1"></i> View
+                    </a>
+                </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+             <p class="text-center text-muted">No archived results found for this student.</p>
+        {% endif %}
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}

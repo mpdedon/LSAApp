@@ -19,7 +19,11 @@ from django.db.models import Sum, Avg, Q
 >>>>>>> 282effb8 (Scores & Broadsheet Issues)
 =======
 from django.db.models import Sum, Avg, Q, F
+<<<<<<< HEAD
 >>>>>>> fba3462f (Migration issues)
+=======
+from django.db.models import Count, Prefetch, OuterRef, Subquery
+>>>>>>> 71139c0a (Reviewed and New Templates)
 from django.utils import timezone
 from django.utils.functional import cached_property
 from datetime import date, timedelta, datetime
@@ -39,6 +43,9 @@ class Session(models.Model):
         start_year = self.start_date.year
         end_year = self.end_date.year
         return f"{start_year}-{end_year} Session"
+
+    class Meta:
+        ordering = ['start_date']
 
     def save(self, *args, **kwargs):
         if self.is_active:
@@ -61,17 +68,21 @@ class Term(models.Model):
     name = models.CharField(max_length=20, choices=TERM_OPTIONS)
     start_date = models.DateField()
     end_date = models.DateField()
+    order = models.PositiveIntegerField(default=0)
     is_active = models.BooleanField(default=True)
     original_is_active = None
+
+    class Meta:
+        unique_together = ('session', 'name') 
+        ordering = ['session__start_date', 'order']
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Store the initial state when the model instance is loaded
         self._original_is_active = self.is_active
 
-    @transaction.atomic # Ensure deactivation and activation are atomic
+    @transaction.atomic 
     def save(self, *args, **kwargs):
-        # Check if 'is_active' is being set to True AND it was False before
         if self.is_active and not self._original_is_active:
             Term.objects.filter(
                 session=self.session, # Only affect terms in the same session
@@ -150,7 +161,44 @@ class Term(models.Model):
                 dates.append(current_date)
             current_date += timedelta(days=1)
         return dates
+    
+    @staticmethod
+    def get_current_term():
+        """Gets the currently active term, or the latest term if none are active."""
+        current = Term.objects.filter(is_active=True).order_by('-session__start_date', '-order').first()
+        if not current:
+            # Fallback logic: get the term with the highest order in the highest session
+            current = Term.objects.order_by('-session__start_date', '-order').first()
+        return current
 
+    @staticmethod
+    def get_next_term(current_term):
+        """Gets the next term in sequence, handling session boundaries."""
+        if not current_term:
+            return None
+        # Ensure current_term has a session with a start_date
+        if not hasattr(current_term, 'session') or not current_term.session or not hasattr(current_term.session, 'start_date'):
+             return None # Cannot determine sequence without session start_date
+
+        # Try next term in the same session based on 'order'
+        next_term_in_session = Term.objects.filter(
+            session=current_term.session,
+            order__gt=current_term.order
+        ).order_by('order').first()
+
+        if next_term_in_session:
+            return next_term_in_session
+        else:
+            next_session = Session.objects.filter(
+                start_date__gt=current_term.session.start_date # **** USE start_date ****
+            ).order_by('start_date').first() # **** ORDER BY start_date ****
+
+            if next_session:
+                # Return the first term (lowest order) in that next session
+                return Term.objects.filter(session=next_session).order_by('order').first()
+
+        return None # No next term found
+    
     def __str__(self):
         return f"{self.name} ({self.session.name})"
 
@@ -438,30 +486,76 @@ class Class(models.Model):
 
     name = models.CharField(max_length=20, unique=True)
     school_level = models.CharField(max_length=20, choices=LEVEL_CHOICES, unique=False, default=None)
+<<<<<<< HEAD
     description = models.TextField()
     teacher = models.ForeignKey('Teacher', on_delete=models.SET_NULL, null=True, blank=True, related_name='classes')
     subjects = models.ManyToManyField('Subject', related_name='class_set', blank=True)  # Assuming you have a Subject model
+=======
+    description = models.TextField(blank=True, null=True)
+    subjects = models.ManyToManyField('Subject', related_name='class_set', blank=True)  
+>>>>>>> 71139c0a (Reviewed and New Templates)
     students = models.ManyToManyField('Student', related_name='classes', blank=True)
-    order = models.PositiveIntegerField(null=True)  # Order defines the class progression
+    order = models.PositiveIntegerField(null=True, blank=True, unique=True)
 
-    def next_class(self):
+<<<<<<< HEAD
+=======
+    def form_teacher(self):
+        """Retrieve the teacher who is the form teacher for this class."""
         try:
-            return Class.objects.get(order=self.order + 1)
+            # Use select_related to fetch related teacher and user efficiently in one go
+            form_teacher_assignment = TeacherAssignment.objects.select_related('teacher__user').filter(
+                class_assigned=self,
+                is_form_teacher=True
+            ).first()
+            return form_teacher_assignment.teacher if form_teacher_assignment else None
+        except NameError: # Handle case where TeacherAssignment is not defined/imported
+             print("Warning: TeacherAssignment model not found or imported.")
+             return None
+        except AttributeError: # Handle case where teacher or user is missing
+             print("Warning: Teacher or User missing for form teacher assignment.")
+             return None
+    
+>>>>>>> 71139c0a (Reviewed and New Templates)
+    def next_class(self):
+        if self.order is None:
+            return None
+        try:
+            return Class.objects.filter(order__gt=self.order).order_by('order').first()
         except Class.DoesNotExist:
             return None
-        
+
     def previous_class(self):
+        if self.order is None or self.order == 0: 
+            return None
         try:
-            return Class.objects.get(order=self.order - 1)
+            # Find the highest order less than the current one
+            return Class.objects.filter(order__lt=self.order).order_by('-order').first()
         except Class.DoesNotExist:
             return None
 
     def save(self, *args, **kwargs):
         if self.order is None:
-            max_order = Class.objects.aggregate(max_order=models.Max('order'))['max_order']
+            # Use aggregate safely, handling the None case
+            result = Class.objects.aggregate(max_order=models.Max('order'))
+            max_order = result.get('max_order') 
             self.order = 1 if max_order is None else max_order + 1
+<<<<<<< HEAD
         super().save(*args, **kwargs)
 
+=======
+
+        super().save(*args, **kwargs) 
+        
+        try:
+            class_subject_assignments = ClassSubjectAssignment.objects.filter(class_assigned=self)
+            assigned_subjects_ids = [assignment.subject.id for assignment in class_subject_assignments]
+            # Use set() for efficiency if you are adding/removing individually
+            self.subjects.set(assigned_subjects_ids)
+
+        except NameError:
+             print("Warning: ClassSubjectAssignment model not found or imported. Subject syncing skipped.")
+
+>>>>>>> 71139c0a (Reviewed and New Templates)
     def subject_count(self):
         return self.subjects.count()
     
@@ -469,7 +563,7 @@ class Class(models.Model):
         return self.students.count()
     
     def __str__(self):
-        return self.name
+        return f"{self.name} ({self.school_level})"
 
 
 class Subject(models.Model):
@@ -519,6 +613,7 @@ class TeacherAssignment(models.Model):
     class Meta:
         unique_together = ('class_assigned', 'teacher', 'session', 'term', 'is_form_teacher')
 
+    ordering = ['session__start_date', 'term__order', 'class_assigned__name', 'teacher__user__last_name']
     def __str__(self):
         form_indicator = " (Form Teacher)" if self.is_form_teacher else ""
         return f"{self.teacher} - {self.class_assigned}{form_indicator} ({self.session.name} - {self.term.name})"
@@ -552,6 +647,7 @@ class ClassSubjectAssignment(models.Model):
     
 
 class Assignment(models.Model):
+    term = models.ForeignKey('Term', on_delete=models.CASCADE, default=1)
     teacher = models.ForeignKey('Teacher', on_delete=models.CASCADE, default=1)
     title = models.CharField(max_length=255)
     description = models.CharField(max_length=500, null=True, blank=True)

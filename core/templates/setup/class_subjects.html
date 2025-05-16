@@ -1,33 +1,109 @@
 {% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Class Subjects by Term{% endblock %}
 
 {% block content %}
-<div class="container mt-5">
-    <h4 class="mb-4 text-center">Class Subjects Overview</h4>
-    <div class="row">
-        {% for class_data in class_subjects_data %}
-        <div class="col-md-4 mb-4">
-            <div class="card">
-                <div class="card-header text-center">
-                    <h5>{{ class_data.class.name }}</h5>
-                    <small>Total Subjects: {{ class_data.subjects|length }}</small>
-                </div>
-                <div class="card-body">
-                    {% if class_data.subjects %}
-                    <ul class="list-group">
-                        {% for subject in class_data.subjects %}
-                        <li class="list-group-item">{{ subject.name }}</li>
-                        {% endfor %}
-                    </ul>
-                    {% else %}
-                    <p class="text-muted text-center">No subjects assigned yet.</p>
-                    {% endif %}
-                </div>
-                <div class="card-footer text-center">
-                    <a href="{% url 'assign_class_subject' class_data.class.id %}" class="btn btn-primary mt-3"></a>
-                </div>
-            </div>
+<div class="container my-4">
+
+    <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap">
+        <h4 class="mb-0 me-3"><i class="fas fa-layer-group me-2"></i>Class Subjects by Term</h4>
+        <div class="d-flex align-items-center">
+            {# --- Rollover Button --- #}
+            {% if show_rollover_button and next_term and current_term %}
+                <form action="{% url 'rollover_class_subjects' %}" method="post" class="me-2">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-sm btn-warning"
+                            title="Copy all subject assignments from {{ current_term }} to {{ next_term }}"
+                            onclick="return confirm('Are you sure you want to copy all subject assignments from {{ current_term }} to {{ next_term }}?\nThis only works if the next term is empty and cannot be undone easily.')">
+                        <i class="fas fa-copy me-1"></i> Rollover Subjects to {{ next_term.name }}
+                    </button>
+                </form>
+            {% endif %}
+            {# Optional: Link back to general class list or setup page #}
+            <a href="{% url 'class_list' %}" class="btn btn-outline-secondary btn-sm mt-1 mt-md-0">
+               <i class="fas fa-arrow-left me-1"></i> Back to Class List
+            </a>
         </div>
-        {% endfor %}
     </div>
-</div>
+
+    {# --- Outer Regroup by Term --- #}
+    {% regroup assignments by term as assignments_by_term %}
+
+    <div class="accordion" id="classSubjectsAccordion">
+        {% for term_group in assignments_by_term %}
+            {# term_group.grouper is the Term object #}
+            {# term_group.list contains assignments for this term #}
+            <div class="accordion-item">
+                <h2 class="accordion-header" id="term-header-{{ term_group.grouper.id }}">
+                    <button class="accordion-button {% if term_group.grouper != current_term %}collapsed{% endif %}"
+                            type="button" data-bs-toggle="collapse"
+                            data-bs-target="#term-collapse-{{ term_group.grouper.id }}"
+                            aria-expanded="{% if term_group.grouper == current_term %}true{% else %}false{% endif %}"
+                            aria-controls="term-collapse-{{ term_group.grouper.id }}">
+                        <span class="me-2 fw-bold">{{ term_group.grouper.name }}</span>
+                        <span class="text-muted small">({{ term_group.grouper.session }})</span>
+                        {# Count distinct classes within this term's assignments for a more meaningful count #}
+                        {% with term_classes_count=term_group.list|length %} {# Approximation, better count requires more logic #}
+                            <span class="badge bg-primary rounded-pill ms-auto me-3">{{ term_classes_count }} Total Assignment{{ term_classes_count|pluralize }}</span>
+                        {% endwith %}
+                        {% if term_group.grouper == current_term %}
+                            <span class="badge bg-success me-2">Current Term</span>
+                        {% endif %}
+                    </button>
+                </h2>
+                <div id="term-collapse-{{ term_group.grouper.id }}"
+                     class="accordion-collapse collapse {% if term_group.grouper == current_term %}show{% endif %}"
+                     aria-labelledby="term-header-{{ term_group.grouper.id }}"
+                     data-bs-parent="#classSubjectsAccordion">
+                    <div class="accordion-body p-3">
+
+                        {# --- Inner Regroup by Class within Term --- #}
+                        {% regroup term_group.list by class_assigned as assignments_by_class %}
+
+                        {% if assignments_by_class %}
+                             <div class="row row-cols-1 row-cols-md-2 g-3"> {# Grid for class lists #}
+                                {% for class_assignments_group in assignments_by_class %}
+                                    {# class_assignments_group.grouper is the Class object #}
+                                    {# class_assignments_group.list contains assignments for this class in this term #}
+                                    <div class="col">
+                                        <div class="card h-100">
+                                            <div class="card-header bg-light py-2 px-3 d-flex justify-content-between align-items-center">
+                                                <h6 class="mb-0 h6">{{ class_assignments_group.grouper.name }}</h6>
+                                                <a href="{% url 'assign_class_subject' class_assignments_group.grouper.id %}" class="btn btn-outline-primary btn-sm py-0 px-1" title="Manage Subjects for {{ class_assignments_group.grouper.name }}">
+                                                    <i class="fas fa-edit small"></i> Manage
+                                                </a>
+                                            </div>
+                                            <div class="card-body py-2 px-3">
+                                                <ul class="list-unstyled mb-0 small">
+                                                    {% for assignment in class_assignments_group.list %}
+                                                        <li class="text-truncate" title="{{ assignment.subject.name }}">
+                                                            <i class="fas fa-book text-muted me-1"></i>{{ assignment.subject.name }}
+                                                        </li>
+                                                    {% empty %}
+                                                         <li class="text-muted fst-italic">No subjects assigned.</li>
+                                                    {% endfor %}
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                {% endfor %}
+                             </div>
+                        {% else %}
+                             <p class="text-center text-muted mb-0">No class subject assignments found for this term.</p>
+                        {% endif %}
+
+                    </div> {# End accordion-body #}
+                </div> {# End accordion-collapse #}
+            </div> {# End accordion-item #}
+        {% empty %}
+            <div class="col-12">
+                 <div class="alert alert-info text-center" role="alert">
+                    <i class="fas fa-info-circle me-1"></i> No subject assignments found for any term.
+                 </div>
+            </div>
+        {% endfor %}
+    </div> {# End Accordion #}
+
+</div> {# End Container #}
 {% endblock %}

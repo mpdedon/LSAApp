@@ -1,90 +1,146 @@
 {% extends 'base.html' %}
+{% load static %}
+
+{# Determine title based on the context variable 'is_update' passed from the view #}
+{% block title %}{% if is_update %}Update Teacher Assignment{% else %}Assign Teacher to Class{% endif %}{% endblock %}
+
 {% block content %}
 <div class="container my-4">
 
-    <div class="card shadow-sm mx-auto" style="max-width: 800px;">
-        <div class="card-header bg-secondary text-white text-center py-3">
-            <h5 class="mb-0">{% if is_update %}Update Teacher Assignment{% else %}Assign Teacher to Class{% endif %}</h5>
-        </div>
+    {# Center the card and control width #}
+    <div class="row justify-content-center">
+        <div class="col-md-9 col-lg-8 col-xl-7"> {# Adjust column sizes as needed #}
 
-        <div class="card-body p-3">
-
-            <!-- Error Messages -->
-            {% if error_message %}
-                <div class="alert alert-danger py-1 mb-3 text-center">{{ error_message }}</div>
-            {% endif %}
-            {% if form.non_field_errors %}
-                <div class="alert alert-danger py-1 mb-3 text-center">
-                    <ul class="list-unstyled mb-0">
-                        {% for error in form.non_field_errors %}
-                            <li>{{ error }}</li>
-                        {% endfor %}
-                    </ul>
-                </div>
-            {% endif %}
-
-            <form method="POST" novalidate>
-                {% csrf_token %}
-                
-                <div class="row gy-2">
-                    <div class="col-12">
-                        <div class="form-floating">
-                            {{ form.class_assigned }}
-                            <label for="class_assigned">Class Assigned</label>
-                            {% if form.class_assigned.errors %}
-                                <div class="text-danger small">{{ form.class_assigned.errors }}</div>
-                            {% endif %}
-                        </div>
-                    </div>
-
-                    <div class="col-12">
-                        <div class="form-floating">
-                            {{ form.teacher }}
-                            <label for="teacher">Teacher</label>
-                            {% if form.teacher.errors %}
-                                <div class="text-danger small">{{ form.teacher.errors }}</div>
-                            {% endif %}
-                        </div>
-                    </div>
-
-                    <div class="col-6">
-                        <div class="form-floating">
-                            {{ form.session }}
-                            <label for="session">Session</label>
-                            {% if form.session.errors %}
-                                <div class="text-danger small">{{ form.session.errors }}</div>
-                            {% endif %}
-                        </div>
-                    </div>
-
-                    <div class="col-6">
-                        <div class="form-floating">
-                            {{ form.term }}
-                            <label for="term">Term</label>
-                            {% if form.term.errors %}
-                                <div class="text-danger small">{{ form.term.errors }}</div>
-                            {% endif %}
-                        </div>
-                    </div>
-
-                    <div class="col-12">
-                        <div class="form-check mt-2">
-                            {{ form.is_form_teacher }}
-                            <label class="form-check-label" for="is_form_teacher">Is Form Teacher</label>
-                        </div>
-                    </div>
+            <div class="card shadow-sm">
+                <div class="card-header bg-light d-flex justify-content-between align-items-center flex-wrap">
+                    <h4 class="card-title mb-0 h5">
+                        {% if is_update %}
+                            <i class="fas fa-edit me-2"></i>Update Teacher Assignment
+                        {% else %}
+                            <i class="fas fa-plus-circle me-2"></i>Assign Teacher to Class
+                        {% endif %}
+                    </h4>
+                    {# Use a consistent 'Back to List' or 'Cancel' button #}
+                    <a href="{% url 'teacher_assignment_list' %}" class="btn btn-outline-secondary btn-sm mt-2 mt-md-0">
+                        <i class="fas fa-times me-1"></i> Cancel
+                    </a>
                 </div>
 
-                <div class="text-center mt-4">
-                    <button type="submit" class="btn btn-success px-5">
-                        {% if is_update %}Update{% else %}Assign{% endif %}
-                    </button>
-                    <a href="{% url 'teacher_assignment_list' %}" class="btn btn-outline-secondary ms-2">Back</a>
-                </div>
-            </form>
+                <div class="card-body p-4"> {# Added more padding #}
 
-        </div>
-    </div>
+                    <!-- General Error Messages -->
+                    {% if error_message %}
+                        <div class="alert alert-danger alert-dismissible fade show py-2 mb-3 text-center" role="alert">
+                            {{ error_message }}
+                            <button type="button" class="btn-close py-2" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    {% endif %}
+                    {% if form.non_field_errors %}
+                        <div class="alert alert-danger alert-dismissible fade show py-2 mb-3" role="alert">
+                            <ul class="list-unstyled mb-0">
+                                {% for error in form.non_field_errors %}
+                                    <li>{{ error }}</li>
+                                {% endfor %}
+                            </ul>
+                             <button type="button" class="btn-close py-2" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    {% endif %}
 
-</div>
+                    <form method="POST" novalidate>
+                        {% csrf_token %}
+
+                        {# Use row with gaps for vertical spacing #}
+                        <div class="row g-3">
+
+                            {# Class Assigned #}
+                            <div class="col-12">
+                                <div class="form-floating {% if form.class_assigned.errors %}is-invalid{% endif %}">
+                                    {# Render the field - Assuming widget has 'form-select' class via form definition #}
+                                    {{ form.class_assigned }}
+                                    <label for="{{ form.class_assigned.id_for_label }}">Class Assigned</label>
+                                </div>
+                                {% if form.class_assigned.errors %}
+                                    <div class="invalid-feedback d-block"> {# Use d-block for errors below floating #}
+                                        {{ form.class_assigned.errors|striptags }}
+                                    </div>
+                                {% endif %}
+                            </div>
+
+                            {# Teacher #}
+                            <div class="col-12">
+                                <div class="form-floating {% if form.teacher.errors %}is-invalid{% endif %}">
+                                     {# Render the field - Assuming widget has 'form-select' class via form definition #}
+                                    {{ form.teacher }}
+                                    <label for="{{ form.teacher.id_for_label }}">Teacher</label>
+                                </div>
+                                {% if form.teacher.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {{ form.teacher.errors|striptags }}
+                                    </div>
+                                {% endif %}
+                            </div>
+
+                            {# Session #}
+                            <div class="col-md-6"> {# Use medium columns for side-by-side #}
+                                <div class="form-floating {% if form.session.errors %}is-invalid{% endif %}">
+                                     {# Render the field - Assuming widget has 'form-select' class via form definition #}
+                                    {{ form.session }}
+                                    <label for="{{ form.session.id_for_label }}">Session</label>
+                                </div>
+                                {% if form.session.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {{ form.session.errors|striptags }}
+                                    </div>
+                                {% endif %}
+                            </div>
+
+                            {# Term #}
+                            <div class="col-md-6"> {# Use medium columns for side-by-side #}
+                                <div class="form-floating {% if form.term.errors %}is-invalid{% endif %}">
+                                     {# Render the field - Assuming widget has 'form-select' class via form definition #}
+                                    {{ form.term }}
+                                    <label for="{{ form.term.id_for_label }}">Term</label>
+                                </div>
+                                {% if form.term.errors %}
+                                    <div class="invalid-feedback d-block">
+                                        {{ form.term.errors|striptags }}
+                                    </div>
+                                {% endif %}
+                            </div>
+
+                            {# Is Form Teacher Checkbox #}
+                            <div class="col-12">
+                                <div class="form-check mt-2 {% if form.is_form_teacher.errors %}is-invalid{% endif %}">
+                                    {# Render checkbox - Assuming Django adds form-check-input class or it works visually #}
+                                    {{ form.is_form_teacher }}
+                                    <label class="form-check-label ms-1" for="{{ form.is_form_teacher.id_for_label }}">
+                                        Is Form Teacher?
+                                    </label>
+                                </div>
+                                {% if form.is_form_teacher.errors %}
+                                     <div class="invalid-feedback d-block">
+                                        {{ form.is_form_teacher.errors|striptags }}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        {# Submit Button - Moved outside the row #}
+                        <div class="text-center mt-4 pt-2 border-top"> {# Add border-top for separation #}
+                            <button type="submit" class="btn btn-success px-4"> {# Adjusted padding #}
+                                <i class="fas {% if is_update %}fa-save{% else %}fa-check{% endif %} me-1"></i>
+                                {% if is_update %}Update Assignment{% else %}Assign Teacher{% endif %}
+                            </button>
+                            {# Optional: Keep Back button here or rely on Cancel in header #}
+                            {# <a href="{% url 'teacher_assignment_list' %}" class="btn btn-outline-secondary ms-2">Back to List</a> #}
+                        </div>
+                    </form>
+
+                </div> {# End card-body #}
+            </div> {# End card #}
+
+        </div> {# End col #}
+    </div> {# End row #}
+
+</div> {# End Container #}
 {% endblock %}

@@ -474,6 +474,7 @@
                                             </a>
                                         </td>
                                     </tr>
+<<<<<<< HEAD
                                 {% endfor %}
                             {% empty %}
                                 <tr>
@@ -482,6 +483,69 @@
                             {% endfor %}
                         </tbody>
                     </table>
+=======
+                                </thead>
+                                <tbody>
+                                    {% for assigned_class in assigned_classes %}
+                                        <tr>
+                                            <td>{{ assigned_class.name }}</td>
+                                            <td>
+                                                {% for subject in class_subjects %}
+                                                    <a href="{% url 'input_scores' assigned_class.id subject.id current_term.id %}" class="btn btn-info btn-sm">
+                                                        Input Scores for {{ subject.name }} {{ current_term.name}}
+                                                    </a>
+                                                {% endfor %}
+                                            </td>
+                                        </tr>
+                                    {% empty %}
+                                        <tr>
+                                            <td colspan="2" class="text-center text-muted">No classes available.</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Subject Teaching Scores Section -->
+                    <button class="btn btn-secondary mb-3" type="button" data-bs-toggle="collapse" data-bs-target="#subjectTeachingScores" aria-expanded="false" aria-controls="subjectTeachingScores">
+                        Input Subject Teaching Scores
+                    </button>
+                    <div class="collapse" id="subjectTeachingScores">
+                        <div class="card card-body">
+                            <h5>Subject Teaching Scores</h5>
+                            <table class="table table-hover table-striped">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Class</th>
+                                        <th>Subject</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for class in classes_subjects_taught%}
+                                        {% for subject in subjects_taught %}
+                                            <tr>
+                                                <td>{{ class.name }}</td>
+                                                <td>{{ subject.name }}</td>
+                                                <td>
+                                                    <a href="{% url 'input_scores' class.id subject.id current_term.id %}" class="btn btn-info btn-sm">
+                                                        Input Scores
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    {% empty %}
+                                        <tr>
+                                            <td colspan="3" class="text-center text-muted">No subject assignments available.</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+>>>>>>> 71139c0a (Reviewed and New Templates)
                 </div>
             </div>
 

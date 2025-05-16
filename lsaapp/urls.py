@@ -26,15 +26,21 @@ from core.auth.views import RegisterView, GuardianRegistrationView, TeacherRegis
 =======
 =======
 from django.conf.urls import handler404, handler500, handler403, handler400
+<<<<<<< HEAD
 from core.views import custom_404, custom_500, custom_403, custom_400
 >>>>>>> 3cd82a6b (Debug Teacher Assgt & Programs)
 from core.views import home, send_test_email
+=======
+
+>>>>>>> 71139c0a (Reviewed and New Templates)
 from core.auth.views import RegisterView, GuardianRegisterView, TeacherRegisterView
 >>>>>>> a6eaa791 (Production Errors Debug)
 from core.auth.views import CustomLoginView, CustomLogoutView
 from core.auth.views import PasswordResetView, PasswordResetDoneView, PasswordResetConfirmView, PasswordResetCompleteView
 from core.auth.views import teacher_dashboard, student_dashboard, guardian_dashboard
-from core.views import AdminDashboardView, PromoteStudentView, programs
+from core.views import custom_404, custom_500, custom_403, custom_400
+from core.views import home, send_test_email
+from core.views import AdminDashboardView, PromoteStudentView, programs, about
 from core.views import CreateNotificationView, NotificationListView
 from core.views import SessionListView, SessionDetailView, SessionCreateView, SessionUpdateView, SessionDeleteView
 from core.views import TermListView, TermDetailView, TermCreateView, TermUpdateView, TermDeleteView, activate_term_view
@@ -44,7 +50,16 @@ from core.views import promote_student, repeat_student, demote_student, mark_dor
 from core.views import create_assessment, admin_assessment_list, approve_assessment, pending_approvals, view_assessment, class_subjects
 from core.views import create_exam, admin_exam_list, approve_exam, pending_approvals, view_exam, class_subjects
 from core.views import broadsheets, view_broadsheet, approve_broadsheet, archive_broadsheet
+<<<<<<< HEAD
 >>>>>>> 7544ea50 (Broadsheets, Archived Result, Payments)
+=======
+from core.views import FeeAssignmentCreateView, FeeAssignmentListView, FeeAssignmentUpdateView, FeeAssignmentDetailView, FeeAssignmentDeleteView, StudentFeeRecordListView
+from core.views import PaymentCreateView, PaymentListView, PaymentUpdateView, PaymentDetailView, PaymentDeleteView, FinancialRecordListView
+from core.views import StudentClassEnrollmentView, StudentEnrollmentsView
+from core.views import AssignSubjectView, AssignTeacherView, AssignClassSubjectView, ClassSubjectRolloverView, DeleteClassSubjectAssigmentView
+from core.views import TeacherAssignmentListView, TeacherAssignmentRolloverView, TeacherAssignmentUpdateView, TeacherAssignmentDetailView, TeacherAssignmentDeleteView
+from core.views import SubjectCreateView, SubjectListView, SubjectUpdateView, SubjectDetailView, SubjectDeleteView
+>>>>>>> 71139c0a (Reviewed and New Templates)
 from core.student.views import StudentListView, StudentCreateView, StudentUpdateView, StudentDetailView, StudentDeleteView, BulkUpdateStudentsView, export_students, student_reports
 from core.student.views import submit_assignment
 from core.teacher.views import TeacherListView, TeacherCreateView, TeacherUpdateView, TeacherDetailView, TeacherDeleteView, TeacherBulkActionView, export_teachers, teacher_reports
@@ -53,13 +68,15 @@ from core.teacher.views import create_assignment, add_question, grade_assignment
 from core.guardian.views import GuardianListView, GuardianCreateView, GuardianUpdateView, GuardianDetailView, GuardianDeleteView, GuardianBulkActionView
 from core.guardian.views import financial_record_detail, view_student_result, export_guardians, guardian_reports
 from core.classes.views import ClassListView, ClassCreateView, ClassUpdateView, ClassDetailView, ClassDeleteView, EnrollStudentView
-from core.views import SubjectCreateView, SubjectListView, SubjectUpdateView, SubjectDetailView, SubjectDeleteView
 from core.results.views import ResultCreateView, ResultListView, ResultUpdateView, ResultDetailView, ResultDeleteView
+<<<<<<< HEAD
 from core.views import FeeAssignmentCreateView, FeeAssignmentListView, FeeAssignmentUpdateView, FeeAssignmentDetailView, FeeAssignmentDeleteView, StudentFeeRecordListView
 from core.views import PaymentCreateView, PaymentListView, PaymentUpdateView, PaymentDetailView, PaymentDeleteView, FinancialRecordListView
 from core.views import StudentClassEnrollmentView, StudentEnrollmentsView
 from core.views import AssignSubjectView, AssignTeacherView, AssignClassSubjectView, DeleteClassSubjectAssignmentView
 from core.views import TeacherAssignmentListView, TeacherAssignmentUpdateView, TeacherAssignmentDetailView, TeacherAssignmentDeleteView
+=======
+>>>>>>> 71139c0a (Reviewed and New Templates)
 from core.subject_assignment.views import SubjectAssignmentListView, SubjectAssignmentCreateView, SubjectAssignmentUpdateView, SubjectAssignmentDetailView, SubjectAssignmentDeleteView
 
 
@@ -71,6 +88,7 @@ urlpatterns = [
     # Home and Auth URLs
     path('', home, name='home'),
     path('programs/', programs, name='programs'),
+    path('about-us/', about, name='about_us'),
     path('register/', RegisterView.as_view(), name='register'),
     path('register/guardian/', GuardianRegisterView.as_view(), name='guardian_register'),
     path('register/teacher/', TeacherRegisterView.as_view(), name='teacher_register'),
@@ -82,7 +100,7 @@ urlpatterns = [
     path('reset/done/', PasswordResetCompleteView.as_view(), name='password_reset_complete'),
     
     # School Setup URLs
-    path('setup/', AdminDashboardView.as_view(), name='school_setup'),
+    path('setup/', AdminDashboardView.as_view(), name='school-setup'),
 
     path('create/', CreateNotificationView.as_view(), name='create_notification'),
     path('list/', NotificationListView.as_view(), name='notification_list'),
@@ -112,9 +130,10 @@ urlpatterns = [
     # Subject & Teacher Assignment URLs
     path('assign_teacher/', AssignTeacherView, name='assign_teacher'),
     path('teacher_assignments/', TeacherAssignmentListView.as_view(), name='teacher_assignment_list'),
-    path('teacher_assignments/update/<int:pk>', TeacherAssignmentUpdateView.as_view(), name='teacher_assignment_update'),
-    path('teacher_assignments/<int:pk>/', TeacherAssignmentDetailView.as_view(), name='teacher_assignment_detail'),
-    path('teacher_assignments/<int:pk>/delete/', TeacherAssignmentDeleteView.as_view(), name='teacher_assignment_delete'),
+    path('teacher-assignments/rollover/', TeacherAssignmentRolloverView.as_view(), name='rollover_teacher_assignments'),
+    path('teacher-assignments/update/<int:pk>', TeacherAssignmentUpdateView.as_view(), name='teacher_assignment_update'),
+    path('teacher-assignments/<int:pk>/', TeacherAssignmentDetailView.as_view(), name='teacher_assignment_detail'),
+    path('teacher-assignments/<int:pk>/delete/', TeacherAssignmentDeleteView.as_view(), name='teacher_assignment_delete'),
     
     path('assign_subject/', AssignSubjectView, name='assign_subject'),
     path('subject_assignments/', SubjectAssignmentListView.as_view(), name='subject_assignment_list'),
@@ -189,7 +208,13 @@ urlpatterns = [
     path('classes/<int:pk>/delete/', ClassDeleteView.as_view(), name='class_delete'),
     path('classes/<int:pk>/enrol/', EnrollStudentView.as_view(), name='enrol_student'),
     path('assign_class_subjects/<int:pk>/', AssignClassSubjectView.as_view(), name='assign_class_subject'),
+<<<<<<< HEAD
     path('class/subject-assignment/<int:pk>/delete/', DeleteClassSubjectAssignmentView.as_view(), name='delete_class_subject_assignment'),
+=======
+    path('class_subjects', class_subjects, name='class_subjects'),
+    path('class-subjects/rollover/', ClassSubjectRolloverView.as_view(), name='rollover_class_subjects'),
+    path('class_subjects/<int:pk>/delete/', DeleteClassSubjectAssigmentView.as_view(), name='delete_class_subjects'),
+>>>>>>> 71139c0a (Reviewed and New Templates)
 
     # Subject URLs
     path('subjects/', SubjectListView.as_view(), name='subject_list'),
