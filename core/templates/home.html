@@ -39,9 +39,9 @@
     "addressCountry": "NG"
   },
   "sameAs": [
-    "YOUR_FACEBOOK_URL",  {# Replace with actual URL #}
-    "YOUR_INSTAGRAM_URL", {# Replace with actual URL #}
-    "YOUR_X_URL"          {# Replace with actual URL #}
+    "YOUR_FACEBOOK_URL",  
+    "YOUR_INSTAGRAM_URL", 
+    "YOUR_X_URL"          
   ],
    "description": "LearnSwift Academia provides a balanced education combining Islamic values with modern academics, technology, and vocational skills for primary and secondary students in Lagos, Nigeria."
 }
@@ -128,7 +128,7 @@
                 <p class="lead text-muted mb-4">
                     Welcome to LearnSwift Academia, a unique Islamic school located in the heart of Agege, Lagos. We are dedicated to providing a nurturing environment where children receive a robust education encompassing both Western academic standards and profound Islamic teachings. Our mission is to cultivate intellectually curious, morally upright, and practically skilled individuals ready to contribute positively to society.
                 </p>
-                <a href="#" class="btn btn-outline-success me-2">Our Mission & Vision</a> {# TODO: Link to About page #}
+                <a href="{% url 'about_us' %}" class="btn btn-outline-success me-2">Our Mission & Vision</a>
                 <a href="{% url 'programs' %}" class="btn btn-success">See Our Programs</a>
             </div>
         </div>
@@ -178,7 +178,7 @@
         <h2 class="text-center text-uppercase text-primary mb-5 fw-bold section-heading">Our Unique Educational Approach</h2>
         <div class="row align-items-center gx-5">
             <div class="col-lg-6 mb-4 mb-lg-0">
-                <img src="{% static 'images/student.jpg' %}" alt="Students learning in a modern classroom at LearnSwift Academia" class="img-fluid rounded shadow">
+                <img src="{% static 'images/home-page.jpg' %}" alt="Students learning in a modern classroom at LearnSwift Academia" class="img-fluid rounded shadow">
             </div>
             <div class="col-lg-6">
                 <h3 class="fw-bold mb-3">More Than Just a School</h3>
@@ -199,14 +199,20 @@
 
 
 <!-- Testimonials Section -->
-<section class="py-5">
+<section class="py-5"> {# Increased padding a bit for better spacing overall py-5 instead of py-3 #}
     <div class="container">
         <h2 class="text-center text-uppercase text-primary mb-5 fw-bold section-heading">Voices From Our Community</h2>
-        <div id="testimonialCarousel" class="carousel slide" data-bs-ride="carousel">
-          <div class="carousel-inner">
+        <div id="testimonialCarousel" class="carousel slide" data-bs-ride="carousel" data-bs-interval="7000"> {# Optional: Slower interval for testimonials #}
+          <div class="carousel-indicators"> {# Added indicators for better navigation #}
+            <button type="button" data-bs-target="#testimonialCarousel" data-bs-slide-to="0" class="active" aria-current="true" aria-label="Testimonial 1"></button>
+            <button type="button" data-bs-target="#testimonialCarousel" data-bs-slide-to="1" aria-label="Testimonial 2"></button>
+            <button type="button" data-bs-target="#testimonialCarousel" data-bs-slide-to="2" aria-label="Testimonial 3"></button>
+          </div>
+          <div class="carousel-inner pb-4"> {# Added padding-bottom to inner to avoid controls overlap on small screens #}
             <div class="carousel-item active">
               <div class="testimonial-card p-4 p-md-5 shadow-sm bg-light rounded text-center mx-auto" style="max-width: 700px;">
-                  <img src="{% static 'images/director_mukhtar-optimized.jpg' %}" alt="Director Mukhtar" class="testimonial-img rounded-circle mb-3">
+                  {# Ensure the image is wrapped if more complex layout is needed, but for simple centering, img tag is fine #}
+                  <img src="{% static 'images/mukhtar_enhanced.jpg' %}" alt="Director Mukhtar of LearnSwift Academia" class="testimonial-img rounded-circle mb-3">
                   <p class="text-muted fst-italic mb-3">"LearnSwift isn't just about academics; it's about building future leaders grounded in faith and equipped with relevant skills. Our integrated approach truly prepares students for life."</p>
                   <h6 class="fw-bold text-success mb-0">- Director Mukhtar</h6>
                   <p class="small text-muted">School Director</p>
@@ -214,17 +220,17 @@
             </div>
             <div class="carousel-item">
               <div class="testimonial-card p-4 p-md-5 shadow-sm bg-light rounded text-center mx-auto" style="max-width: 700px;">
-                  <img src="{% static 'images/mrs_ahmad-optimized.jpg' %}" alt="Mrs. Ahmad" class="testimonial-img rounded-circle mb-3">
+                  <img src="{% static 'images/fatima_enhanced.jpg' %}" alt="Mrs. Ahmad, Teacher at LearnSwift Academia" class="testimonial-img rounded-circle mb-3">
                   <p class="text-muted fst-italic mb-3">"As a teacher here, I appreciate the focus on both knowledge and character. The supportive environment allows us to genuinely connect with and nurture each student."</p>
-                  <h6 class="fw-bold text-success mb-0">- Mrs. Ahmad</h6>
+                  <h6 class="fw-bold text-success mb-0">- Mrs. Fatima</h6>
                    <p class="small text-muted">Teacher</p>
               </div>
             </div>
             <div class="carousel-item">
                <div class="testimonial-card p-4 p-md-5 shadow-sm bg-light rounded text-center mx-auto" style="max-width: 700px;">
-                  <img src="{% static 'images/alhaji_bello-optimized.jpg' %}" alt="Alhaji Bello" class="testimonial-img rounded-circle mb-3">
+                  <img src="{% static 'images/sadiq_enhanced.jpg' %}" alt="Alhaji Bello, Parent at LearnSwift Academia" class="testimonial-img rounded-circle mb-3">
                   <p class="text-muted fst-italic mb-3">"We chose LearnSwift for the strong Islamic values combined with modern education. We've seen tremendous growth in our child's confidence, knowledge, and character. Highly recommended!"</p>
-                  <h6 class="fw-bold text-success mb-0">- Alhaji Bello</h6>
+                  <h6 class="fw-bold text-success mb-0">- Alhaji Sadiq Loko</h6>
                    <p class="small text-muted">Parent</p>
               </div>
             </div>
