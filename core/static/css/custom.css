@@ -481,3 +481,55 @@ footer {
 .bg-success-subtle { /* Already defined, used for team section */
     /* background-color: #e2f5ea; */
 }
+
+/* --- Testimonials Section --- */
+.testimonial-card {
+    border-left: 5px solid var(--bs-success); /* Accent border */
+    /* max-width: 700px; /* Already in inline style, which is fine for this case */
+    /* min-height: 300px; /* Optional: ensure cards have a minimum height */
+    display: flex; /* Added to help with vertical centering if needed */
+    flex-direction: column; /* Added */
+    justify-content: center; /* Added */
+}
+
+.testimonial-img {
+    width: 100px;  /* Or your desired width */
+    height: 100px; /* Or your desired height - should be same as width for circle */
+    object-fit: cover; /* Ensures the image covers the area, might crop if not square */
+    object-position: center; /* Centers the image within its box */
+    border: 4px solid #fff; /* White border to lift it from background */
+    box-shadow: 0 4px 10px rgba(0,0,0,0.15); /* Softer shadow */
+    /* margin: 0 auto 1rem; /* Centering image and adding margin bottom */
+    /* The mb-3 class on the img tag already handles bottom margin */
+}
+
+/* Style for testimonial carousel indicators */
+#testimonialCarousel .carousel-indicators button {
+    background-color: rgba(0, 0, 0, 0.25); /* Darker, semi-transparent */
+    border-radius: 50%; /* Make them circles */
+    width: 10px;
+    height: 10px;
+    margin-left: 5px;
+    margin-right: 5px;
+    border: none;
+}
+
+#testimonialCarousel .carousel-indicators .active {
+    background-color: var(--bs-primary); /* Active indicator color */
+}
+
+/* Adjust carousel controls to be more subtle or match theme */
+#testimonialCarousel .carousel-control-prev-icon,
+#testimonialCarousel .carousel-control-next-icon {
+    background-color: rgba(0, 0, 0, 0.3); /* Semi-transparent background for controls */
+    border-radius: 50%;
+    width: 2.5rem; /* Adjust size if needed */
+    height: 2.5rem;
+    background-size: 50% 50%;
+}
+
+#testimonialCarousel .carousel-control-prev,
+#testimonialCarousel .carousel-control-next {
+    width: 5%; /* Adjust hit area of controls */
+    /* You might need to adjust opacity or z-index if they interfere */
+}
