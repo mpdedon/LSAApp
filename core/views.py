@@ -484,13 +484,12 @@ class TeacherAssignmentListView(AdminRequiredMixin, ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        print("\n--- DEBUG: get_context_data ---") # Start marker
+        print("\n--- DEBUG: TeacherAssignmentListView.get_context_data ---")
         try:
-            # Assuming static methods or imported functions
             current_term = Term.get_current_term()
-            next_term = Term.get_next_term(current_term)
-            print(f"DEBUG: current_term = {current_term} (ID: {getattr(current_term, 'id', 'N/A')}, Order: {getattr(current_term, 'order', 'N/A')})")
-            print(f"DEBUG: next_term = {next_term} (ID: {getattr(next_term, 'id', 'N/A')}, Order: {getattr(next_term, 'order', 'N/A')})")
+            next_term = Term.get_next_term(current_term) # Pass current_term instance
+            print(f"DEBUG: current_term = {current_term} (ID: {getattr(current_term, 'id', 'N/A')}, Order: {getattr(current_term, 'order', 'N/A')}, Session: {getattr(current_term, 'session', 'N/A')})")
+            print(f"DEBUG: next_term = {next_term} (ID: {getattr(next_term, 'id', 'N/A')}, Order: {getattr(next_term, 'order', 'N/A')}, Session: {getattr(next_term, 'session', 'N/A')})")
         except Exception as e:
             current_term = None
             next_term = None
@@ -499,36 +498,28 @@ class TeacherAssignmentListView(AdminRequiredMixin, ListView):
 
         context['current_term'] = current_term
         context['next_term'] = next_term
-        context['show_rollover_button'] = False # Default
+        context['show_rollover_button'] = False
 
-        # Explicitly check attributes before using them
-        current_session = getattr(current_term, 'session', None)
-        next_session = getattr(next_term, 'session', None)
-        print(f"DEBUG: current_session = {current_session}")
-        print(f"DEBUG: next_session = {next_session}")
-
-        # Check if basic conditions are met
-        if current_term and next_term and current_session and next_session:
-            print("DEBUG: Basic conditions PASSED (current_term, next_term, sessions exist)")
+        # Check if basic conditions are met for rollover
+        if current_term and next_term and current_term.session and next_term.session:
+            print(f"DEBUG: Basic conditions PASSED (current_term: {current_term.id}, next_term: {next_term.id})")
             try:
-                # CONDITION 4 CHECK: Assignments in NEXT term
+                # CONDITION: No assignments in the NEXT term
                 assignments_in_next_term_count = TeacherAssignment.objects.filter(
-                    session=next_session, term=next_term
+                    session=next_term.session, term=next_term
                 ).count()
                 print(f"DEBUG: [Condition 4] Assignments count in NEXT term ({next_term}): {assignments_in_next_term_count}")
 
                 if assignments_in_next_term_count == 0:
                     print("DEBUG: [Condition 4] PASSED (Next term is empty)")
-
-                    # CONDITION 5 CHECK: Assignments in CURRENT term
+                    # CONDITION: Assignments exist in CURRENT term
                     current_term_has_assignments = TeacherAssignment.objects.filter(
-                        session=current_session, term=current_term
+                        session=current_term.session, term=current_term
                     ).exists()
                     print(f"DEBUG: [Condition 5] Assignments exist in CURRENT term ({current_term}): {current_term_has_assignments}")
 
                     if current_term_has_assignments:
                         print("DEBUG: [Condition 5] PASSED (Current term has assignments)")
-                        # *** Only set True if BOTH conditions passed ***
                         context['show_rollover_button'] = True
                         print("DEBUG: *** Setting show_rollover_button = True ***")
                     else:
@@ -537,13 +528,11 @@ class TeacherAssignmentListView(AdminRequiredMixin, ListView):
                     print(f"DEBUG: [Condition 4] FAILED (Next term is NOT empty, count={assignments_in_next_term_count})")
             except Exception as e:
                 print(f"DEBUG: EXCEPTION checking assignments: {e}")
-                # show_rollover_button remains False
         else:
-            # This block executes if current_term, next_term, current_session, or next_session is None/invalid
-            print("DEBUG: Basic conditions FAILED (current_term, next_term, or sessions missing/invalid)")
+            print("DEBUG: Basic conditions FAILED (current_term, next_term, or their sessions missing/invalid)")
 
         print(f"DEBUG: Final context['show_rollover_button'] = {context['show_rollover_button']}")
-        print("--- END DEBUG: get_context_data ---\n") # End marker
+        print("--- END DEBUG: TeacherAssignmentListView.get_context_data ---\n")
         return context
 
 class TeacherAssignmentRolloverView(AdminRequiredMixin, ListView):
@@ -674,34 +663,49 @@ class AssignClassSubjectView(AdminRequiredMixin, CreateView):
 
     def get(self, request, pk): # pk is likely the Class ID
         class_instance = get_object_or_404(Class, pk=pk)
-        # Fetch current session/term smartly
-        current_session = Session.objects.filter(is_active=True).first() or Session.objects.order_by('-start_date').first()
-        current_term = Term.objects.filter(is_active=True, session=current_session).first() or Term.objects.filter(session=current_session).order_by('-order').first()
+
+        # Use the robust model method to get current term
+        active_term = Term.get_current_term()
+        if not active_term:
+            messages.error(request, "No active term found. Cannot assign subjects.")
+            # Decide how to handle this - maybe redirect or show an error form state
+            active_session = Session.get_current_session() # Try to get session at least
+        else:
+            active_session = active_term.session
 
         assigned_subject_ids = []
-        if current_session and current_term:
+        if active_session and active_term:
              assigned_subject_ids = ClassSubjectAssignment.objects.filter(
                  class_assigned=class_instance,
-                 session=current_session,
-                 term=current_term
+                 session=active_session, # Use determined active session
+                 term=active_term      # Use determined active term
              ).values_list('subject_id', flat=True)
 
         form = self.form_class(initial={
             'subjects': list(assigned_subject_ids),
-            'session': current_session,
-            'term': current_term,
-            # 'class_assigned': class_instance # Usually not needed if URL provides pk
+            'session': active_session, # Pass the determined active session
+            'term': active_term,       # Pass the determined active term
         })
+        # Restrict form choices if needed
+        if active_session:
+            form.fields['session'].queryset = Session.objects.filter(pk=active_session.pk)
+            form.fields['session'].initial = active_session
+        if active_term:
+            form.fields['term'].queryset = Term.objects.filter(pk=active_term.pk)
+            form.fields['term'].initial = active_term
 
-        existing_assignments = class_instance.subject_assignments.select_related(
-            'subject', 'session', 'term'
-        ).order_by('session__start_date', 'term__order', 'subject__name')
+
+        existing_assignments = class_instance.subject_assignments.filter(
+             session=active_session, term=active_term # Show only relevant assignments
+        ).select_related('subject').order_by('subject__name')
 
         context = {
             'form': form,
             'class_instance': class_instance,
             'existing_assignments': existing_assignments,
-            'is_update': False, # Or determine based on logic
+            'current_session': active_session, # Pass to template for display
+            'current_term': active_term,       # Pass to template for display
+            'is_update': bool(assigned_subject_ids), # True if already has assignments for current
         }
         return render(request, self.template_name, context)
 
@@ -759,46 +763,33 @@ class AssignClassSubjectView(AdminRequiredMixin, CreateView):
 
 
 def class_subjects(request):
-
     assignments = ClassSubjectAssignment.objects.select_related(
-        'class_assigned',
-        'subject',
-        'session',
-        'term'
-    ).order_by(
-        'term__session__start_date', 
-        'term__order',             
-        'class_assigned__name',    
-        'subject__name')           
+        'class_assigned', 'subject', 'session', 'term'
+    ).order_by('term__session__start_date', 'term__order', 'class_assigned__name', 'subject__name')
 
-    # Rollover Button Logic
-    current_term = Term.get_current_term() # Assuming static method exists
-    next_term = Term.get_next_term(current_term) if current_term else None # Assuming static method exists
+    # Rollover Button Logic using new model methods
+    current_term = Term.get_current_term()
+    next_term = Term.get_next_term(current_term) if current_term else None
     show_rollover_button = False
 
-    if current_term and next_term and hasattr(current_term, 'session') and hasattr(next_term, 'session'):
-         # Check if next term has any ClassSubjectAssignment records
+    if current_term and next_term and current_term.session and next_term.session:
         next_term_is_empty = not ClassSubjectAssignment.objects.filter(
             session=next_term.session, term=next_term
         ).exists()
-
         if next_term_is_empty:
-             # Check if current term has any ClassSubjectAssignment records
-             current_term_has_assignments = ClassSubjectAssignment.objects.filter(
-                 session=current_term.session, term=current_term
-             ).exists()
-             if current_term_has_assignments:
-                 show_rollover_button = True
-
+            current_term_has_assignments = ClassSubjectAssignment.objects.filter(
+                session=current_term.session, term=current_term
+            ).exists()
+            if current_term_has_assignments:
+                show_rollover_button = True
+    # ... (rest of your context and render)
     context = {
-        'assignments': assignments, 
+        'assignments': assignments,
         'current_term': current_term,
         'next_term': next_term,
         'show_rollover_button': show_rollover_button,
     }
-
     return render(request, 'setup/class_subjects.html', context)
-
 
 # --- NEW Rollover View ---
 class ClassSubjectRolloverView(AdminRequiredMixin, ListView):
@@ -820,7 +811,7 @@ class ClassSubjectRolloverView(AdminRequiredMixin, ListView):
         # Double-check: Only proceed if the next term is empty
         if ClassSubjectAssignment.objects.filter(session=next_term.session, term=next_term).exists():
              messages.warning(request, f"Assignments already exist for {next_term}. Rollover cancelled.")
-             return redirect('class_subjects_by_term')
+             return redirect('class_subjects')
 
         assignments_to_copy = ClassSubjectAssignment.objects.filter(
             session=current_term.session, term=current_term
@@ -828,7 +819,7 @@ class ClassSubjectRolloverView(AdminRequiredMixin, ListView):
 
         if not assignments_to_copy.exists():
              messages.info(request, f"No subject assignments found in {current_term} to roll over.")
-             return redirect('class_subjects_by_term')
+             return redirect('class_subjects')
 
         new_assignments = []
         for assignment in assignments_to_copy:

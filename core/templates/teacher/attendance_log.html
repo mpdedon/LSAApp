@@ -1,56 +1,119 @@
 {% extends 'base.html' %}
+{% load attendance_filters humanize %}
 
-{% load attendance_filters %}
+{% block title %}Attendance Log - {{ class_instance.name }} - Week {{ selected_week_index|add:1 }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    .summary-table th, .summary-table td {
+        text-align: center;
+        vertical-align: middle;
+    }
+    .summary-table th:first-child, .summary-table td:first-child {
+        text-align: left;
+    }
+     .week-nav-label {
+        min-width: 150px;
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-<div class="container mt-4">
-    <h2 class="text-center">Attendance Summary for {{ class_instance.name }}</h2>
-
-    <!-- Week Navigation -->
-    <div class="text-center mb-4">
-        <div class="btn-group" role="group" aria-label="Week navigation">
-            {% if current_week > 0 %}
-            <a href="?week={{ current_week|add:"-1" }}" class="btn btn-outline-primary">Previous Week</a>
-            {% endif %}
-            <span class="btn btn-outline-dark">Week {{ current_week|add:1 }} of {{ weeks|length }}</span>
-            {% if current_week < max_week %}
-            <a href="?week={{ current_week|add:"1" }}" class="btn btn-outline-primary">Next Week</a>
-            {% endif %}
+<div class="container mt-4 mb-5">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="mb-0">Attendance Log: <span class="text-primary">{{ class_instance.name }}</span></h2>
+        <div>
+            <a href="{% url 'mark_attendance' class_instance.id %}" class="btn btn-outline-primary btn-sm me-2">
+                <i class="fas fa-edit me-1"></i> Mark/Edit Attendance
+            </a>
+            <a href="{% url 'teacher_dashboard' %}" class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-arrow-left me-1"></i> Back to Dashboard
+            </a>
         </div>
     </div>
+    <hr>
 
-    <!-- Attendance Table -->
-    <table class="table table-striped table-hover table-bordered">
-        <thead class="thead-dark">
-            <tr>
-                <th scope="col">Student Name</th>
-                <th scope="col">Total Present (Week {{ current_week|add:1 }})</th>
-                <th scope="col">Total Absent (Week {{ current_week|add:1 }})</th>
-                <th scope="col">Total Present (To Date)</th>
-                <th scope="col">Total Absent (To Date)</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for summary in student_attendance_summary %}
-            <tr>
-                <td>{{ summary.student.user.get_full_name }}</td>
-                <td>{{ summary.total_present_week }}</td>
-                <td>{{ summary.total_absent_week }}</td>
-                <td>{{ summary.total_present }}</td>
-                <td>{{ summary.total_absent }}</td>
-            </tr>
-            {% empty %}
-            <tr>
-                <td colspan="5" class="text-center">No attendance records found.</td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    <!-- Back Button -->
-    <div class="mb-3 text-end">
-        <a href="{% url 'teacher_dashboard' %}" class="btn btn-secondary">Back to Dashboard</a>
-        <a href="{% url 'mark_attendance' class_instance.id %}" class="btn btn-secondary">Back to Attendance Form</a>
-    </div>
-    
+    {% if no_active_term %}
+        <div class="alert alert-danger text-center" role="alert">
+            <strong>No active term found.</strong> Attendance log cannot be displayed.
+        </div>
+    {% elif no_weeks %}
+        <div class="alert alert-warning text-center" role="alert">
+            No weeks have been defined for the current term: {{ current_term.name }}.
+        </div>
+    {% else %}
+        <!-- Week Navigation -->
+        <div class="d-flex justify-content-between align-items-center my-4 p-3 bg-light rounded shadow-sm">
+            <div>
+                {% if selected_week_index > 0 %}
+                    <a href="?week={{ selected_week_index|add:"-1" }}{% for key, val in request.GET.items %}{% if key != 'week' %}&{{ key }}={{ val }}{% endif %}{% endfor %}" class="btn btn-primary btn-sm">
+                        <i class="fas fa-chevron-left me-1"></i> Prev Week
+                    </a>
+                {% else %}
+                    <span class="btn btn-primary btn-sm disabled" aria-disabled="true">
+                        <i class="fas fa-chevron-left me-1"></i> Prev Week
+                    </span>
+                {% endif %}
+            </div>
+            <div class="fw-bold fs-5 text-center week-nav-label">
+                Week {{ selected_week_index|add:1 }} <span class="text-muted small">of {{ weeks_for_nav|length }}</span>
+                 {% if current_term %}
+                    <div class="text-muted small" style="font-size: 0.8em;">({{ current_term.name }} - {{ current_term.session.name }})</div>
+                {% endif %}
+            </div>
+            <div>
+                {% if selected_week_index < max_week_index %}
+                    <a href="?week={{ selected_week_index|add:"1" }}{% for key, val in request.GET.items %}{% if key != 'week' %}&{{ key }}={{ val }}{% endif %}{% endfor %}" class="btn btn-primary btn-sm">
+                        Next Week <i class="fas fa-chevron-right ms-1"></i>
+                    </a>
+                {% else %}
+                    <span class="btn btn-primary btn-sm disabled" aria-disabled="true">
+                        Next Week <i class="fas fa-chevron-right ms-1"></i>
+                    </span>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if not student_attendance_summary %}
+            <div class="alert alert-info text-center" role="alert">
+                No attendance data to display for this class or week.
+            </div>
+        {% else %}
+            <div class="table-responsive">
+                <table class="table table-striped table-hover table-bordered summary-table">
+                    <thead class="table-light">
+                        <tr>
+                            <th scope="col" style="width: 30%;">Student Name</th>
+                            <th scope="col">Present (Week {{ selected_week_index|add:1 }})</th>
+                            <th scope="col">Absent (Week {{ selected_week_index|add:1 }})</th>
+                            <th scope="col">Present (Term Total)</th>
+                            <th scope="col">Absent (Term Total)</th>
+                            <th scope="col">Term Attendance %</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for summary in student_attendance_summary %}
+                        <tr>
+                            <td class="fw-medium">{{ summary.student.user.get_full_name|default:summary.student.user.username }}</td>
+                            <td>{{ summary.present_in_selected_week }}</td>
+                            <td>{{ summary.absent_in_selected_week }}</td>
+                            <td>{{ summary.total_present_term }}</td>
+                            <td>{{ summary.total_absent_term }}</td>
+                            <td>
+                                {% with total_days_term=summary.total_present_term|add:summary.total_absent_term %}
+                                    {% if total_days_term > 0 %}
+                                        {{ summary.total_present_term|percentage_of:total_days_term|floatformat:1 }}%
+                                    {% else %}
+                                        N/A
+                                    {% endif %}
+                                {% endwith %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% endif %} {# End if student_attendance_summary #}
+    {% endif %} {# End if no_active_term / no_weeks #}
 </div>
 {% endblock %}

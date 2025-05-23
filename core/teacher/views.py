@@ -13,6 +13,7 @@ from django.db.models import Q, Count, F
 from django.http import HttpResponseForbidden
 from datetime import date
 from decimal import Decimal 
+from collections import defaultdict
 from core.teacher.forms import TeacherRegistrationForm, MessageForm
 from core.models import Teacher, Student, Guardian, Class, Subject, Attendance, Assessment, Exam
 from core.models import Assignment, Question, AssignmentSubmission, AssessmentSubmission, ExamSubmission, AcademicAlert
@@ -31,6 +32,17 @@ logger = logging.getLogger(__name__)
 class AdminRequiredMixin(UserPassesTestMixin):
     def test_func(self):
         return self.request.user.is_superuser
+    
+def teacher_required(function):
+    def wrap(request, *args, **kwargs):
+        if request.user.role == 'teacher': # Adjust role check as per your CustomUser
+            return function(request, *args, **kwargs)
+        else:
+            messages.error(request, "You are not authorized to view this page.")
+            return redirect('login') # Or appropriate redirect
+    wrap.__doc__ = function.__doc__
+    wrap.__name__ = function.__name__
+    return wrap
     
 def TeacherRegisterView(request):
     if request.method == 'POST':
@@ -191,192 +203,221 @@ def teacher_reports(request):
     # Implement report generation logic here
     pass
 
+
 @login_required
+@teacher_required # Use your teacher role check
 def mark_attendance(request, class_id):
-    class_instance = Class.objects.get(id=class_id)
-    students = class_instance.enrolled_students.all()
+    try:
+        class_instance = get_object_or_404(Class, id=class_id)
 
-    # Fetch the active session and term
-    current_session = Session.objects.get(is_active=True)
-    current_term = Term.objects.filter(session=current_session, is_active=True).order_by('-start_date').first()
+        students = class_instance.enrolled_students.filter(status='active').order_by('user__last_name', 'user__first_name')
+    except Class.DoesNotExist:
+        messages.error(request, "Class not found.")
+        return redirect('teacher_dashboard') # Or a more appropriate error page
 
-    # Get the current week based on today's date and the term's start date
-    weeks = current_term.get_term_weeks()
-    # Calculate the current week (how many weeks have passed since the term started)
-    today = date.today()
-    start_date = current_term.start_date
-    current_week = (today - start_date).days // 7  # Calculate which week we're currently in
+    # Fetch the active term
+    current_term = Term.get_current_term() # Use the robust method from Term model
+    if not current_term:
+        messages.error(request, "No active term found. Attendance cannot be marked.")
+        context = {'class_instance': class_instance, 'students': students, 'no_active_term': True}
+        return render(request, 'teacher/mark_attendance.html', context)
 
-    # Handle the case where the `week` parameter is passed via the URL
-    selected_week = int(request.GET.get('week', current_week))
+    weeks_date_objects = current_term.get_term_weeks() # List of lists of date objects
+    if not weeks_date_objects:
+        messages.warning(request, f"No weeks defined for the current term: {current_term}.")
+        context = {'class_instance': class_instance, 'students': students, 'current_term': current_term, 'no_weeks': True}
+        return render(request, 'teacher/mark_attendance.html', context)
 
-    # Ensure the selected week is within a valid range
-    selected_week = max(0, min(selected_week, len(weeks) - 1))
+    # Determine default selected week (current calendar week or last viewed)
+    today = timezone.now().date()
+    default_week_index = 0
+    for i, week in enumerate(weeks_date_objects):
+        if week and today >= week[0] and today <= week[-1]: # Check if today falls within this week
+            default_week_index = i
+            break
+        elif week and today < week[0] and i == 0: # If today is before the first week, show first week
+            default_week_index = 0
+            break
+        elif week and today > week[-1] and i == len(weeks_date_objects) -1: # If today is after last week, show last week
+             default_week_index = i
+             break
 
-    # Determine the selected week's date range
-    if weeks and isinstance(weeks[selected_week], list):  # Ensure that weeks[selected_week] is a list
-        week_days = weeks[selected_week]  # Using the selected week's days directly for display
+
+    # "Remember Last Week" - Store in session
+    session_key_last_week = f'attendance_last_week_class_{class_id}'
+    if 'week' in request.GET:
+        selected_week_index = int(request.GET.get('week'))
+        request.session[session_key_last_week] = selected_week_index
     else:
-        week_days = []
+        selected_week_index = request.session.get(session_key_last_week, default_week_index)
 
-    # Exclude weekends (Saturday and Sunday)
-    week_days = [day for day in week_days if day.weekday() < 5]
+    # Ensure selected_week_index is valid
+    selected_week_index = max(0, min(selected_week_index, len(weeks_date_objects) - 1))
+    request.session[session_key_last_week] = selected_week_index # Update session with validated index
 
-    # Get attendance records for the week
-    if week_days:  # Ensure week_days is not empty
+    week_days_for_display = weeks_date_objects[selected_week_index] if selected_week_index < len(weeks_date_objects) else []
+    # Filter out weekends (Saturday=5, Sunday=6)
+    school_week_days = [day for day in week_days_for_display if day.weekday() < 5]
+
+    # Prepare attendance dictionary: {student_id: {'YYYY-MM-DD': 'present'/'absent'}}
+    attendance_dict = defaultdict(dict) # Use defaultdict
+    if school_week_days:
         attendance_records = Attendance.objects.filter(
             class_assigned=class_instance,
-            date__in=week_days,
-            term=current_term
+            date__in=school_week_days, # Use actual date objects for query
+            term=current_term,
+            student__in=students
         ).select_related('student')
-    else:
-        attendance_records = Attendance.objects.none()
 
-    # Prepare attendance dictionary: {student_id: {date: attendance_record}}
-    attendance_dict = {}
-    for record in attendance_records:
-        student_id = record.student.user.id
-        record_date = record.date  # Changed 'date' to 'record_date' to avoid confusion
-        if student_id not in attendance_dict:
-            attendance_dict[student_id] = {}
-        attendance_dict[student_id][record_date] = record.is_present
+        for record in attendance_records:
+            date_str = record.date.strftime('%Y-%m-%d')
+            status = "present" if record.is_present else "absent"
+            # For other statuses if you add them:
+            # if record.is_late: status = "late"
+            # elif record.is_excused: status = "excused"
+            attendance_dict[record.student_id][date_str] = status # Use student.id as key
 
     if request.method == 'POST':
-        # Check if attendance has already been submitted for this week
-        #if Attendance.objects.filter(class_assigned=class_instance, term=current_term, date__in=week_days).exists():
-        #    messages.error(request, "Attendance for this week has already been submitted and cannot be edited.")
-        #    return redirect('attendance_log', class_id=class_instance.id)
+        submitted_week_idx = int(request.POST.get('submitted_week_index', -1))
+        if submitted_week_idx != selected_week_index:
+            messages.error(request, "Week mismatch during submission. Please try again.")
+            return redirect(request.path_info + f"?week={selected_week_index}")
 
+        records_to_update_or_create = []
         for student in students:
-            for day in week_days:
-                day_str = day.strftime("%Y-%m-%d")
+            for day_obj in school_week_days: 
+                day_str = day_obj.strftime("%Y-%m-%d")
+                # Use student.id for consistency in name attribute
                 attendance_status = request.POST.get(f'attendance_{student.user.id}_{day_str}')
 
-                if attendance_status:
-                    is_present = True if attendance_status == 'present' else False
+                if attendance_status: # If 'present' or 'absent' was selected
+                    is_present_val = (attendance_status == 'present')
+                    is_absent_val = (attendance_status == 'absent')
+                    # Add other status checks if needed
+                    # is_late_val = (attendance_status == 'late')
+                    # is_excused_val = (attendance_status == 'excused')
 
-                    # Create or update attendance record for each day in the week
-                    attendance_record, created = Attendance.objects.update_or_create(
+                    # Prepare for update_or_create
+                    defaults = {'is_present': is_present_val}
+                    # Add other fields to defaults:
+                    # defaults['is_late'] = is_late_val
+                    # defaults['is_excused'] = is_excused_val
+                    # defaults['remarks'] = request.POST.get(f'remarks_{student.id}_{day_str}', '')
+
+                    Attendance.objects.update_or_create(
                         student=student,
-                        date=day,
+                        date=day_obj, 
                         class_assigned=class_instance,
                         term=current_term,
-                        defaults={'is_present': is_present}
+                        defaults=defaults
                     )
 
-        messages.success(request, "Attendance marked successfully.")
-        return redirect('attendance_log', class_id=class_instance.id)  # Redirect to the attendance log
+        messages.success(request, f"Attendance for Week {selected_week_index + 1} saved successfully.")
+        # Redirect to the same week to show saved changes
+        return redirect('attendance_log', class_id=class_instance.id)
 
-    # Get today's date
-    today = date.today()
 
-    # Determine the maximum week number based on today's date
-    max_week = next((i for i, week in enumerate(weeks) if week[-1] > today), len(weeks) - 1)
+    # Determine max_week correctly based on actual weeks defined
+    # max_week is the last valid index for weeks_date_objects
+    max_week_index = len(weeks_date_objects) - 1 if weeks_date_objects else 0
 
     context = {
         'class_instance': class_instance,
         'students': students,
-        'weeks': weeks,
-        'selected_week': selected_week,
-        'week_days': week_days,
+        'current_term': current_term,
+        'weeks_for_nav': weeks_date_objects, # Pass the full list for length calculation
+        'selected_week_index': selected_week_index, # Pass the 0-based index
+        'week_days_for_display': school_week_days, # Actual school days to iterate
         'attendance_dict': attendance_dict,
-        'current_week': current_week,
-        'total_weeks': len(weeks),  
-        'max_week': max_week,  
+        'max_week_index': max_week_index,
     }
-
     return render(request, 'teacher/mark_attendance.html', context)
 
 @login_required
+@teacher_required
 def attendance_log(request, class_id):
-    class_instance = Class.objects.get(id=class_id)
-    students = class_instance.enrolled_students.all()
+    try:
+        class_instance = get_object_or_404(Class, id=class_id)
+        students = class_instance.enrolled_students.filter(status='active').order_by('user__last_name', 'user__first_name')
+    except Class.DoesNotExist:
+        messages.error(request, "Class not found.")
+        return redirect('teacher_dashboard')
 
-    # Get active session and term
-    current_session = Session.objects.get(is_active=True)
-    current_term = Term.objects.filter(session=current_session, is_active=True).order_by('-start_date').first()
+    current_term = Term.get_current_term()
+    if not current_term:
+        messages.error(request, "No active term found. Cannot display attendance log.")
+        context = {'class_instance': class_instance, 'students': students, 'no_active_term': True}
+        return render(request, 'teacher/attendance_log.html', context)
 
-    # Get the current week based on today's date and the term's start date
-    weeks = current_term.get_term_weeks()
+    weeks_date_objects = current_term.get_term_weeks()
+    if not weeks_date_objects:
+        messages.warning(request, f"No weeks defined for the current term: {current_term}.")
+        context = {'class_instance': class_instance, 'students': students, 'current_term': current_term, 'no_weeks': True}
+        return render(request, 'teacher/attendance_log.html', context)
 
-    today = date.today()
-    start_date = current_term.start_date
-    current_week = (today - start_date).days // 7  # Calculate which week we're currently in
+    today = timezone.now().date()
+    default_week_index = 0
+    for i, week in enumerate(weeks_date_objects):
+        if week and today >= week[0] and today <= week[-1]:
+            default_week_index = i
+            break
+        elif week and today < week[0] and i == 0: default_week_index = 0; break
+        elif week and today > week[-1] and i == len(weeks_date_objects) -1: default_week_index = i; break
 
-    # Get the selected week from the URL or use the current week by default
-    selected_week = int(request.GET.get('week', current_week))
+    # Use session to remember last viewed log week, similar to mark_attendance
+    session_key_log_week = f'attendance_log_last_week_class_{class_id}'
+    if 'week' in request.GET:
+        selected_week_index = int(request.GET.get('week'))
+        request.session[session_key_log_week] = selected_week_index
+    else:
+        selected_week_index = request.session.get(session_key_log_week, default_week_index)
 
-    # Ensure the selected week is within valid range
-    selected_week = max(0, min(selected_week, len(weeks) - 1))
+    selected_week_index = max(0, min(selected_week_index, len(weeks_date_objects) - 1))
+    request.session[session_key_log_week] = selected_week_index # Update session
 
-    # Get the week days for the selected week
-    week_days = weeks[selected_week] if weeks and isinstance(weeks[selected_week], list) else []
+    week_days_for_log = weeks_date_objects[selected_week_index] if selected_week_index < len(weeks_date_objects) else []
+    school_week_days_for_log = [day for day in week_days_for_log if day.weekday() < 5]
 
-    # Exclude weekends (Saturday and Sunday)
-    week_days = [day for day in week_days if day.weekday() < 5]
-
-    # Get attendance records for the selected week
-    attendance_records = Attendance.objects.filter(
-        class_assigned=class_instance,
-        date__in=week_days,
-        term=current_term
-    ).select_related('student')
-    
-    # Summarize attendance for each student
     student_attendance_summary = []
-
     for student in students:
-        
-        total_present_week = Attendance.objects.filter(
-            class_assigned=class_instance,
-            term=current_term,
-            student=student,
-            is_present=True,
-            date__in=week_days  # Filter for current week
-        ).count()
-        
-        total_absent_week = Attendance.objects.filter(
-            class_assigned=class_instance,
-            term=current_term,
-            student=student,
-            is_present=False,
-            date__in=week_days  # Filter for current week
-        ).count()
+        # Per-week summary
+        present_in_selected_week = 0
+        absent_in_selected_week = 0
+        if school_week_days_for_log: # Only query if there are school days in the week
+            present_in_selected_week = Attendance.objects.filter(
+                student=student, term=current_term, date__in=school_week_days_for_log, is_present=True
+            ).count()
+            absent_in_selected_week = Attendance.objects.filter(
+                student=student, term=current_term, date__in=school_week_days_for_log, is_present=False
+            ).count()
 
-        # Total attendance to date
-        total_present = Attendance.objects.filter(
-            class_assigned=class_instance,
-            term=current_term,
-            student=student,
-            is_present=True
+        # Overall term summary
+        total_present_term = Attendance.objects.filter(
+            student=student, term=current_term, is_present=True
         ).count()
-        
-        total_absent = Attendance.objects.filter(
-            class_assigned=class_instance,
-            term=current_term,
-            student=student,
-            is_present=False
+        total_absent_term = Attendance.objects.filter(
+            student=student, term=current_term, is_present=False
         ).count()
-
-        today = date.today()
-
-        # Determine the maximum week number based on today's date
-        max_week = next((i for i, week in enumerate(weeks) if week[-1] > today), len(weeks) - 1)
 
         student_attendance_summary.append({
             'student': student,
-            'total_present_week': total_present_week,
-            'total_absent_week': total_absent_week,
-            'total_present': total_present,
-            'total_absent': total_absent,
+            'present_in_selected_week': present_in_selected_week,
+            'absent_in_selected_week': absent_in_selected_week,
+            'total_present_term': total_present_term,
+            'total_absent_term': total_absent_term,
         })
+
+    max_week_index = len(weeks_date_objects) - 1 if weeks_date_objects else 0
 
     context = {
         'class_instance': class_instance,
+        'students': students, # Pass students for iteration if needed
+        'current_term': current_term,
         'student_attendance_summary': student_attendance_summary,
-        'current_week': current_week,
-        'weeks': weeks,
-        'max_week': max_week,
+        'weeks_for_nav': weeks_date_objects,
+        'selected_week_index': selected_week_index,
+        'max_week_index': max_week_index,
+        'week_days_for_log_display': school_week_days_for_log, # For displaying the days in the log
     }
     return render(request, 'teacher/attendance_log.html', context)
 

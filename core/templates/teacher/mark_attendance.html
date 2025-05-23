@@ -1,64 +1,165 @@
 {% extends 'base.html' %}
+{% load attendance_filters %}
+{% load static humanize %}
 
-{% load attendance_filters %}  
-{% load static %}
+{% block title %}Mark Attendance - {{ class_instance.name }} - Week {{ selected_week_index|add:1 }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    .attendance-table th, .attendance-table td {
+        vertical-align: middle;
+        text-align: center; /* Center content in cells */
+    }
+    .attendance-table th:first-child, .attendance-table td:first-child {
+        text-align: left; /* Align student name left */
+    }
+    .attendance-table .btn-group-sm > .btn {
+        padding: .3rem .6rem; /* Slightly larger buttons */
+        font-size: .8rem;
+        min-width: 80px; /* Ensure buttons have some width */
+    }
+    .btn-check:checked + .btn-outline-success,
+    .btn-check:checked + .btn-outline-danger,
+    .btn-check:checked + .btn-outline-warning,
+    .btn-check:checked + .btn-outline-info {
+        font-weight: bold;
+        color: #fff; /* White text on active button */
+    }
+    .btn-check:checked + .btn-outline-success { background-color: var(--bs-success); border-color: var(--bs-success); }
+    .btn-check:checked + .btn-outline-danger { background-color: var(--bs-danger); border-color: var(--bs-danger); }
+    .btn-check:checked + .btn-outline-warning { background-color: var(--bs-warning); border-color: var(--bs-warning); color: #000 !important; } /* Dark text for warning */
+    .btn-check:checked + .btn-outline-info { background-color: var(--bs-info); border-color: var(--bs-info); }
+
+    .week-nav-label {
+        min-width: 150px; /* Ensure label doesn't jump around */
+    }
+</style>
+{% endblock %}
 
 {% block content %}
-<h2>Mark Attendance for {{ class_instance.name }}</h2>
+<div class="container mt-4 mb-5">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="mb-0">Mark Attendance: <span class="text-primary">{{ class_instance.name }}</span></h2>
+        <a href="{% url 'teacher_dashboard' %}" class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-arrow-left me-1"></i> Back to Dashboard
+        </a>
+    </div>
+    <hr>
 
-<!-- Navigation for weeks -->
-<div>
-    {% if selected_week > 0 %}
-        <a href="?week={{ selected_week|add:"-1" }}" class="btn btn-info">Previous Week</a>
+    {% if no_active_term %}
+        <div class="alert alert-danger text-center" role="alert">
+            <strong>No active term found.</strong> Attendance cannot be marked. Please contact an administrator.
+        </div>
+    {% elif no_weeks %}
+        <div class="alert alert-warning text-center" role="alert">
+            No weeks have been defined for the current term: {{ current_term.name }}.
+        </div>
     {% else %}
-        <span class="btn btn-info disabled">Previous Week</span>
+        <!-- Week Navigation -->
+        <div class="d-flex justify-content-between align-items-center my-4 p-3 bg-light rounded shadow-sm">
+            <div>
+                {% if selected_week_index > 0 %}
+                    <a href="?week={{ selected_week_index|add:"-1" }}{% for key, val in request.GET.items %}{% if key != 'week' %}&{{ key }}={{ val }}{% endif %}{% endfor %}" class="btn btn-primary btn-sm">
+                        <i class="fas fa-chevron-left me-1"></i> Prev Week
+                    </a>
+                {% else %}
+                    <span class="btn btn-primary btn-sm disabled" aria-disabled="true">
+                        <i class="fas fa-chevron-left me-1"></i> Prev Week
+                    </span>
+                {% endif %}
+            </div>
+            <div class="fw-bold fs-5 text-center week-nav-label">
+                Week {{ selected_week_index|add:1 }} <span class="text-muted small">of {{ weeks_for_nav|length }}</span>
+                {% if current_term %}
+                    <div class="text-muted small" style="font-size: 0.8em;">({{ current_term.name }} - {{ current_term.session.name }})</div>
+                {% endif %}
+            </div>
+            <div>
+                {% if selected_week_index < max_week_index %}
+                    <a href="?week={{ selected_week_index|add:"1" }}{% for key, val in request.GET.items %}{% if key != 'week' %}&{{ key }}={{ val }}{% endif %}{% endfor %}" class="btn btn-primary btn-sm">
+                        Next Week <i class="fas fa-chevron-right ms-1"></i>
+                    </a>
+                {% else %}
+                    <span class="btn btn-primary btn-sm disabled" aria-disabled="true">
+                        Next Week <i class="fas fa-chevron-right ms-1"></i>
+                    </span>
+                {% endif %}
+            </div>
+        </div>
+
+        {% if not students %}
+            <div class="alert alert-info text-center" role="alert">
+                No students enrolled in {{ class_instance.name }} for the current term.
+            </div>
+        {% elif not week_days_for_display %}
+            <div class="alert alert-info text-center" role="alert">
+                No school days (Mon-Fri) found for Week {{ selected_week_index|add:1 }}.
+            </div>
+        {% else %}
+            <form method="POST">
+                {% csrf_token %}
+                <input type="hidden" name="submitted_week_index" value="{{ selected_week_index }}">
+
+                <div class="table-responsive">
+                    <table class="table table-bordered table-hover align-middle attendance-table">
+                        <thead class="table-light text-center">
+                            <tr>
+                                <th scope="col" style="width: 20%; min-width: 150px;" class="text-start">Student Name</th>
+                                {% for day_obj in week_days_for_display %}
+                                    <th scope="col" style="min-width: 120px;"> {# Reduced min-width for buttons #}
+                                        <div>{{ day_obj|date:"D" }}</div>
+                                        <div class="small text-muted">{{ day_obj|date:"d M" }}</div>
+                                    </th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for student in students %}
+                                <tr>
+                                    <td class="fw-medium text-start">
+                                        {{ student.user.get_full_name|default:student.user.username }}
+                                    </td>
+                                    {% for day_obj in week_days_for_display %}
+                                        {% with day_str=day_obj|date:'Y-m-d' %} {# Use date string for dict lookup #}
+                                        {% with attendance_status=attendance_dict|get_item:student.user.id|get_item:day_str %}
+                                        <td>
+                                            <div class="btn-group btn-group-sm" role="group" aria-label="Attendance for {{ student.user.get_full_name }} on {{ day_str }}">
+                                                <input type="radio" class="btn-check"
+                                                       name="attendance_{{ student.user.id }}_{{ day_str }}"
+                                                       id="present_{{ student.user.id }}_{{ day_str }}"
+                                                       value="present" autocomplete="off"
+                                                       {% if attendance_status == "present" %}checked{% endif %} required>
+                                                <label class="btn btn-outline-success" for="present_{{ student.user.id }}_{{ day_str }}">
+                                                    <i class="fas fa-check d-sm-none"></i><span class="d-none d-sm-inline">Present</span>
+                                                </label>
+
+                                                <input type="radio" class="btn-check"
+                                                       name="attendance_{{ student.user.id }}_{{ day_str }}"
+                                                       id="absent_{{ student.user.id }}_{{ day_str }}"
+                                                       value="absent" autocomplete="off"
+                                                       {% if attendance_status == "absent" %}checked{% endif %} required>
+                                                <label class="btn btn-outline-danger" for="absent_{{ student.user.id }}_{{ day_str }}">
+                                                    <i class="fas fa-times d-sm-none"></i><span class="d-none d-sm-inline">Absent</span>
+                                                </label>
+
+                                            </div>
+                                        </td>
+                                        {% endwith %}
+                                        {% endwith %}
+                                    {% endfor %}
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="mt-4 text-center">
+                    <button type="submit" class="btn btn-success btn-lg px-5">
+                        <i class="fas fa-save me-2"></i>Save Attendance
+                    </button>
+                </div>
+            </form>
+        {% endif %}
     {% endif %}
-    <span>Week {{ selected_week|add:1 }} of {{ weeks|length }}</span>
-    {% if selected_week < max_week %}
-        <a href="?week={{ selected_week|add:"1" }}" class="btn btn-info">Next Week</a>
-    {% else %}
-        <span class="btn btn-info disabled">Next Week</span>
-    {% endif %}
-  </div>
-  
-<br>
-<form method="POST">
-    {% csrf_token %}
-    <table class="table table-striped">
-        <thead>
-            <tr>
-                <th>Student Name</th>
-                {% for day in week_days %}
-                    <th>{{ day|date:"D d M" }}</th> <!-- Display the date in a nice format -->
-                {% endfor %}
-            </tr>
-        </thead>
-        <tbody>
-            {% for student in students %}
-                <tr>
-                    <td>{{ student.user.get_full_name }}</td>
-                    {% for day in week_days %}
-                    <td>
-                      <label>
-                        <input type="radio" name="attendance_{{ student.user.id }}_{{ day|date:'Y-m-d' }}" value="present"
-                        {% if attendance_dict|get_item:student.id|get_item:day %} checked {% endif %}>
-                        Present
-                    </label>
-                    <label>
-                        <input type="radio" name="attendance_{{ student.user.id }}_{{ day|date:'Y-m-d' }}" value="absent"
-                        {% if attendance_dict|get_item:student.id|get_item:day %} checked {% endif %}>
-                        Absent
-                    </label>
-                  </td>
-                    {% endfor %}
-                </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-    <button type="submit" class="button btn-success">Submit Attendance</button>
-</form>
-<!-- Back Button -->
-<div class="mb-3 text-end">
-    <a href="{% url 'teacher_dashboard' %}" class="btn btn-secondary">Back to Dashboard</a>
 </div>
 {% endblock %}
