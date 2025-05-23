@@ -15,15 +15,30 @@ import json
 # Create your models here.
 
 class Session(models.Model):
-    start_date = models.DateField()
+    start_date = models.DateField(unique=True)
     end_date = models.DateField()
-    is_active = models.BooleanField(default=True)
+    is_active = models.BooleanField(default=False)
 
+    @transaction.atomic
+    def save(self, *args, **kwargs):
+        if self.is_active and not self._state.adding: 
+            # Get current active session if it exists and is not self
+            current_active = Session.objects.filter(is_active=True).exclude(pk=self.pk).first()
+            if current_active:
+                current_active.is_active = False
+                current_active.save(update_fields=['is_active']) # Avoid recursion
+        elif self._state.adding and self.is_active: 
+             Session.objects.filter(is_active=True).update(is_active=False) # Deactivate all others
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return self.name or f"Session {self.pk}"
+    
     @property
-    def name(self):
-        start_year = self.start_date.year
-        end_year = self.end_date.year
-        return f"{start_year}-{end_year} Session"
+    def name(self): 
+        if self.start_date and self.end_date:
+            return f"{self.start_date.year}-{self.end_date.year} Session"
+        return f"Session ID {self.pk}"
 
     class Meta:
         ordering = ['start_date']
@@ -33,8 +48,13 @@ class Session(models.Model):
             Session.objects.filter(is_active=True).update(is_active=False)
         super().save(*args, **kwargs)
 
-    def __str__(self):
-        return self.name
+    @classmethod
+    def get_current_session(cls):
+        return cls.objects.filter(is_active=True).order_by('-start_date').first()
+
+    def get_next_session(self):
+        """Gets the session immediately following this one."""
+        return Session.objects.filter(start_date__gt=self.end_date).order_by('start_date').first()
 
 
 class Term(models.Model):
@@ -45,12 +65,18 @@ class Term(models.Model):
         ('Third Term', 'Third'),
     ]
 
+    TERM_ORDER = {
+        'First Term': 1,
+        'Second Term': 2,
+        'Third Term': 3
+    }
+
     session = models.ForeignKey(Session, related_name='terms', on_delete=models.CASCADE)
     name = models.CharField(max_length=20, choices=TERM_OPTIONS)
     start_date = models.DateField()
     end_date = models.DateField()
-    order = models.PositiveIntegerField(default=0)
-    is_active = models.BooleanField(default=True)
+    order = models.IntegerField(editable=False, null=True, blank=True)
+    is_active = models.BooleanField(default=False)
     original_is_active = None
 
     class Meta:
@@ -64,29 +90,38 @@ class Term(models.Model):
 
     @transaction.atomic 
     def save(self, *args, **kwargs):
-        if self.is_active and not self._original_is_active:
-            Term.objects.filter(
-                session=self.session, # Only affect terms in the same session
-                is_active=True
-            ).exclude(pk=self.pk).update(is_active=False)
+        # Set order automatically based on name
+        self.order = self.TERM_ORDER.get(self.name)
 
+        # Activation logic
+        was_active_before_save = self._original_is_active
+        is_being_activated = self.is_active and not was_active_before_save
+
+        if is_being_activated:
+            with transaction.atomic():
+                # Deactivate other terms in the SAME session
+                Term.objects.filter(
+                    session=self.session, is_active=True
+                ).exclude(pk=self.pk).update(is_active=False)
+                # Ensure the parent session is active
+                if not self.session.is_active:
+                    self.session.is_active = True
+                    self.session.save() # This might trigger Session's save logic
         super().save(*args, **kwargs)
-
-        # Update the original state after saving
         self._original_is_active = self.is_active
-
+    
     def activate(self):
         """Explicit method to activate this term and deactivate others in the session."""
         if not self.is_active:
             self.is_active = True
             self.save() # The save method now contains the deactivation logic
 
-    def deactivate(self):
+    def deactivate(self): # Also check this one if you use it
         """Explicit method to deactivate this term."""
         if self.is_active:
             self.is_active = False
-            self.save() # Save method handles simple False -> False transition
-    
+            self.save()
+            
     def get_term_weeks(term):
         term_days = []
         current_date = term.start_date
@@ -143,45 +178,52 @@ class Term(models.Model):
             current_date += timedelta(days=1)
         return dates
     
-    @staticmethod
-    def get_current_term():
-        """Gets the currently active term, or the latest term if none are active."""
-        current = Term.objects.filter(is_active=True).order_by('-session__start_date', '-order').first()
-        if not current:
-            # Fallback logic: get the term with the highest order in the highest session
-            current = Term.objects.order_by('-session__start_date', '-order').first()
-        return current
+    @classmethod
+    def get_current_term(cls):
+        """Gets the currently active term. Assumes only one term is active at a time."""
+        return cls.objects.filter(is_active=True).select_related('session').first()
 
-    @staticmethod
-    def get_next_term(current_term):
-        """Gets the next term in sequence, handling session boundaries."""
-        if not current_term:
-            return None
-        # Ensure current_term has a session with a start_date
-        if not hasattr(current_term, 'session') or not current_term.session or not hasattr(current_term.session, 'start_date'):
-             return None # Cannot determine sequence without session start_date
+    def get_next_term_in_session(self):
+        """Gets the next term within the SAME session based on order."""
+        if self.order is None: return None
+        return Term.objects.filter(
+            session=self.session,
+            order__gt=self.order
+        ).order_by('order').select_related('session').first()
 
-        # Try next term in the same session based on 'order'
-        next_term_in_session = Term.objects.filter(
-            session=current_term.session,
-            order__gt=current_term.order
-        ).order_by('order').first()
+    def get_first_term_of_next_session(self):
+        """Gets the first term (order=1) of the next chronological session."""
+        next_session = self.session.get_next_session()
+        if next_session:
+            return Term.objects.filter(
+                session=next_session,
+                order=1 # Assuming first term is order 1
+            ).select_related('session').first()
+        return None
 
-        if next_term_in_session:
-            return next_term_in_session
-        else:
-            next_session = Session.objects.filter(
-                start_date__gt=current_term.session.start_date # **** USE start_date ****
-            ).order_by('start_date').first() # **** ORDER BY start_date ****
+    @classmethod
+    def get_next_term(cls, current_term_instance=None):
+        """
+        Determines the next logical term.
+        If current_term is provided, it finds the next one.
+        If not, it implies finding the next for the *globally* current term.
+        """
+        if not current_term_instance:
+            current_term_instance = cls.get_current_term()
 
-            if next_session:
-                # Return the first term (lowest order) in that next session
-                return Term.objects.filter(session=next_session).order_by('order').first()
+        if not current_term_instance:
+            return None # No current term, so no "next" term
 
-        return None # No next term found
-    
+        # Try to find next term in the same session
+        next_in_session = current_term_instance.get_next_term_in_session()
+        if next_in_session:
+            return next_in_session
+
+        # If no next term in current session, try first term of next session
+        return current_term_instance.get_first_term_of_next_session()
+
     def __str__(self):
-        return f"{self.name} ({self.session.name})"
+        return f"{self.name} ({self.session.name if self.session else 'No Session'})"
 
 # class CustomUserManager(BaseUserManager):
     def create_user(self, username, password=None, **extra_fields):
