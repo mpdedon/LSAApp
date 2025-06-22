@@ -19,6 +19,11 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+from django.conf.urls import handler404, handler500, handler403, handler400
+from django.contrib.sitemaps.views import sitemap
+>>>>>>> 1df42e70 (Assessment, Blog & Others)
 
 <<<<<<< HEAD
 from core.views import home
@@ -40,15 +45,20 @@ from core.auth.views import PasswordResetView, PasswordResetDoneView, PasswordRe
 from core.auth.views import teacher_dashboard, student_dashboard, guardian_dashboard
 from core.views import custom_404, custom_500, custom_403, custom_400
 from core.views import home, send_test_email
-from core.views import AdminDashboardView, PromoteStudentView, programs, about
+from core.views import AdminDashboardView, PromoteStudentView, programs, about, contact
 from core.views import CreateNotificationView, NotificationListView
 from core.views import SessionListView, SessionDetailView, SessionCreateView, SessionUpdateView, SessionDeleteView
 from core.views import TermListView, TermDetailView, TermCreateView, TermUpdateView, TermDeleteView, activate_term_view
 from core.views import promote_student, repeat_student, demote_student, mark_dormant_student, mark_left_student, mark_active
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
 from core.views import create_assessment, admin_assessment_list, approve_assessment, pending_approvals, view_assessment, class_subjects
 from core.views import create_exam, admin_exam_list, approve_exam, pending_approvals, view_exam, class_subjects
+=======
+from core.views import create_assessment, admin_assessment_list, approve_assessment, pending_assessments, view_assessment, admin_delete_assessment, assessment_submissions_list, class_subjects
+from core.views import create_exam, admin_exam_list, approve_exam, pending_approvals, view_exam
+>>>>>>> 1df42e70 (Assessment, Blog & Others)
 from core.views import broadsheets, view_broadsheet, approve_broadsheet, archive_broadsheet
 <<<<<<< HEAD
 >>>>>>> 7544ea50 (Broadsheets, Archived Result, Payments)
@@ -59,7 +69,12 @@ from core.views import StudentClassEnrollmentView, StudentEnrollmentsView
 from core.views import AssignSubjectView, AssignTeacherView, AssignClassSubjectView, ClassSubjectRolloverView, DeleteClassSubjectAssigmentView
 from core.views import TeacherAssignmentListView, TeacherAssignmentRolloverView, TeacherAssignmentUpdateView, TeacherAssignmentDetailView, TeacherAssignmentDeleteView
 from core.views import SubjectCreateView, SubjectListView, SubjectUpdateView, SubjectDetailView, SubjectDeleteView
+<<<<<<< HEAD
 >>>>>>> 71139c0a (Reviewed and New Templates)
+=======
+from core.views import PostCreateView, PostUpdateView, PostDeleteView, ManagePostListView
+from core.views import CategoryCreateView, CategoryUpdateView, ManageCategoryListView, TagCreateView, TagUpdateView, ManageTagListView
+>>>>>>> 1df42e70 (Assessment, Blog & Others)
 from core.student.views import StudentListView, StudentCreateView, StudentUpdateView, StudentDetailView, StudentDeleteView, BulkUpdateStudentsView, export_students, student_reports
 from core.student.views import submit_assignment
 from core.teacher.views import TeacherListView, TeacherCreateView, TeacherUpdateView, TeacherDetailView, TeacherDeleteView, TeacherBulkActionView, export_teachers, teacher_reports
@@ -67,6 +82,11 @@ from core.teacher.views import input_scores, broadsheet, mark_attendance, attend
 from core.teacher.views import create_assignment, add_question, grade_assignment, view_submitted_assignments, update_assignment, delete_assignment, assignment_detail, assignment_list
 from core.guardian.views import GuardianListView, GuardianCreateView, GuardianUpdateView, GuardianDetailView, GuardianDeleteView, GuardianBulkActionView
 from core.guardian.views import financial_record_detail, view_student_result, export_guardians, guardian_reports
+<<<<<<< HEAD
+=======
+from core.guardian.views import submit_assignment, submit_assessment, submit_exam
+from core.guardian.views import view_assignment_result, view_assessment_result, view_exam_result
+>>>>>>> 1df42e70 (Assessment, Blog & Others)
 from core.classes.views import ClassListView, ClassCreateView, ClassUpdateView, ClassDetailView, ClassDeleteView, EnrollStudentView
 from core.results.views import ResultCreateView, ResultListView, ResultUpdateView, ResultDetailView, ResultDeleteView
 <<<<<<< HEAD
@@ -78,17 +98,25 @@ from core.views import TeacherAssignmentListView, TeacherAssignmentUpdateView, T
 =======
 >>>>>>> 71139c0a (Reviewed and New Templates)
 from core.subject_assignment.views import SubjectAssignmentListView, SubjectAssignmentCreateView, SubjectAssignmentUpdateView, SubjectAssignmentDetailView, SubjectAssignmentDeleteView
+from core.blog.views import PostDetailView, PostListView, BlogSearchView
+from core.blog.sitemaps import PostSitemap, CategorySitemap
 
+
+sitemaps = {
+    'posts': PostSitemap,
+    'categories': CategorySitemap,
+}
 
 urlpatterns = [
 
     # Admin URL 
     path('admin/', admin.site.urls),
-   
+
     # Home and Auth URLs
     path('', home, name='home'),
     path('programs/', programs, name='programs'),
     path('about-us/', about, name='about_us'),
+    path('contact-us/', contact, name='contact_us'),
     path('register/', RegisterView.as_view(), name='register'),
     path('register/guardian/', GuardianRegisterView.as_view(), name='guardian_register'),
     path('register/teacher/', TeacherRegisterView.as_view(), name='teacher_register'),
@@ -99,6 +127,31 @@ urlpatterns = [
     path('reset/<uidb64>/<token>/', PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
     path('reset/done/', PasswordResetCompleteView.as_view(), name='password_reset_complete'),
     
+    # Blog URLS
+    path('blog', PostListView.as_view(), name='post_list'),
+    path('post/<slug:slug>/', PostDetailView.as_view(), name='post_detail'), \
+    path('category/<slug:category_slug>/', PostListView.as_view(), name='category_post_list'), 
+    path('tag/<slug:tag_slug>/', PostListView.as_view(), name='tag_post_list'),          
+    path('author/<str:username>/', PostListView.as_view(), name='author_post_list'),    
+    path('search/', BlogSearchView.as_view(), name='blog_search'), 
+    path('sitemap.xml', sitemap, {'sitemaps': sitemaps}, name='django.contrib.sitemaps.views.sitemap'),
+    path("ckeditor5/", include('django_ckeditor_5.urls')),
+    
+    path('post/<slug:slug>/', PostDetailView.as_view(), name='post_detail'),
+    path('category/<slug:category_slug>/', PostListView.as_view(), name='category_post_list'),
+    path('tag/<slug:tag_slug>/', PostListView.as_view(), name='tag_post_list'),
+    path('author/<str:username>/', PostListView.as_view(), name='author_post_list'),
+    path('posts/', ManagePostListView.as_view(), name='post_manage_list'),
+    path('posts/create/', PostCreateView.as_view(), name='manage_post_create'),
+    path('posts/<int:pk>/update/', PostUpdateView.as_view(), name='manage_post_update'),
+    path('posts/<int:pk>/delete/', PostDeleteView.as_view(), name='manage_post_delete'),
+    path('categories/', ManageCategoryListView.as_view(), name='manage_category_list'),
+    path('categories/create/', CategoryCreateView.as_view(), name='manage_category_create'),
+    path('categories/<int:pk>/update/', CategoryUpdateView.as_view(), name='manage_category_update'),
+    path('tags/', ManageTagListView.as_view(), name='manage_tag_list'),
+    path('tags/create/', TagCreateView.as_view(), name='manage_tag_create'),
+    path('tags/<int:pk>/update/', TagUpdateView.as_view(), name='manage_tag_update'),
+
     # School Setup URLs
     path('setup/', AdminDashboardView.as_view(), name='school-setup'),
 
@@ -186,6 +239,8 @@ urlpatterns = [
     path('assignments/submitted/', view_submitted_assignments, name='view_submitted_assignments'),
     path('assignments/<int:assignment_id>/edit/', update_assignment, name='update_assignment'),
     path('assignments/<int:assignment_id>/delete/', delete_assignment, name='delete_assignment'),
+    path('assignment/<int:assignment_id>/result/', view_assignment_result, name='view_assignment_result'),
+
 
     # Guardian URLs
     path('guardians/', GuardianListView.as_view(), name='guardian_list'),
@@ -246,6 +301,36 @@ urlpatterns = [
     path('payments/delete/<int:pk>/', PaymentDeleteView.as_view(), name='delete_payment'),
     path('financial-records/', FinancialRecordListView.as_view(), name='financial_record_list'),
 
+<<<<<<< HEAD
+=======
+    # Assessment URLs
+    path('assessments-create/', create_assessment, name='create_assessment'),
+    path('assessment/approve/<int:assessment_id>/', approve_assessment, name='approve_assessment'),
+    path('assessment/pending-assessments/', pending_assessments, name='pending_assessments'),
+    path('assessment/teacher-list/', teacher_assessment_list, name='teacher_assessment_list'),
+    path('admin-assessment-list/', admin_assessment_list, name='admin_assessment_list'),
+    path('assessment/<int:assessment_id>/', view_assessment, name='view_assessment'),
+    path('assessment/update/<int:assessment_id>/', update_assessment, name='update_assessment'),
+    path('admin_delete/<int:assessment_id>/', admin_delete_assessment, name='admin_delete_assessment'),
+    path('assessment/delete/<int:assessment_id>/', delete_assessment, name='delete_assessment'),
+    path('submit_assessment/<int:assessment_id>/', submit_assessment, name='submit_assessment'),
+    path('assessment/<int:assessment_id>/submissions/', assessment_submissions_list, name='assessment_submissions_list'),
+    path('grade-essay-assessment/<int:submission_id>/', grade_essay_assessment, name='grade_essay_assessment'),
+    path('assessment/<int:assessment_id>/result/', view_assessment_result, name='view_assessment_result'),
+
+    # Exam URLs
+    path('exams-create/', create_exam, name='create_exam'),
+    path('exam/approve/<int:exam_id>/', approve_exam, name='approve_exam'),
+    path('exam/pending-approvals/', pending_approvals, name='pending_approvals'),
+    path('exam/teacher-list/', teacher_exam_list, name='teacher_exam_list'),
+    path('admin-exam-list/', admin_exam_list, name='admin_exam_list'),
+    path('exam/<int:exam_id>/', view_exam, name='view_exam'),
+    path('exam/update/<int:exam_id>/', update_exam, name='update_exam'),
+    path('exam/delete/<int:exam_id>/', delete_exam, name='delete_exam'),
+    path('exam/submit_exam/<int:exam_id>/', submit_exam, name='submit_exam'),
+    path('exam/grade_exam/<int:submission_id>/', grade_essay_exam, name='grade_essay_exam'),
+    path('exam/<int:exam_id>/result/', view_exam_result, name='view_exam_result'),
+>>>>>>> 1df42e70 (Assessment, Blog & Others)
 ]
 
 <<<<<<< HEAD
@@ -259,3 +344,4 @@ handler500 = 'core.views.custom_500'
 >>>>>>> 3cd82a6b (Debug Teacher Assgt & Programs)
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

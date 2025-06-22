@@ -7,7 +7,12 @@ from .models import TeacherAssignment, SubjectAssignment, Assessment, Assignment
 from .models import Attendance, Expense, Payment, FeeAssignment, FinancialRecord
 from .models import Session, Term, Result, Enrollment, Holiday, SchoolDay, Message
 from .models import AssignmentSubmission, Notification, Exam, SubjectResult
+<<<<<<< HEAD
 from .models import CustomUser
+=======
+from .models import CustomUser, EmailCampaign
+from .models import Post, Category, Tag
+>>>>>>> 1df42e70 (Assessment, Blog & Others)
 
 
 admin.site.register(Student)
@@ -40,7 +45,7 @@ admin.site.register(Message)
 
 class UserAdmin(admin.ModelAdmin):
     list_display = ('username', 'email', 'role')  # Include role for visibility
-    list_filter = ('role',)  # Add a filter for role in admin
+    list_filter = ('role',)  
     fieldsets = (
         (None, {'fields': ('username', 'email', 'password', 'role')}),
     )
@@ -87,4 +92,57 @@ class StudentAdmin(admin.ModelAdmin):
     actions = [promote_students, repeat_students, demote_students, mark_students_dormant, mark_students_left]
 
 # Register model with admin
+<<<<<<< HEAD
 admin.site.register(Student, StudentAdmin)
+=======
+admin.site.register(Student, StudentAdmin)
+
+@admin.register(EmailCampaign)
+class EmailCampaignAdmin(admin.ModelAdmin):
+    list_display = ('subject', 'created_at')  # Use valid fields
+    search_fields = ('subject',)  # Add searchable fields
+
+@admin.register(Category)
+class CategoryAdmin(admin.ModelAdmin):
+    list_display = ('name', 'slug', 'created_at')
+    search_fields = ('name',)
+    # prepopulated_fields = {'slug': ('name',)} # Slug is auto-generated now
+
+@admin.register(Tag)
+class TagAdmin(admin.ModelAdmin):
+    list_display = ('name', 'slug', 'created_at')
+    search_fields = ('name',)
+    # prepopulated_fields = {'slug': ('name',)}
+
+@admin.register(Post)
+class PostAdmin(admin.ModelAdmin):
+    list_display = ('title', 'author', 'status', 'published_date', 'views_count')
+    list_filter = ('status', 'created_at', 'published_date', 'author', 'categories', 'tags')
+    search_fields = ('title', 'content')
+    # prepopulated_fields = {'slug': ('title',)} # Slug is auto-generated on save
+    raw_id_fields = ('author',) # Useful if many users
+    date_hierarchy = 'published_date'
+    ordering = ('status', '-published_date')
+    filter_horizontal = ('categories', 'tags') # Better UI for ManyToMany
+
+    fieldsets = (
+        (None, {
+            'fields': ('title', 'author', 'content', 'featured_image')
+        }),
+        ('Publication', {
+            'fields': ('status', 'published_date')
+        }),
+        ('Categorization', {
+            'fields': ('categories', 'tags')
+        }),
+        ('SEO', {
+            'classes': ('collapse',), # Collapsible section
+            'fields': ('meta_description', 'meta_keywords') 
+        }),
+    )
+    readonly_fields = ('slug', 'views_count', 'created_at', 'updated_at') 
+
+    def get_queryset(self, request):
+        # Show all posts in admin, not just published
+        return super().get_queryset(request)
+>>>>>>> 1df42e70 (Assessment, Blog & Others)

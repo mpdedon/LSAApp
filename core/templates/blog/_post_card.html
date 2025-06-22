@@ -1,0 +1,30 @@
+{% load static %}
+<div class="card blog-post-card mb-4 shadow-sm">
+    {% if post.featured_image %}
+        <a href="{{ post.get_absolute_url }}">
+            <img src="{{ post.featured_image.url }}" class="card-img-top" alt="{{ post.title }}">
+        </a>
+    {% endif %}
+    <div class="card-body">
+        {% for category in post.categories.all %}
+            <a href="{{ category.get_absolute_url }}" class="badge bg-primary text-decoration-none mb-2 me-1">{{ category.name }}</a>
+        {% endfor %}
+        <h3 class="card-title h5"><a href="{{ post.get_absolute_url }}" class="text-dark text-decoration-none stretched-link">{{ post.title }}</a></h3>
+        <p class="card-text text-muted small">
+            By <a href="#">{{ post.author.get_full_name|default:post.author.username }}</a>
+            on {{ post.published_date|date:"F d, Y" }}
+            {# Optional: Read time - needs a helper function/property #}
+            {# | <i class="far fa-clock"></i> 5 min read #}
+        </p>
+        <p class="card-text">{{ post.content|striptags|truncatewords_html:30 }}</p>
+        {# <a href="{{ post.get_absolute_url }}" class="btn btn-sm btn-outline-primary">Read More »</a> #}
+    </div>
+    <div class="card-footer bg-transparent border-top-0 d-flex justify-content-between align-items-center small text-muted">
+        <span>
+            {% for tag in post.tags.all %}
+                <a href="{{ tag.get_absolute_url }}" class="badge bg-secondary text-decoration-none me-1">{{ tag.name }}</a>
+            {% endfor %}
+        </span>
+        <span><i class="far fa-eye me-1"></i> {{ post.views_count }}</span>
+    </div>
+</div>

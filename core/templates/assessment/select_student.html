@@ -1,0 +1,37 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Select Student for {{ item_type_verbose }}: {{ item.title }}{% endblock %}
+
+{% block content %}
+<div class="container my-4 main-content-below-navbar">
+    <div class="row justify-content-center">
+        <div class="col-lg-8 col-md-10">
+            <div class="card shadow-lg border-0">
+                <div class="card-header bg-info text-white text-center">
+                    <h4 class="mb-0">Select Student for {{ item_type_verbose }}: "{{ item.title }}"</h4>
+                </div>
+                <div class="card-body p-4 p-md-5">
+                    <p class="text-center text-muted mb-4">You have multiple children enrolled in the relevant class. Please choose which child you are proceeding for.</p>
+                    
+                    <div class="list-group">
+                        {% for student_obj in students %}
+                            {# ... your debug divs ... #}
+                            <a href="{% url submit_url_name item.id %}?student_id={{ student_obj.user.id }}" class="list-group-item list-group-item-action ...">
+                                Student: {{ student_obj.user.get_full_name|default:student_obj.user.username }} 
+                                (Click to submit with User ID: {{ student_obj.user.id }})
+                            </a>
+                        {% endfor %}
+                    </div>
+
+                    <div class="text-center mt-4">
+                        <a href="{% url 'guardian_dashboard' %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left me-1"></i> Back to Dashboard
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
