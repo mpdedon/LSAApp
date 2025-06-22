@@ -1,0 +1,22 @@
+{% extends 'blog/_manage_base.html' %}
+{% load crispy_forms_tags %} {# Optional #}
+
+{% block manage_page_title %}{{ page_title|default:"Manage Category" }}{% endblock %}
+{% block manage_content_title %}{{ page_title|default:"Manage Category" }}{% endblock %}
+
+{% block manage_content %}
+    <form method="post" novalidate>
+        {% csrf_token %}
+
+        {# If using crispy-forms #}
+        {% crispy form %}
+        
+        <hr>
+        <div class="d-flex justify-content-end">
+            <a href="{% url 'manage_category_list' %}" class="btn btn-secondary me-2">Cancel</a>
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-save me-1"></i> Save Category
+            </button>
+        </div>
+    </form>
+{% endblock %}

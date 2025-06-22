@@ -4,11 +4,14 @@ from django.core.exceptions import ValidationError
 from django.contrib.auth.models import AbstractUser
 from django.conf import settings
 from django.db.models import Sum, Avg, Q, F
-from django.db.models import Count, Prefetch, OuterRef, Subquery
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.functional import cached_property
-from datetime import date, timedelta, datetime
+from django.utils.text import slugify
+from django.utils.html import strip_tags
+from datetime import date, timedelta
 from decimal import Decimal
+from django_ckeditor_5.fields import CKEditor5Field
 import json
 
 
@@ -754,16 +757,46 @@ class OnlineQuestion(models.Model):
     question_text = models.TextField()
     options = models.JSONField(null=True, blank=True)  # For SCQ/MCQ, store choices as JSON
     correct_answer = models.CharField(max_length=255, null=True, blank=True)  # For SCQ/MCQ correct answer
+    points = models.PositiveIntegerField(default=1)
 
     def __str__(self):
         return self.question_text
     
     def options_list(self):
-        if isinstance(self.options, list):
+        if self.options and isinstance(self.options, list):
             return self.options
-        elif isinstance(self.options, str):
-            return json.loads(self.options)
+        elif self.options and isinstance(self.options, str):
+            try:
+                return json.loads(self.options)
+            except json.JSONDecodeError:
+                return []
         return []
+
+    def is_option_correct(self, submitted_answer):
+        if not self.correct_answer or submitted_answer is None:
+            return False
+
+        if self.question_type == 'SCQ':
+            return str(submitted_answer).strip().lower() == str(self.correct_answer).strip().lower()
+        elif self.question_type == 'MCQ':
+            # For MCQ, self.correct_answer stores comma or space-separated correct options
+            # submitted_answer here for MCQ would be a LIST of strings from request.POST.getlist()
+            if not isinstance(submitted_answer, list): 
+                return False 
+            
+            correct_options_set = set()
+            if self.correct_answer:
+                if ',' in self.correct_answer:
+                    correct_options_set = set(opt.strip().lower() for opt in self.correct_answer.split(','))
+                else: # Assume space separated
+                    correct_options_set = set(opt.strip().lower() for opt in self.correct_answer.split(' ') if opt.strip())
+            
+            submitted_options_set = set(str(opt).strip().lower() for opt in submitted_answer)
+            
+            return submitted_options_set == correct_options_set and bool(correct_options_set) # Match and ensure not empty set comparison
+        
+        # For ES, this method isn't directly applicable for boolean correctness
+        return False
     
 class Assessment(models.Model):
     term = models.ForeignKey('Term', on_delete=models.CASCADE, default=1)
@@ -771,6 +804,7 @@ class Assessment(models.Model):
     title = models.CharField(max_length=255, null=True)
     short_description = models.CharField(max_length=500, null=True, blank=True)
     score = models.IntegerField(default=0, null=True, blank=True)
+    total_marks = models.PositiveIntegerField(null=True, blank=True, help_text="Total marks possible for this assessment.")
     class_assigned = models.ForeignKey('Class', on_delete=models.CASCADE, default=None)
     is_online = models.BooleanField(default=True)
     due_date = models.DateTimeField(null=True, blank=True)
@@ -792,8 +826,12 @@ class Assessment(models.Model):
             return timezone.now() > self.due_date
         return False
 
+    @property
+    def get_total_marks(self):
+        return self.questions.aggregate(total_marks=Sum('points'))['total_marks'] or 0
+
 class AssessmentSubmission(models.Model):
-    assessment = models.ForeignKey('Assessment', on_delete=models.CASCADE)
+    assessment = models.ForeignKey('Assessment', on_delete=models.CASCADE, related_name='submissions_for_assessment')
     student = models.ForeignKey('Student', on_delete=models.CASCADE)
     answers = models.JSONField()  # Stores the student's answers
     score = models.IntegerField(null=True, blank=True)
@@ -810,6 +848,7 @@ class Exam(models.Model):
     title = models.CharField(max_length=255, null=True)
     short_description = models.CharField(max_length=500, null=True, blank=True)
     score = models.IntegerField(default=0, null=True, blank=True)
+    total_marks = models.PositiveIntegerField(null=True, blank=True, help_text="Total marks possible for this assessment.")
     class_assigned = models.ForeignKey('Class', on_delete=models.CASCADE, default=None)
     is_online = models.BooleanField(default=True)
     due_date = models.DateTimeField(null=True, blank=True)
@@ -831,8 +870,12 @@ class Exam(models.Model):
             return timezone.now() > self.due_date
         return False
 
+    @property
+    def get_total_marks(self):
+        return self.questions.aggregate(total_marks=Sum('points'))['total_marks'] or 0
+
 class ExamSubmission(models.Model):
-    exam = models.ForeignKey('Exam', on_delete=models.CASCADE)
+    exam = models.ForeignKey('Exam', on_delete=models.CASCADE, related_name='submissions_for_exam')
     student = models.ForeignKey('Student', on_delete=models.CASCADE)
     answers = models.JSONField()  # Stores the student's answers
     score = models.IntegerField(null=True, blank=True)
@@ -845,21 +888,27 @@ class ExamSubmission(models.Model):
     
 class AcademicAlert(models.Model):
     ALERT_TYPE_CHOICES = [
-        ('assignment', 'Assignment'),
-        ('assessment', 'Assessment'),
-        ('exam', 'Exam'),
+        ('assignment_available', 'Assignment Available'),
+        ('assignment_submission', 'Assignment Submitted'),
+        ('assessment_available', 'Assessment Available'),
+        ('assessment_submission', 'Assessment Submitted'),
+        ('exam_available', 'Exam Available'),
+        ('exam_submission', 'Exam Submitted'),
+        ('general_announcement', 'General Announcement')
     ]
     
-    alert_type = models.CharField(max_length=20, choices=ALERT_TYPE_CHOICES)
+    alert_type = models.CharField(max_length=30, choices=ALERT_TYPE_CHOICES)
     title = models.CharField(max_length=255)
     summary = models.TextField()
-    teacher = models.ForeignKey(Teacher, on_delete=models.CASCADE, related_name='alerts_sent')
+    source_user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, related_name="generated_academic_alerts")
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='academic_alerts')
     due_date = models.DateTimeField(null=True, blank=True)
+    duration = models.IntegerField(null=True, blank=True)
     is_done = models.BooleanField(default=False)
     date_submitted = models.DateTimeField(null=True, blank=True)
     total_grade = models.FloatField(null=True, blank=True)
-    related_object_id = models.IntegerField()  # ID of the related assignment, assessment, or exam
+    related_object_id = models.IntegerField()  
+    is_read = models.BooleanField(default=False)
     date_created = models.DateTimeField(auto_now_add=True)
 
     def get_related_url(self):
@@ -873,7 +922,11 @@ class AcademicAlert(models.Model):
         return "#"
 
     def __str__(self):
-        return f"{self.alert_type.capitalize()} Alert: {self.title} for {self.student.get_full_name()}"
+        source_name = self.source_user.get_full_name() or self.source_user.username if self.source_user else "School Admin"
+        return f"{self.get_alert_type_display()} for {self.student.user.username} from {source_name}: {self.title}"
+
+    class Meta:
+        ordering = ['-date_created']
 
 
 class Result(models.Model):
@@ -1281,8 +1334,6 @@ class Expense(models.Model):
     def __str__(self):
         return f"{self.description} - {self.amount} on {self.expense_date}"
 
-
-from django.conf import settings
 class EmailCampaign(models.Model):
     subject = models.CharField(max_length=255)
     message = models.TextField()
@@ -1292,3 +1343,108 @@ class EmailCampaign(models.Model):
     def __str__(self):
         return self.subject
 
+# Blog Models
+class Category(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    slug = models.SlugField(max_length=120, unique=True, editable=False)
+    description = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Category"
+        verbose_name_plural = "Categories"
+        ordering = ['name']
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = slugify(self.name)
+        super().save(*args, **kwargs)
+
+    def get_absolute_url(self):
+        return reverse('category_post_list', kwargs={'category_slug': self.slug})
+
+    def __str__(self):
+        return self.name
+
+class Tag(models.Model): 
+    name = models.CharField(max_length=50, unique=True)
+    slug = models.SlugField(max_length=60, unique=True, editable=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['name']
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            self.slug = slugify(self.name)
+        super().save(*args, **kwargs)
+
+    def get_absolute_url(self):
+        return reverse('tag_post_list', kwargs={'tag_slug': self.slug})
+
+    def __str__(self):
+        return self.name
+
+class PostManager(models.Manager):
+    def published(self):
+        return self.filter(status='published', published_date__lte=timezone.now())
+
+class Post(models.Model):
+    STATUS_CHOICES = (
+        ('draft', 'Draft'),
+        ('published', 'Published'),
+    )
+
+    title = models.CharField(max_length=250)
+    slug = models.SlugField(max_length=280, unique_for_date='published_date', editable=False)
+    author = models.ForeignKey(CustomUser, on_delete=models.CASCADE, related_name='blog_posts')
+    content = CKEditor5Field(config_name='default')
+    featured_image = models.ImageField(upload_to='blog/featured_images/%Y/%m/%d/', blank=True, null=True)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='draft')
+
+    published_date = models.DateTimeField(default=timezone.now) 
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    categories = models.ManyToManyField(Category, related_name='posts', blank=True)
+    tags = models.ManyToManyField(Tag, related_name='posts', blank=True) # Or use TaggableManager() if using django-taggit
+
+    meta_description = models.TextField(max_length=170, blank=True, null=True, help_text="Optimal length 150-160 characters")
+    meta_keywords = models.CharField(max_length=255, blank=True, null=True, help_text="Comma-separated keywords (less important for modern SEO)")
+
+    views_count = models.PositiveIntegerField(default=0, editable=False)
+
+    objects = models.Manager() # Default manager\
+    published_objects = PostManager() # Custom manager for published posts
+
+    class Meta:
+        ordering = ('-published_date',) 
+        indexes = [
+            models.Index(fields=['-published_date', 'status']),
+        ]
+
+    def save(self, *args, **kwargs):
+        if not self.slug:
+            base_slug = slugify(self.title)
+            # Ensure slug is unique for the publication date (or globally if unique=True on slug)
+            self.slug = base_slug
+            counter = 1
+            while Post.objects.filter(slug=self.slug, published_date__date=self.published_date.date()).exists():
+                self.slug = f"{base_slug}-{counter}"
+                counter += 1
+
+        if not self.meta_description: # Auto-generate meta description if empty
+            self.meta_description = strip_tags(self.content)[:160]
+
+        super().save(*args, **kwargs)
+
+    def get_absolute_url(self):
+        return reverse('post_detail', kwargs={'slug': self.slug})
+
+    def __str__(self):
+        return self.title
+
+    def increment_views(self):
+        self.views_count += 1
+        self.save(update_fields=['views_count']) # Save only this field to avoid triggering other save logic/signals

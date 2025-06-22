@@ -1,0 +1,85 @@
+{% extends 'base.html' %} {# Use your main site's base template #}
+{% load static %}
+
+{% block title %}
+    {% if archive_title %}
+        {{ archive_title }} | LearnSwift Blog
+    {% else %}
+        LearnSwift Academia Blog
+    {% endif %}
+{% endblock %}
+
+{% block meta_description %}
+    {% if archive_title %}
+        Articles related to {{ archive_title }} on the LearnSwift Academia blog.
+    {% else %}
+        Insights and articles from LearnSwift Academia on Islamic education, intellectual development, tech skills, and character building.
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="container mt-4 mb-5">
+    <div class="row">
+        <!-- Main Blog Content -->
+        <div class="col-lg-8">
+            {% if archive_title %}
+                <h1 class="mb-4 page-title">{{ archive_title }}</h1>
+            {% else %}
+                <h1 class="mb-4 page-title">LearnSwift Academia Blog</h1>
+                <p class="lead text-muted mb-4">
+                    Explore insights on Islamic education, fostering intellectual capacity in children,
+                    practical skills in tech and vocation, and building strong moral character.
+                </p>
+            {% endif %}
+
+            {% if request.GET.q and not posts %}
+                 <div class="alert alert-warning" role="alert">
+                    No posts found matching your search query: "{{ request.GET.q }}".
+                </div>
+            {% elif not posts %}
+                <div class="alert alert-info" role="alert">
+                    No posts available yet. Check back soon!
+                </div>
+            {% endif %}
+
+            {% for post in posts %}
+                {% include "blog/_post_card.html" %}
+            {% endfor %}
+
+            <!-- Pagination -->
+            {% if is_paginated %}
+            <nav aria-label="Page navigation">
+                <ul class="pagination justify-content-center">
+                    {% if page_obj.has_previous %}
+                        <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">« Previous</a></li>
+                    {% else %}
+                        <li class="page-item disabled"><span class="page-link">« Previous</span></li>
+                    {% endif %}
+
+                    {% for i in paginator.page_range %}
+                        {% if page_obj.number == i %}
+                            <li class="page-item active" aria-current="page"><span class="page-link">{{ i }}</span></li>
+                        {% elif i > page_obj.number|add:'-3' and i < page_obj.number|add:'3' %}
+                            <li class="page-item"><a class="page-link" href="?page={{ i }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">{{ i }}</a></li>
+                        {% elif i == page_obj.number|add:'-3' or i == page_obj.number|add:'3' %}
+                             <li class="page-item disabled"><span class="page-link">...</span></li>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if page_obj.has_next %}
+                        <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">Next »</a></li>
+                    {% else %}
+                        <li class="page-item disabled"><span class="page-link">Next »</span></li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+        </div>
+
+        <!-- Sidebar -->
+        <div class="col-lg-4">
+            {% include "blog/_sidebar.html" %}
+        </div>
+    </div>
+</div>
+{% endblock %}

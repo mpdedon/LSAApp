@@ -1,64 +1,105 @@
 {% extends 'base.html' %}
-{% load add_class %}
-{% block content %}
-<div class="container my-5" style="max-width: 70%;">
-    <div class="card shadow-lg border-0">
-        <div class="card-header bg-light text-white text-center">
-            <h2>{{ assessment.title }}</h2>
-        </div>
-        <div class="card-body row">
-            <!-- Left Column -->
-            <div class="col-md-6 mb-0">
-                <p><strong>Subject:</strong> {{ assessment.subject.name }}</p>
-                <p><strong>Class:</strong> {{ assessment.class_assigned.name }}</p>
-                <p><strong>Term:</strong> {{ assessment.term.name }}</p>
-            </div>
-            <div class="col-md-6 mb-0">
-                <p><strong>Due Date:</strong> {{ assessment.due_date|date:"M d, Y H:i" }}</p>
-                <p><strong>Duration:</strong> {{ assessment.duration }} minutes</p>
-                <p><strong>Is Online:</strong> {{ assessment.is_online|yesno:"Yes,No" }}</p>
-            </div>
-           
-            <h3 class="mt-5 text-center">Questions</h3>
-            
-            {% if questions %}
-                {% for question in questions %}
-                    <div class="card my-4 p-4 shadow-sm">
-                        <p><strong>Q{{ forloop.counter }}: {{ question.question_text }}</strong></p>
-                        <p><small>Type: {{ question.get_question_type_display }}</small></p>
-                        
-                        <!-- Check if the question has options and render them -->
-                        {% if question.options %}
-                            <ul class="list-group">
-                                {% for option in question.options %}
-                                    <li class="list-group-item {% if option == question.correct_answer %}bg-success text-white{% endif %}">
-                                        {{ option }}
-                                    </li>
-                                {% endfor %}
-                            </ul>
-                        {% else %}
-                            <p><em>No options provided for this question.</em></p>
-                        {% endif %}
-                        
-                        <!-- Display Correct Answer (For Essay type or no options) -->
-                        {% if question.question_type == "ES" or not question.options %}
-                            <p class="mt-3"><strong>Correct Answer:</strong> {{ question.correct_answer }}</p>
-                        {% endif %}
-                    </div>
-                {% endfor %}
-            {% else %}
-                <p>No questions available for this assessment.</p>
-            {% endif %}
-            
-            <div>
-                <div class="text-center mt-5">
-                    <a href="{% url 'teacher_dashboard' %}" class="btn btn-outline-secondary btn-sm">Back to Dashboard</a>
-                    <a href="{% url 'update_assessment' assessment.id%}" class="btn btn-outline-danger btn-sm">Update Assessment</a>
+{% load static humanize %} {# No need for custom_string_filters if not used elsewhere #}
 
+{% block title %}Details: {{ assessment.title }}{% endblock %}
+
+{% block content %}
+<div class="container my-4 main-content-below-navbar">
+    <div class="card shadow-lg">
+        <div class="card-header bg-primary text-white">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2 class="mb-0 h4">{{ assessment.title }}</h2>
+                <div>
+                    <a href="{% url 'update_assessment' assessment.id %}" class="btn btn-light btn-sm"><i class="fas fa-edit me-1"></i> Edit</a>
+                    {% if user.is_superuser and not assessment.is_approved %}
+                        <button type="button" class="btn btn-success btn-sm ms-2" data-bs-toggle="modal" data-bs-target="#approveModal{{ assessment.id }}"><i class="fas fa-check-circle me-1"></i> Approve</button>
+                    {% endif %}
                 </div>
             </div>
-            
+        </div>
+        <div class="card-body p-4">
+            {# ... Assessment details (subject, class, due, duration, status) ... #}
+            <div class="row mb-3"><div class="col-md-6"><p class="mb-1"><strong>Subject:</strong> {{ assessment.subject.name }}</p><p class="mb-0"><strong>Class:</strong> {{ assessment.class_assigned.name }}</p></div><div class="col-md-6"><p class="mb-1"><strong>Due:</strong> {{ assessment.due_date|date:"F d, Y, P"|default:"N/A" }}</p><p class="mb-0"><strong>Duration:</strong> {{ assessment.duration|default:"N/A" }} min</p></div></div>
+            {% if assessment.short_description %}<p class="text-muted mb-3">{{ assessment.short_description|safe }}</p>{% endif %}
+            <p><strong>Status:</strong> <span class="badge {% if assessment.is_approved %}bg-success{% else %}bg-warning text-dark{% endif %}">{% if assessment.is_approved %}Approved{% else %}Pending Approval{% endif %}</span></p>
+
+            <hr class="my-4">
+            <h4 class="mb-3">Questions & Options Overview</h4>
+
+            {% if questions_processed %}
+                {% for q_data in questions_processed %}
+                    {% with question=q_data.instance %} {# Get the original question object #}
+                    <div class="card mb-3 question-review-card">
+                        <div class="card-header bg-light-subtle py-2">
+                            <strong class="question-number">Question {{ forloop.counter }}:</strong>
+                            <span class="badge bg-secondary float-end">{{ question.get_question_type_display }}</span>
+                        </div>
+                        <div class="card-body">
+                            <p class="question-text mb-2">{{ question.question_text|safe }}</p>
+
+                            {% if question.question_type == 'SCQ' or question.question_type == 'MCQ' %}
+                                {% if q_data.options_with_status %}
+                                    <p class="mb-1"><small class="text-muted">Options (Correct answer(s) highlighted):</small></p>
+                                    <ul class="list-group list-group-flush options-display">
+                                        {% for option_status in q_data.options_with_status %}
+                                            <li class="list-group-item ps-2 {% if option_status.is_marked_correct %}list-group-item-success-teacher{% endif %}">
+                                                <i class="far {% if option_status.is_marked_correct %}fa-check-circle text-success{% else %}fa-circle text-muted{% endif %} me-2"></i>
+                                                {{ option_status.text }}
+                                            </li>
+                                        {% endfor %}
+                                    </ul>
+                                {% else %}
+                                    <p class="text-danger small"><em>Warning: No options configured for this SCQ/MCQ!</em></p>
+                                {% endif %}
+                                
+                                {% comment %} Display the stored correct_answer string for verification by teacher {% endcomment %}
+                                {% if question.correct_answer %}
+                                    <p class="mt-2 mb-0">
+                                        <small class="text-muted">
+                                            Designated Correct Answer(s) String:
+                                        </small> 
+                                        <strong class="text-success">{{ question.correct_answer }}</strong>
+                                    </p>
+                                {% endif %}
+
+                            {% elif question.question_type == 'ES' %}
+                                <p class="text-muted small"><em>This is an essay question.</em></p>
+                                {% if question.correct_answer %}
+                                    <p class="mt-2 mb-1"><strong>Model Answer / Rubric:</strong></p>
+                                    <div class="p-2 rounded bg-light border small">{{ question.correct_answer|safe }}</div>
+                                {% else %}
+                                     <p class="text-muted small"><em>No model answer provided.</em></p>
+                                {% endif %}
+                            {% endif %}
+                        </div>
+                    </div>
+                    {% endwith %}
+                {% endfor %}
+            {% else %}
+                <div class="alert alert-info text-center">
+                    No questions have been added to this {{ assessment.title|lower }} yet. 
+                    <a href="{% url 'update_assessment' assessment.id %}">Add Questions</a>.
+                </div>
+            {% endif %}
+
+            <div class="text-center mt-4 pt-3 border-top">
+                <a href="{{ request.META.HTTP_REFERER|default:'admin_dashboard' }}" class="btn btn-secondary"><i class="fas fa-arrow-left me-1"></i> Back</a>
+            </div>
         </div>
     </div>
 </div>
+
+{# Modal for Approve ... (keep as is) #}
+{% if user.is_superuser and not assessment.is_approved %}
+<div class="modal fade" id="approveModal{{ assessment.id }}" tabindex="-1" aria-labelledby="approveModalLabel{{ assessment.id }}" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="approveModalLabel{{ assessment.id }}">Confirm Approval</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body">Are you sure you want to approve: <strong>{{ assessment.title }}</strong>?</div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><form method="POST" action="{% url 'approve_assessment' assessment.id %}" style="display: inline;">{% csrf_token %}<button type="submit" class="btn btn-success">Yes, Approve</button></form></div></div></div></div>
+{% endif %}
+
+<style> /* Move to main CSS file */
+    .question-review-card { border-left: 3px solid #6c757d; }
+    .question-number { color: #495057; }
+    .question-text { font-size: 1.1rem; margin-bottom: 0.75rem !important; }
+    .options-display .list-group-item { padding: .5rem .75rem; font-size: 0.95rem; border-bottom: 1px solid #eee !important; }
+    .options-display .list-group-item:last-child { border-bottom: 0 !important; }
+    .list-group-item-success-teacher { background-color: #e6f5e9 !important; font-weight: 500; }
+</style>
 {% endblock %}

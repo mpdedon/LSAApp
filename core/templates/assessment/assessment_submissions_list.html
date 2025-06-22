@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+
+{% block title %}Submissions for {{ assessment.title }}{% endblock %}
+
+{% block content %}
+<div class="container my-4 main-content-below-navbar">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="mb-0">Submissions for: <em>{{ assessment.title }}</em></h2>
+        <a href="{% url 'admin_assessment_list' %}" class="btn btn-outline-secondary btn-sm">
+            <i class="fas fa-arrow-left me-1"></i> Back to All Assessments
+        </a>
+    </div>
+    <p><strong>Subject:</strong> {{ assessment.subject.name }} | <strong>Class:</strong> {{ assessment.class_assigned.name }}</p>
+    {% if pending_manual_grade_count > 0 %}
+        <div class="alert alert-info">
+            There are <strong>{{ pending_manual_grade_count }}</strong> submission(s) pending manual review for essay questions.
+        </div>
+    {% endif %}
+
+    {% if submissions %}
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover table-striped mb-0">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Student</th>
+                            <th>Submitted At</th>
+                            <th>Score</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for sub in submissions %}
+                        <tr>
+                            <td class="align-middle">{{ sub.student.user.get_full_name|default:sub.student.user.username }}</td>
+                            <td class="align-middle">{{ sub.submitted_at|date:"d M Y, P" }}</td>
+                            <td class="align-middle">{{ sub.score|default:"N/A" }}</td>
+                            <td class="align-middle">
+                                {% if sub.is_graded %}
+                                    <span class="badge bg-success">Graded</span>
+                                {% elif sub.requires_manual_review %}
+                                    <span class="badge bg-warning text-dark">Pending Manual Grade</span>
+                                {% else %}
+                                    <span class="badge bg-info">Pending Auto-Grade</span> {# Or just "Submitted" #}
+                                {% endif %}
+                            </td>
+                            <td class="align-middle">
+                                <a href="{% url 'grade_essay_assessment' sub.id %}" class="btn btn-sm {% if sub.requires_manual_review and not sub.is_graded %}btn-warning{% else %}btn-outline-primary{% endif %}">
+                                    <i class="fas fa-pen-alt me-1"></i> {% if sub.requires_manual_review and not sub.is_graded %}Grade Essays{% else %}View/Regrade{% endif %}
+                                </a>
+                                {# Add other actions like view submission details if needed #}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    {% else %}
+    <div class="alert alert-secondary text-center">
+        No submissions yet for this assessment.
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

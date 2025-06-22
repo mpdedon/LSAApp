@@ -1,24 +1,88 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
+{% load static %} {# Good practice #}
+
+{% block title %}Pending Exam Approvals{% endblock %}
+
 {% block content %}
-<h2>Pending Approvals</h2>
-<table>
-    <thead>
-        <tr>
-            <th>Title</th>
-            <th>Teacher</th>
-            <th>Class</th>
-            <th>Actions</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for exam in pending_exams %}
-        <tr>
-            <td>{{ exam.title }}</td>
-            <td>{{ exam.created_by.get_full_name }}</td>
-            <td>{{ exam.class_assigned.name }}</td>
-            <td><a href="{% url 'exams:approve_exam' exam.id %}">Approve</a></td>
-        </tr>
+<div class="container my-4 main-content-below-navbar">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0">Pending Exam Approvals</h2>
+        {# Optionally, a link back to the main exam list or admin dashboard #}
+        {# <a href="{% url 'admin_exam_list' %}" class="btn btn-outline-secondary btn-sm">All Exams</a> #}
+    </div>
+
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                {{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
         {% endfor %}
-    </tbody>
-</table>
+    {% endif %}
+
+    {% if pending_exams %}
+        <div class="card shadow-sm">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover mb-0">
+                        <thead class="table-dark">
+                            <tr>
+                                <th scope="col" style="width: 5%;">#</th>
+                                <th scope="col" style="width: 35%;">Title</th>
+                                <th scope="col" style="width: 20%;">Created By</th>
+                                <th scope="col" style="width: 20%;">Class</th>
+                                <th scope="col" style="width: 20%;" class="text-center">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for exam in pending_exams %}
+                                <tr>
+                                    <td class="align-middle">{{ forloop.counter }}</td>
+                                    <td class="align-middle">{{ exam.title }}</td>
+                                    <td class="align-middle">{{ exam.created_by.get_full_name|default:exam.created_by.username }}</td>
+                                    <td class="align-middle">{{ exam.class_assigned.name }}</td>
+                                    <td class="text-center align-middle">
+                                        {# Using a modal for approve confirmation is better UX #}
+                                        <button type="button" class="btn btn-success btn-sm" data-bs-toggle="modal" data-bs-target="#approveExamModal{{ exam.id }}">
+                                            <i class="fas fa-check-circle me-1"></i> Approve
+                                        </button>
+                                    </td>
+                                </tr>
+
+                                <!-- Approve Confirmation Modal for each Exam -->
+                                <div class="modal fade" id="approveExamModal{{ exam.id }}" tabindex="-1" aria-labelledby="approveExamModalLabel{{ exam.id }}" aria-hidden="true">
+                                    <div class="modal-dialog modal-dialog-centered">
+                                        <div class="modal-content">
+                                            <div class="modal-header">
+                                                <h5 class="modal-title" id="approveExamModalLabel{{ exam.id }}">Confirm Exam Approval</h5>
+                                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                            </div>
+                                            <div class="modal-body">
+                                                Are you sure you want to approve the exam: <strong>{{ exam.title }}</strong>
+                                                for Class: <strong>{{ exam.class_assigned.name }}</strong>?
+                                                <p class="small text-muted mt-2">Once approved, students will be notified (if applicable).</p>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                                <form method="POST" action="{% url 'approve_exam' exam.id %}" style="display: inline;">
+                                                    {% csrf_token %}
+                                                    <button type="submit" class="btn btn-success">Yes, Approve</button>
+                                                </form>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    {% else %}
+        <div class="alert alert-info text-center" role="alert">
+            <i class="fas fa-info-circle me-2"></i>
+            There are no exams currently pending approval.
+        </div>
+    {% endif %}
+</div>
 {% endblock %}

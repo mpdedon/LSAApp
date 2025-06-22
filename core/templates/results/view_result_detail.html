@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% load static humanize string_filters %} 
+
+{% block title %}{{ item_type_verbose }} Result: {{ item.title }}{% endblock %}
+
+{% block content %}
+<div class="container my-4 main-content-below-navbar">
+    <div class="row justify-content-center">
+        <div class="col-lg-10 col-xl-8">
+            <div class="card shadow-lg border-0">
+                <div class="card-header 
+                    {% if item_type_verbose == 'Assessment' %}bg-info{% elif item_type_verbose == 'Exam' %}bg-success{% elif item_type_verbose == 'Assignment' %}bg-secondary{% else %}bg-primary{% endif %} 
+                    text-white text-center">
+                    <h2 class="mb-0 h3">{{ item_type_verbose }} Result for: {{ item.title }}</h2>
+                </div>
+                <div class="card-body p-4 p-md-5">
+                    {# Result Summary Section Start #}
+                    <div class="result-summary mb-4 p-3 bg-light rounded border">
+                        <p class="lead text-center">
+                            Result for: <strong>{{ student_viewing.user.get_full_name|default:student_viewing.user.username }}</strong>
+                        </p>
+                        <hr>
+                        <div class="row text-center">
+                            <div class="col-md-3 mb-2 mb-md-0">
+                                <p class="mb-1"><strong>Total Score:</strong></p>
+                                <h4 class="mb-0">
+                                    {% if submission.is_graded %}
+                                        {{ submission.score|floatformat:1 }}/{{ item.questions.count }}
+                                    {% elif submission.requires_manual_review %}
+                                        Partially Graded <small>(Essays Pending)</small>
+                                    {% else %}
+                                        Pending Grade
+                                    {% endif %}
+                                </h4>
+                            </div>
+                            <div class="col-md-4 mb-2 mb-md-0">
+                                <p class="mb-1"><strong>Status:</strong></p>
+                                <h4 class="mb-0">
+                                    {% if submission.is_graded %}
+                                        <span class="badge bg-success">Graded</span>
+                                    {% elif submission.requires_manual_review %}
+                                        <span class="badge bg-warning text-dark">Pending Manual Review</span>
+                                    {% else %}
+                                        <span class="badge bg-info">Submitted</span>
+                                    {% endif %}
+                                </h4>
+                            </div>
+                            <div class="col-md-5">
+                                <p class="mb-1"><strong>Submitted:</strong></p>
+                                <h4 class="mb-0"><small>{{ submission.submitted_at|date:"F d, Y, P" }}</small></h4>
+                            </div>
+                        </div>
+                        {% if submission.feedback and submission.is_graded %}
+                            <hr class="my-2">
+                            <div class="teacher-feedback mt-3 p-3 bg-white border rounded">
+                                <h5>Teacher's Feedback:</h5>
+                                <p class="mb-0">{{ submission.feedback|safe }}</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                    {# Result Summary Section End #}
+
+                    <h4 class="mb-3">Your Answers & Question Review:</h4>
+                    {% for qa_data in questions_with_answers %}
+                        {% with question_obj=qa_data.question_instance %} {# Using question_obj to avoid clash if 'question' is a context var #}
+                        <div class="card mb-3 question-result-card 
+                            {% if qa_data.question_type != 'ES' %}{% if qa_data.is_correct_display %}border-success{% elif qa_data.is_correct_display == False %}border-danger{% else %}border-light{% endif %}{% else %}border-light{% endif %}">
+                            <div class="card-header bg-light-subtle py-2 
+                                {% if qa_data.question_type != 'ES' %}{% if qa_data.is_correct_display %}bg-success-subtle{% elif qa_data.is_correct_display == False %}bg-danger-subtle{% endif %}{% endif %}">
+                                <p class="fw-bold mb-0">Question {{ forloop.counter }}: 
+                                    {% if qa_data.question_type != 'ES' %}
+                                        {% if qa_data.is_correct_display %}<span class="badge bg-success float-end">Correct</span>
+                                        {% elif qa_data.is_correct_display == False %}<span class="badge bg-danger float-end">Incorrect</span>
+                                        {% else %}<span class="badge bg-secondary float-end">Not Auto-Graded</span>{% endif %}
+                                    {% else %}<span class="badge bg-info float-end">Essay</span>{% endif %}
+                                </p>
+                            </div>
+                            <div class="card-body">
+                                <p class="question-text mb-2">{{ qa_data.question_text|safe }}</p>
+                                
+                                <p class="mb-1"><strong>Your Answer:</strong></p>
+                                <div class="p-2 rounded mb-3 {% if qa_data.question_type != 'ES' and qa_data.is_correct_display == False %}bg-danger-subtle border border-danger-subtle{% else %}bg-light border{% endif %}">
+                                    {% if qa_data.question_type == 'MCQ' %}
+                                        {% if qa_data.student_answer_display %}
+                                            <ul class="list-unstyled mb-0">
+                                                {% for ans_item in qa_data.student_answer_display %}<li><i class="fas fa-check-square text-primary me-1"></i> {{ ans_item }}</li>{% endfor %}
+                                            </ul>
+                                        {% else %}<em class="text-muted">Not Answered</em>{% endif %}
+                                    {% else %}
+                                        {{ qa_data.student_answer_display|default:"<em class='text-muted'>Not Answered</em>"|safe }}
+                                    {% endif %}
+                                </div>
+
+                                {# --- Options Review Section --- #}
+                                {% if qa_data.question_type != 'ES' %}
+                                    {% if user.is_superuser or user == item.created_by.user or user == student_viewing.user %} {# Authorization to see correct answers #}
+                                        <p class="mt-3 mb-1"><strong>Options Review & Correct Answer(s):</strong></p>
+                                        {% if qa_data.options_detailed %}
+                                            <ul class="list-group list-group-flush options-review">
+                                                {% for option_detail in qa_data.options_detailed %}
+                                                    <li class="list-group-item d-flex justify-content-between align-items-center 
+                                                        {% if option_detail.is_correct %}list-group-item-success-custom{% endif %}
+                                                        {% if option_detail.is_student_choice and not option_detail.is_correct %}list-group-item-danger-custom{% endif %}">
+                                                        <span>
+                                                            {% if option_detail.is_student_choice %}
+                                                                <i class="fas {% if qa_data.question_type == 'MCQ' %}fa-check-square{% else %}fa-dot-circle{% endif %} text-primary me-2"></i>
+                                                            {% else %}
+                                                                <i class="far {% if qa_data.question_type == 'MCQ' %}fa-square{% else %}fa-circle{% endif %} text-muted me-2"></i>
+                                                            {% endif %}
+                                                            {{ option_detail.text }}
+                                                        </span>
+                                                        {% if option_detail.is_correct %}
+                                                            <span class="badge bg-success">Correct Answer</span>
+                                                        {% elif option_detail.is_student_choice %}
+                                                            {# No badge, styling indicates incorrect student choice #}
+                                                        {% endif %}
+                                                    </li>
+                                                {% endfor %} {# End for option_detail #}
+                                            </ul>
+                                        {% else %}
+                                            <p class="text-muted small"><em>No options were configured for this question.</em></p>
+                                        {% endif %} {# End if qa_data.options_detailed #}
+                                    {% endif %} {# End authorization check #}
+                                {% elif qa_data.question_type == 'ES' and qa_data.correct_answer_model %}
+                                    {% if user.is_superuser or user == item.created_by.user %} 
+                                         <p class="mt-3 mb-1"><strong>Model Answer/Rubric:</strong></p>
+                                         <div class="p-2 rounded bg-info-subtle">{{ qa_data.correct_answer_model }}</div>
+                                    {% endif %}
+                                {% endif %} {# End Options Review / Essay Model Answer Section #}
+                            </div> {# End card-body #}
+                        </div> {# End question-result-card #}
+                        {% endwith %} {# End with question_obj #}
+                    {% empty %} {# This is for the questions_with_answers loop #}
+                        <div class="alert alert-info text-center" role="alert">
+                            No questions and answers to display for this submission.
+                        </div>
+                    {% endfor %} {# End for qa_data #}
+
+                    <div class="text-center mt-4 pt-3 border-top">
+                        <a href="{{ request.META.HTTP_REFERER|default:'home' }}" class="btn btn-secondary"><i class="fas fa-arrow-left me-1"></i> Back</a>
+                    </div>
+                </div> {# End card-body p-4 p-md-5 #}
+            </div> {# End card shadow-lg #}
+        </div> {# End col #}
+    </div> {# End row #}
+</div> {# End container #}
+
+<style> /* Move to CSS file */
+    .question-result-card.border-success { border-left-width: 4px !important; }
+    .question-result-card.border-danger { border-left-width: 4px !important; }
+    .question-text { font-size: 1.05rem; line-height: 1.6; }
+    .result-summary { font-size: 0.95rem; }
+    .options-review .list-group-item { padding: .5rem 1rem; font-size: 0.9rem; }
+    .list-group-item-success-custom { background-color: #e6f5e9; border-left: 3px solid #198754 !important; }
+    .list-group-item-danger-custom { background-color: #f8d7da; border-left: 3px solid #dc3545 !important; }
+</style>
+{% endblock content %} {# Correctly closing the content block #}

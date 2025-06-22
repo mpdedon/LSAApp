@@ -86,10 +86,10 @@
             <a class="nav-link" href="{% url 'programs' %}">Programs</a>
           </li>
           <li class="nav-item">
-            <a class="nav-link" href="#">Blog</a> {# ADD URL #}
+            <a class="nav-link" href="{% url 'post_list' %}">Blog</a>
           </li>
           <li class="nav-item">
-            <a class="nav-link" href="#">Contact</a> {# ADD URL #}
+            <a class="nav-link" href="{% url 'contact_us' %}">Contact</a> 
           </li>
 
           {% if user.is_authenticated %}

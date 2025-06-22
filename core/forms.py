@@ -68,3 +68,29 @@ class NotificationForm(forms.ModelForm):
         self.fields['is_active'].widget.attrs.update({
             'class': 'form-check-input'
         })
+
+
+class ContactForm(forms.Form):
+    name = forms.CharField(
+        max_length=100,
+        widget=forms.TextInput(attrs={'class': 'form-control form-control-sm', 'placeholder': 'Your Full Name'})
+    )
+    email = forms.EmailField(
+        widget=forms.EmailInput(attrs={'class': 'form-control form-control-sm', 'placeholder': 'Your Email Address'})
+    )
+    phone_number = forms.CharField(
+        max_length=20,
+        required=False, # Optional field
+        widget=forms.TextInput(attrs={'class': 'form-control form-control-sm', 'placeholder': 'Your Phone Number (Optional)'})
+    )
+    subject = forms.CharField(
+        max_length=150,
+        widget=forms.TextInput(attrs={'class': 'form-control form-control-sm', 'placeholder': 'Subject of your inquiry'})
+    )
+    message = forms.CharField(
+        widget=forms.Textarea(attrs={'class': 'form-control form-control-sm', 'rows': 5, 'placeholder': 'Your Message'})
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.label_suffix = ""
