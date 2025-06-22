@@ -1,0 +1,25 @@
+{% extends 'blog/_manage_base.html' %}
+{% load crispy_forms_tags %}
+{% load static %} 
+
+{% block extra_head %}
+    {{ block.super }}
+    {{ form.media }} {# Place form.media here, specific to this form page #}
+{% endblock %}
+
+{% block manage_page_title %}{{ page_title|default:"Manage Post" }}{% endblock %}
+{% block manage_content_title %}{{ page_title|default:"Manage Post" }}{% endblock %}
+
+{% block manage_content %}
+    <form method="post" enctype="multipart/form-data" novalidate>
+        {% csrf_token %}
+        {{ form|crispy }} 
+        <hr>
+        <div class="d-flex justify-content-end">
+            <a href="{% url 'post_manage_list' %}" class="btn btn-secondary me-2">Cancel</a>
+            <button type="submit" class="btn btn-primary">
+                <i class="fas fa-save me-1"></i> Save Post
+            </button>
+        </div>
+    </form>
+{% endblock %}

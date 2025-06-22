@@ -1,5 +1,7 @@
 {% extends 'base.html' %}
 
+{% load submission_tags %}
+
 {% block content %}
 <div class="container d-flex justify-content-center align-items-center" style="min-height: 80vh;">
     <div class="card shadow-lg border-0" style="width: 70%; max-width: 800px;">
@@ -20,6 +22,26 @@
                 <p><strong>Description:</strong> {{ assignment.description|default:"No description provided." }}</p>
                 <p><strong>Due Date:</strong> {{ assignment.due_date|date:"M d, Y h:i A" }}</p>
             </div>
+
+            {% if student %}
+                {% with item_type=item|model_name_lower %} {# Requires a custom filter model_name_lower or pass from view #}
+                {% comment %} Or pass item_type_verbose from view and use it to construct URL name {% endcomment %}
+                    {% firstof assessment exam assignment as current_item %} {# Get the specific item #}
+                    {% if item_type_verbose == "Assessment" %}{% get_submission "AssessmentSubmission" current_item student as existing_submission %}{% endif %}
+                    {% if item_type_verbose == "Exam" %}{% get_submission "ExamSubmission" current_item student as existing_submission %}{% endif %}
+                    {% if item_type_verbose == "Assignment" %}{% get_submission "AssignmentSubmission" current_item student as existing_submission %}{% endif %}
+
+                    {% if existing_submission %}
+                        <div class="alert alert-info text-center" role="alert">
+                            You have already submitted this {{ item_type_verbose|lower }}.
+                            <a href="{% if item_type_verbose == 'Assessment' %}{% url 'view_assessment_result' item.id %}{% elif item_type_verbose == 'Exam' %}{% url 'view_exam_result' item.id %}{% elif item_type_verbose == 'Assignment' %}{% url 'view_assignment_result' item.id %}{% endif %}{% if request.user.guardian_profile %}?student_id={{ student.id }}{% endif %}" class="btn btn-sm btn-primary ms-2">
+                                View Your Result
+                            </a>
+                        </div>
+                        {# Optionally hide the submission form if already submitted, by wrapping the form in an if not existing_submission #}
+                    {% endif %}
+                {% endwith %}
+            {% endif %}
             <hr class="my-3">
             <form method="post">
                 {% csrf_token %}

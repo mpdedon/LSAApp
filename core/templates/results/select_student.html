@@ -1,0 +1,51 @@
+{% extends 'base.html' %} {# Or your guardian specific base template #}
+{% load static %}
+
+{% block title %}Select Student to {{ page_title_action|default:"View Item Result" }}{% endblock %}
+
+{% block content %}
+<div class="container my-4 main-content-below-navbar">
+    <div class="row justify-content-center">
+        <div class="col-lg-8 col-md-10">
+            <div class="card shadow-lg border-0">
+                <div class="card-header bg-info text-white text-center">
+                    <h4 class="mb-0">{{ page_title_action|default:"Select Student for Result" }}: "{{ item.title }}"</h4>
+                </div>
+                <div class="card-body p-4 p-md-5">
+                    <p class="text-center text-muted mb-4">You have multiple children enrolled in the relevant class. Please select which child's result you wish to view.</p>
+                    
+                    <div class="list-group">
+                        {% for student_obj in students %}
+                            {# Ensure student_obj.id is the Student PK if your view logic uses student_qs.get(id=...) #}
+                            {# Or use student_obj.user.id if your view logic uses student_qs.get(user_id=...) #}
+                            {# Let's assume student_obj.id is the Student PK for this template based on common _get_student_for_result_view patterns #}
+                            <a href="{% url target_url_name item.id %}?student_id={{ student_obj.user.id }}" class="list-group-item list-group-item-action flex-column align-items-start py-3">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <h5 class="mb-1">
+                                        <i class="fas fa-user-graduate me-2 text-info"></i>
+                                        {{ student_obj.user.get_full_name|default:student_obj.user.username }}
+                                    </h5>
+                                    <small class="text-muted">Class: {{ student_obj.current_class.name }}</small>
+                                </div>
+                                <p class="mb-1 text-muted small">
+                                    Select to view {{ item_type_verbose|lower }} result for this student.
+                                </p>
+                            </a>
+                        {% empty %}
+                            <div class="alert alert-warning text-center" role="alert">
+                                No eligible students found for this {{ item_type_verbose|lower }}.
+                            </div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="text-center mt-4">
+                        <a href="{% url 'guardian_dashboard' %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left me-1"></i> Back to Dashboard
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

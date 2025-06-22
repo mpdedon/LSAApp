@@ -16,7 +16,7 @@ from collections import defaultdict
 from decimal import Decimal
 from core.models import Student, Teacher, Guardian, Assignment, Result, Attendance, Subject, Class, Payment
 from core.models import Session, Term, Message, Assessment, Exam, Notification, AssignmentSubmission, AcademicAlert
-from core.models import FinancialRecord, StudentFeeRecord, AssessmentSubmission
+from core.models import FinancialRecord, StudentFeeRecord, AssessmentSubmission, ExamSubmission
 from django.db.models import Sum
 from django.views.generic.edit import FormView
 from django.contrib import messages
@@ -160,10 +160,9 @@ def admin_dashboard(request):
         'term_count': term_count,
         'subject_count': subject_count,
         'payment_count': payment_count,
-        'recent_enrollments': recent_enrollments, # Pass recent enrollments
+        'recent_enrollments': recent_enrollments, 
         'student_counts_by_class_labels': student_counts_by_class_labels, # Data for JS chart
         'student_counts_by_class_data': student_counts_by_class_data,   # Data for JS chart
-        # Add other analytics data needed
     }
     # Use the new base template for rendering
     return render(request, 'setup/dashboard.html', context) # Adjust template path
@@ -435,9 +434,9 @@ def guardian_dashboard(request):
     archived_terms = Term.objects.filter(is_active=False).order_by('-start_date')
     print(f"DEBUG: Archived Terms found: {[str(t) for t in archived_terms]}")
 
-    assignments_data = {}
-    assessments_data = {}
-    exams_data = {}
+    assignments_context_data = defaultdict(lambda: {'details': [], 'total': 0, 'completed': 0, 'pending': 0, 'completion_percentage': 0})
+    assessments_context_data = defaultdict(list) 
+    exams_context_data = defaultdict(list)
     messages_data = defaultdict(list)
     attendance_data = {}
     attendance_logs = {}
@@ -453,43 +452,135 @@ def guardian_dashboard(request):
     ).order_by('-created_at')
 
     # Fetch academic alerts for the students
-    academic_alerts = AcademicAlert.objects.filter(
+    raw_alerts_qs = AcademicAlert.objects.filter(
         student__in=students,
-        due_date__gte=timezone.now()
-    ).select_related('teacher', 'student').order_by('-due_date')
+        # Add other relevant filters like is_read=False or date ranges
+    ).select_related('student__user', 'source_user').order_by('-date_created')
+
+    academic_alerts = []
+    for alert in raw_alerts_qs:
+        original_display_type = alert.get_alert_type_display()
+        cleaned_display_type = original_display_type
+        if original_display_type:
+            cleaned_display_type = original_display_type.replace(" (for Student)", "").replace(" (for Guardian)", "")
+        else:
+            cleaned_display_type = "Notification" 
+
+        summary_text = alert.summary
+        if not summary_text: 
+            if alert.alert_type.endswith('_available'):
+                item_name = alert.title.replace(f"{alert.get_alert_type_display().split(' ')[0]} Available: ", "") 
+                summary_text = f"The {alert.get_alert_type_display().lower().replace(' available','')} '{item_name}' is now available."
+            elif alert.alert_type.endswith('_submission'):
+                item_name = alert.title.replace(f"{alert.get_alert_type_display().split(' ')[0]} Submitted: ", "")
+                summary_text = f"A submission for '{item_name}' was received."
+            else:
+                summary_text = "Please check for more details."
+        
+        academic_alerts.append({
+            'instance': alert,
+            'cleaned_display_type': cleaned_display_type,
+            'processed_summary': summary_text 
+        })
+
 
     for student in students:
         # Assignments data
-        total_assignments = Assignment.objects.filter(
+        all_class_assignments = Assignment.objects.filter(
             class_assigned=student.current_class,
-            active=True, due_date__gte=timezone.now()
-            ).count()
-        
-        completed_assignments = AssignmentSubmission.objects.filter(
-            student=student, assignment__class_assigned=student.current_class, is_completed=True
-        ).count()
+            active=True
+        ).order_by('due_date')
 
-        if total_assignments > 0:
-            completion_percentage = (completed_assignments / total_assignments) * 100
-        else:
-            completion_percentage = 0
-        # Get the list of assignment details
-        assignments_details = Assignment.objects.filter(class_assigned=student.current_class)
+        completed_assignment_ids = set(
+            AssignmentSubmission.objects.filter(student=student, assignment__in=all_class_assignments, is_completed=True)
+            .values_list('assignment_id', flat=True)
+        )
 
-        assignments_data[student.user.id] = {
-            'total': total_assignments,
-            'completed': completed_assignments,
-            'pending': total_assignments - completed_assignments,
-            'completion_percentage': completion_percentage,
-            'details': assignments_details
-        }
+        assignment_details_for_student = []
+        total_relevant_assignments = 0
+        completed_count = 0
+
+        for assign in all_class_assignments:
+            is_past_due = assign.due_date < timezone.now() if assign.due_date else False
+            has_submitted = assign.id in completed_assignment_ids
+            submission_instance = AssignmentSubmission.objects.filter(student=student, assignment=assign).first() # Get submission for result link
+
+            # Only count assignments that are not past due OR have been submitted towards "total/pending"
+            if not is_past_due or has_submitted:
+                total_relevant_assignments +=1
+                if has_submitted:
+                    completed_count +=1
+            
+            assignment_details_for_student.append({
+                'id': assign.id,
+                'title': assign.title,
+                'due_date': assign.due_date,
+                'is_past_due': is_past_due,
+                'has_submitted': has_submitted,
+                'submission_id': submission_instance.id if submission_instance else None,
+                })
+
+        assignments_context_data[student.user.id]['details'] = assignment_details_for_student
+        assignments_context_data[student.user.id]['total'] = total_relevant_assignments
+        assignments_context_data[student.user.id]['completed'] = completed_count
+        assignments_context_data[student.user.id]['pending'] = total_relevant_assignments - completed_count
+        assignments_context_data[student.user.id]['completion_percentage'] = (completed_count / total_relevant_assignments * 100) if total_relevant_assignments > 0 else 0
 
         # Assessments and exams data
-        online_assessments = Assessment.objects.filter(class_assigned=student.current_class, due_date__gte=timezone.now())
-        assessments_data[student.user.id] = online_assessments
+        all_class_assessments = Assessment.objects.filter(
+            class_assigned=student.current_class,
+            is_approved=True 
+        ).order_by('due_date')
 
-        online_exams = Exam.objects.filter(class_assigned=student.current_class, due_date__gte=timezone.now())
-        exams_data[student.user.id] = online_exams
+        submitted_assessment_ids = set(
+            AssessmentSubmission.objects.filter(student=student, assessment__in=all_class_assessments)
+            .values_list('assessment_id', flat=True)
+        )
+        
+        assessment_list_for_student = []
+        for assess in all_class_assessments:
+            is_past_due = assess.due_date < timezone.now() if assess.due_date else False
+            has_submitted = assess.id in submitted_assessment_ids
+            submission_instance = AssessmentSubmission.objects.filter(student=student, assessment=assess).first()
+
+            assessment_list_for_student.append({
+                'id': assess.id,
+                'title': assess.title,
+                'due_date': assess.due_date,
+                'is_past_due': is_past_due,
+                'has_submitted': has_submitted,
+                'submission_id': submission_instance.id if submission_instance else None,
+                'is_graded': submission_instance.is_graded if submission_instance else False,
+            })
+        assessments_context_data[student.user.id] = assessment_list_for_student
+        
+        # === Exams Data ===
+        all_class_exams = Exam.objects.filter(
+            class_assigned=student.current_class,
+            is_approved=True
+        ).order_by('due_date')
+
+        submitted_exam_ids = set(
+            ExamSubmission.objects.filter(student=student, exam__in=all_class_exams)
+            .values_list('exam_id', flat=True)
+        )
+
+        exam_list_for_student = []
+        for ex in all_class_exams:
+            is_past_due = ex.due_date < timezone.now() if ex.due_date else False
+            has_submitted = ex.id in submitted_exam_ids
+            submission_instance = ExamSubmission.objects.filter(student=student, exam=ex).first()
+
+            exam_list_for_student.append({
+                'id': ex.id,
+                'title': ex.title,
+                'due_date': ex.due_date,
+                'is_past_due': is_past_due,
+                'has_submitted': has_submitted,
+                'submission_id': submission_instance.id if submission_instance else None,
+                'is_graded': submission_instance.is_graded if submission_instance else False,
+            })
+        exams_context_data[student.user.id] = exam_list_for_student
     
         # Fetch messages sent by any of these teachers regarding this student
         student_messages = Message.objects.filter(
@@ -615,9 +706,9 @@ def guardian_dashboard(request):
         'guardian': guardian,
         'students': students,
         'teachers': teachers,
-        'assignments_data': assignments_data,
-        'assessments_data': assessments_data,
-        'exams_data': exams_data,
+        'assignments_data': dict(assignments_context_data), 
+        'assessments_data': dict(assessments_context_data),
+        'exams_data': dict(exams_context_data),
         'messages_data': messages_data,
         'attendance_data': attendance_data,
         'attendance_logs': attendance_logs,

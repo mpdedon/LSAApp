@@ -1,0 +1,48 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Select Student for {{ item_type_verbose }}: {{ item.title }}{% endblock %}
+
+{% block content %}
+<div class="container my-4 main-content-below-navbar">
+    <div class="row justify-content-center">
+        <div class="col-lg-8 col-md-10">
+            <div class="card shadow-lg border-0">
+                <div class="card-header bg-warninsg text-white text-center">
+                    <h4 class="mb-0">Select Student for {{ item_type_verbose }}: "{{ item.title }}"</h4>
+                </div>
+                <div class="card-body p-4 p-md-5">
+                    <p class="text-center text-muted mb-4">You have multiple children enrolled in the relevant class. Please choose which child you are proceeding for.</p>
+                    
+                    <div class="list-group">
+                        {% for student_obj in students %}
+                            <a href="{% url submit_url_name item.id %}?student_id={{ student_obj.id }}" class="list-group-item list-group-item-action flex-column align-items-start py-3">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <h5 class="mb-1">
+                                        <i class="fas fa-child me-2 text-primary"></i>
+                                        {{ student_obj.user.get_full_name|default:student_obj.user.username }}
+                                    </h5>
+                                    <small class="text-muted">Class: {{ student_obj.current_class.name }}</small>
+                                </div>
+                                <p class="mb-1 text-muted small">
+                                    Select this student to proceed with the {{ item_type_verbose|lower }}.
+                                </p>
+                            </a>
+                        {% empty %}
+                            <div class="alert alert-warning text-center" role="alert">
+                                No eligible students found for this {{ item_type_verbose|lower }}.
+                            </div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="text-center mt-4">
+                        <a href="{% url 'guardian_dashboard' %}" class="btn btn-outline-secondary">
+                            <i class="fas fa-arrow-left me-1"></i> Back to Dashboard
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

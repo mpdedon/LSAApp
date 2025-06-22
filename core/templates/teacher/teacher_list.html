@@ -74,7 +74,7 @@
                             <td>{{ teacher.user.username }}</td>
                             <td>{{ teacher.user.email }}</td>
                             <td>{{ teacher.user.get_full_name }}</td>
-                            <td>{{ teacher.current_class.name }}</td>
+                            <td>{% for class in teacher.current_classes %} {{ class.name }} {% endfor %}</td>
                             <td>{{ teacher.contact }}</td>
                             <td>
                                 <a href="{% url 'teacher_detail' teacher.user.id %}" class="btn btn-info btn-sm">V</a>

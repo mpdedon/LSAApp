@@ -5,6 +5,11 @@ from django.dispatch import receiver
 
 from core.models import Student, Term, SchoolDay, Student, Result, FeeAssignment, StudentFeeRecord
 from core.models import StudentFeeRecord, Payment, FinancialRecord, Term, Student, Holiday
+from core.models import (
+    Assessment, Exam, Assignment, 
+    AssessmentSubmission, ExamSubmission, AssignmentSubmission,
+    Student, AcademicAlert
+)
 
 from django.core.mail import send_mail, EmailMultiAlternatives
 from django.db import IntegrityError
@@ -280,3 +285,122 @@ def update_financial_record_archive_on_term_change(sender, instance, **kwargs):
 #                 'outstanding_balance': instance.net_fee
 #             }
 #         )
+
+
+# --- Helper for Item Availability (Assessments, Exams, Assignments) ---
+def _create_notifications_for_item_availability(item_instance, item_type_prefix, item_verbose_name):
+    """
+    Helper to create notifications when an item becomes available.
+    item_type_prefix should be 'assessment', 'exam', or 'assignment'.
+    item_verbose_name is 'Assessment', 'Exam', or 'Assignment'.
+    """
+    # For Assignment, check 'active' status instead of 'is_approved'
+    if item_type_prefix == 'assignment':
+        if not item_instance.active or (item_instance.due_date and item_instance.due_date < timezone.now()): # Don't notify for past due, inactive
+            return
+    elif not getattr(item_instance, 'is_approved', False): # For Assessment/Exam
+        return
+
+    # For Assignment, created_by is the Teacher instance directly
+    if item_type_prefix == 'assignment':
+        teacher_creator = item_instance.teacher 
+        initiating_user = teacher_creator.user if teacher_creator else None # Get CustomUser from Teacher
+    else: # For Assessment/Exam, created_by is a CustomUser
+        initiating_user = item_instance.created_by
+    
+    if not initiating_user:
+        print(f"Signal Warning: {item_verbose_name} ID {item_instance.id} has no clear initiating user. Skipping notifications.")
+        return
+
+    target_class = item_instance.class_assigned
+    students_in_class = Student.objects.filter(current_class=target_class)
+    if not students_in_class.exists():
+        return
+        
+    alerts_created_count = 0
+    alert_type_for_item = f"{item_type_prefix}_available"
+
+    for student in students_in_class:
+        if not AcademicAlert.objects.filter(
+            student=student,
+            alert_type=alert_type_for_item,
+            related_object_id=item_instance.id 
+        ).exists():
+            AcademicAlert.objects.create(
+                student=student,
+                alert_type=alert_type_for_item,
+                title=f"{item_verbose_name} Available: {item_instance.title}",
+                summary=getattr(item_instance, 'description', None) or getattr(item_instance, 'short_description', None) or f"The {item_verbose_name.lower()} '{item_instance.title}' is now available.",
+                source_user=initiating_user,
+                due_date=getattr(item_instance, 'due_date', None),
+                duration=getattr(item_instance, 'duration', None), # Assignment might not have duration
+                related_object_id=item_instance.id,
+            )
+            alerts_created_count += 1
+    
+    if alerts_created_count > 0:
+        print(f"Signal: {alerts_created_count} student alerts created for {item_verbose_name.lower()} '{item_instance.title}'.")
+
+@receiver(post_save, sender=Assessment)
+def assessment_availability_notifier(sender, instance, created, **kwargs):
+    if instance.is_approved:
+        _create_notifications_for_item_availability(instance, 'assessment', 'Assessment')
+
+@receiver(post_save, sender=Exam)
+def exam_availability_notifier(sender, instance, created, **kwargs):
+    if instance.is_approved:
+        _create_notifications_for_item_availability(instance, 'exam', 'Exam')
+
+@receiver(post_save, sender=Assignment)
+def assignment_availability_notifier(sender, instance, created, **kwargs):
+    # Assignment doesn't have 'is_approved', it uses 'active' and due_date
+    if instance.active and (not instance.due_date or instance.due_date >= timezone.now()):
+        # Only notify if it's newly created and active, or if it became active
+        # The duplicate check in the helper handles repeated saves of an active assignment.
+         _create_notifications_for_item_availability(instance, 'assignment', 'Assignment')
+
+
+# --- Helper for Item Submission (Assessments, Exams, Assignments) ---
+def _create_notifications_for_submission(submission_instance, item_type_prefix, related_item_title, related_item_id, item_verbose_name):
+    """
+    Helper to create notifications when an item is submitted.
+    item_type_prefix should be 'assessment', 'exam', or 'assignment'.
+    related_item_title is the title of the parent Assessment/Exam/Assignment.
+    related_item_id is the ID of the parent Assessment/Exam/Assignment.
+    item_verbose_name is 'Assessment', 'Exam', or 'Assignment'.
+    """
+    student = submission_instance.student
+    alert_type_for_submission = f"{item_type_prefix}_submission"
+    
+    # Alert for the student (and thus visible to guardian)
+    if not AcademicAlert.objects.filter(
+        student=student, 
+        alert_type=alert_type_for_submission, 
+        related_object_id=submission_instance.id # Link to the submission itself
+    ).exists():
+        AcademicAlert.objects.create(
+            student=student,
+            alert_type=alert_type_for_submission,
+            title=f"{item_verbose_name} Submitted: {related_item_title}",
+            summary=(f"Your submission for {item_verbose_name.lower()} '{related_item_title}' "
+                     f"by {student.user.get_full_name()} was received on "
+                     f"{submission_instance.submitted_at.strftime('%Y-%m-%d %H:%M')}."),
+            source_user=student.user, # Student is the actor for submission
+            related_object_id=submission_instance.id, 
+        )
+        print(f"Signal: Submission alert created for {item_verbose_name.lower()} (parent ID {related_item_id}) by student '{student.user.username}'.")
+
+@receiver(post_save, sender=AssessmentSubmission)
+def assessment_submission_notifier(sender, instance, created, **kwargs):
+    if created:
+        _create_notifications_for_submission(instance, 'assessment', instance.assessment.title, instance.assessment.id, 'Assessment')
+
+@receiver(post_save, sender=ExamSubmission)
+def exam_submission_notifier(sender, instance, created, **kwargs):
+    if created:
+        _create_notifications_for_submission(instance, 'exam', instance.exam.title, instance.exam.id, 'Exam')
+
+@receiver(post_save, sender=AssignmentSubmission)
+def assignment_submission_notifier(sender, instance, created, **kwargs):
+    if created:
+        _create_notifications_for_submission(instance, 'assignment', instance.assignment.title, instance.assignment.id, 'Assignment')

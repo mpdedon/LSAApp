@@ -4,24 +4,26 @@ from django.contrib.auth.mixins import UserPassesTestMixin
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.urls import reverse, reverse_lazy
 from django.db import IntegrityError, transaction
-from django.db.models import Sum, Max, Q
+from django.db.models import Count, Sum, Max, Q
 from django.contrib import messages
 from django.views.generic import ListView, CreateView, DetailView, UpdateView, DeleteView, TemplateView, FormView
 from django.core.paginator import Paginator
 from django.core.exceptions import ValidationError
 from django.http import HttpResponseBadRequest, JsonResponse
-from django.core.mail import send_mail
+from django.core.mail import send_mail, BadHeaderError
 from django.shortcuts import HttpResponse
 from django.utils import timezone
 from django.core.exceptions import ObjectDoesNotExist
+from django.conf import settings
 from decimal import Decimal, InvalidOperation
 from datetime import timedelta
 from core.models import Session, Term, Student, Teacher, Guardian, Notification
 from core.models import Class, Subject, FeeAssignment, Enrollment, Payment, Assessment, Exam
 from core.models import SubjectAssignment, TeacherAssignment, ClassSubjectAssignment
 from core.models import SubjectResult, Result, StudentFeeRecord, FinancialRecord, AcademicAlert
+from core.models import AssessmentSubmission, ExamSubmission
 from core.utils import get_current_term, get_next_term   
-from core.forms import ClassSubjectAssignmentForm, NonAcademicSkillsForm, NotificationForm
+from core.forms import ClassSubjectAssignmentForm, NonAcademicSkillsForm, NotificationForm, ContactForm
 from core.session.forms import SessionForm
 from core.term.forms import TermForm
 from core.subject.forms import SubjectForm
@@ -32,6 +34,8 @@ from core.subject_assignment.forms import SubjectAssignmentForm
 from core.teacher_assignment.forms import TeacherAssignmentForm
 from core.assessment.forms import AssessmentForm, OnlineQuestionForm
 from core.exams.forms import ExamForm
+from core.models import Post, Category, Tag
+from core.blog.forms import PostForm, CategoryForm, TagForm
 import logging
 
 logger = logging.getLogger(__name__)
@@ -46,6 +50,58 @@ def about(request):
 
 def programs(request):
     return render(request, 'programs.html')
+
+def contact(request):
+    if request.method == 'POST':
+        form = ContactForm(request.POST)
+        if form.is_valid():
+            name = form.cleaned_data['name']
+            from_email = form.cleaned_data['email']
+            phone = form.cleaned_data['phone_number']
+            subject = form.cleaned_data['subject']
+            message_content = form.cleaned_data['message']
+
+            full_message = f"Message from: {name}\n"
+            full_message += f"Email: {from_email}\n"
+            if phone:
+                full_message += f"Phone: {phone}\n\n"
+            full_message += f"Subject: {subject}\n\n"
+            full_message += f"Message:\n{message_content}"
+
+            try:
+                send_mail(
+                    f"Contact Form Inquiry: {subject}", # Email subject
+                    full_message, # Email body
+                    from_email, # From (can be a fixed email from settings or user's email)
+                    [settings.DEFAULT_FROM_EMAIL], # To (your school's inquiry email address)
+                    # Use settings.EMAIL_HOST_USER or a dedicated inquiry email
+                    # For testing, DEFAULT_FROM_EMAIL might be your console backend address
+                    # In production, this should be your actual inquiry handling email.
+                    fail_silently=False,
+                )
+                messages.success(request, "Your message has been sent successfully! We will get back to you soon.")
+                return redirect('contact_us') # Redirect to same page (or a thank you page)
+            except BadHeaderError:
+                messages.error(request, "Invalid header found. Could not send email.")
+            except Exception as e:
+                messages.error(request, f"An error occurred while sending your message: {e}. Please try again later or contact us directly via phone.")
+                # Log the error e
+                print(f"Email sending error: {e}")
+
+        else: # Form is invalid
+            messages.error(request, "Please correct the errors below and try again.")
+    else:
+        form = ContactForm()
+
+    context = {
+        'form': form,
+        'school_email': 'learnswift2020@gmail.com',
+        'school_phone_1': '+234 703 485 8160',
+        'school_phone_2': '+234 706 236 1134',
+        'school_address_line1': '5 Bode Tobun Street, off Oniwaya Road,',
+        'school_address_line2': 'Agege, Lagos, Nigeria',
+    }
+    return render(request, 'contact_us.html', context)
 
 # core/views.py
 def custom_404(request, exception):
@@ -800,13 +856,13 @@ class ClassSubjectRolloverView(AdminRequiredMixin, ListView):
 
         if not current_term or not next_term:
             messages.error(request, "Cannot determine current or next term for rollover.")
-            return redirect('class_subjects_by_term') # Redirect to the accordion list
+            return redirect('class_subjects') # Redirect to the accordion list
 
         # Ensure terms and sessions are valid before proceeding
         if not hasattr(current_term, 'session') or not current_term.session or \
            not hasattr(next_term, 'session') or not next_term.session:
             messages.error(request, "Term or session data is incomplete for rollover.")
-            return redirect('class_subjects_by_term')
+            return redirect('class_subjects')
 
         # Double-check: Only proceed if the next term is empty
         if ClassSubjectAssignment.objects.filter(session=next_term.session, term=next_term).exists():
@@ -839,7 +895,7 @@ class ClassSubjectRolloverView(AdminRequiredMixin, ListView):
         except Exception as e:
             messages.error(request, f"An error occurred during rollover: {e}")
 
-        return redirect('class_subjects_by_term')
+        return redirect('class_subjects')
 
 class DeleteClassSubjectAssigmentView(DeleteView, AdminRequiredMixin):
     def post(self, request, pk):
@@ -1543,7 +1599,7 @@ class PaymentDeleteView(AdminRequiredMixin, DeleteView):
              # Redirect back to list or detail view on error
              return redirect('payment_list')
 
-# --- Financial Record List View (Refactored) ---
+# --- Financial Record List View ---
 class FinancialRecordListView(AdminRequiredMixin, ListView):
     model = FinancialRecord
     template_name = 'financial_record/financial_record_list.html'
@@ -1657,145 +1713,248 @@ def send_test_email(request):
     return HttpResponse("Test email sent successfully!")
 
 
-@login_required
-def create_assessment(request):
-    # Ensure the logged-in user is authorized
-    user = request.user
-    teacher = None
-    if not user.is_superuser:
-        teacher = get_object_or_404(Teacher, user=user)
-        assigned_classes = teacher.assigned_classes().all()
-        subjects = teacher.assigned_subjects().all()
-    else:
-        assigned_classes = Class.objects.all()
-        subjects = Subject.objects.all()
-
-    # Handle GET request: render form
-    if request.method == 'GET':
-        form = AssessmentForm()
-        form.fields['class_assigned'].queryset = assigned_classes
-        form.fields['subject'].queryset = subjects
-        return render(request, 'assessment/create_assessment.html', {'form': form})
-
-    # Handle POST request: process form data
-    if request.method == 'POST':
-        form = AssessmentForm(request.POST)
-
-        # Limit class and subject choices for teachers
-        form.fields['class_assigned'].queryset = assigned_classes
-        form.fields['subject'].queryset = subjects
-
-        if form.is_valid():
-            # Save the assessment instance
-            assessment = form.save(commit=False)
-            assessment.created_by = user
-            assessment.is_approved = user.is_superuser  # Auto-approve if admin
-            assessment.due_date = form.cleaned_data['due_date']
-            assessment.duration = form.cleaned_data['duration']
-            assessment.save()
-            form.save_m2m()  # Save many-to-many questions
-
-            # Process and validate questions dynamically
-            errors = process_questions(request, assessment)
-
-            if not errors:
-                # Notify students if the assessment is approved
-                if assessment.is_approved:
-                    notify_students(assessment)
-                return redirect('teacher_dashboard' if teacher else 'admin_dashboard')
-            else:
-                print("Errors in questions:", errors)  # Debugging line
-                return render(request, 'assessment/create_assessment.html', {
-                    'form': form,
-                    'errors': errors,
-                })
-        else:
-            print("Form errors:", form.errors)  # Debugging line
-            return render(request, 'assessment/create_assessment.html', {
-                'form': form,
-                'errors': form.errors,  # Add form errors to be displayed in the template
-            })
-
-                  
-def process_questions(request, assessment):
+# --- Helper: Process NEW Questions (for Create and Update) ---
+def _process_newly_added_questions(request, assessment, question_name_prefix='new_question_'):
     errors = []
     question_number = 1
+    questions_successfully_added = 0
 
-    while f'question_type_{question_number}' in request.POST:
-        question_type = request.POST.get(f'question_type_{question_number}')
-        question_text = request.POST.get(f'question_text_{question_number}')
-        options = request.POST.get(f'options_{question_number}', '')
-        correct_answer = request.POST.get(f'correct_answer_{question_number}')
+    while True:
+        q_type_key = f'{question_name_prefix}type_{question_number}'
+        q_text_key = f'{question_name_prefix}text_{question_number}'
+        q_options_key = f'{question_name_prefix}options_{question_number}'
+        q_correct_key = f'{question_name_prefix}correct_answer_{question_number}'
 
-        print(f"Processing Question {question_number}: {question_type}, {question_text}, {options}, {correct_answer}")  # Debugging line
+        if q_type_key not in request.POST and q_text_key not in request.POST : # Check if any primary field for this new question number exists
+            break
 
-        options_list = [opt.strip() for opt in options.split(',') if opt.strip()]
-        question_data = {
+        question_type = request.POST.get(q_type_key)
+        question_text = request.POST.get(q_text_key, '').strip()
+        options_str = request.POST.get(q_options_key, '')
+        correct_answer_str = request.POST.get(q_correct_key, '').strip()
+        print(f"  For {q_correct_key}, fetched correct_answer_str: '{correct_answer_str}'")
+
+        if not question_text and not question_type: # Skip if completely empty entry from JS
+             question_number += 1
+             continue
+        if not question_text: # Error if type present but no text
+            if question_type: errors.append(f"Error in New Question {question_number}: Text is empty.")
+            question_number += 1
+            continue
+
+        options_list = [opt.strip() for opt in options_str.split(',') if opt.strip()]
+        
+        form_data = {
             'question_type': question_type,
             'question_text': question_text,
-            'options': json.dumps(options_list) if options_list else '',
-            'correct_answer': correct_answer
+            'options': options_list,
+            'correct_answer': correct_answer_str if correct_answer_str else None
         }
-
-        question_form = OnlineQuestionForm(question_data)
+        
+        question_form = OnlineQuestionForm(form_data)
         if question_form.is_valid():
-            if question_type in ['SCQ', 'MCQ']:
-                if not options_list:
-                    errors.append(f"Error in Question {question_number}: Options are required for SCQ/MCQ.")
-                else:
-                    question_form.save()
-                    assessment.questions.add(question_form.instance)
-            elif question_type == 'ES':
-                question_form.save()
-                assessment.questions.add(question_form.instance)
+            try:
+                new_question = question_form.save()
+                assessment.questions.add(new_question)
+                questions_successfully_added += 1
+            except Exception as e:
+                errors.append(f"Error saving new question {question_number}: {str(e)}")
         else:
-            print(f"Question {question_number} Errors: {question_form.errors}")  # Debugging line
-            errors.append(f"Error in Question {question_number}: {question_form.errors}")
+            for field, field_errors in question_form.errors.items():
+                errors.append(f"New Question {question_number} ({field.replace('_',' ').title()}): {', '.join(field_errors)}")
+        
         question_number += 1
-
+    
+    if questions_successfully_added == 0 and f'{question_name_prefix}type_1' in request.POST:
+        if not errors: errors.append("Attempted to add new questions, but none were valid or saved.")
     return errors
 
-def notify_students(assessment):
-    students = Student.objects.filter(current_class=assessment.class_assigned)
-    for student in students:
-        AcademicAlert.objects.create(
-            alert_type='assessment',
-            title=assessment.title,
-            summary=assessment.short_description or 'New assessment available!',
-            teacher=assessment.created_by,
-            student=student,
-            due_date=assessment.due_date,
-            duration=assessment.duration,
-            related_object_id=assessment.id
-        )
+# --- Create Assessment View ---
+@login_required
+def create_assessment(request):
+    user = request.user
+    teacher_profile = Teacher.objects.filter(user=user).first() # Adjusted to filter
+
+    if teacher_profile:
+        assigned_classes_qs = teacher_profile.assigned_classes()
+        assigned_subjects_qs = teacher_profile.assigned_subjects()
+    elif user.is_superuser:
+        assigned_classes_qs = Class.objects.all()
+        assigned_subjects_qs = Subject.objects.all()
+    else:
+        messages.error(request, "You are not authorized to create assessments.")
+        return redirect('home') # Or an appropriate unauthorized page
+
+    if request.method == 'POST':
+        form = AssessmentForm(request.POST)
+        form.fields['class_assigned'].queryset = assigned_classes_qs
+        form.fields['subject'].queryset = assigned_subjects_qs
+
+        if form.is_valid():
+            assessment = form.save(commit=False)
+            assessment.created_by = user
+            if user.is_superuser: # Superusers can auto-approve
+                assessment.is_approved = True
+            assessment.save() # Save assessment to get an ID before adding M2M questions
+
+            # Use the specific function for new questions from 'create' form (prefix 'question_')
+            question_processing_errors = _process_newly_added_questions(request, assessment, question_name_prefix='question_')
+            
+            if not question_processing_errors:
+                messages.success(request, f"Assessment '{assessment.title}' created successfully.")
+                return redirect('admin_dashboard' if user.is_superuser else 'teacher_dashboard')
+            else:
+                assessment.delete() # Rollback assessment creation if questions had critical errors
+                form_with_initial_data = AssessmentForm(request.POST) # Re-bind to show original data
+                form_with_initial_data.fields['class_assigned'].queryset = assigned_classes_qs
+                form_with_initial_data.fields['subject'].queryset = assigned_subjects_qs
+                messages.error(request, "Assessment not created. Please correct the question errors.")
+                return render(request, 'assessment/create_assessment.html', {
+                    'form': form_with_initial_data,
+                    'question_errors': question_processing_errors,
+                })
+        else: # AssessmentForm is invalid
+            form.fields['class_assigned'].queryset = assigned_classes_qs # Re-set for template
+            form.fields['subject'].queryset = assigned_subjects_qs
+            return render(request, 'assessment/create_assessment.html', {'form': form})
+    else: # GET request
+        form = AssessmentForm()
+        form.fields['class_assigned'].queryset = assigned_classes_qs
+        form.fields['subject'].queryset = assigned_subjects_qs
+        return render(request, 'assessment/create_assessment.html', {'form': form})
+
+# --- Update Assessment View ---
+@login_required
+def update_assessment(request, assessment_id):
+    assessment = get_object_or_404(Assessment, id=assessment_id)
+    user = request.user
+    teacher_profile = Teacher.objects.filter(user=user).first()
+
+    # Authorization
+    if not (user.is_superuser or assessment.created_by == user):
+        messages.error(request, "You are not authorized to update this assessment.")
+        return redirect('home')
+
+    if teacher_profile and not user.is_superuser :
+        assigned_classes_qs = teacher_profile.assigned_classes()
+        assigned_subjects_qs = teacher_profile.assigned_subjects()
+    else: # Superuser or non-teacher (though auth check above should handle non-teacher)
+        assigned_classes_qs = Class.objects.all()
+        assigned_subjects_qs = Subject.objects.all()
+
+    if request.method == 'POST':
+        form = AssessmentForm(request.POST, instance=assessment)
+        form.fields['class_assigned'].queryset = assigned_classes_qs
+        form.fields['subject'].queryset = assigned_subjects_qs
+
+        if form.is_valid():
+            updated_assessment = form.save(commit=False)
+            if user.is_superuser and not assessment.is_approved: # Superuser can approve on update
+                 updated_assessment.is_approved = True
+                 updated_assessment.approved_by = user
+            updated_assessment.updated_at = timezone.now()
+            updated_assessment.save()
+            # form.save_m2m() # Only if AssessmentForm itself has M2M fields
+
+            all_errors = []
+
+            # 1. Update Existing Questions
+            submitted_existing_ids = set()
+            for q_instance in assessment.questions.all():
+                q_id = q_instance.id
+                # Check if data for this existing question was submitted for update
+                # (Assumes edit form fields are named question_ID_text, etc.)
+                if f'question_{q_id}_text' in request.POST or f'question_{q_id}_type' in request.POST:
+                    submitted_existing_ids.add(q_id)
+                    data_for_existing = {
+                        'question_type': request.POST.get(f'question_{q_id}_type'),
+                        'question_text': request.POST.get(f'question_{q_id}_text', '').strip(),
+                        'options': [opt.strip() for opt in request.POST.get(f'question_{q_id}_options', '').split(',') if opt.strip()],
+                        'correct_answer': request.POST.get(f'question_{q_id}_correct_answer', '').strip() or None
+                    }
+                    q_form = OnlineQuestionForm(data_for_existing, instance=q_instance)
+                    if q_form.is_valid():
+                        q_form.save()
+                    else:
+                        for field, field_errors in q_form.errors.items():
+                            all_errors.append(f"Existing Question ID {q_id} ({field.replace('_',' ').title()}): {', '.join(field_errors)}")
+            
+            # 2. Remove Questions (if a mechanism exists to mark them for deletion)
+            deleted_ids_str = request.POST.get('deleted_question_ids', '') # e.g., "12,15,20"
+            if deleted_ids_str:
+                deleted_ids = [int(id_str) for id_str in deleted_ids_str.split(',') if id_str.isdigit()]
+                assessment.questions.remove(*deleted_ids) 
+                OnlineQuestion.objects.filter(id__in=deleted_ids, assessments=None).delete() # Optional: delete orphaned questions
+
+            # 3. Add Newly Added Questions (uses 'new_question_' prefix)
+            new_question_errors = _process_newly_added_questions(request, assessment, question_name_prefix='new_question_')
+            all_errors.extend(new_question_errors)
+
+            if not all_errors:
+                messages.success(request, "Assessment updated successfully.")
+                return redirect('view_assessment', assessment_id=assessment.id)
+            else:
+                messages.error(request, "Errors occurred. Please review.")
+        # If form is invalid or errors occurred, re-render with context
+        current_questions = assessment.questions.all().order_by('id')
+        return render(request, 'assessment/update_assessment.html', {
+            'form': form, # This form instance will have its own errors
+            'assessment': assessment,
+            'questions': current_questions,
+            'processing_errors': all_errors if 'all_errors' in locals() and all_errors else [] 
+        })
+
+    else: # GET request
+        form = AssessmentForm(instance=assessment)
+        form.fields['class_assigned'].queryset = assigned_classes_qs
+        form.fields['subject'].queryset = assigned_subjects_qs
+        questions = assessment.questions.all().order_by('id')
+        return render(request, 'assessment/update_assessment.html', {
+            'form': form,
+            'assessment': assessment,
+            'questions': questions
+        })
 
 @login_required
 @user_passes_test(lambda u: u.is_superuser)
 def approve_assessment(request, assessment_id):
-    assessment = get_object_or_404(Assessment, id=assessment_id, is_approved=False)
+    assessment = get_object_or_404(Assessment, id=assessment_id)
     if request.method == 'POST':
-        assessment.is_approved = True
-        assessment.approved_by = request.user
-        assessment.save()
-        notify_students(assessment)
-        messages.success(request, f"Assessment '{assessment.title}' approved and published!")
-        return redirect('admin_dashboard')
+        if not assessment.is_approved:
+            assessment.is_approved = True
+            assessment.approved_by = request.user
+            assessment.save()
+            messages.success(request, f"Assessment '{assessment.title}' approved and students notified.")
+        else:
+            messages.info(request, f"Assessment '{assessment.title}' was already approved.")
+        return redirect('school-setup') 
+    return render(request, 'assessment/approve_assessment_confirm.html', {'assessment': assessment})
 
-    return render(request, 'setup/approve_assessment.html', {'assessment': assessment})
 
 @login_required
-@user_passes_test(lambda u: u.is_superuser)
+@user_passes_test(lambda u: u.is_superuser) 
 def admin_assessment_list(request):
-    assessments = Assessment.objects.all()
-    return render(request, 'assessment/admin_assessment_list.html', {'assessments': assessments})
+
+    assessments_qs = Assessment.objects.annotate(
+        submission_count=Count('submissions_for_assessment') 
+    ).order_by('-created_at')
+    
+    pending_assessment_count = Assessment.objects.filter(is_approved=False).count()
+    
+    return render(request, 'assessment/admin_assessment_list.html', {
+        'assessments': assessments_qs,
+        'pending_assessment_count': pending_assessment_count
+    })
+
 
 @login_required
 @user_passes_test(lambda u: u.is_superuser)
-def pending_approvals(request):
+def pending_assessments(request):
     pending_assessments = Assessment.objects.filter(is_approved=False)
     return render(request, 'setup/pending_assessments.html', {'pending_assessments': pending_assessments})
 
 @login_required
+@user_passes_test(lambda u: u.is_superuser)
 def view_assessment(request, assessment_id):
     # Retrieve the assessment and its questions
     assessment = get_object_or_404(Assessment, id=assessment_id)
@@ -1806,6 +1965,156 @@ def view_assessment(request, assessment_id):
         'questions': questions,
     }
     return render(request, 'assessment/assessment_detail.html', context)
+
+# views.py
+@login_required
+@user_passes_test(lambda u: u.is_superuser)
+def admin_delete_assessment(request, assessment_id):
+    print(f"--- [DELETE VIEW] Attempting to access assessment ID: {assessment_id} by user: {request.user.username} ---")
+    assessment = get_object_or_404(Assessment, id=assessment_id)
+    
+    if request.method == 'POST':
+        assessment_title = assessment.title
+        print(f"--- [DELETE VIEW] POST request. Assessment to delete: '{assessment_title}' (ID: {assessment.id}) ---")
+        
+        try:
+            print("--- [DELETE VIEW] Before assessment.delete() ---")
+            assessment.delete()
+            print("--- [DELETE VIEW] After assessment.delete() ---") # If this prints, delete itself was successful
+            messages.success(request, f"Assessment '{assessment_title}' has been successfully deleted.")
+            return redirect('admin_assessment_list')
+        except Exception as e:
+            print(f"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+            print(f"!!! [DELETE VIEW] EXCEPTION DURING assessment.delete(): {type(e).__name__} - {str(e)} !!!")
+            print(f"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+            # Forcing a full traceback print to console if DEBUG is True
+            import traceback
+            traceback.print_exc() # This should print the full traceback to console
+            
+            messages.error(request, f"An error occurred: {str(e)}. Please check server logs.")
+            # It's often better to NOT redirect immediately on error if you want to see the error page
+            # But if the error page isn't helpful, redirecting might be what you want.
+            # For debugging, let's try rendering an error or just letting Django handle it.
+            # return redirect('admin_assessment_list') 
+            raise e 
+            
+    messages.warning(request, "Invalid request to delete. Deletion must be confirmed.")
+    return redirect('admin_assessment_list')
+
+
+# views.py
+@login_required
+def assessment_submissions_list(request, assessment_id):
+    assessment = get_object_or_404(Assessment, id=assessment_id)
+
+    # Authorization: Superuser or creator of the assessment
+    if not (request.user.is_superuser or assessment.created_by == request.user):
+        messages.error(request, "You are not authorized to view submissions for this assessment.")
+        return redirect('admin_assessment_list') # Or appropriate redirect
+
+    submissions = AssessmentSubmission.objects.filter(assessment=assessment)\
+                                          .select_related('student__user')\
+                                          .order_by('-submitted_at')
+    
+    pending_manual_grade_count = submissions.filter(requires_manual_review=True, is_graded=False).count()
+
+    context = {
+        'assessment': assessment,
+        'submissions': submissions,
+        'pending_manual_grade_count': pending_manual_grade_count,
+    }
+    return render(request, 'assessment/assessment_submissions_list.html', context)
+
+
+def grade_essay_assessment_view(request, submission_id):
+    submission = get_object_or_404(AssessmentSubmission, id=submission_id)
+    assessment = submission.assessment
+    user = request.user # Get the current user
+
+    # Authorization
+    if not (user.is_superuser or assessment.created_by == user):
+        messages.error(request, "You are not authorized to grade this submission.")
+        return redirect('home') # Or a more appropriate unauthorized page
+
+    # Prepare questions and answers for display
+    all_questions_data = []
+    max_possible_auto_score = 0
+    max_possible_manual_score = 0 # Assuming 1 point per essay for now, adjust as needed
+
+    for q_obj in assessment.questions.all().order_by('id'):
+        raw_ans = submission.answers.get(str(q_obj.id)) if isinstance(submission.answers, dict) else None
+        student_answer_display = ", ".join(raw_ans) if isinstance(raw_ans, list) else raw_ans
+        
+        is_correct_auto = None
+        if q_obj.question_type in ['SCQ', 'MCQ']:
+            max_possible_auto_score += 1 # Assuming 1 point per question
+            # Simplified check for display; actual grading happened on submission
+            if q_obj.question_type == 'SCQ' and student_answer_display == q_obj.correct_answer:
+                is_correct_auto = True
+            elif q_obj.question_type == 'MCQ':
+                correct_mcq_set = set(op.strip().lower() for op in (q_obj.correct_answer or "").split(',') if op.strip())
+                submitted_mcq_set = set(op.strip().lower() for op in (student_answer_display or "").split(',') if op.strip())
+                if correct_mcq_set == submitted_mcq_set and correct_mcq_set:
+                    is_correct_auto = True
+                elif correct_mcq_set:
+                    is_correct_auto = False
+        elif q_obj.question_type == 'ES':
+            max_possible_manual_score += 1 # Example: 1 point per essay, or define points per question
+
+        all_questions_data.append({
+            'question': q_obj,
+            'student_answer': student_answer_display,
+            'is_essay': q_obj.question_type == 'ES',
+            'is_correct_auto': is_correct_auto
+        })
+
+    # The score stored on submission for mixed assessments is the auto-graded part
+    auto_graded_score = 0
+    if not submission.requires_manual_review and submission.is_graded: # Was fully auto-graded
+        auto_graded_score = submission.score or 0
+    elif submission.requires_manual_review and submission.score is not None: # Auto-graded part was stored
+        auto_graded_score = submission.score or 0
+
+
+    if request.method == 'POST':
+        manual_score_str = request.POST.get('manual_score') # Score for manually graded parts
+        feedback_str = request.POST.get('feedback', '').strip()
+
+        try:
+            manual_score_input = float(manual_score_str) if manual_score_str else 0
+            
+            # Calculate final score
+            final_score = (auto_graded_score if auto_graded_score is not None else 0) + manual_score_input
+            
+            submission.score = final_score 
+            submission.feedback = feedback_str
+            submission.is_graded = True
+            submission.requires_manual_review = False 
+            submission.save()
+            
+            messages.success(request, f"Submission for {submission.student.user.get_full_name()} graded. Final Score: {final_score}")
+            
+            # Dynamic redirect
+            if user.is_superuser:
+                return redirect('assessment_submissions_list', assessment_id=assessment.id)
+            elif hasattr(user, 'teacher_profile'): # Or your way of identifying a teacher
+                 # You might need a specific teacher_assessment_submissions_list URL/view
+                return redirect('teacher_dashboard') # Fallback for now
+            else: # Should not happen due to auth check
+                return redirect('home')
+
+        except (ValueError, TypeError):
+            messages.error(request, "Invalid score entered. Please enter a valid number for the manual score.")
+            # Fall through to re-render the form with an error
+
+    context = {
+        'submission': submission,
+        'assessment': assessment,
+        'all_questions_data': all_questions_data,
+        'auto_graded_score': auto_graded_score, 
+        'max_possible_manual_score': max_possible_manual_score, 
+    }
+    return render(request, 'assessment/grade_essay_submission.html', context)
 
 
 @login_required
@@ -1957,3 +2266,125 @@ def view_exam(request, exam_id):
         'questions': questions,
     }
     return render(request, 'exam/exam_detail.html', context)
+
+
+# === Post Management Views ===
+class ManagePostListView(AdminRequiredMixin, ListView):
+    model = Post
+    template_name = 'blog/post_manage_list.html' 
+    context_object_name = 'posts'
+    paginate_by = 15
+    ordering = ['-updated_at'] 
+
+    def get_queryset(self):
+        # Show all posts (drafts and published) for management
+        return Post.objects.all().select_related('author').order_by(*self.ordering)
+
+class PostCreateView(AdminRequiredMixin, CreateView):
+    model = Post
+    form_class = PostForm
+    template_name = 'blog/post_form.html' 
+    success_url = reverse_lazy('post_manage_list') 
+
+    def form_valid(self, form):
+        form.instance.author = self.request.user 
+        messages.success(self.request, "Blog post created successfully!")
+        return super().form_valid(form)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['page_title'] = "Create New Blog Post"
+        return context
+
+class PostUpdateView(AdminRequiredMixin, UpdateView):
+    model = Post
+    form_class = PostForm
+    template_name = 'blog/post_form.html'
+    success_url = reverse_lazy('post_manage_list')
+
+    def form_valid(self, form):
+        messages.success(self.request, "Blog post updated successfully!")
+        return super().form_valid(form)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['page_title'] = f"Edit Post: {self.object.title}"
+        return context
+
+class PostDeleteView(AdminRequiredMixin, DeleteView):
+    model = Post
+    template_name = 'blog/post_confirm_delete.html' 
+    success_url = reverse_lazy('post_list')
+
+    def form_valid(self, form): # Or post method for DeleteView
+        messages.success(self.request, f"Blog post '{self.object.title}' deleted successfully.")
+        return super().form_valid(form)
+
+
+# ===  Category Management Views (Similar Structure) ===
+class ManageCategoryListView(AdminRequiredMixin, ListView):
+    model = Category
+    template_name = 'blog/category_manage_list.html'
+    context_object_name = 'categories'
+    paginate_by = 20
+
+class CategoryCreateView(AdminRequiredMixin, CreateView):
+    model = Category
+    form_class = CategoryForm
+    template_name = 'blog/category_form.html'
+    success_url = reverse_lazy('category_manage_list')
+    def form_valid(self, form):
+        messages.success(self.request, "Category created successfully!")
+        return super().form_valid(form)
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['page_title'] = "Create New Category"
+        return context
+
+class CategoryUpdateView(AdminRequiredMixin, UpdateView):
+    model = Category
+    form_class = CategoryForm
+    template_name = 'blog/category_form.html'
+    success_url = reverse_lazy('category_manage_list')
+    def form_valid(self, form):
+        messages.success(self.request, "Category updated successfully!")
+        return super().form_valid(form)
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['page_title'] = f"Edit Category: {self.object.name}"
+        return context
+
+
+# === Tag Management Views (Similar Structure) ===
+class ManageTagListView(AdminRequiredMixin, ListView):
+    model = Tag
+    template_name = 'blog/tag_manage_list.html'
+    context_object_name = 'tags'
+    paginate_by = 50
+
+class TagCreateView(AdminRequiredMixin, CreateView):
+    model = Tag
+    form_class = TagForm
+    template_name = 'blog/tag_form.html'
+    success_url = reverse_lazy('tag_manage_list')
+    def form_valid(self, form):
+        messages.success(self.request, "Tag created successfully!")
+        return super().form_valid(form)
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['page_title'] = "Create New Tag"
+        return context
+
+class TagUpdateView(AdminRequiredMixin, UpdateView):
+    model = Tag
+    form_class = TagForm
+    template_name = 'blog/tag_form.html'
+    success_url = reverse_lazy('tag_manage_list')
+    def form_valid(self, form):
+        messages.success(self.request, "Tag updated successfully!")
+        return super().form_valid(form)
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['page_title'] = f"Edit Tag: {self.object.name}"
+        return context
+

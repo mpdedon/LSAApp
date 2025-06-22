@@ -1,20 +1,82 @@
 {% extends "base.html" %}
-{% block content %}
-<div class="container mt-5">
-    <h2 class="text-center">Manual Review for {{ submission.assessment.title }}</h2>
-    <p class="text-muted">Student: {{ submission.student.user.get_full_name }}</p>
-    <form method="post" class="mt-4">
-        {% csrf_token %}
-        {% for question_id, answer in submission.answers.items %}
-            <div class="card mb-3 p-3 shadow-sm">
-                <p><strong>Q{{ forloop.counter }}: </strong> Answered: {{ answer }}</p>
-            </div>
-        {% endfor %}
+{% block title %}Grade Assessment: {{ submission.assessment.title }}{% endblock %}
 
-        <label for="score">Assign Score (Out of 100)</label>
-        <input type="number" name="score" class="form-control" required min="0" max="100">
-        
-        <button type="submit" class="btn btn-primary mt-4">Submit Score</button>
-    </form>
+{% block content %}
+<div class="container my-4 main-content-below-navbar">
+    <div class="card shadow-lg">
+        <div class="card-header bg-info text-white">
+            <h4 class="mb-0">Manual Grade & Feedback for: {{ submission.assessment.title }}</h4>
+        </div>
+        <div class="card-body">
+            <p><strong>Student:</strong> {{ submission.student.user.get_full_name|default:submission.student.user.username }}</p>
+            <p><strong>Submitted:</strong> {{ submission.submitted_at|date:"F d, Y, P" }}</p>
+            {% if auto_graded_score is not None %}
+                <p><strong>Auto-graded Score (SCQ/MCQ):</strong> {{ auto_graded_score }} / {{ max_possible_auto_score }}</p>
+            {% endif %}
+            <hr>
+
+            <h5>Student's Answers:</h5>
+            {% for q_data in all_questions_data %}
+                <div class="mb-4 p-3 border rounded {% if q_data.is_essay %}bg-light{% endif %}">
+                    <p class="mb-1"><strong>Q{{ forloop.counter }}. {{ q_data.question.question_text|safe }}</strong> 
+                       <span class="badge bg-secondary">{{ q_data.question.get_question_type_display }}</span>
+                    </p>
+                    
+                    {% if q_data.is_essay %}
+                        <div class="student-answer p-2" style="background-color: #f8f9fa; border-left: 3px solid #0dcaf0;">
+                            {{ q_data.student_answer|default:"No answer provided."|linebreaksbr }}
+                        </div>
+                    {% else %} {# SCQ/MCQ #}
+                        <p class="mb-1"><em>Student's Answer:</em> {{ q_data.student_answer|default:"Not answered" }}</p>
+                        <p class="mb-0"><small><em>Correct Answer:</em> {{ q_data.question.correct_answer }} 
+                            {% if q_data.is_correct_auto is True %}
+                                <span class="badge bg-success">Correct (Auto)</span>
+                            {% elif q_data.is_correct_auto is False and q_data.question.correct_answer %} {# Only show incorrect if there was a correct answer #}
+                                <span class="badge bg-danger">Incorrect (Auto)</span>
+                            {% elif not q_data.question.correct_answer and q_data.student_answer %}
+                                <span class="badge bg-secondary">No Correct Ans Defined</span>
+                            {% endif %}
+                        </small></p>
+                    {% endif %}
+                </div>
+            {% endfor %}
+
+            <hr class="my-4">
+            <h5 class="mb-3">Grading & Feedback</h5>
+            <form method="post">
+                {% csrf_token %}
+                <div class="mb-3">
+                    <label for="manual_score" class="form-label">
+                        <strong>Score for Manually Graded Parts (e.g., Essays)</strong>
+                        (Max possible for manual parts: {{ max_possible_manual_score }})
+                        {# You could calculate total_possible_score for assessment and show it #}
+                    </label>
+                    <input type="number" step="0.5" name="manual_score" id="manual_score" class="form-control" 
+                           required min="0" value="0" {# Default manual score to 0 #}
+                           max="{{ max_possible_manual_score }}"> {# Set max based on manual parts #}
+                    <small class="text-muted d-block">
+                        This score will be added to the auto-graded score ({{ auto_graded_score|default:0 }}) to get the final score.
+                    </small>
+                </div>
+                <div class="mb-3">
+                    <label for="feedback" class="form-label"><strong>Overall Feedback for Student</strong></label>
+                    <textarea name="feedback" id="feedback" class="form-control" rows="4" placeholder="Provide constructive feedback...">{{ submission.feedback|default:"" }}</textarea>
+                </div>
+                
+                <div class="text-center">
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        <i class="fas fa-check-circle me-1"></i> Finalize Grade
+                    </button>
+                    {% if user.is_superuser %}
+                        <a href="{% url 'assessment_submissions_list' submission.assessment.id %}" class="btn btn-secondary btn-lg">Cancel</a>
+                    {% elif request.user.teacher %} 
+                        <a href="{% url 'teacher_assessment_list' %}" class="btn btn-secondary btn-lg">Cancel</a>
+                    {% else %}
+                        <a href="{{ request.META.HTTP_REFERER|default:'home' }}" class="btn btn-secondary btn-lg">Cancel</a>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
 {% endblock %}
