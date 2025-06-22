@@ -5,7 +5,17 @@ chardet==5.2.0
 crispy-bootstrap5==2024.2
 cssselect2==0.7.0
 Django==5.0.1
+<<<<<<< HEAD
 django-crispy-forms==2.3
+=======
+django-anymail==12.0
+django-ckeditor-5==0.2.18
+django-crispy-forms==2.3
+django-dotenv==1.4.2
+django-js-asset==3.1.2
+django-ratelimit==4.1.0
+flower==2.0.1
+>>>>>>> bf42a614 (Assessments, Submissions, Blog etc)
 fonttools==4.54.1
 pillow==10.4.0
 pycparser==2.22
