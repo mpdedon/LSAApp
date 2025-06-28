@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load humanize %}
 
-{% block title %}Grade Submission: {{ submission.assessment.title }}{% endblock %}
+{% block title %}Grade Submission: {{ submission.exam.title }}{% endblock %}
 
 {% block content %}
 <div class="container my-4 mb-5">
@@ -13,8 +13,8 @@
             <!-- Submission Info Header -->
             <div class="p-3 mb-4 bg-light rounded border">
                 <dl class="row mb-0">
-                    <dt class="col-sm-3">Assessment:</dt>
-                    <dd class="col-sm-9">{{ submission.assessment.title }}</dd>
+                    <dt class="col-sm-3">Exam:</dt>
+                    <dd class="col-sm-9">{{ submission.exam.title }}</dd>
 
                     <dt class="col-sm-3">Student:</dt>
                     <dd class="col-sm-9">{{ submission.student.user.get_full_name|default:submission.student.user.username }}</dd>
@@ -86,9 +86,9 @@
                 <div class="d-flex justify-content-end mt-4">
                     {# Simplified Cancel Button Logic #}
                     {% if user.is_superuser %}
-                        <a href="{% url 'assessment_submissions_list' submission.assessment.id %}" class="btn btn-secondary me-2">Cancel</a>
+                        <a href="{% url 'exam_submissions_list' submission.exam.id %}" class="btn btn-secondary me-2">Cancel</a>
                     {% else %}
-                        <a href="{% url 'teacher_assessment_list' %}" class="btn btn-secondary me-2">Cancel</a>
+                        <a href="{% url 'teacher_exam_list' %}" class="btn btn-secondary me-2">Cancel</a>
                     {% endif %}
 
                     <button type="submit" class="btn btn-primary">
