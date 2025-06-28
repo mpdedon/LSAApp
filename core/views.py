@@ -21,7 +21,7 @@ from core.models import Session, Term, Student, Teacher, Guardian, Notification
 from core.models import Class, Subject, FeeAssignment, Enrollment, Payment, Assessment, Exam
 from core.models import SubjectAssignment, TeacherAssignment, ClassSubjectAssignment
 from core.models import SubjectResult, Result, StudentFeeRecord, FinancialRecord, AcademicAlert
-from core.models import AssessmentSubmission, ExamSubmission
+from core.models import OnlineQuestion, AssessmentSubmission, ExamSubmission
 from core.utils import get_current_term, get_next_term   
 from core.forms import ClassSubjectAssignmentForm, NonAcademicSkillsForm, NotificationForm, ContactForm
 from core.session.forms import SessionForm
@@ -1712,6 +1712,7 @@ def send_test_email(request):
     )
     return HttpResponse("Test email sent successfully!")
 
+### ----- ASSESSMENT SECTION ----- ###
 
 # --- Helper: Process NEW Questions (for Create and Update) ---
 def _process_newly_added_questions(request, assessment, question_name_prefix='new_question_'):
@@ -1953,6 +1954,7 @@ def pending_assessments(request):
     pending_assessments = Assessment.objects.filter(is_approved=False)
     return render(request, 'setup/pending_assessments.html', {'pending_assessments': pending_assessments})
 
+
 @login_required
 @user_passes_test(lambda u: u.is_superuser)
 def view_assessment(request, assessment_id):
@@ -1980,22 +1982,16 @@ def admin_delete_assessment(request, assessment_id):
         try:
             print("--- [DELETE VIEW] Before assessment.delete() ---")
             assessment.delete()
-            print("--- [DELETE VIEW] After assessment.delete() ---") # If this prints, delete itself was successful
+            print("--- [DELETE VIEW] After assessment.delete() ---") 
             messages.success(request, f"Assessment '{assessment_title}' has been successfully deleted.")
             return redirect('admin_assessment_list')
         except Exception as e:
-            print(f"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-            print(f"!!! [DELETE VIEW] EXCEPTION DURING assessment.delete(): {type(e).__name__} - {str(e)} !!!")
-            print(f"!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-            # Forcing a full traceback print to console if DEBUG is True
+
             import traceback
             traceback.print_exc() # This should print the full traceback to console
             
             messages.error(request, f"An error occurred: {str(e)}. Please check server logs.")
-            # It's often better to NOT redirect immediately on error if you want to see the error page
-            # But if the error page isn't helpful, redirecting might be what you want.
-            # For debugging, let's try rendering an error or just letting Django handle it.
-            # return redirect('admin_assessment_list') 
+
             raise e 
             
     messages.warning(request, "Invalid request to delete. Deletion must be confirmed.")
@@ -2059,7 +2055,7 @@ def grade_essay_assessment_view(request, submission_id):
                 elif correct_mcq_set:
                     is_correct_auto = False
         elif q_obj.question_type == 'ES':
-            max_possible_manual_score += 1 # Example: 1 point per essay, or define points per question
+            max_possible_manual_score += 1 
 
         all_questions_data.append({
             'question': q_obj,
@@ -2094,18 +2090,15 @@ def grade_essay_assessment_view(request, submission_id):
             
             messages.success(request, f"Submission for {submission.student.user.get_full_name()} graded. Final Score: {final_score}")
             
-            # Dynamic redirect
             if user.is_superuser:
                 return redirect('assessment_submissions_list', assessment_id=assessment.id)
-            elif hasattr(user, 'teacher_profile'): # Or your way of identifying a teacher
-                 # You might need a specific teacher_assessment_submissions_list URL/view
-                return redirect('teacher_dashboard') # Fallback for now
-            else: # Should not happen due to auth check
+            elif hasattr(user, 'teacher_profile'): 
+                return redirect('teacher_dashboard') 
+            else: 
                 return redirect('home')
 
         except (ValueError, TypeError):
             messages.error(request, "Invalid score entered. Please enter a valid number for the manual score.")
-            # Fall through to re-render the form with an error
 
     context = {
         'submission': submission,
@@ -2117,145 +2110,194 @@ def grade_essay_assessment_view(request, submission_id):
     return render(request, 'assessment/grade_essay_submission.html', context)
 
 
+### ----- EXAM SECTON ------ ###
+
+# --- Create Exam View ---
+
 @login_required
 def create_exam(request):
-    # Ensure the logged-in user is authorized
     user = request.user
-    teacher = None
-    if not user.is_superuser:
-        teacher = get_object_or_404(Teacher, user=user)
-        assigned_classes = teacher.assigned_classes().all()
-        subjects = teacher.assigned_subjects().all()
+    teacher_profile = Teacher.objects.filter(user=user).first() 
+
+    if teacher_profile:
+        assigned_classes_qs = teacher_profile.assigned_classes()
+        assigned_subjects_qs = teacher_profile.assigned_subjects()
+    elif user.is_superuser:
+        assigned_classes_qs = Class.objects.all()
+        assigned_subjects_qs = Subject.objects.all()
     else:
-        assigned_classes = Class.objects.all()
-        subjects = Subject.objects.all()
+        messages.error(request, "You are not authorized to create exams.")
+        return redirect('home') 
 
-    # Handle GET request: render form
-    if request.method == 'GET':
-        form = ExamForm()
-        form.fields['class_assigned'].queryset = assigned_classes
-        form.fields['subject'].queryset = subjects
-        return render(request, 'exam/create_exam.html', {'form': form})
-
-    # Handle POST request: process form data
     if request.method == 'POST':
         form = ExamForm(request.POST)
-
-        # Limit class and subject choices for teachers
-        form.fields['class_assigned'].queryset = assigned_classes
-        form.fields['subject'].queryset = subjects
+        form.fields['class_assigned'].queryset = assigned_classes_qs
+        form.fields['subject'].queryset = assigned_subjects_qs
 
         if form.is_valid():
-            # Save the Exam instance
             exam = form.save(commit=False)
             exam.created_by = user
-            exam.is_approved = user.is_superuser  # Auto-approve if admin
-            exam.due_date = form.cleaned_data['due_date']
-            exam.duration = form.cleaned_data['duration']
-            exam.save()
-            form.save_m2m()  # Save many-to-many questions
+            if user.is_superuser: 
+                exam.is_approved = True
+            exam.save() 
 
-            # Process and validate questions dynamically
-            errors = process_questions(request, exam)
-
-            if not errors:
-                # Notify students if the exam is approved
-                if exam.is_approved:
-                    notify_students(exam)
-                return redirect('teacher_dashboard' if teacher else 'admin_dashboard')
+            # Use the specific function for new questions from 'create' form (prefix 'question_')
+            question_processing_errors = _process_newly_added_questions(request, exam, question_name_prefix='question_')
+            
+            if not question_processing_errors:
+                messages.success(request, f"Exam '{exam.title}' created successfully.")
+                return redirect('admin_dashboard' if user.is_superuser else 'teacher_dashboard')
             else:
-                print("Errors in questions:", errors)  # Debugging line
+                exam.delete() 
+                form_with_initial_data = ExamForm(request.POST) 
+                form_with_initial_data.fields['class_assigned'].queryset = assigned_classes_qs
+                form_with_initial_data.fields['subject'].queryset = assigned_subjects_qs
+                messages.error(request, "Exam not created. Please correct the question errors.")
                 return render(request, 'exam/create_exam.html', {
-                    'form': form,
-                    'errors': errors,
+                    'form': form_with_initial_data,
+                    'question_errors': question_processing_errors,
                 })
-        else:
-            print("Form errors:", form.errors)  # Debugging line
-            return render(request, 'exam/create_exam.html', {
-                'form': form,
-                'errors': form.errors,  # Add form errors to be displayed in the template
-            })
+        else: 
+            form.fields['class_assigned'].queryset = assigned_classes_qs # Re-set for template
+            form.fields['subject'].queryset = assigned_subjects_qs
+            return render(request, 'exam/create_exam.html', {'form': form})
+    else: # GET request
+        form = ExamForm()
+        form.fields['class_assigned'].queryset = assigned_classes_qs
+        form.fields['subject'].queryset = assigned_subjects_qs
+        return render(request, 'exam/create_exam.html', {'form': form})
 
-                  
-def process_questions(request, exam):
-    errors = []
-    question_number = 1
+# --- Update Exam View ---
+@login_required
+def update_exam(request, exam_id):
+    exam = get_object_or_404(Exam, id=exam_id)
+    user = request.user
+    teacher_profile = Teacher.objects.filter(user=user).first()
 
-    while f'question_type_{question_number}' in request.POST:
-        question_type = request.POST.get(f'question_type_{question_number}')
-        question_text = request.POST.get(f'question_text_{question_number}')
-        options = request.POST.get(f'options_{question_number}', '')
-        correct_answer = request.POST.get(f'correct_answer_{question_number}')
+    # Authorization
+    if not (user.is_superuser or exam.created_by == user):
+        messages.error(request, "You are not authorized to update this exam.")
+        return redirect('home')
 
-        print(f"Processing Question {question_number}: {question_type}, {question_text}, {options}, {correct_answer}")  # Debugging line
+    if teacher_profile and not user.is_superuser :
+        assigned_classes_qs = teacher_profile.assigned_classes()
+        assigned_subjects_qs = teacher_profile.assigned_subjects()
+    else: # Superuser or non-teacher (though auth check above should handle non-teacher)
+        assigned_classes_qs = Class.objects.all()
+        assigned_subjects_qs = Subject.objects.all()
 
-        options_list = [opt.strip() for opt in options.split(',') if opt.strip()]
-        question_data = {
-            'question_type': question_type,
-            'question_text': question_text,
-            'options': json.dumps(options_list) if options_list else '',
-            'correct_answer': correct_answer
-        }
+    if request.method == 'POST':
+        form = ExamForm(request.POST, instance=exam)
+        form.fields['class_assigned'].queryset = assigned_classes_qs
+        form.fields['subject'].queryset = assigned_subjects_qs
 
-        question_form = OnlineQuestionForm(question_data)
-        if question_form.is_valid():
-            if question_type in ['SCQ', 'MCQ']:
-                if not options_list:
-                    errors.append(f"Error in Question {question_number}: Options are required for SCQ/MCQ.")
-                else:
-                    question_form.save()
-                    exam.questions.add(question_form.instance)
-            elif question_type == 'ES':
-                question_form.save()
-                exam.questions.add(question_form.instance)
-        else:
-            print(f"Question {question_number} Errors: {question_form.errors}")  # Debugging line
-            errors.append(f"Error in Question {question_number}: {question_form.errors}")
-        question_number += 1
+        if form.is_valid():
+            updated_exam = form.save(commit=False)
+            if user.is_superuser and not exam.is_approved: 
+                 updated_exam.is_approved = True
+                 updated_exam.approved_by = user
+            updated_exam.updated_at = timezone.now()
+            updated_exam.save()
 
-    return errors
+            all_errors = []
 
-def notify_students(exam):
-    students = Student.objects.filter(current_class=exam.class_assigned)
-    for student in students:
-        AcademicAlert.objects.create(
-            alert_type='exam',
-            title=exam.title,
-            summary=exam.short_description or 'New exam available!',
-            teacher=exam.created_by,
-            student=student,
-            due_date=exam.due_date,
-            duration=exam.duration,
-            related_object_id=exam.id
-        )
+            # 1. Update Existing Questions
+            submitted_existing_ids = set()
+            for q_instance in exam.questions.all():
+                q_id = q_instance.id
+                # Check if data for this existing question was submitted for update
+                # (Assumes edit form fields are named question_ID_text, etc.)
+                if f'question_{q_id}_text' in request.POST or f'question_{q_id}_type' in request.POST:
+                    submitted_existing_ids.add(q_id)
+                    data_for_existing = {
+                        'question_type': request.POST.get(f'question_{q_id}_type'),
+                        'question_text': request.POST.get(f'question_{q_id}_text', '').strip(),
+                        'options': [opt.strip() for opt in request.POST.get(f'question_{q_id}_options', '').split(',') if opt.strip()],
+                        'correct_answer': request.POST.get(f'question_{q_id}_correct_answer', '').strip() or None
+                    }
+                    q_form = OnlineQuestionForm(data_for_existing, instance=q_instance)
+                    if q_form.is_valid():
+                        q_form.save()
+                    else:
+                        for field, field_errors in q_form.errors.items():
+                            all_errors.append(f"Existing Question ID {q_id} ({field.replace('_',' ').title()}): {', '.join(field_errors)}")
+            
+            # 2. Remove Questions (if a mechanism exists to mark them for deletion)
+            deleted_ids_str = request.POST.get('deleted_question_ids', '') # e.g., "12,15,20"
+            if deleted_ids_str:
+                deleted_ids = [int(id_str) for id_str in deleted_ids_str.split(',') if id_str.isdigit()]
+                exam.questions.remove(*deleted_ids) 
+                OnlineQuestion.objects.filter(id__in=deleted_ids, exams=None).delete() # Optional: delete orphaned questions
+
+            # 3. Add Newly Added Questions (uses 'new_question_' prefix)
+            new_question_errors = _process_newly_added_questions(request, exam, question_name_prefix='new_question_')
+            all_errors.extend(new_question_errors)
+
+            if not all_errors:
+                messages.success(request, "Exam updated successfully.")
+                return redirect('view_exam', exam_id=exam.id)
+            else:
+                messages.error(request, "Errors occurred. Please review.")
+        # If form is invalid or errors occurred, re-render with context
+        current_questions = exam.questions.all().order_by('id')
+        return render(request, 'exam/update_exam.html', {
+            'form': form, # This form instance will have its own errors
+            'exam': exam,
+            'questions': current_questions,
+            'processing_errors': all_errors if 'all_errors' in locals() and all_errors else [] 
+        })
+
+    else: # GET request
+        form = ExamForm(instance=exam)
+        form.fields['class_assigned'].queryset = assigned_classes_qs
+        form.fields['subject'].queryset = assigned_subjects_qs
+        questions = exam.questions.all().order_by('id')
+        return render(request, 'exam/update_exam.html', {
+            'form': form,
+            'exam': exam,
+            'questions': questions
+        })
 
 @login_required
 @user_passes_test(lambda u: u.is_superuser)
 def approve_exam(request, exam_id):
-    exam = get_object_or_404(Exam, id=exam_id, is_approved=False)
+    exam = get_object_or_404(Exam, id=exam_id)
     if request.method == 'POST':
-        exam.is_approved = True
-        exam.approved_by = request.user
-        exam.save()
-        notify_students(exam)
-        messages.success(request, f"Exam '{exam.title}' approved and published!")
-        return redirect('admin_dashboard')
+        if not exam.is_approved:
+            exam.is_approved = True
+            exam.approved_by = request.user
+            exam.save()
+            messages.success(request, f"Exam '{exam.title}' approved and students notified.")
+        else:
+            messages.info(request, f"Exam '{exam.title}' was already approved.")
+        return redirect('school-setup') 
+    return render(request, 'exam/approve_exam_confirm.html', {'exam': exam})
 
-    return render(request, 'setup/approve_exam.html', {'exam': exam})
 
 @login_required
-@user_passes_test(lambda u: u.is_superuser)
+@user_passes_test(lambda u: u.is_superuser) 
 def admin_exam_list(request):
-    exams = Exam.objects.all()
-    return render(request, 'exam/admin_exam_list.html', {'exams': exams})
+
+    exams_qs = Exam.objects.annotate(
+        submission_count=Count('submissions_for_exam') 
+    ).order_by('-created_at')
+    
+    pending_exam_count = Exam.objects.filter(is_approved=False).count()
+    
+    return render(request, 'exam/admin_exam_list.html', {
+        'exams': exams_qs,
+        'pending_exam_count': pending_exam_count,
+    })
+
 
 @login_required
 @user_passes_test(lambda u: u.is_superuser)
-def pending_approvals(request):
+def pending_exams(request):
     pending_exams = Exam.objects.filter(is_approved=False)
     return render(request, 'setup/pending_exams.html', {'pending_exams': pending_exams})
 
 @login_required
+@user_passes_test(lambda u: u.is_superuser)
 def view_exam(request, exam_id):
     # Retrieve the exam and its questions
     exam = get_object_or_404(Exam, id=exam_id)
@@ -2266,6 +2308,145 @@ def view_exam(request, exam_id):
         'questions': questions,
     }
     return render(request, 'exam/exam_detail.html', context)
+
+# views.py
+@login_required
+@user_passes_test(lambda u: u.is_superuser)
+def admin_delete_exam(request, exam_id):
+    exam = get_object_or_404(Exam, id=exam_id)
+    
+    if request.method == 'POST':
+        exam_title = exam.title
+        
+        try:
+            print("--- [DELETE VIEW] Before exam.delete() ---")
+            exam.delete()
+            print("--- [DELETE VIEW] After exam.delete() ---") # If this prints, delete itself was successful
+            messages.success(request, f"Exam '{exam_title}' has been successfully deleted.")
+            return redirect('admin_exam_list')
+        
+        except Exception as e:
+            import traceback
+            traceback.print_exc() 
+            
+            messages.error(request, f"An error occurred: {str(e)}. Please check server logs.")
+ 
+            raise e 
+            
+    messages.warning(request, "Invalid request to delete. Deletion must be confirmed.")
+    return redirect('admin_exam_list')
+
+
+# views.py
+@login_required
+def exam_submissions_list(request, exam_id):
+    exam = get_object_or_404(Exam, id=exam_id)
+
+    if not (request.user.is_superuser or exam.created_by == request.user):
+        messages.error(request, "You are not authorized to view submissions for this exam.")
+        return redirect('admin_exam_list') # Or appropriate redirect
+
+    submissions = ExamSubmission.objects.filter(exam=exam)\
+                                          .select_related('student__user')\
+                                          .order_by('-submitted_at')
+    
+    pending_manual_grade_count = submissions.filter(requires_manual_review=True, is_graded=False).count()
+
+    context = {
+        'exam': exam,
+        'submissions': submissions,
+        'pending_manual_grade_count': pending_manual_grade_count,
+    }
+    return render(request, 'exam/exam_submissions_list.html', context)
+
+
+def grade_essay_exam_view(request, submission_id):
+    submission = get_object_or_404(ExamSubmission, id=submission_id)
+    exam = submission.exam
+    user = request.user 
+
+    # Authorization
+    if not (user.is_superuser or exam.created_by == user):
+        messages.error(request, "You are not authorized to grade this submission.")
+        return redirect('home') # Or a more appropriate unauthorized page
+
+    # Prepare questions and answers for display
+    all_questions_data = []
+    max_possible_auto_score = 0
+    max_possible_manual_score = 0 # Assuming 1 point per essay for now, adjust as needed
+
+    for q_obj in exam.questions.all().order_by('id'):
+        raw_ans = submission.answers.get(str(q_obj.id)) if isinstance(submission.answers, dict) else None
+        student_answer_display = ", ".join(raw_ans) if isinstance(raw_ans, list) else raw_ans
+        
+        is_correct_auto = None
+        if q_obj.question_type in ['SCQ', 'MCQ']:
+            max_possible_auto_score += 1 # Assuming 1 point per question
+            # Simplified check for display; actual grading happened on submission
+            if q_obj.question_type == 'SCQ' and student_answer_display == q_obj.correct_answer:
+                is_correct_auto = True
+            elif q_obj.question_type == 'MCQ':
+                correct_mcq_set = set(op.strip().lower() for op in (q_obj.correct_answer or "").split(',') if op.strip())
+                submitted_mcq_set = set(op.strip().lower() for op in (student_answer_display or "").split(',') if op.strip())
+                if correct_mcq_set == submitted_mcq_set and correct_mcq_set:
+                    is_correct_auto = True
+                elif correct_mcq_set:
+                    is_correct_auto = False
+        elif q_obj.question_type == 'ES':
+            max_possible_manual_score += 1 # Example: 1 point per essay, or define points per question
+
+        all_questions_data.append({
+            'question': q_obj,
+            'student_answer': student_answer_display,
+            'is_essay': q_obj.question_type == 'ES',
+            'is_correct_auto': is_correct_auto
+        })
+
+    # The score stored on submission for mixed exams is the auto-graded part
+    auto_graded_score = 0
+    if not submission.requires_manual_review and submission.is_graded: # Was fully auto-graded
+        auto_graded_score = submission.score or 0
+    elif submission.requires_manual_review and submission.score is not None: # Auto-graded part was stored
+        auto_graded_score = submission.score or 0
+
+
+    if request.method == 'POST':
+        manual_score_str = request.POST.get('manual_score') # Score for manually graded parts
+        feedback_str = request.POST.get('feedback', '').strip()
+
+        try:
+            manual_score_input = float(manual_score_str) if manual_score_str else 0
+            
+            # Calculate final score
+            final_score = (auto_graded_score if auto_graded_score is not None else 0) + manual_score_input
+            
+            submission.score = final_score 
+            submission.feedback = feedback_str
+            submission.is_graded = True
+            submission.requires_manual_review = False 
+            submission.save()
+            
+            messages.success(request, f"Submission for {submission.student.user.get_full_name()} graded. Final Score: {final_score}")
+            
+            # Dynamic redirect
+            if user.is_superuser:
+                return redirect('exam_submissions_list', exam_id=exam.id)
+            elif hasattr(user, 'teacher_profile'): 
+                return redirect('teacher_dashboard') 
+            else: 
+                return redirect('home')
+
+        except (ValueError, TypeError):
+            messages.error(request, "Invalid score entered. Please enter a valid number for the manual score.")
+
+    context = {
+        'submission': submission,
+        'exam': exam,
+        'all_questions_data': all_questions_data,
+        'auto_graded_score': auto_graded_score, 
+        'max_possible_manual_score': max_possible_manual_score, 
+    }
+    return render(request, 'exam/grade_essay_submission.html', context)
 
 
 # === Post Management Views ===

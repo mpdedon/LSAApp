@@ -1,20 +1,102 @@
 {% extends "base.html" %}
-{% block content %}
-<div class="container mt-5">
-    <h2 class="text-center">Manual Review for {{ submission.exam.title }}</h2>
-    <p class="text-muted">Student: {{ submission.student.user.get_full_name }}</p>
-    <form method="post" class="mt-4">
-        {% csrf_token %}
-        {% for question_id, answer in submission.answers.items %}
-            <div class="card mb-3 p-3 shadow-sm">
-                <p><strong>Q{{ forloop.counter }}: </strong> Answered: {{ answer }}</p>
-            </div>
-        {% endfor %}
+{% load humanize %}
 
-        <label for="score">Assign Score (Out of 100)</label>
-        <input type="number" name="score" class="form-control" required min="0" max="100">
-        
-        <button type="submit" class="btn btn-primary mt-4">Submit Score</button>
-    </form>
+{% block title %}Grade Submission: {{ submission.exam.title }}{% endblock %}
+
+{% block content %}
+<div class="container my-4 mb-5">
+    <div class="card shadow-sm">
+        <div class="card-header bg-info text-white">
+            <h4 class="mb-0">Grade Submission & Provide Feedback</h4>
+        </div>
+        <div class="card-body">
+            <!-- Submission Info Header -->
+            <div class="p-3 mb-4 bg-light rounded border">
+                <dl class="row mb-0">
+                    <dt class="col-sm-3">Exam:</dt>
+                    <dd class="col-sm-9">{{ submission.exam.title }}</dd>
+
+                    <dt class="col-sm-3">Student:</dt>
+                    <dd class="col-sm-9">{{ submission.student.user.get_full_name|default:submission.student.user.username }}</dd>
+
+                    <dt class="col-sm-3">Submitted:</dt>
+                    <dd class="col-sm-9">{{ submission.submitted_at|date:"F d, Y, P" }} ({{ submission.submitted_at|timesince }} ago)</dd>
+
+                    {% if auto_graded_score is not None and max_possible_auto_score > 0 %}
+                        <dt class="col-sm-3">Auto-graded Score:</dt>
+                        <dd class="col-sm-9 fw-bold">{{ auto_graded_score|floatformat:2 }} / {{ max_possible_auto_score|floatformat:2 }}</dd>
+                    {% endif %}
+                </dl>
+            </div>
+
+            <hr>
+            <h5 class="mb-3">Student's Answers</h5>
+
+            {% for q_data in all_questions_data %}
+                <div class="mb-4 p-3 border rounded {% if q_data.is_essay %}bg-light border-warning{% endif %}">
+                    <p class="mb-2"><strong>Q{{ forloop.counter }}. {{ q_data.question.question_text|safe }}</strong>
+                       <span class="badge bg-secondary float-end">{{ q_data.question.get_question_type_display }} ({{ q_data.question.points }} pts)</span>
+                    </p>
+
+                    {% if q_data.is_essay %}
+                        <h6 class="text-muted small">Student's Essay Answer:</h6>
+                        <div class="student-answer p-3" style="background-color: #fdfdfe; border-left: 4px solid #0dcaf0;">
+                            {{ q_data.student_answer|default:"<em class='text-danger'>No answer provided.</em>"|linebreaksbr }}
+                        </div>
+                    {% else %} {# SCQ/MCQ #}
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span><em>Student's Answer:</em> <strong>{{ q_data.student_answer|default:"Not answered" }}</strong></span>
+                            {% if q_data.is_correct_auto is True %}
+                                <span class="badge bg-success"><i class="fas fa-check me-1"></i>Correct</span>
+                            {% elif q_data.is_correct_auto is False %}
+                                <span class="badge bg-danger"><i class="fas fa-times me-1"></i>Incorrect</span>
+                            {% endif %}
+                        </div>
+                        <div class="text-muted small mt-1">
+                            <em>Correct Answer:</em> {{ q_data.question.correct_answer }}
+                        </div>
+                    {% endif %}
+                </div>
+            {% endfor %}
+
+            <hr class="my-4">
+            <h5 class="mb-3">Grading & Finalization</h5>
+
+            <form method="post" class="p-3 bg-light border rounded">
+                {% csrf_token %}
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="manual_score" class="form-label fw-bold">
+                            Score for Essay/Manual Parts
+                        </label>
+                        <div class="input-group">
+                             <input type="number" step="0.5" name="manual_score" id="manual_score" class="form-control"
+                                   required min="0" value="{{ request.POST.manual_score|default:0 }}" {# Repopulate on error #}
+                                   max="{{ max_possible_manual_score }}">
+                            <span class="input-group-text">/ {{ max_possible_manual_score|floatformat:2 }}</span>
+                        </div>
+                        <small class="text-muted d-block mt-1">
+                            This will be added to the auto-graded score of {{ auto_graded_score|default:0|floatformat:2 }}.
+                        </small>
+                    </div>
+                </div>
+
+
+
+                <div class="d-flex justify-content-end mt-4">
+                    {# Simplified Cancel Button Logic #}
+                    {% if user.is_superuser %}
+                        <a href="{% url 'exam_submissions_list' submission.exam.id %}" class="btn btn-secondary me-2">Cancel</a>
+                    {% else %}
+                        <a href="{% url 'teacher_exam_list' %}" class="btn btn-secondary me-2">Cancel</a>
+                    {% endif %}
+
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-check-circle me-1"></i> Finalize Grade
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
 {% endblock %}

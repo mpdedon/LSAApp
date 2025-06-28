@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% load static %} 
+{% load static %} \
 {% load submission_tags %}
 
 {% block title %}Take Exam: {{ exam.title }}{% endblock %}
@@ -32,7 +32,7 @@
                     </div>
 
                     {% if student %}
-                        {% with item_type=item|model_name_lower %} {# Requires a custom filter model_name_lower or pass from view #}
+                        {% with item_type=exam|model_name_lower %} {# Requires a custom filter model_name_lower or pass from view #}
                         {% comment %} Or pass item_type_verbose from view and use it to construct URL name {% endcomment %}
                             {% firstof exam exam assignment as current_item %} {# Get the specific item #}
                             {% if item_type_verbose == "Exam" %}{% get_submission "ExamSubmission" current_item student as existing_submission %}{% endif %}

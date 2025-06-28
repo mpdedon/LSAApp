@@ -1,79 +1,99 @@
 {% extends "base.html" %}
-{% block title %}Grade Assessment: {{ submission.assessment.title }}{% endblock %}
+{% load humanize %}
+
+{% block title %}Grade Submission: {{ submission.assessment.title }}{% endblock %}
 
 {% block content %}
-<div class="container my-4 main-content-below-navbar">
-    <div class="card shadow-lg">
+<div class="container my-4 mb-5">
+    <div class="card shadow-sm">
         <div class="card-header bg-info text-white">
-            <h4 class="mb-0">Manual Grade & Feedback for: {{ submission.assessment.title }}</h4>
+            <h4 class="mb-0">Grade Submission & Provide Feedback</h4>
         </div>
         <div class="card-body">
-            <p><strong>Student:</strong> {{ submission.student.user.get_full_name|default:submission.student.user.username }}</p>
-            <p><strong>Submitted:</strong> {{ submission.submitted_at|date:"F d, Y, P" }}</p>
-            {% if auto_graded_score is not None %}
-                <p><strong>Auto-graded Score (SCQ/MCQ):</strong> {{ auto_graded_score }} / {{ max_possible_auto_score }}</p>
-            {% endif %}
-            <hr>
+            <!-- Submission Info Header -->
+            <div class="p-3 mb-4 bg-light rounded border">
+                <dl class="row mb-0">
+                    <dt class="col-sm-3">Assessment:</dt>
+                    <dd class="col-sm-9">{{ submission.assessment.title }}</dd>
 
-            <h5>Student's Answers:</h5>
+                    <dt class="col-sm-3">Student:</dt>
+                    <dd class="col-sm-9">{{ submission.student.user.get_full_name|default:submission.student.user.username }}</dd>
+
+                    <dt class="col-sm-3">Submitted:</dt>
+                    <dd class="col-sm-9">{{ submission.submitted_at|date:"F d, Y, P" }} ({{ submission.submitted_at|timesince }} ago)</dd>
+
+                    {% if auto_graded_score is not None and max_possible_auto_score > 0 %}
+                        <dt class="col-sm-3">Auto-graded Score:</dt>
+                        <dd class="col-sm-9 fw-bold">{{ auto_graded_score|floatformat:2 }} / {{ max_possible_auto_score|floatformat:2 }}</dd>
+                    {% endif %}
+                </dl>
+            </div>
+
+            <hr>
+            <h5 class="mb-3">Student's Answers</h5>
+
             {% for q_data in all_questions_data %}
-                <div class="mb-4 p-3 border rounded {% if q_data.is_essay %}bg-light{% endif %}">
-                    <p class="mb-1"><strong>Q{{ forloop.counter }}. {{ q_data.question.question_text|safe }}</strong> 
-                       <span class="badge bg-secondary">{{ q_data.question.get_question_type_display }}</span>
+                <div class="mb-4 p-3 border rounded {% if q_data.is_essay %}bg-light border-warning{% endif %}">
+                    <p class="mb-2"><strong>Q{{ forloop.counter }}. {{ q_data.question.question_text|safe }}</strong>
+                       <span class="badge bg-secondary float-end">{{ q_data.question.get_question_type_display }} ({{ q_data.question.points }} pts)</span>
                     </p>
-                    
+
                     {% if q_data.is_essay %}
-                        <div class="student-answer p-2" style="background-color: #f8f9fa; border-left: 3px solid #0dcaf0;">
-                            {{ q_data.student_answer|default:"No answer provided."|linebreaksbr }}
+                        <h6 class="text-muted small">Student's Essay Answer:</h6>
+                        <div class="student-answer p-3" style="background-color: #fdfdfe; border-left: 4px solid #0dcaf0;">
+                            {{ q_data.student_answer|default:"<em class='text-danger'>No answer provided.</em>"|linebreaksbr }}
                         </div>
                     {% else %} {# SCQ/MCQ #}
-                        <p class="mb-1"><em>Student's Answer:</em> {{ q_data.student_answer|default:"Not answered" }}</p>
-                        <p class="mb-0"><small><em>Correct Answer:</em> {{ q_data.question.correct_answer }} 
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span><em>Student's Answer:</em> <strong>{{ q_data.student_answer|default:"Not answered" }}</strong></span>
                             {% if q_data.is_correct_auto is True %}
-                                <span class="badge bg-success">Correct (Auto)</span>
-                            {% elif q_data.is_correct_auto is False and q_data.question.correct_answer %} {# Only show incorrect if there was a correct answer #}
-                                <span class="badge bg-danger">Incorrect (Auto)</span>
-                            {% elif not q_data.question.correct_answer and q_data.student_answer %}
-                                <span class="badge bg-secondary">No Correct Ans Defined</span>
+                                <span class="badge bg-success"><i class="fas fa-check me-1"></i>Correct</span>
+                            {% elif q_data.is_correct_auto is False %}
+                                <span class="badge bg-danger"><i class="fas fa-times me-1"></i>Incorrect</span>
                             {% endif %}
-                        </small></p>
+                        </div>
+                        <div class="text-muted small mt-1">
+                            <em>Correct Answer:</em> {{ q_data.question.correct_answer }}
+                        </div>
                     {% endif %}
                 </div>
             {% endfor %}
 
             <hr class="my-4">
-            <h5 class="mb-3">Grading & Feedback</h5>
-            <form method="post">
+            <h5 class="mb-3">Grading & Finalization</h5>
+
+            <form method="post" class="p-3 bg-light border rounded">
                 {% csrf_token %}
-                <div class="mb-3">
-                    <label for="manual_score" class="form-label">
-                        <strong>Score for Manually Graded Parts (e.g., Essays)</strong>
-                        (Max possible for manual parts: {{ max_possible_manual_score }})
-                        {# You could calculate total_possible_score for assessment and show it #}
-                    </label>
-                    <input type="number" step="0.5" name="manual_score" id="manual_score" class="form-control" 
-                           required min="0" value="0" {# Default manual score to 0 #}
-                           max="{{ max_possible_manual_score }}"> {# Set max based on manual parts #}
-                    <small class="text-muted d-block">
-                        This score will be added to the auto-graded score ({{ auto_graded_score|default:0 }}) to get the final score.
-                    </small>
+                <div class="row">
+                    <div class="col-md-6 mb-3">
+                        <label for="manual_score" class="form-label fw-bold">
+                            Score for Essay/Manual Parts
+                        </label>
+                        <div class="input-group">
+                             <input type="number" step="0.5" name="manual_score" id="manual_score" class="form-control"
+                                   required min="0" value="{{ request.POST.manual_score|default:0 }}" {# Repopulate on error #}
+                                   max="{{ max_possible_manual_score }}">
+                            <span class="input-group-text">/ {{ max_possible_manual_score|floatformat:2 }}</span>
+                        </div>
+                        <small class="text-muted d-block mt-1">
+                            This will be added to the auto-graded score of {{ auto_graded_score|default:0|floatformat:2 }}.
+                        </small>
+                    </div>
                 </div>
-                <div class="mb-3">
-                    <label for="feedback" class="form-label"><strong>Overall Feedback for Student</strong></label>
-                    <textarea name="feedback" id="feedback" class="form-control" rows="4" placeholder="Provide constructive feedback...">{{ submission.feedback|default:"" }}</textarea>
-                </div>
-                
-                <div class="text-center">
-                    <button type="submit" class="btn btn-primary btn-lg">
+
+
+
+                <div class="d-flex justify-content-end mt-4">
+                    {# Simplified Cancel Button Logic #}
+                    {% if user.is_superuser %}
+                        <a href="{% url 'assessment_submissions_list' submission.assessment.id %}" class="btn btn-secondary me-2">Cancel</a>
+                    {% else %}
+                        <a href="{% url 'teacher_assessment_list' %}" class="btn btn-secondary me-2">Cancel</a>
+                    {% endif %}
+
+                    <button type="submit" class="btn btn-primary">
                         <i class="fas fa-check-circle me-1"></i> Finalize Grade
                     </button>
-                    {% if user.is_superuser %}
-                        <a href="{% url 'assessment_submissions_list' submission.assessment.id %}" class="btn btn-secondary btn-lg">Cancel</a>
-                    {% elif request.user.teacher %} 
-                        <a href="{% url 'teacher_assessment_list' %}" class="btn btn-secondary btn-lg">Cancel</a>
-                    {% else %}
-                        <a href="{{ request.META.HTTP_REFERER|default:'home' }}" class="btn btn-secondary btn-lg">Cancel</a>
-                    {% endif %}
                 </div>
             </form>
         </div>

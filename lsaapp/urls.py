@@ -33,7 +33,7 @@ from core.views import SessionListView, SessionDetailView, SessionCreateView, Se
 from core.views import TermListView, TermDetailView, TermCreateView, TermUpdateView, TermDeleteView, activate_term_view
 from core.views import promote_student, repeat_student, demote_student, mark_dormant_student, mark_left_student, mark_active
 from core.views import create_assessment, admin_assessment_list, approve_assessment, pending_assessments, view_assessment, admin_delete_assessment, assessment_submissions_list, class_subjects
-from core.views import create_exam, admin_exam_list, approve_exam, pending_approvals, view_exam
+from core.views import create_exam, admin_exam_list, approve_exam, pending_exams, view_exam, admin_delete_exam, exam_submissions_list
 from core.views import broadsheets, view_broadsheet, approve_broadsheet, archive_broadsheet
 from core.views import FeeAssignmentCreateView, FeeAssignmentListView, FeeAssignmentUpdateView, FeeAssignmentDetailView, FeeAssignmentDeleteView, StudentFeeRecordListView
 from core.views import PaymentCreateView, PaymentListView, PaymentUpdateView, PaymentDetailView, PaymentDeleteView, FinancialRecordListView
@@ -265,9 +265,9 @@ urlpatterns = [
     path('admin-assessment-list/', admin_assessment_list, name='admin_assessment_list'),
     path('assessment/<int:assessment_id>/', view_assessment, name='view_assessment'),
     path('assessment/update/<int:assessment_id>/', update_assessment, name='update_assessment'),
-    path('admin_delete/<int:assessment_id>/', admin_delete_assessment, name='admin_delete_assessment'),
+    path('admin-delete/<int:assessment_id>/', admin_delete_assessment, name='admin_delete_assessment'),
     path('assessment/delete/<int:assessment_id>/', delete_assessment, name='delete_assessment'),
-    path('submit_assessment/<int:assessment_id>/', submit_assessment, name='submit_assessment'),
+    path('submit-assessment/<int:assessment_id>/', submit_assessment, name='submit_assessment'),
     path('assessment/<int:assessment_id>/submissions/', assessment_submissions_list, name='assessment_submissions_list'),
     path('grade-essay-assessment/<int:submission_id>/', grade_essay_assessment, name='grade_essay_assessment'),
     path('assessment/<int:assessment_id>/result/', view_assessment_result, name='view_assessment_result'),
@@ -275,14 +275,16 @@ urlpatterns = [
     # Exam URLs
     path('exams-create/', create_exam, name='create_exam'),
     path('exam/approve/<int:exam_id>/', approve_exam, name='approve_exam'),
-    path('exam/pending-approvals/', pending_approvals, name='pending_approvals'),
+    path('exam/pending-exams/', pending_exams, name='pending_exams'),
     path('exam/teacher-list/', teacher_exam_list, name='teacher_exam_list'),
     path('admin-exam-list/', admin_exam_list, name='admin_exam_list'),
     path('exam/<int:exam_id>/', view_exam, name='view_exam'),
     path('exam/update/<int:exam_id>/', update_exam, name='update_exam'),
+    path('admin-delete/<int:exam_id>/', admin_delete_exam, name='admin_delete_exam'),
     path('exam/delete/<int:exam_id>/', delete_exam, name='delete_exam'),
-    path('exam/submit_exam/<int:exam_id>/', submit_exam, name='submit_exam'),
-    path('exam/grade_exam/<int:submission_id>/', grade_essay_exam, name='grade_essay_exam'),
+    path('submit-exam/<int:exam_id>/', submit_exam, name='submit_exam'),
+    path('exam/<int:exam_id>/submissions/', exam_submissions_list, name='exam_submissions_list'),
+    path('grade-essay-exam/<int:submission_id>/', grade_essay_exam, name='grade_essay_exam'),
     path('exam/<int:exam_id>/result/', view_exam_result, name='view_exam_result'),
 ]
 

@@ -1,5 +1,5 @@
 # core/auth/views.py
-from django.shortcuts import render, redirect
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.views import LoginView, LogoutView
 from django.views.generic import TemplateView
 from django.contrib.auth.views import PasswordResetView, PasswordResetDoneView, PasswordResetConfirmView, PasswordResetCompleteView
@@ -14,7 +14,7 @@ from django.urls import reverse_lazy
 from django.db.models import Count, Q
 from collections import defaultdict
 from decimal import Decimal
-from core.models import Student, Teacher, Guardian, Assignment, Result, Attendance, Subject, Class, Payment
+from core.models import Student, Teacher, Guardian, Assignment, Result, Attendance, Subject, Class, Payment, ClassSubjectAssignment
 from core.models import Session, Term, Message, Assessment, Exam, Notification, AssignmentSubmission, AcademicAlert
 from core.models import FinancialRecord, StudentFeeRecord, AssessmentSubmission, ExamSubmission
 from django.db.models import Sum
@@ -167,6 +167,7 @@ def admin_dashboard(request):
     # Use the new base template for rendering
     return render(request, 'setup/dashboard.html', context) # Adjust template path
 
+
 @login_required
 @user_passes_test(lambda u: u.role == 'student')
 def student_dashboard(request):
@@ -195,11 +196,9 @@ def student_dashboard(request):
     student_id = student.user.id 
     attendance_data = {}
     assignments_data = {} 
-    # assessments/exams can be passed as querysets filtered later
     financial_data = {}
     result_data = {}
     archived_results_data = defaultdict(list) # Keep using defaultdict
-
 
     # --- Fetch Data Efficiently ---
     now = timezone.now()
@@ -208,15 +207,14 @@ def student_dashboard(request):
     subjects = Subject.objects.filter(
         class_assignments__class_assigned=current_class,
         class_assignments__term=active_term # Filter by active term
-        # class_assignments__session=active_session # Redundant if filtering by active_term
     ).distinct()
 
     # Assignments for current class & term (show upcoming/recent?)
     # Decide which assignments to show (e.g., only pending, or recent)
     assignments = Assignment.objects.filter(
         class_assigned=current_class,
-        term=active_term, # Filter by term
-        due_date__gte=now # Optionally filter only upcoming
+        term=active_term, 
+        due_date__gte=now #
     ).select_related('subject', 'teacher__user').order_by('due_date')
 
     # Fetch student's submissions for these assignments
@@ -242,14 +240,14 @@ def student_dashboard(request):
     # Assessments & Exams for current class & term
     assessments = Assessment.objects.filter(
         class_assigned=current_class,
-        term=active_term
-        # due_date__gte=now # Optional: Filter upcoming only
+        term=active_term,
+        due_date__gte=now 
         ).select_related('subject').order_by('due_date')
 
     exams = Exam.objects.filter(
         class_assigned=current_class,
-        term=active_term
-        # due_date__gte=now # Optional: Filter upcoming only
+        term=active_term,
+        due_date__gte=now 
         ).select_related('subject').order_by('due_date')
 
     # Attendance Summary (for the active term is more relevant here)
@@ -274,7 +272,7 @@ def student_dashboard(request):
     # Financial Record for current term
     financial_record = FinancialRecord.objects.filter(
         student=student, term=active_term
-    ).first() # Use first() instead of get() to handle non-existence gracefully
+    ).first() 
 
     if financial_record:
         financial_data[student_id] = {
@@ -339,26 +337,66 @@ def student_dashboard(request):
     ).order_by('-created_at')
 
     # Fetch academic alerts for the students
-    academic_alerts = AcademicAlert.objects.filter(
-        student=student,
-        due_date__gte=timezone.now()
-    ).select_related('teacher', 'student').order_by('-due_date')
+    all_potential_alerts = AcademicAlert.objects.filter(
+            student__in=student,
+            is_active=True 
+        ).select_related(
+            'student__user', 'source_user'
+        ).order_by('-created_at')
+
+    # Get IDs of submissions made by these students to avoid showing 'Take It' for completed tasks
+    completed_assessment_ids = set(AssessmentSubmission.objects.filter(student__in=student).values_list('assessment_id', flat=True))
+    completed_exam_ids = set(ExamSubmission.objects.filter(student__in=student).values_list('exam_id', flat=True))
+    completed_assignment_ids = set(AssignmentSubmission.objects.filter(student__in=student).values_list('assignment_id', flat=True))
+
+    action_required_alerts = []
+    recent_update_alerts = []
+
+    for alert in all_potential_alerts:
+        # Determine the action status
+        is_actionable = False
+        is_overdue = alert.due_date and alert.due_date < timezone.now().date()
+
+        if alert.alert_type == 'assessment_available' and alert.related_object_id not in completed_assessment_ids and not is_overdue:
+            is_actionable = True
+        elif alert.alert_type == 'exam_available' and alert.related_object_id not in completed_exam_ids and not is_overdue:
+            is_actionable = True
+        elif alert.alert_type == 'assignment_available' and alert.related_object_id not in completed_assignment_ids and not is_overdue:
+            is_actionable = True
+        
+        # --- Prepare data for template ---
+        # Clean up display text for 'alert_type'
+        cleaned_display_type = alert.alert_type.replace('_', ' ').title()
+
+        alert_data = {
+            'instance': alert,
+            'cleaned_display_type': cleaned_display_type,
+            'is_overdue': is_overdue,
+            'is_actionable': is_actionable,
+        }
+
+        if is_actionable:
+            action_required_alerts.append(alert_data)
+        else:
+            recent_update_alerts.append(alert_data)
+
 
     context = {
         'student': student,
-        'current_class': current_class, # Renamed from 'class' to avoid conflict
+        'current_class': current_class, 
         'term': active_term,
         'session': active_session,
         'subjects': subjects,
         'assignments_data': assignments_data, 
-        'assessments': assessments, # Pass queryset
-        'exams': exams, # Pass queryset
+        'assessments': assessments, 
+        'exams': exams, 
         'attendance_data': attendance_data,
         'financial_data': financial_data,
         'result_data': result_data,
         'archived_results_data': dict(archived_results_data),
         'notifications': notifications,
-        'academic_alerts': academic_alerts,
+        'action_required_alerts': action_required_alerts,
+        'recent_update_alerts': recent_update_alerts[:6],
     }
     return render(request, 'student/student_dashboard.html', context)
 
@@ -422,21 +460,42 @@ def teacher_dashboard(request):
 @user_passes_test(lambda u: u.role == 'guardian')
 def guardian_dashboard(request):
   
-    if request.user.role != 'guardian':
+    try:
+        guardian = get_object_or_404(Guardian, user=request.user)
+    except Guardian.DoesNotExist:
+        messages.error(request, "Guardian profile not found.")
         return redirect('login') 
-    
-    guardian = Guardian.objects.get(user=request.user)
-    students = guardian.students.all()
-    current_session = Session.objects.get(is_active=True)
-    current_term = Term.objects.filter(session=current_session, is_active=True).order_by('-start_date').first()
-    print(f"DEBUG: Current Term identified as: {current_term} - {current_term.id}")
-    teachers = Teacher.objects.filter(subjectassignment__subject__students__in=students).distinct()
-    archived_terms = Term.objects.filter(is_active=False).order_by('-start_date')
-    print(f"DEBUG: Archived Terms found: {[str(t) for t in archived_terms]}")
 
-    assignments_context_data = defaultdict(lambda: {'details': [], 'total': 0, 'completed': 0, 'pending': 0, 'completion_percentage': 0})
-    assessments_context_data = defaultdict(list) 
-    exams_context_data = defaultdict(list)
+    students = guardian.students.all().select_related('user', 'current_class')
+
+    try:
+        current_session = Session.objects.get(is_active=True)
+        current_term = Term.objects.get(session=current_session, is_active=True)
+    except (Session.DoesNotExist, Term.DoesNotExist, Session.MultipleObjectsReturned, Term.MultipleObjectsReturned) as e:
+        messages.warning(request, f"Could not determine the active academic period: {e}. Some data may be unavailable.")
+        current_session = None
+        current_term = None
+
+    archived_terms = Term.objects.filter(is_active=False).order_by('-start_date')
+
+    teachers = Teacher.objects.none()
+    student_class_ids = students.exclude(current_class__isnull=True).values_list('current_class_id', flat=True).distinct()
+    if student_class_ids and current_term:
+        # This uses the ClassSubjectAssignment model.
+        subjects_assigned_to_classes = ClassSubjectAssignment.objects.filter(
+            class_assigned_id__in=student_class_ids,
+            term=current_term
+        ).values_list('subject_id', flat=True)
+
+        teachers = Teacher.objects.filter(
+            subjectassignment__class_assigned_id__in=student_class_ids,
+            subjectassignment__subject_id__in=subjects_assigned_to_classes,
+            subjectassignment__term=current_term
+        ).distinct().select_related('user')
+
+    assignments_data = defaultdict(lambda: {'details': [], 'total': 0, 'completed': 0, 'pending': 0, 'completion_percentage': 0})
+    assessments_data = defaultdict(list) 
+    exams_data = defaultdict(list)
     messages_data = defaultdict(list)
     attendance_data = {}
     attendance_logs = {}
@@ -451,40 +510,72 @@ def guardian_dashboard(request):
         expiry_date__lt=timezone.now().date()
     ).order_by('-created_at')
 
-    # Fetch academic alerts for the students
-    raw_alerts_qs = AcademicAlert.objects.filter(
-        student__in=students,
-        # Add other relevant filters like is_read=False or date ranges
-    ).select_related('student__user', 'source_user').order_by('-date_created')
+    all_potential_alerts = AcademicAlert.objects.filter(
+            student__in=students,
+            due_date__gte = timezone.now()
+        ).select_related(
+            'student__user', 'source_user'
+        ).order_by('-date_created')
 
-    academic_alerts = []
-    for alert in raw_alerts_qs:
-        original_display_type = alert.get_alert_type_display()
-        cleaned_display_type = original_display_type
-        if original_display_type:
-            cleaned_display_type = original_display_type.replace(" (for Student)", "").replace(" (for Guardian)", "")
+    # Get IDs of submissions made by these students to avoid showing 'Take It' for completed tasks
+    completed_assessment_ids = set(AssessmentSubmission.objects.filter(student__in=students).values_list('assessment_id', flat=True))
+    completed_exam_ids = set(ExamSubmission.objects.filter(student__in=students).values_list('exam_id', flat=True))
+    completed_assignment_ids = set(AssignmentSubmission.objects.filter(student__in=students).values_list('assignment_id', flat=True))
+
+    action_required_alerts = []
+    recent_update_alerts = []
+
+    for alert in all_potential_alerts:
+        # Determine the action status
+        is_actionable = False
+        if alert.due_date:
+            # Compare the .date() part of the due_date with today's date
+            is_overdue = alert.due_date.date() < timezone.now().date()
         else:
-            cleaned_display_type = "Notification" 
-
-        summary_text = alert.summary
-        if not summary_text: 
-            if alert.alert_type.endswith('_available'):
-                item_name = alert.title.replace(f"{alert.get_alert_type_display().split(' ')[0]} Available: ", "") 
-                summary_text = f"The {alert.get_alert_type_display().lower().replace(' available','')} '{item_name}' is now available."
-            elif alert.alert_type.endswith('_submission'):
-                item_name = alert.title.replace(f"{alert.get_alert_type_display().split(' ')[0]} Submitted: ", "")
-                summary_text = f"A submission for '{item_name}' was received."
-            else:
-                summary_text = "Please check for more details."
+            is_overdue = False
+        if alert.alert_type == 'assessment_available' and alert.related_object_id not in completed_assessment_ids and not is_overdue:
+            is_actionable = True
+        elif alert.alert_type == 'exam_available' and alert.related_object_id not in completed_exam_ids and not is_overdue:
+            is_actionable = True
+        elif alert.alert_type == 'assignment_available' and alert.related_object_id not in completed_assignment_ids and not is_overdue:
+            is_actionable = True
         
-        academic_alerts.append({
+        # --- Prepare data for template ---
+        # Clean up display text for 'alert_type'
+        cleaned_display_type = alert.alert_type.replace('_', ' ').title()
+
+        alert_data = {
             'instance': alert,
             'cleaned_display_type': cleaned_display_type,
-            'processed_summary': summary_text 
-        })
+            'is_overdue': is_overdue,
+            'is_actionable': is_actionable,
+        }
 
+        if is_actionable:
+            action_required_alerts.append(alert_data)
+        else:
+            recent_update_alerts.append(alert_data)
 
+    student_ids = [s.user.id for s in students]
+
+    # All relevant financial records
+    financial_records_qs = FinancialRecord.objects.filter(student_id__in=student_ids, term=current_term).select_related('student')
+    financial_records_dict = {fr.student_id: fr for fr in financial_records_qs}
+
+    # All relevant results
+    results_qs = Result.objects.filter(student_id__in=student_ids, term=current_term, is_approved=True)
+    results_dict = {res.student_id: res for res in results_qs}
+
+    # All relevant archived results
+    archived_results_qs = Result.objects.filter(student_id__in=student_ids, term__in=archived_terms, is_approved=True, is_archived=True).select_related('term')
+    archived_results_dict = defaultdict(list)
+    for res in archived_results_qs:
+        archived_results_dict[res.student_id].append(res)
+    
     for student in students:
+
+        student_id = student.user.id
+
         # Assignments data
         all_class_assignments = Assignment.objects.filter(
             class_assigned=student.current_class,
@@ -520,11 +611,11 @@ def guardian_dashboard(request):
                 'submission_id': submission_instance.id if submission_instance else None,
                 })
 
-        assignments_context_data[student.user.id]['details'] = assignment_details_for_student
-        assignments_context_data[student.user.id]['total'] = total_relevant_assignments
-        assignments_context_data[student.user.id]['completed'] = completed_count
-        assignments_context_data[student.user.id]['pending'] = total_relevant_assignments - completed_count
-        assignments_context_data[student.user.id]['completion_percentage'] = (completed_count / total_relevant_assignments * 100) if total_relevant_assignments > 0 else 0
+        assignments_data[student.user.id]['details'] = assignment_details_for_student
+        assignments_data[student.user.id]['total'] = total_relevant_assignments
+        assignments_data[student.user.id]['completed'] = completed_count
+        assignments_data[student.user.id]['pending'] = total_relevant_assignments - completed_count
+        assignments_data[student.user.id]['completion_percentage'] = (completed_count / total_relevant_assignments * 100) if total_relevant_assignments > 0 else 0
 
         # Assessments and exams data
         all_class_assessments = Assessment.objects.filter(
@@ -552,7 +643,7 @@ def guardian_dashboard(request):
                 'submission_id': submission_instance.id if submission_instance else None,
                 'is_graded': submission_instance.is_graded if submission_instance else False,
             })
-        assessments_context_data[student.user.id] = assessment_list_for_student
+        assessments_data[student.user.id] = assessment_list_for_student
         
         # === Exams Data ===
         all_class_exams = Exam.objects.filter(
@@ -580,7 +671,7 @@ def guardian_dashboard(request):
                 'submission_id': submission_instance.id if submission_instance else None,
                 'is_graded': submission_instance.is_graded if submission_instance else False,
             })
-        exams_context_data[student.user.id] = exam_list_for_student
+        exams_data[student.user.id] = exam_list_for_student
     
         # Fetch messages sent by any of these teachers regarding this student
         student_messages = Message.objects.filter(
@@ -628,87 +719,40 @@ def guardian_dashboard(request):
         ]
         # Retrieve StudentFeeRecord and FinancialRecord for the current term
         student_fee_record = StudentFeeRecord.objects.filter(student=student, term=current_term).first()
-        financial_record = FinancialRecord.objects.filter(student=student, term=current_term).first()
-
-        if student_fee_record:
-            total_fee = student_fee_record.net_fee
-            discount = student_fee_record.discount
-        else:
-            total_fee = discount = 0
-
+        financial_record = financial_records_dict.get(student_id)
         if financial_record:
-            total_paid = financial_record.payments.aggregate(total=Sum('amount_paid'))['total'] or 0
-            outstanding_balance = financial_record.total_fee - financial_record.total_discount - total_paid
-            is_fully_paid = outstanding_balance <= 0
-            can_access_results = financial_record.can_access_results
-        else:
-            total_paid = 0
-            outstanding_balance = total_fee - discount  # Full balance if no financial record
-            is_fully_paid = False
-            can_access_results = False
-
-        has_waiver = student_fee_record and student_fee_record.waiver
-
-        if has_waiver:
-            can_access_results = True
-        
-        elif financial_record:
-            can_access_results = financial_record.can_access_results
-        
-        else:
-            can_access_results = False
-        
-        if total_fee > 0:
-            payment_percentage = (total_paid / total_fee) * 100
-        else:
-            payment_percentage = 0
-        # Update financial data for the context
-        financial_data[student.user.id] = {
-            'total_fee': total_fee,
-            'total_discount': discount,
-            'total_paid': total_paid,
-            'outstanding_balance': outstanding_balance,
-            'can_access_results': can_access_results,
-            'is_fully_paid': is_fully_paid,
-            'payment_percenage': payment_percentage,
-            'has_waiver': has_waiver,
-        }
-
-        # Get results if the guardian can access them
-        #if can_access_results:
-        result = Result.objects.filter(student=student, term=current_term, is_approved=True).first()
-        if result:
-            result_data[student.user.id] = {
-                'id': result.id,
-                'term_id': result.term.id,
-                'student_id': result.student.user.id,
+            financial_data[student_id] = {
+                'total_fee': financial_record.total_fee,
+                'total_discount': financial_record.total_discount,
+                'total_paid': financial_record.total_paid,
+                'outstanding_balance': financial_record.outstanding_balance,
+                'can_access_results': financial_record.can_access_results,
+                'is_fully_paid': financial_record.is_fully_paid,
+                'has_waiver': financial_record.has_waiver,
+                'payment_percentage': (financial_record.total_paid / financial_record.total_fee * 100) if financial_record.total_fee > 0 else (100 if financial_record.is_fully_paid else 0),
             }
+        else: 
+            financial_data[student_id] = {'can_access_results': False, 'outstanding_balance': 'N/A'} 
+
+        # --- RESULT DATA ---
+        result = results_dict.get(student_id)
+        if result and financial_data[student_id]['can_access_results']: 
+            result_data[student_id] = result
         else:
-            result_data[student.user.id] = None
-        # Fetch archived results (past terms)
-        for term in archived_terms:
-            archived_result = Result.objects.filter(
-                student=student, 
-                term=term, 
-                is_approved=True,  
-                is_archived=True   
-            ).first()
-            
-            if archived_result:
-                archived_results_data[student.user.id].append({
-                    'term_name': term.name,
-                    'term_id': term.id,
-                    'student_id': student.user.id,
-                    'result_id': archived_result.id
-                })
+            result_data[student_id] = None
+        
+        # --- ARCHIVED RESULT DATA ---
+        archived_results = archived_results_dict.get(student_id)
+        if archived_results:
+            archived_results_data[student_id] = archived_results
 
     context = {
         'guardian': guardian,
         'students': students,
         'teachers': teachers,
-        'assignments_data': dict(assignments_context_data), 
-        'assessments_data': dict(assessments_context_data),
-        'exams_data': dict(exams_context_data),
+        'assignments_data': dict(assignments_data), 
+        'assessments_data': dict(assessments_data),
+        'exams_data': dict(exams_data),
         'messages_data': messages_data,
         'attendance_data': attendance_data,
         'attendance_logs': attendance_logs,
@@ -716,7 +760,8 @@ def guardian_dashboard(request):
         'result_data': result_data,
         'archived_results_data': archived_results_data,
         'notifications': notifications,
-        'academic_alerts': academic_alerts,
+        'action_required_alerts': action_required_alerts,
+        'recent_update_alerts': recent_update_alerts[:6],
     }
     return render(request, 'guardian/guardian_dashboard.html', context)
 
