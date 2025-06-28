@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% load static humanize %}
 
-{% block title %}Submissions for: {{ assessment.title }}{% endblock %}
+{% block title %}Submissions for: {{ exam.title }}{% endblock %}
 
 {% block content %}
 <div class="container my-4 mb-5">
@@ -9,13 +9,13 @@
     <div class="p-4 mb-4 bg-light rounded-3 shadow-sm">
         <div class="d-flex justify-content-between align-items-center">
             <div>
-                <h2 class="display-6 fw-bold mb-1">{{ assessment.title }}</h2>
+                <h2 class="display-6 fw-bold mb-1">{{ exam.title }}</h2>
                 <p class="text-muted mb-0">
-                    Submissions for <strong>{{ assessment.class_assigned.name }}</strong> | <strong>{{ assessment.subject.name }}</strong>
+                    Submissions for <strong>{{ exam.class_assigned.name }}</strong> | <strong>{{ exam.subject.name }}</strong>
                 </p>
             </div>
-            <a href="{% url 'admin_assessment_list' %}" class="btn btn-outline-secondary btn-sm d-none d-md-block">
-                <i class="fas fa-arrow-left me-1"></i> Back to Assessments
+            <a href="{% url 'admin_exam_list' %}" class="btn btn-outline-secondary btn-sm d-none d-md-block">
+                <i class="fas fa-arrow-left me-1"></i> Back to Exams
             </a>
         </div>
     </div>
@@ -26,7 +26,7 @@
             <div class="card h-100 text-center">
                 <div class="card-body">
                     <div class="fs-5 text-muted">Total Score</div>
-                    <div class="display-5 fw-bold text-primary">{{ assessment.total_possible_score|default:0|floatformat|intcomma }}</div>
+                    <div class="display-5 fw-bold text-primary">{{ exam.total_possible_score|default:0|floatformat|intcomma }}</div>
                 </div>
             </div>
         </div>
@@ -50,8 +50,8 @@
             <div class="card h-100 text-center">
                  <div class="card-body">
                     <div class="fs-5 text-muted">Due Date</div>
-                    <div class="h5 fw-bold mt-2">{{ assessment.due_date|date:"d M Y" }}</div>
-                    <div class="small text-muted">{{ assessment.due_date|date:"P" }}</div>
+                    <div class="h5 fw-bold mt-2">{{ exam.due_date|date:"d M Y" }}</div>
+                    <div class="small text-muted">{{ exam.due_date|date:"P" }}</div>
                 </div>
             </div>
         </div>
@@ -71,7 +71,7 @@
                         <tr>
                             <th scope="col" class="ps-3">Student</th>
                             <th scope="col">Submitted At</th>
-                            <th scope="col" class="text-center">Score ({{ assessment.total_possible_score|default:0 }})</th>
+                            <th scope="col" class="text-center">Score ({{ exam.total_possible_score|default:0 }})</th>
                             <th scope="col" class="text-center">Status</th>
                             <th scope="col" class="text-center">Actions</th>
                         </tr>
@@ -99,11 +99,11 @@
                             </td>
                             <td class="text-center">
                                 {% if sub.requires_manual_review and not sub.is_graded %}
-                                    <a href="{% url 'grade_essay_assessment' sub.id %}" class="btn btn-warning btn-sm">
+                                    <a href="{% url 'grade_essay_exam' sub.id %}" class="btn btn-warning btn-sm">
                                         <i class="fas fa-pen-alt me-1"></i> Grade Now
                                     </a>
                                 {% else %}
-                                    <a href="{% url 'grade_essay_assessment' sub.id %}" class="btn btn-outline-primary btn-sm">
+                                    <a href="{% url 'grade_essay_exam' sub.id %}" class="btn btn-outline-primary btn-sm">
                                         <i class="fas fa-search me-1"></i> View / Regrade
                                     </a>
                                 {% endif %}
@@ -116,7 +116,7 @@
             {% else %}
             <div class="text-center p-5 text-muted">
                 <i class="fas fa-folder-open fa-3x mb-3"></i>
-                <p class="mb-0">No submissions have been received for this assessment yet.</p>
+                <p class="mb-0">No submissions have been received for this exam yet.</p>
             </div>
             {% endif %}
         </div>

@@ -25,7 +25,35 @@
           "name": "LearnSwift Academia",
           "url": "https://learnswift.icu/"
         },
-        "educationalCredentialAwarded": ["Primary School Certificate", "Basic Education Certificate", "Senior Secondary Certificate (WAEC, NECO)"]
+        "educationalCredentialAwarded": ["Primary School Certificate", "Basic Education Certificate", "Senior Secondary Certificate (WAEC, NECO)"],
+        "hasCourseInstance": [
+          {
+            "@type": "CourseInstance",
+            "courseMode": ["on-site", "blended"],
+            "location": {
+              "@type": "Place",
+              "name": "LearnSwift Academia Campus",
+              "address": {
+                "@type": "PostalAddress",
+                "streetAddress": "5 Bode Tobun Street, off Oniwaya Road",
+                "addressLocality": "Agege",
+                "addressRegion": "LA",
+                "postalCode": "100283",
+                "addressCountry": "NG"
+              }
+            },
+            "instructor": {
+              "@type": "Person",
+              "name": "Qualified Teaching Staff"
+            }
+          }
+        ],
+        "offers": {
+          "@type": "Offer",
+          "category": "Enrollment",
+          "price": "0",  {# Use "0" or don't specify price if tuition is variable/on request #}
+          "priceCurrency": "NGN" {# Nigerian Naira #}
+        }
       }
     },
     {
@@ -35,12 +63,34 @@
         "@type": "Course",
         "name": "Swift Aleem Academy (Arabic & Islamic Studies)",
         "description": "Intensive program focused on Arabic language mastery, Quran memorization (Hifz), and core Islamic sciences.",
-         "provider": {
+        "provider": {
           "@type": "EducationalOrganization",
           "name": "LearnSwift Academia",
           "url": "https://learnswift.icu/"
         },
-         "educationalCredentialAwarded": ["Quran Memorization Certificate", "Certificate of Proficiency in Arabic Language"]
+        "educationalCredentialAwarded": ["Quran Memorization Certificate", "Certificate of Proficiency in Arabic Language"],
+        "hasCourseInstance": [
+          {
+            "@type": "CourseInstance",
+            "courseMode": "on-site",
+            "location": {
+              "@type": "Place",
+              "name": "LearnSwift Academia Campus",
+              "address": {
+                "@type": "PostalAddress",
+                "streetAddress": "5 Bode Tobun Street, off Oniwaya Road",
+                "addressLocality": "Agege",
+                "addressRegion": "LA",
+                "postalCode": "100283",
+                "addressCountry": "NG"
+              }
+            }
+          }
+        ],
+        "offers": {
+          "@type": "Offer",
+          "category": "Enrollment"
+        }
       }
     },
      {
@@ -50,12 +100,27 @@
         "@type": "Course",
         "name": "LearnSwift Vocational Academy",
         "description": "Hands-on vocational training in trades like fashion design, carpentry, culinary arts, empowering students with practical, entrepreneurial skills.",
-         "provider": {
+        "provider": {
           "@type": "EducationalOrganization",
           "name": "LearnSwift Academia",
           "url": "https://learnswift.icu/"
         },
-         "educationalCredentialAwarded": "Vocational Skills Certificate"
+        "educationalCredentialAwarded": "Vocational Skills Certificate",
+        "hasCourseInstance": [
+          {
+            "@type": "CourseInstance",
+            "courseMode": "on-site",
+            "courseWorkload": "PT-PT", {# Example: part-time, use as applicable #}
+            "location": {
+              "@type": "Place",
+              "name": "LearnSwift Academia Campus"
+            }
+          }
+        ],
+        "offers": {
+          "@type": "Offer",
+          "category": "Enrollment"
+        }
       }
     },
     {
@@ -65,12 +130,26 @@
         "@type": "Course",
         "name": "LearnSwift Coding Academy",
         "description": "Specialized training in modern coding languages, web development, app creation, and in-demand digital technologies.",
-         "provider": {
+        "provider": {
           "@type": "EducationalOrganization",
           "name": "LearnSwift Academia",
           "url": "https://learnswift.icu/"
         },
-         "educationalCredentialAwarded": ["Coding Certificate (Frontend, Backend, Full-stack)", "Digital Skills Accreditation"]
+        "educationalCredentialAwarded": ["Coding Certificate (Frontend, Backend, Full-stack)", "Digital Skills Accreditation"],
+        "hasCourseInstance": [
+          {
+            "@type": "CourseInstance",
+            "courseMode": ["on-site", "online"],
+            "location": {
+              "@type": "Place",
+              "name": "LearnSwift Academia (On-site & Online)"
+            }
+          }
+        ],
+        "offers": {
+          "@type": "Offer",
+          "category": "Enrollment"
+        }
       }
     },
      {
@@ -80,12 +159,26 @@
         "@type": "Course",
         "name": "LearnSwift Online Academy",
         "description": "Flexible online platform offering our core programs, allowing students to learn Islamic and academic subjects from anywhere.",
-         "provider": {
+        "provider": {
           "@type": "EducationalOrganization",
           "name": "LearnSwift Academia",
           "url": "https://learnswift.icu/"
         },
-        "courseMode": "online"
+        "educationalCredentialAwarded": "Online Completion Certificate",
+        "hasCourseInstance": [
+          {
+            "@type": "CourseInstance",
+            "courseMode": "online",
+            "location": {
+              "@type": "VirtualLocation", {# Use VirtualLocation for fully online courses #}
+              "url": "https://learnswift.icu/programs/" {# Link to the online program page #}
+            }
+          }
+        ],
+        "offers": {
+          "@type": "Offer",
+          "category": "Enrollment"
+        }
       }
     }
   ]
