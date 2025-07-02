@@ -1839,7 +1839,7 @@ def update_assessment(request, assessment_id):
     if teacher_profile and not user.is_superuser :
         assigned_classes_qs = teacher_profile.assigned_classes()
         assigned_subjects_qs = teacher_profile.assigned_subjects()
-    else: # Superuser or non-teacher (though auth check above should handle non-teacher)
+    else: 
         assigned_classes_qs = Class.objects.all()
         assigned_subjects_qs = Subject.objects.all()
 
@@ -1850,12 +1850,11 @@ def update_assessment(request, assessment_id):
 
         if form.is_valid():
             updated_assessment = form.save(commit=False)
-            if user.is_superuser and not assessment.is_approved: # Superuser can approve on update
+            if user.is_superuser and not assessment.is_approved: 
                  updated_assessment.is_approved = True
                  updated_assessment.approved_by = user
             updated_assessment.updated_at = timezone.now()
             updated_assessment.save()
-            # form.save_m2m() # Only if AssessmentForm itself has M2M fields
 
             all_errors = []
 
@@ -1880,14 +1879,12 @@ def update_assessment(request, assessment_id):
                         for field, field_errors in q_form.errors.items():
                             all_errors.append(f"Existing Question ID {q_id} ({field.replace('_',' ').title()}): {', '.join(field_errors)}")
             
-            # 2. Remove Questions (if a mechanism exists to mark them for deletion)
             deleted_ids_str = request.POST.get('deleted_question_ids', '') # e.g., "12,15,20"
             if deleted_ids_str:
                 deleted_ids = [int(id_str) for id_str in deleted_ids_str.split(',') if id_str.isdigit()]
                 assessment.questions.remove(*deleted_ids) 
                 OnlineQuestion.objects.filter(id__in=deleted_ids, assessments=None).delete() # Optional: delete orphaned questions
 
-            # 3. Add Newly Added Questions (uses 'new_question_' prefix)
             new_question_errors = _process_newly_added_questions(request, assessment, question_name_prefix='new_question_')
             all_errors.extend(new_question_errors)
 
@@ -1899,13 +1896,13 @@ def update_assessment(request, assessment_id):
         # If form is invalid or errors occurred, re-render with context
         current_questions = assessment.questions.all().order_by('id')
         return render(request, 'assessment/update_assessment.html', {
-            'form': form, # This form instance will have its own errors
+            'form': form, 
             'assessment': assessment,
             'questions': current_questions,
             'processing_errors': all_errors if 'all_errors' in locals() and all_errors else [] 
         })
 
-    else: # GET request
+    else: 
         form = AssessmentForm(instance=assessment)
         form.fields['class_assigned'].queryset = assigned_classes_qs
         form.fields['subject'].queryset = assigned_subjects_qs
