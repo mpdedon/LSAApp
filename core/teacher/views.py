@@ -721,18 +721,7 @@ def create_assignment(request):
 
             # Handle errors or redirect on success
             if not errors:
-                # Notify students in the assigned class
-                students = Student.objects.filter(current_class=assignment.class_assigned)
-                for student in students:
-                    AcademicAlert.objects.create(
-                        alert_type='assignment',
-                        title=assignment.title,
-                        summary=assignment.description or 'New assignment available!',
-                        teacher=teacher,
-                        student=student,
-                        due_date=assignment.due_date,
-                        related_object_id=assignment.id
-                    )
+
                 return redirect('teacher_dashboard')
             
             else:

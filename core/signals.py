@@ -2,7 +2,7 @@
 
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
-
+from django.utils import timezone
 from core.models import Student, Term, SchoolDay, Student, Result, FeeAssignment, StudentFeeRecord
 from core.models import StudentFeeRecord, Payment, FinancialRecord, Term, Student, Holiday
 from core.models import (
