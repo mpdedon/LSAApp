@@ -31,9 +31,9 @@
               <td>{{ data.student.user.get_full_name }}</td>
       
               {% for subject in subjects %}  {# Ensures all subjects have a column #}
-                  {% with subject_result=data.subject_results|dict_key:subject.id %}
-                      <td>{{ subject_result.total_score|default:"-" }}</td>
-                  {% endwith %}
+              {% with data.subject_results|dict_key:subject.id as subject_result %}
+                  <td>{{ subject_result.total_score|default_if_none:"-" }}</td>
+              {% endwith %}
               {% endfor %}
       
               <td>{{ data.total_score }}</td>
