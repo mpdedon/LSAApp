@@ -338,16 +338,16 @@ def student_dashboard(request):
 
     # Fetch academic alerts for the students
     all_potential_alerts = AcademicAlert.objects.filter(
-            student__in=student,
-            is_active=True 
+            student=student,
+            due_date__gte = timezone.now()
         ).select_related(
             'student__user', 'source_user'
-        ).order_by('-created_at')
+        ).order_by('-date_created')[:10]
 
     # Get IDs of submissions made by these students to avoid showing 'Take It' for completed tasks
-    completed_assessment_ids = set(AssessmentSubmission.objects.filter(student__in=student).values_list('assessment_id', flat=True))
-    completed_exam_ids = set(ExamSubmission.objects.filter(student__in=student).values_list('exam_id', flat=True))
-    completed_assignment_ids = set(AssignmentSubmission.objects.filter(student__in=student).values_list('assignment_id', flat=True))
+    completed_assessment_ids = set(AssessmentSubmission.objects.filter(student=student).values_list('assessment_id', flat=True))
+    completed_exam_ids = set(ExamSubmission.objects.filter(student=student).values_list('exam_id', flat=True))
+    completed_assignment_ids = set(AssignmentSubmission.objects.filter(student=student).values_list('assignment_id', flat=True))
 
     action_required_alerts = []
     recent_update_alerts = []

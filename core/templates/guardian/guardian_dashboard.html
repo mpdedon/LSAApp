@@ -4,6 +4,48 @@
 {% load message_filters %}
 {% load humanize %}
 
+{% block title %}Guardian Dashboard{% endblock %}
+
+{% block extra_head %}
+{# Add any page-specific CSS here if needed #}
+<style>
+    /* Custom styling for the dashboard */
+    .dashboard-layout {
+        display: grid;
+        grid-template-columns: 280px 1fr; /* Sidebar width and main content */
+        gap: 1.5rem;
+    }
+    .profile-sidebar {
+        position: sticky;
+        top: 80px; /* Adjust based on your main navbar height */
+        height: calc(100vh - 100px); /* Fill height minus some padding */
+    }
+    .stat-card .display-4 { font-size: 2.5rem; }
+    .nav-pills .nav-link {
+        color: #495057; /* Muted color for inactive tabs */
+    }
+    .nav-pills .nav-link.active {
+        background-color: var(--bs-primary);
+        font-weight: bold;
+    }
+    .student-tab-pane .card-header {
+        background-color: var(--bs-light);
+        font-weight: 500;
+    }
+
+    @media (max-width: 991.98px) {
+        .dashboard-layout {
+            grid-template-columns: 1fr; /* Stack on smaller screens */
+        }
+        .profile-sidebar {
+            position: static;
+            height: auto;
+            margin-bottom: 1.5rem;
+        }
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <link href="https://maxcdn.bootstrapcdn.com/font-awesome/4.3.0/css/font-awesome.min.css" rel="stylesheet">
 

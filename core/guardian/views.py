@@ -377,16 +377,13 @@ def submit_assessment(request, assessment_id):
         return redirect('guardian_dashboard' if hasattr(user, 'guardian_profile') else 'student_dashboard' if hasattr(user, 'student_profile') else 'home')
 
     if assessment.is_due: 
-        print(f"Assessment '{assessment.title}' is past due. Rendering assessment_due.html.")
         return render(request, 'assessment/assessment_due.html', {"assessment": assessment, "student": student})
     
     if AssessmentSubmission.objects.filter(assessment=assessment, student=student).exists():
-        print(f"Student {student.user.username} already submitted assessment '{assessment.title}'. Rendering already_submitted.html.")
         return render(request, 'assessment/already_submitted.html', {"assessment": assessment, "student": student})
 
     # Handle POST (Submission Logic)
     if request.method == "POST":
-        print(f"--- POST request for student {student.user.username}, assessment '{assessment.title}' ---")
 
         answers = {}
         score = 0
@@ -417,11 +414,9 @@ def submit_assessment(request, assessment_id):
             is_graded=not requires_manual_review, requires_manual_review=requires_manual_review
         )
         messages.success(request, f"Assessment '{assessment.title}' submitted successfully for {student.user.get_full_name()}.")
-        print(f"Submission ID {submission.id} created. Redirecting.")
         return redirect('student_dashboard' if hasattr(user, 'student_dashboard') else 'guardian_dashboard')
 
     # Render Submission Form (GET Request)
-    print(f"--- Rendering submission form: assessment/submit_assessment.html for student {student.user.username} ---")
     return render(request, 'assessment/submit_assessment.html', {
         'assessment': assessment,
         'questions': assessment.questions.all().order_by('id'),
@@ -451,7 +446,7 @@ def submit_exam(request, exam_id):
         # Check if a specific student is selected
         student_id = request.GET.get('student_id')
         if student_id:
-            student = get_object_or_404(students, id=student_id)
+            student = get_object_or_404(students, user_id=student_id)
         elif students.count() == 1:
             student = students.first()
         else:
