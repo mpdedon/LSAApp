@@ -921,7 +921,6 @@ def _process_newly_added_questions(request, assessment, question_name_prefix='ne
         question_text = request.POST.get(q_text_key, '').strip()
         options_str = request.POST.get(q_options_key, '')
         correct_answer_str = request.POST.get(q_correct_key, '').strip()
-        print(f"  For {q_correct_key}, fetched correct_answer_str: '{correct_answer_str}'")
 
         if not question_text and not question_type:
              question_number += 1
@@ -1169,10 +1168,8 @@ def view_assessment(request, assessment_id):
         messages.error(request, "You are not authorized to view this assessment's details.")
         return redirect('home') 
 
-    print(f"Viewing Assessment ID: {assessment_id}")
-    print(f"Fetched {questions.count()} questions for this assessment.")
-    for q_idx, q in enumerate(questions):
-        print(f"  Q{q_idx+1}: {q.question_text[:50]}... (Type: {q.question_type}, Options: {q.options})")
+    #for q_idx, q in enumerate(questions):
+    #    print(f"  Q{q_idx+1}: {q.question_text[:50]}... (Type: {q.question_type}, Options: {q.options})")
 
     # Prepare questions with processed options for the template
     processed_questions_for_teacher_view = []
@@ -1532,10 +1529,8 @@ def view_exam(request, exam_id):
         messages.error(request, "You are not authorized to view this exam's details.")
         return redirect('home') 
 
-    print(f"Viewing Exam ID: {exam_id}")
-    print(f"Fetched {questions.count()} questions for this exam.")
-    for q_idx, q in enumerate(questions):
-        print(f"  Q{q_idx+1}: {q.question_text[:50]}... (Type: {q.question_type}, Options: {q.options})")
+    #for q_idx, q in enumerate(questions):
+    #    print(f"  Q{q_idx+1}: {q.question_text[:50]}... (Type: {q.question_type}, Options: {q.options})")
 
     # Prepare questions with processed options for the template
     processed_questions_for_teacher_view = []

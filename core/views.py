@@ -499,13 +499,11 @@ def AssignTeacherView(request):
             else:
                 try:
                     form.save()
-                    print("Form saved successfully")  # Debug print to confirm form is saved
                     return redirect('teacher_assignment_list')  # Redirect on successful save
                 except IntegrityError as e:
                     error_message = f"A unique constraint error occurred: {str(e)}"
         else:
-            print("Form is invalid")
-            print(form.errors)  # Print the form errors to debug
+            print(form.errors)  
 
     else:
         form = TeacherAssignmentForm()
@@ -540,12 +538,9 @@ class TeacherAssignmentListView(AdminRequiredMixin, ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        print("\n--- DEBUG: TeacherAssignmentListView.get_context_data ---")
         try:
             current_term = Term.get_current_term()
             next_term = Term.get_next_term(current_term) # Pass current_term instance
-            print(f"DEBUG: current_term = {current_term} (ID: {getattr(current_term, 'id', 'N/A')}, Order: {getattr(current_term, 'order', 'N/A')}, Session: {getattr(current_term, 'session', 'N/A')})")
-            print(f"DEBUG: next_term = {next_term} (ID: {getattr(next_term, 'id', 'N/A')}, Order: {getattr(next_term, 'order', 'N/A')}, Session: {getattr(next_term, 'session', 'N/A')})")
         except Exception as e:
             current_term = None
             next_term = None
@@ -558,26 +553,19 @@ class TeacherAssignmentListView(AdminRequiredMixin, ListView):
 
         # Check if basic conditions are met for rollover
         if current_term and next_term and current_term.session and next_term.session:
-            print(f"DEBUG: Basic conditions PASSED (current_term: {current_term.id}, next_term: {next_term.id})")
             try:
-                # CONDITION: No assignments in the NEXT term
                 assignments_in_next_term_count = TeacherAssignment.objects.filter(
                     session=next_term.session, term=next_term
                 ).count()
-                print(f"DEBUG: [Condition 4] Assignments count in NEXT term ({next_term}): {assignments_in_next_term_count}")
 
                 if assignments_in_next_term_count == 0:
-                    print("DEBUG: [Condition 4] PASSED (Next term is empty)")
                     # CONDITION: Assignments exist in CURRENT term
                     current_term_has_assignments = TeacherAssignment.objects.filter(
                         session=current_term.session, term=current_term
                     ).exists()
-                    print(f"DEBUG: [Condition 5] Assignments exist in CURRENT term ({current_term}): {current_term_has_assignments}")
 
                     if current_term_has_assignments:
-                        print("DEBUG: [Condition 5] PASSED (Current term has assignments)")
                         context['show_rollover_button'] = True
-                        print("DEBUG: *** Setting show_rollover_button = True ***")
                     else:
                         print("DEBUG: [Condition 5] FAILED (Current term has NO assignments)")
                 else:
@@ -588,7 +576,6 @@ class TeacherAssignmentListView(AdminRequiredMixin, ListView):
             print("DEBUG: Basic conditions FAILED (current_term, next_term, or their sessions missing/invalid)")
 
         print(f"DEBUG: Final context['show_rollover_button'] = {context['show_rollover_button']}")
-        print("--- END DEBUG: TeacherAssignmentListView.get_context_data ---\n")
         return context
 
 class TeacherAssignmentRolloverView(AdminRequiredMixin, ListView):
@@ -702,7 +689,6 @@ class SubjectAssignmentListView(ListView):
                 Q(subject__name__icontains=search_query) |
                 Q(class_assigned__name__icontains=search_query)
             )
-            print(f"Filtered Results: {subject_assignments}")  # Debugging line
 
         paginator = Paginator(subject_assignments, 10)
         page_number = request.GET.get('page')
@@ -1176,13 +1162,11 @@ class StudentFeeRecordListView(AdminRequiredMixin, ListView):
         if records_to_create_instances:
             try:
                 created_records = StudentFeeRecord.objects.bulk_create(records_to_create_instances)
-                # Use print for dev, logging for prod
                 print(f"Sync: Created {len(created_records)} new StudentFeeRecords.")
                 # messages.info(self.request, f"Created {len(created_records)} new fee records.") # Avoid messages in sync logic
             except IntegrityError as e:
                  # Handle potential unique constraint violations if sync runs concurrently (unlikely here)
                  print(f"Sync Error during bulk_create: {e}")
-                 # Optionally re-fetch or handle differently
                  pass
 
         # --- Update Existing Records Needing Save (Triggers Signals) ---
@@ -1733,7 +1717,6 @@ def _process_newly_added_questions(request, assessment, question_name_prefix='ne
         question_text = request.POST.get(q_text_key, '').strip()
         options_str = request.POST.get(q_options_key, '')
         correct_answer_str = request.POST.get(q_correct_key, '').strip()
-        print(f"  For {q_correct_key}, fetched correct_answer_str: '{correct_answer_str}'")
 
         if not question_text and not question_type: # Skip if completely empty entry from JS
              question_number += 1
@@ -1969,17 +1952,13 @@ def view_assessment(request, assessment_id):
 @login_required
 @user_passes_test(lambda u: u.is_superuser)
 def admin_delete_assessment(request, assessment_id):
-    print(f"--- [DELETE VIEW] Attempting to access assessment ID: {assessment_id} by user: {request.user.username} ---")
     assessment = get_object_or_404(Assessment, id=assessment_id)
     
     if request.method == 'POST':
         assessment_title = assessment.title
-        print(f"--- [DELETE VIEW] POST request. Assessment to delete: '{assessment_title}' (ID: {assessment.id}) ---")
         
         try:
-            print("--- [DELETE VIEW] Before assessment.delete() ---")
             assessment.delete()
-            print("--- [DELETE VIEW] After assessment.delete() ---") 
             messages.success(request, f"Assessment '{assessment_title}' has been successfully deleted.")
             return redirect('admin_assessment_list')
         except Exception as e:
@@ -2316,9 +2295,7 @@ def admin_delete_exam(request, exam_id):
         exam_title = exam.title
         
         try:
-            print("--- [DELETE VIEW] Before exam.delete() ---")
             exam.delete()
-            print("--- [DELETE VIEW] After exam.delete() ---") # If this prints, delete itself was successful
             messages.success(request, f"Exam '{exam_title}' has been successfully deleted.")
             return redirect('admin_exam_list')
         
