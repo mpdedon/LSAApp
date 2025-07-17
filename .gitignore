@@ -1,0 +1,64 @@
+# --- General ---
+# Ignore OS-specific files
+.DS_Store
+Thumbs.db
+ehthumbs.db
+
+# Ignore IDE/Editor-specific files
+.idea/
+.vscode/
+.project
+.pydevproject
+.settings
+.classpath
+*.swp
+
+# --- Python ---
+# Ignore byte-compiled / optimized / C extensions
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.so
+
+# Ignore virtual environments
+/lsa_env/
+/venv/
+/env/
+/.venv/
+env.bak/
+venv.bak/
+
+# Ignore distribution / packaging
+/build/
+/dist/
+*.egg-info/
+/site/
+.tox/
+.nox/
+.hypothesis/
+.pytest_cache/
+
+# --- Django ---
+# Ignore local database files
+*.sqlite3
+db.sqlite3
+db.sqlite3-journal
+
+# Ignore local media and static files collected by collectstatic
+# The slash at the beginning ensures it only matches at the project root
+/mediafiles/
+/staticfiles/
+# If you have a different STATIC_ROOT or MEDIA_ROOT, add them here
+# e.g., /public/static/
+
+# Ignore local settings and environment variables
+.env
+.env.*
+local_settings.py
+secrets.dev.yaml
+
+# Ignore log files
+*.log
+celerybeat-schedule
+
