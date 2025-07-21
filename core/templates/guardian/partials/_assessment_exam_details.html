@@ -1,0 +1,24 @@
+{% load static humanize message_filters %}
+
+{% if items %}
+    <ul class="list-group list-group-flush">
+        {% for item in items %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+            <div>
+                <h6 class="mb-0">{{ item.title }}</h6>
+                <small class="text-muted">Due: {{ item.due_date|date:"d M Y, P" }}{% if item.is_past_due and not item.has_submitted %}<span class="badge bg-danger ms-1">Overdue</span>{% endif %}</small>
+            </div>
+            <div class="ms-2">
+                {% if item.has_submitted %}
+                    <a href="{% if type == 'assessment' %}{% url 'view_assessment_result' item.submission_id %}{% else %}{% url 'view_exam_result' item.submission_id %}{% endif %}" class="btn btn-sm btn-info">
+                        Result {% if item.is_graded %}(Graded){% else %}(Pending){% endif %}
+                    </a>
+                {% elif item.is_past_due %}<button class="btn btn-sm btn-secondary" disabled>Past Due</button>
+                {% else %}<a href="{% if type == 'assessment' %}{% url 'submit_assessment' item.id %}{% else %}{% url 'submit_exam' item.id %}{% endif %}" class="btn btn-sm {% if type == 'exam' %}btn-success{% else %}btn-primary{% endif %}">Start</a>{% endif %}
+            </div>
+        </li>
+        {% endfor %}
+    </ul>
+{% else %}
+    <p class="text-center text-muted">No {{ type }}s currently available.</p>
+{% endif %}

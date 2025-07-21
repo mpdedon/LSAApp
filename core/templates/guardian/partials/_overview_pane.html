@@ -1,0 +1,57 @@
+{% load static humanize message_filters %}
+
+<h5 class="mb-3">At-a-Glance Overview</h5>
+<div class="row g-3">
+    <div class="col-md-6 col-xl-4">
+        <div class="card stat-card h-100">
+            <div class="card-body d-flex align-items-center">
+                <div class="stat-card-icon bg-primary text-white me-3"><i class="fas fa-user-check"></i></div>
+                <div>
+                    <div class="stat-card-title">ATTENDANCE</div>
+                    <div class="stat-card-value">{{ attendance_data|get_item:student.user.id|get_item:'attendance_percentage'|floatformat:1|default:0 }}%</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6 col-xl-4">
+        <div class="card stat-card h-100" style="border-left-color: var(--bs-success);">
+            <div class="card-body d-flex align-items-center">
+                {% with student_assignments=assignments_data|get_item:student.user.id %}
+                <div class="stat-card-icon bg-success text-white me-3"><i class="fas fa-book"></i></div>
+                <div>
+                    <div class="stat-card-title">ASSIGNMENTS</div>
+                    <div class="stat-card-value">{{ student_assignments.completed|default:0 }}/{{ student_assignments.total|default:0 }}</div>
+                </div>
+                {% endwith %}
+            </div>
+        </div>
+    </div>
+    <div class="col-md-12 col-xl-4">
+        <div class="card stat-card h-100" style="border-left-color: var(--bs-danger);">
+            <div class="card-body d-flex align-items-center">
+                {% with data=financial_data|get_item:student.user.id %}
+                <div class="stat-card-icon bg-danger text-white me-3"><i class="fas fa-wallet"></i></div>
+                <div>
+                    <div class="stat-card-title">FEES DUE</div>
+                    <div class="stat-card-value">₦{{ data.outstanding_balance|floatformat:0|intcomma|default:"N/A" }}</div>
+                </div>
+                {% endwith %}
+            </div>
+        </div>
+    </div>
+</div>
+<div class="card mt-4">
+    <div class="card-header"><h6 class="mb-0">Attendance Details</h6></div>
+    <div class="card-body">
+        {% with data=attendance_data|get_item:student.user.id %}
+            <div class="row text-center">
+                <div class="col"><strong>Total Days:</strong> {{ data.total_days|default:0 }}</div>
+                <div class="col"><strong>Present:</strong> {{ data.present_days|default:0 }}</div>
+                <div class="col"><strong>Absent:</strong> {{ data.absent_days|default:0 }}</div>
+            </div>
+            <div class="progress mt-3" style="height: 20px;">
+                <div class="progress-bar" role="progressbar" style="width: {{ data.attendance_percentage|default:0 }}%;" aria-valuenow="{{ data.attendance_percentage|default:0 }}">{{ data.attendance_percentage|floatformat:1 }}%</div>
+            </div>
+        {% endwith %}
+    </div>
+</div>
