@@ -60,7 +60,7 @@
         "name": "LearnSwift Academia",
         "logo": {
           "@type": "ImageObject",
-          "url": "{{ request.scheme }}://{{ request.get_host }}{% static 'images/logo_social_preview.jpg' %}" {# Your school logo #}
+          "url": "{{ request.scheme }}://{{ request.get_host }}{% static 'images/logo.jpg' %}" 
         }
       },
       "description": "{{ post.meta_description|default:post.content|striptags|truncatewords:30 }}"

@@ -1,0 +1,21 @@
+{% load static humanize message_filters %}
+
+{% if assignments.details %}
+    <ul class="list-group list-group-flush">
+        {% for item in assignments.details %}
+        <li class="list-group-item d-flex justify-content-between align-items-center">
+            <div>
+                <h6 class="mb-0">{{ item.title }}</h6>
+                <small class="text-muted">Due: {{ item.due_date|date:"d M Y, P" }}{% if item.is_past_due and not item.has_submitted %}<span class="badge bg-danger ms-1">Overdue</span>{% endif %}</small>
+            </div>
+            <div class="ms-2">
+                {% if item.has_submitted %}<a href="{% url 'view_assignment_result' item.submission_id %}" class="btn btn-sm btn-info">View Result</a>
+                {% elif item.is_past_due %}<button class="btn btn-sm btn-secondary" disabled>Past Due</button>
+                {% else %}<a href="{% url 'submit_assignment' item.id %}" class="btn btn-sm btn-primary">Submit</a>{% endif %}
+            </div>
+        </li>
+        {% endfor %}
+    </ul>
+{% else %}
+    <p class="text-center text-muted">No active assignments found.</p>
+{% endif %}

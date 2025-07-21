@@ -1,0 +1,76 @@
+{% load humanize %}
+
+<div class="card-header bg-light py-2">
+    <ul class="nav nav-tabs card-header-tabs" id="alertTab" role="tablist">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#action-required">
+                Action Required <span class="badge rounded-pill bg-danger ms-1">{{ action_required_alerts|length }}</span>
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link" data-bs-toggle="tab" data-bs-target="#recent-updates">
+                Recent Updates
+            </button>
+        </li>
+    </ul>
+</div>
+<div class="card-body p-3">
+    <div class="tab-content" id="alertTabContent">
+        <!-- Action Required Tab Pane -->
+        <div class="tab-pane fade show active" id="action-required">
+            {% if action_required_alerts %}
+                <div class="list-group list-group-flush">
+                    {% for alert_data in action_required_alerts %}
+                        {% with alert=alert_data.instance %}
+                        <div class="list-group-item list-group-item-action p-3">
+                            <div class="d-flex w-100 justify-content-between align-items-start">
+                                <h6 class="mb-1"><span class="badge bg-primary me-2">{{ alert.student.user.first_name }}</span>{{ alert.title }}</h6>
+                                <small class="text-muted text-nowrap">{{ alert.created_at|naturaltime }}</small>
+                            </div>
+                            <p class="mb-2 small text-muted">{{ alert.summary|truncatewords:20 }}</p>
+                            <div class="d-flex justify-content-between align-items-center">
+                                <small class="text-danger"><i class="far fa-calendar-times me-1"></i>Due: <strong>{{ alert.due_date|date:"D, d M Y" }}</strong></small>
+                                <div class="alert-actions">
+                                    {% if alert.alert_type == 'assessment_available' %}<a href="{% url 'submit_assessment' alert.related_object_id %}" class="btn btn-sm btn-primary">Take Assessment</a>
+                                    {% elif alert.alert_type == 'exam_available' %}<a href="{% url 'submit_exam' alert.related_object_id %}" class="btn btn-sm btn-primary">Start Exam</a>
+                                    {% elif alert.alert_type == 'assignment_available' %}<a href="{% url 'submit_assignment' alert.related_object_id %}" class="btn btn-sm btn-primary">View & Submit</a>{% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        {% endwith %}
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="text-center p-4 text-muted"><i class="fas fa-check-circle fa-2x text-success mb-2"></i><p class="mb-0">No pending actions required.</p></div>
+            {% endif %}
+        </div>
+        <!-- Recent Updates Tab Pane -->
+        <div class="tab-pane fade" id="recent-updates">
+            {% if recent_update_alerts %}
+                 <div class="list-group list-group-flush">
+                    {% for alert_data in recent_update_alerts %}
+                        {% with alert=alert_data.instance cleaned_display_type=alert_data.cleaned_display_type %}
+                        <div class="list-group-item p-3">
+                             <div class="d-flex w-100 justify-content-between align-items-start">
+                                <h6 class="mb-1 text-muted"><span class="badge bg-secondary me-2">{{ alert.student.user.first_name }}</span>{{ alert.title }}</h6>
+                                <small class="text-muted text-nowrap">{{ alert.created_at|naturaltime }}</small>
+                             </div>
+                             <div class="d-flex justify-content-between align-items-center mt-2">
+                                 <small class="text-muted">Type: <strong>{{ cleaned_display_type }}</strong></small>
+                                 <div class="alert-actions">
+                                     {% if alert.alert_type == 'assessment_submission' %}<a href="{% url 'view_assessment_result' alert.related_object_id %}" class="btn btn-sm btn-outline-info">View Result</a>
+                                     {% elif alert.alert_type == 'exam_submission' %}<a href="{% url 'view_exam_result' alert.related_object_id %}" class="btn btn-sm btn-outline-info">View Result</a>
+                                     {% elif alert.alert_type == 'assignment_submission' %}<a href="{% url 'view_assignment_result' alert.related_object_id %}" class="btn btn-sm btn-outline-info">View Result</a>
+                                     {% elif alert_data.is_overdue %}<span class="badge bg-danger">Overdue</span>{% endif %}
+                                 </div>
+                             </div>
+                        </div>
+                        {% endwith %}
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="text-center p-4 text-muted"><p class="mb-0">No recent updates.</p></div>
+            {% endif %}
+        </div>
+    </div>
+</div>
