@@ -162,6 +162,8 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
+if os.getenv('DJANGO_ENV') == 'production': 
+    STATICFILES_DIRS.append(MEDIA_ROOT)
 
 # --- Step 7: Default PK and Security Settings ---
 
