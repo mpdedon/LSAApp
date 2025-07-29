@@ -34,7 +34,7 @@ from core.views import TermListView, TermDetailView, TermCreateView, TermUpdateV
 from core.views import promote_student, repeat_student, demote_student, mark_dormant_student, mark_left_student, mark_active
 from core.views import create_assessment, admin_assessment_list, approve_assessment, pending_assessments, view_assessment, admin_delete_assessment, assessment_submissions_list, class_subjects
 from core.views import create_exam, admin_exam_list, approve_exam, pending_exams, view_exam, admin_delete_exam, exam_submissions_list
-from core.views import broadsheets, view_broadsheet, approve_broadsheet, archive_broadsheet
+from core.views import broadsheets, view_broadsheet, approve_broadsheet, archive_broadsheet, admin_leaderboard_view
 from core.views import FeeAssignmentCreateView, FeeAssignmentListView, FeeAssignmentUpdateView, FeeAssignmentDetailView, FeeAssignmentDeleteView, StudentFeeRecordListView
 from core.views import PaymentCreateView, PaymentListView, PaymentUpdateView, PaymentDetailView, PaymentDeleteView, FinancialRecordListView
 from core.views import StudentClassEnrollmentView, StudentEnrollmentsView
@@ -44,7 +44,7 @@ from core.views import SubjectCreateView, SubjectListView, SubjectUpdateView, Su
 from core.views import PostCreateView, PostUpdateView, PostDeleteView, ManagePostListView
 from core.views import CategoryCreateView, CategoryUpdateView, ManageCategoryListView, TagCreateView, TagUpdateView, ManageTagListView
 from core.student.views import StudentListView, StudentCreateView, StudentUpdateView, StudentDetailView, StudentDeleteView, BulkUpdateStudentsView, export_students, student_reports
-from core.student.views import submit_assignment, submit_assessment, submit_exam
+from core.student.views import submit_assignment, submit_assessment, submit_exam, message_teacher
 from core.teacher.views import TeacherListView, TeacherCreateView, TeacherUpdateView, TeacherDetailView, TeacherDeleteView, TeacherBulkActionView, export_teachers, teacher_reports
 from core.teacher.views import input_scores, broadsheet, mark_attendance, attendance_log, message_guardian, update_result, view_na_result, grade_essay_questions
 from core.teacher.views import create_assignment, add_question, grade_assignment, view_submitted_assignments, update_assignment, delete_assignment, assignment_detail, assignment_list
@@ -139,6 +139,7 @@ urlpatterns = [
     path('broadsheets/<int:term_id>/', view_broadsheet, name='view_broadsheet'),
     path('broadsheets/approve/<int:term_id>/<int:class_id>/', approve_broadsheet, name='approve_broadsheet'),
     path('broadsheets/archive/<int:term_id>/', archive_broadsheet, name='archive_broadsheet'),
+    path('admin-leaderboards/', admin_leaderboard_view, name='admin_leaderboard_list'),
 
     # Subject & Teacher Assignment URLs
     path('assign_teacher/', AssignTeacherView, name='assign_teacher'),
@@ -170,6 +171,7 @@ urlpatterns = [
     path('dormant/<int:pk>/', mark_dormant_student, name='mark_dormant_student'),
     path('left/<int:pk>/', mark_left_student, name='mark_left_student'),
     path('mark_active/<int:pk>/', mark_active, name='mark_active'),
+    path('dashboard/send-message/', message_teacher, name='send_message'),
 
     # Teacher URLs
     path('teachers/', TeacherListView.as_view(), name='teacher_list'),
@@ -296,4 +298,3 @@ handler500 = 'core.views.custom_500'
 
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
-    urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)

@@ -9,8 +9,8 @@
   <title>{% block title %}LearnSwift Academia | Islamic School for Holistic Development{% endblock %}</title>
   <meta name="description" content="{% block meta_description %}Discover LearnSwift Academia, a leading Islamic school in Lagos, Nigeria, focusing on holistic development, intellectual growth, tech skills, and strong moral character.{% endblock %}"/>
   <meta name="author" content="LearnSwift Academia" />
-  <link rel="canonical" href="{{ request.build_absolute_uri }}" /> {# Assumes correct domain setup #}
-  {% block meta_robots %}<meta name="robots" content="index, follow"/>{% endblock %} {# Allow indexing by default #}
+  <link rel="canonical" href="{{ request.build_absolute_uri }}" /> 
+  {% block meta_robots %}<meta name="robots" content="index, follow"/>{% endblock %} 
 
   <!-- Open Graph / Facebook -->
   <meta property="og:type" content="website" />
@@ -52,12 +52,9 @@
 
 </head>
 <body>
-  {% load static %}
   <!-- Navbar -->
-  {# Use fixed-top for overlay, navbar-dark for light text initially, add custom class 'navbar-transparent' #}
   <nav class="navbar navbar-expand-lg navbar-dark fixed-top shadow-sm main-navbar navbar-transparent py-3">
     <div class="container">
-      {# Ensure logo works on dark/transparent backgrounds initially, maybe use a white/light version #}
       <a class="navbar-brand fw-bold" href="{% url 'home' %}">
         <img src="{% static 'images/logo.jpg' %}" alt="LearnSwift Academia Logo" height="35" class="me-2 d-inline-block align-text-top"> {# Use white logo version #}
         LearnSwift Academia
@@ -70,7 +67,7 @@
         aria-controls="navbarNav"
         aria-expanded="false"
         aria-label="Toggle navigation">
-        <span class="navbar-toggler-icon"></span> {# Toggler icon color might need adjustment via CSS #}
+        <span class="navbar-toggler-icon"></span> 
       </button>
       <div class="collapse navbar-collapse" id="navbarNav">
         {# Links remain structurally similar, but styling will change via CSS #}
@@ -95,10 +92,9 @@
           {% if user.is_authenticated %}
             <li class="nav-item dropdown">
               <a class="nav-link dropdown-toggle" href="#" id="dashboardDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-                <i class="fas fa-user-circle me-1"></i> My Account {# More generic text #}
+                <i class="fas fa-user-circle me-1"></i> My Account 
               </a>
-              <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="dashboardDropdown"> {# Align dropdown to the right #}
-                {# Dashboard links... (keep as before or refine) #}
+              <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="dashboardDropdown"> 
                 {% if user.is_superuser %}
                     <li><span class="dropdown-header small text-muted">Admin Dashboard</span></li>
                     <li><a class="dropdown-item" href="{% url 'student_list' %}"><i class="fas fa-users fa-fw me-2"></i>Students</a></li>
@@ -125,7 +121,6 @@
               </ul>
             </li>
           {% else %}
-            {# Use styled buttons #}
             <li class="nav-item ms-lg-2">
               <a class="btn btn-outline-light btn-sm nav-btn" href="{% url 'login' %}">
                 Login
@@ -142,7 +137,6 @@
     </div>
   </nav>
 
-{# CRUCIAL: Add padding to the top of the main content area to prevent overlap #}
 <div class="main-content-padding"></div>
 
   <!-- Main Content -->
@@ -155,7 +149,7 @@
     <!-- Footer -->
     <footer class="footer-section bg-dark text-white pt-4 pb-3"> 
     <div class="container">
-      <div class="row gy-4"> {# Use gy-4 for vertical gap on smaller screens #}
+      <div class="row gy-4"> 
 
         <!-- Column 1: About & Contact -->
         <div class="col-lg-5 col-md-6 mb-3 mb-md-0">
@@ -164,7 +158,7 @@
               LearnSwift Academia
           </h5>
           <p class="footer-text small mb-3">Nurturing faith, intellect, and practical skills for balanced, successful lives grounded in Islamic values.</p> {# Slightly shorter text #}
-          <address class="footer-text small mb-0"> {# Smaller font #}
+          <address class="footer-text small mb-0"> 
             <i class="fas fa-map-marker-alt fa-fw me-1 opacity-75"></i> 5 Bode Tobun St, Agege, Lagos<br>
             <i class="fas fa-phone fa-fw me-1 opacity-75"></i> <a href="tel:+2347034858160" class="footer-link">+234 703 485 8160</a> |
             <i class="fas fa-envelope fa-fw me-1 opacity-75 ms-1"></i> <a href="mailto:learnswift2020@gmail.com" class="footer-link">learnswift2020@gmail.com</a>
@@ -174,8 +168,8 @@
         <!-- Column 2: Essential Links -->
         <div class="col-lg-3 col-md-6 mb-3 mb-md-0">
           <h5 class="mb-3 footer-heading">Explore</h5>
-          <ul class="list-unstyled footer-links small"> {# Smaller font #}
-            <div class="row"> {# Split links into two sub-columns for compactness #}
+          <ul class="list-unstyled footer-links small">
+            <div class="row"> 
                 <div class="col-6">
                      <li><a href="{% url 'home' %}">Home</a></li>
                      <li><a href="#">About Us</a></li>
@@ -213,28 +207,26 @@
                  </div>
              </form>
         </div>
-      </div> {# End row #}
+      </div> 
 
-      <hr class="footer-divider my-3"> {# Reduced margin my-3 #}
+      <hr class="footer-divider my-3"> 
 
       <div class="row">
         <div class="col text-center">
           <p class="small footer-text mb-0">© {% now "Y" %} LearnSwift Academia. All Rights Reserved.</p>
         </div>
       </div>
-    </div> {# End container #}
+    </div> 
     </footer>
   </div>
   <!-- Scripts -->
-  {# Place jQuery here if needed by older Bootstrap plugins, otherwise Bootstrap 5 doesn't require it #}
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
-  {# Font Awesome JS is generally not needed if using CSS version, unless using specific JS features #}
   {# <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/js/all.min.js" integrity="sha512-uKQ39gEGiyUJl4AI6L+ekBdGKpGw4xJ55+cprOpSoOTEUyL0T+sfC3t2IsA+WYTRRn4Tb9J7B8ayfAUHRTz8fQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script> #}
 
   <!-- Custom JS -->
-  <script src="{% static 'js/script.js' %}"></script> {# Your custom scripts #}
+  <script src="{% static 'js/script.js' %}"></script> 
 
-  {% block extra_js %}{% endblock %} {# Placeholder for page-specific JS #}
+  {% block extra_js %}{% endblock %} 
 
 </body>
 </html>

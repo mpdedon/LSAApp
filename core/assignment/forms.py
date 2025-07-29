@@ -1,7 +1,13 @@
 from django import forms
 from core.models import Assignment, Question, AssignmentSubmission
+from core.fields import AwareDateTimeField
 
 class AssignmentForm(forms.ModelForm):
+
+    due_date = AwareDateTimeField(
+        required=False, 
+        widget=forms.DateTimeInput(attrs={'type': 'datetime-local', 'class': 'form-control'})
+    )
     class Meta:
         model = Assignment
         fields = ['title', 'description', 'class_assigned', 'subject', 'due_date']

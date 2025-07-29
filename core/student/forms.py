@@ -1,7 +1,7 @@
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
 from django.core.exceptions import ValidationError
-from core.models import Student, CustomUser, Guardian, Class
+from core.models import Student, CustomUser, Guardian, Class, Message
 
 class StudentRegistrationForm(UserCreationForm):
     date_of_birth = forms.DateField(
@@ -125,3 +125,31 @@ class StudentRegistrationForm(UserCreationForm):
             student.save()
 
         return student
+
+
+class MessageForm(forms.ModelForm):
+
+    recipient = forms.ModelChoiceField(
+        queryset=CustomUser.objects.none(), # Start with an empty queryset
+        label="Send To",
+        widget=forms.Select(attrs={'class': 'form-select form-select-sm'})
+    )
+
+    class Meta:
+        model = Message
+        fields = ['recipient', 'title', 'content']
+        widgets = {
+            'title': forms.TextInput(attrs={'class': 'form-control form-control-sm', 'placeholder': 'Message Title'}),
+            'content': forms.Textarea(attrs={'class': 'form-control form-control-sm', 'rows': 4, 'placeholder': 'Type your message here...'}),
+        }
+        labels = {
+            'title': 'Subject',
+            'content': 'Message'
+        }
+
+    def __init__(self, *args, **kwargs):
+        teacher_queryset = kwargs.pop('teacher_queryset', None)
+        super().__init__(*args, **kwargs)
+        
+        if teacher_queryset is not None:
+            self.fields['recipient'].queryset = teacher_queryset

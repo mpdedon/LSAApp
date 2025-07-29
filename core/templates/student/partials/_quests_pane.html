@@ -1,0 +1,27 @@
+{% load humanize student_filters %}
+
+{% if upcoming_quests %}
+    {% for task in upcoming_quests|slice:":10" %} {# Show top 5 upcoming quests #}
+        <div class="quest-card mb-3">
+            <div class="card-body d-flex align-items-center p-3">
+                {% if task.type == 'assignment' %}<div class="quest-icon bg-info-subtle text-info"><i class="bi bi-journal-check"></i></div>
+                {% elif task.type == 'assessment' %}<div class="quest-icon bg-warning-subtle text-warning"><i class="bi bi-pencil-square"></i></div>
+                {% elif task.type == 'exam' %}<div class="quest-icon bg-success-subtle text-success"><i class="bi bi-file-earmark-check-fill"></i></div>
+                {% endif %}
+                <div class="flex-grow-1 mx-3">
+                    <div class="quest-title">{{ task.obj.title }}</div>
+                    <div class="text-muted small">{{ task.obj.subject.name }}</div>
+                </div>
+                <div class="text-end">
+                    <div class="quest-due text-danger">Due: {{ task.due_date|date:"D, d M" }}</div>
+                    <a href="{{ task.submit_url }}" class="btn btn-sm btn-primary mt-1" style="background-color: var(--dash-primary-color); border-color: var(--dash-primary-color);">Start Quest</a>
+                </div>
+            </div>
+        </div>
+    {% endfor %}
+{% else %}
+    <div class="text-center p-4 text-muted">
+        <i class="bi bi-trophy-fill fa-3x mb-3 text-success"></i>
+        <h5 class="fw-bold">Quest Log is Clear!</h5><p>No pending tasks.</p>
+    </div>
+{% endif %}

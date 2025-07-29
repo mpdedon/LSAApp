@@ -1,0 +1,16 @@
+{% load humanize student_filters %}
+
+{% with data=attendance_data %}
+<div class="text-center">
+    <div class="display-4 fw-bold" style="color: var(--dash-primary-color);">{{ data.attendance_percentage|floatformat:0 }}%</div>
+    <div class="text-muted">Attendance Rate this Term</div>
+</div>
+<div class="progress mt-3 mb-3" style="height: 10px;">
+    <div class="progress-bar" role="progressbar" style="width: {{ data.attendance_percentage }}%; background-color: var(--dash-primary-color);"></div>
+</div>
+<div class="d-flex justify-content-between text-center small">
+    <div><strong>Total Days:</strong><br>{{ data.total_days }}</div>
+    <div><strong>Present:</strong><br>{{ data.present_days }}</div>
+    <div><strong>Absent:</strong><br>{{ data.absent_days }}</div>
+</div>
+{% endwith %}

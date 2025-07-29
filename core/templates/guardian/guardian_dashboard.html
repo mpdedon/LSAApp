@@ -80,7 +80,11 @@
     <div class="col-lg-3">
         <aside class="profile-card">
             <div class="card-body text-center d-flex flex-column p-4">
-                <img src="{{ guardian.profile_image.url }}" class="img-fluid rounded-circle mb-3 mx-auto" alt="{{ guardian.user.get_full_name }}" style="width: 120px; height: 120px; object-fit: cover; border: 4px solid #fff; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                {% if guardian.profile_image %}
+                    <img src="{{ guardian.profile_image.url }}" class="img-fluid rounded-circle mb-3 mx-auto" alt="{{ guardian.user.get_full_name }}" style="width: 120px; height: 120px; object-fit: cover; border: 4px solid #fff; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                {% else %}
+                    <img src="{% static 'core/images/profile_images/default.jpg' %}" class="img-fluid rounded-circle mb-3 mx-auto" alt="Default Profile Image" style="width: 120px; height: 120px; object-fit: cover; border: 4px solid #fff; box-shadow: 0 2px 10px rgba(0,0,0,0.1);">
+                {% endif %}
                 <h5 class="fw-bold mb-0">{{ guardian.user.get_full_name|default:guardian.user.username }}</h5>
                 <p class="text-muted small mb-3">{{ guardian.user.email }}</p>
                 <hr>
@@ -117,7 +121,7 @@
                 <ul class="nav nav-tabs student-tabs" id="studentTabs" role="tablist">
                     {% for student in students %}
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link {% if forloop.first %}active{% endif %}" id="tab-{{ student.id }}" data-bs-toggle="tab" data-bs-target="#student-{{ student.id }}" type="button" role="tab">
+                        <button class="nav-link {% if forloop.first %}active{% endif %}" id="tab-{{ student.user.id }}" data-bs-toggle="tab" data-bs-target="#student-{{ student.user.id }}" type="button" role="tab">
                             {{ student.user.first_name }}
                         </button>
                     </li>
@@ -127,11 +131,15 @@
             <div class="card-body">
                 <div class="tab-content pt-2" id="studentTabContent">
                     {% for student in students %}
-                    <div class="tab-pane fade {% if forloop.first %}show active{% endif %}" id="student-{{ student.id }}" role="tabpanel">
+                    <div class="tab-pane fade {% if forloop.first %}show active{% endif %}" id="student-{{ student.user.id }}" role="tabpanel">
 
                         <!-- Student Header inside tab -->
                         <div class="d-flex align-items-center mb-4 p-3 bg-light rounded">
-                            <img src="{{ student.profile_image.url }}" class="rounded-circle me-3" alt="{{ student.user.get_full_name }}" style="width: 60px; height: 60px; object-fit: cover;">
+                            {% if student.profile_image %}
+                                <img src="{{ student.profile_image.url }}" class="rounded-circle me-3" alt="{{ student.user.get_full_name }}" style="width: 60px; height: 60px; object-fit: cover;">
+                            {% else %}
+                                <img src="{% static 'core/images/profile_images/default.jpg' %}" class="rounded-circle me-3" alt="Default Profile Image" style="width: 60px; height: 60px; object-fit: cover;">
+                            {% endif %}
                             <div>
                                 <h4 class="mb-0">{{ student.user.get_full_name }}</h4>
                                 <p class="mb-0 text-muted">{{ student.current_class }} | Status: <span class="fw-semibold">{{ student.status|title }}</span></p>
@@ -139,38 +147,38 @@
                         </div>
 
                         <!-- Secondary Tabs for Detailed Info -->
-                        <ul class="nav nav-pills mb-3" id="pills-tab-{{ student.id }}" role="tablist">
+                        <ul class="nav nav-pills mb-3" id="pills-tab-{{ student.user.id }}" role="tablist">
                             <li class="nav-item" role="presentation">
-                                <button class="nav-link active" data-bs-toggle="pill" data-bs-target="#pills-overview-{{ student.id }}">Overview</button>
+                                <button class="nav-link active" data-bs-toggle="pill" data-bs-target="#pills-overview-{{ student.user.id }}">Overview</button>
                             </li>
                             <li class="nav-item" role="presentation">
-                                <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pills-academics-{{ student.id }}">Academics</button>
+                                <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pills-academics-{{ student.user.id }}">Academics</button>
                             </li>
                             <li class="nav-item" role="presentation">
-                                <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pills-finance-{{ student.id }}">Finance & Results</button>
+                                <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pills-finance-{{ student.user.id }}">Finance & Results</button>
                             </li>
                              <li class="nav-item" role="presentation">
-                                <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pills-communication-{{ student.id }}">Communication</button>
+                                <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pills-communication-{{ student.user.id }}">Communication</button>
                             </li>
                         </ul>
-                        <div class="tab-content bg-light p-3 rounded" id="pills-tabContent-{{ student.id }}">
+                        <div class="tab-content bg-light p-3 rounded" id="pills-tabContent-{{ student.user.id }}">
                             <!-- OVERVIEW PANE -->
-                            <div class="tab-pane fade show active" id="pills-overview-{{ student.id }}">
+                            <div class="tab-pane fade show active" id="pills-overview-{{ student.user.id }}">
                                 {% include 'guardian/partials/_overview_pane.html' with student=student %}
                             </div>
 
                             <!-- ACADEMICS PANE -->
-                            <div class="tab-pane fade" id="pills-academics-{{ student.id }}">
+                            <div class="tab-pane fade" id="pills-academics-{{ student.user.id }}">
                                 {% include 'guardian/partials/_academics_pane.html' with student=student %}
                             </div>
 
                             <!-- FINANCE & RESULTS PANE -->
-                            <div class="tab-pane fade" id="pills-finance-{{ student.id }}">
+                            <div class="tab-pane fade" id="pills-finance-{{ student.user.id }}">
                                 {% include 'guardian/partials/_finance_pane.html' with student=student %}
                             </div>
                             
                             <!-- COMMUNICATION PANE -->
-                            <div class="tab-pane fade" id="pills-communication-{{ student.id }}">
+                            <div class="tab-pane fade" id="pills-communication-{{ student.user.id }}">
                                 {% include 'guardian/partials/_communication_pane.html' with student=student %}
                             </div>
                         </div>

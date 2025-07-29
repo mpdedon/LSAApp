@@ -1,0 +1,22 @@
+{% load humanize student_filters %}
+
+<h6>Your Badge Progress</h6>
+<p class="small text-muted mb-1">You've completed <strong>{{ gamification.submission_count }}</strong> tasks so far!</p>
+{% if gamification.next_badge %}
+    <div class="d-flex align-items-center mb-1">
+         <div class="badge-icon badge-locked me-2" title="Next Badge"><i class="bi {{ gamification.next_badge.icon }}"></i></div>
+         <div class="flex-grow-1">
+             <div class="progress" style="height: 10px;">
+                <div class="progress-bar" role="progressbar" style="width: {{ gamification.progress_to_next_badge }}%; background-color: var(--dash-secondary-color);"></div>
+             </div>
+             <small class="text-muted">Next Badge: {{ gamification.next_badge.name }} (at {{ gamification.next_badge.threshold }} tasks)</small>
+         </div>
+    </div>
+{% else %}
+    <div class="alert alert-success small p-2 text-center">You've unlocked all the current badges! Amazing!</div>
+{% endif %}
+<div class="mt-2">
+    {% for badge in gamification.earned_badges %}
+        <span class="badge-icon badge-earned" title="{{ badge.name }}"><i class="bi {{ badge.icon }}"></i></span>
+    {% endfor %}
+</div>

@@ -96,7 +96,6 @@ class GuardianListView(View, AdminRequiredMixin):
 class GuardianBulkActionView(View, AdminRequiredMixin):
     def post(self, request, *args, **kwargs):
         action = request.POST.get('action')
-        print(action)
         selected_guardians = request.POST.getlist('selected_guardians')
 
         if not action or not selected_guardians:
@@ -329,7 +328,6 @@ def submit_assessment(request, assessment_id):
 
     if hasattr(user, 'guardian'): 
         guardian = user.guardian
-        print(f"User is a Guardian: {guardian}")
 
         students_qs = Student.objects.filter(
             student_guardian=guardian,
@@ -341,7 +339,6 @@ def submit_assessment(request, assessment_id):
             return redirect('guardian_dashboard')
 
         student_id_from_get = request.GET.get('student_id')
-        print(f"student_id from GET: {student_id_from_get}")
 
         if student_id_from_get:
             try:
@@ -745,10 +742,8 @@ def view_student_result(request, student_id, term_id):
         result = get_object_or_404(Result.objects.select_related('term__session'), student=student, term=term)
 
     except Http404 as e:
-        print(f"Error fetching result data: {e}")
         return HttpResponse("Result data not found.", status=404)
     except Exception as e:
-        print(f"Unexpected error fetching data: {e}")
         return HttpResponse("An error occurred while retrieving result data.", status=500)
 
     # --- Permissions Check ---
@@ -854,13 +849,10 @@ def view_student_result(request, student_id, term_id):
             css = CSS(filename=css_path, font_config=font_config)
 
         except IndexError:
-            print("Error: settings.STATICFILES_DIRS is empty. Cannot locate static files.")
             return HttpResponse("Error generating PDF: Static file configuration missing.", status=500)
         except FileNotFoundError as e:
-             print(f"Error: {e}")
              return HttpResponse("Error generating PDF: Required styles missing.", status=500)
         except Exception as e:
-             print(f"Error loading CSS for PDF: {e}")
              return HttpResponse("Error generating PDF: Could not load styles.", status=500)
 
 
@@ -878,7 +870,6 @@ def view_student_result(request, student_id, term_id):
 
         except Exception as e:
             # Catch WeasyPrint errors
-            print(f"Error generating PDF with WeasyPrint: {e}")
             return HttpResponse(f"An error occurred during PDF generation: {e}", status=500)
 
         # Create HTTP response with PDF

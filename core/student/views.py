@@ -8,9 +8,9 @@ from django.contrib import messages
 from django.views import View
 from django.core.paginator import Paginator
 from django.db.models import Q
-from core.models import Student, Assignment, AssignmentSubmission
+from core.models import Student, Assignment, AssignmentSubmission, Teacher, CustomUser, Message
 from core.models import Assessment, AssessmentSubmission, Exam, ExamSubmission, AcademicAlert 
-from .forms import StudentRegistrationForm
+from .forms import StudentRegistrationForm, MessageForm
 from core.assignment.forms import AssignmentSubmissionForm
 
 # Student Views
@@ -129,7 +129,6 @@ class StudentCreateView(View):
         form = StudentRegistrationForm(request.POST, request.FILES)
         if form.is_valid():
             form.save()
-            print("Successfully saved form")
             return redirect('student_list')
         else:
             print("Form is NOT valid. Errors: ", form.errors)
@@ -350,31 +349,11 @@ def submit_assessment(request, assessment_id):
             requires_manual_review=requires_manual_review
         )
 
-        # Notify guardian
-        notify_guardian(submission)
-        return redirect('student_dashboard' if hasattr(user, 'student') else 'guardian_dashboard')
-
     # Render the assessment form
     return render(request, 'assessment/submit_assessment.html', {
         'assessment': assessment,
         'questions': assessment.questions.all()
     })
-
-def notify_guardian(student, assessment):
-    if student.student_guardian:
-        guardian = student.student_guardian
-        AcademicAlert.objects.create(
-            alert_type='assessment_submission',
-            title=f"{student.user.get_full_name()} submitted {assessment.title}",
-            summary=f"{student.user.get_full_name()} has submitted the assessment titled '{assessment.title}'.",
-            teacher=assessment.created_by.teacher,
-            student=student,
-            due_date=assessment.due_date,
-            duration=assessment.duration,
-            related_object_id=assessment.id
-        )
-    else:
-        print(f"No guardian associated with student {student.user.get_full_name()}")
 
 
 @login_required
@@ -451,28 +430,36 @@ def submit_exam(request, exam_id):
             requires_manual_review=requires_manual_review
         )
 
-        # Notify guardian
-        notify_guardian(submission)
-        return redirect('student_dashboard' if hasattr(user, 'student') else 'guardian_dashboard')
-
     # Render the exam form
     return render(request, 'exam/submit_exam.html', {
         'exam': exam,
         'questions': exam.questions.all()
     })
 
-def notify_guardian(student, exam):
-    if student.student_guardian:
-        guardian = student.student_guardian
-        AcademicAlert.objects.create(
-            alert_type='exam_submission',
-            title=f"{student.user.get_full_name()} submitted {exam.title}",
-            summary=f"{student.user.get_full_name()} has submitted the exam titled '{exam.title}'.",
-            teacher=exam.created_by.teacher,
-            student=student,
-            due_date=exam.due_date,
-            duration=exam.duration,
-            related_object_id=exam.id
-        )
+
+def message_teacher(request):
+    student = get_object_or_404(Student, user=request.user)
+    
+    # We need to populate the form's queryset for recipients
+    class_teachers = Teacher.objects.filter(
+        teacherassignment__class_assigned=student.current_class,
+        teacherassignment__term__is_active=True
+    ).select_related('user').distinct()
+    teacher_users_queryset = CustomUser.objects.filter(teacher__in=class_teachers)
+
+    # Pass the POST data AND the dynamic queryset to the form
+    form = MessageForm(request.POST, teacher_queryset=teacher_users_queryset)
+
+    if form.is_valid():
+        message = form.save(commit=False)
+        message.sender = request.user
+        message.student = student # Associate the message with the sending student
+        message.save()
+        messages.success(request, "Your message has been sent successfully!")
     else:
-        print(f"No guardian associated with student {student.user.get_full_name()}")
+        # If the form is invalid, store the errors in messages to display on the dashboard
+        for field, errors in form.errors.items():
+            for error in errors:
+                messages.error(request, f"{field.title()}: {error}")
+    
+    return redirect('student_dashboard') 

@@ -50,6 +50,65 @@
                             </a>
                         </div>
                     </li>
+                     <!-- Class Leaderboard -->
+                    <li>
+                        <div class="row mt-4">
+                            <div class="col-12">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h3 class="mb-0"><i class="fas fa-trophy me-2 text-warning"></i>Class Leaderboards</h3>
+                                    <!-- Term Filter Form -->
+                                    <form method="get" class="d-flex align-items-center">
+                                        <label for="term_id_select" class="form-label me-2 mb-0 small">Term:</label>
+                                        <select name="term_id" id="term_id_select" class="form-select form-select-sm" onchange="this.form.submit()">
+                                            {% for term in selectable_terms %}
+                                                <option value="{{ term.id }}" {% if term.id == display_term.id %}selected{% endif %}>
+                                                    {{ term }}
+                                                </option>
+                                            {% endfor %}
+                                        </select>
+                                    </form>
+                                </div>
+
+                                {% if not display_term %}
+                                    <div class="alert alert-warning">Please select a term to view leaderboards.</div>
+                                {% elif leaderboard_data %}
+                                    <div class="accordion" id="leaderboardAccordion">
+                                    {% for class_id, data in leaderboard_data.items %}
+                                        <div class="accordion-item">
+                                            <h2 class="accordion-header" id="heading-{{ class_id }}">
+                                                <button class="accordion-button {% if not forloop.first %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-{{ class_id }}">
+                                                    <strong>{{ data.class_name }}</strong>
+                                                </button>
+                                            </h2>
+                                            <div id="collapse-{{ class_id }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}" data-bs-parent="#leaderboardAccordion">
+                                                <div class="accordion-body p-0">
+                                                    <ul class="list-group list-group-flush">
+                                                        {% for student in data.top_students %}
+                                                        <li class="list-group-item d-flex align-items-center">
+                                                            <span class="fw-bold me-3" style="width: 30px;">#{{ student.rank }}</span>
+                                                            {% if student.profile_image %}
+                                                                <img src="{{ student.profile_image.url }}" class="rounded-circle me-2" style="width: 40px; height: 40px; object-fit: cover;">
+                                                            {% else %}
+                                                                <img src="{% static 'core/images/profile_images/default.jpg' %}" class="rounded-circle me-2" style="width: 40px; height: 40px; object-fit: cover;">
+                                                            {% endif %}
+                                                            <span class="flex-grow-1">{{ student.user.get_full_name }}</span>
+                                                            <span class="badge bg-primary rounded-pill">{{ student.term_submission_count }} tasks submitted</span>
+                                                        </li>
+                                                        {% empty %}
+                                                        <li class="list-group-item text-muted">No student submissions yet for this class in the current term.</li>
+                                                        {% endfor %}
+                                                    </ul>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    {% endfor %}
+                                </div>
+                                {% else %}
+                                    <div class="alert alert-light">You were not assigned to any classes for the selected term ({{ display_term }}).</div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </li>
                 </ul>
             </div>
         </div>
