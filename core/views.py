@@ -4,7 +4,8 @@ from django.contrib.auth.mixins import UserPassesTestMixin
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.urls import reverse, reverse_lazy
 from django.db import IntegrityError, transaction
-from django.db.models import Count, Sum, Max, Q
+from django.db.models import Count, Sum, Q, F, Window, OuterRef, Subquery, IntegerField, Value
+from django.db.models.functions import Rank, Coalesce
 from django.contrib import messages
 from django.views.generic import ListView, CreateView, DetailView, UpdateView, DeleteView, TemplateView, FormView
 from django.core.paginator import Paginator
@@ -21,7 +22,7 @@ from core.models import Session, Term, Student, Teacher, Guardian, Notification
 from core.models import Class, Subject, FeeAssignment, Enrollment, Payment, Assessment, Exam
 from core.models import SubjectAssignment, TeacherAssignment, ClassSubjectAssignment
 from core.models import SubjectResult, Result, StudentFeeRecord, FinancialRecord, AcademicAlert
-from core.models import OnlineQuestion, AssessmentSubmission, ExamSubmission
+from core.models import OnlineQuestion, AssignmentSubmission, AssessmentSubmission, ExamSubmission
 from core.utils import get_current_term, get_next_term   
 from core.forms import ClassSubjectAssignmentForm, NonAcademicSkillsForm, NotificationForm, ContactForm
 from core.session.forms import SessionForm
@@ -412,11 +413,10 @@ class SubjectCreateView(AdminRequiredMixin, CreateView):
     def post(self, request):
         form = SubjectForm(request.POST)
         if form.is_valid():
-            print('Form is Valid')
             form.save()
             return redirect('subject_list')
         else:
-            print(form.errors)
+            pass
         return render(request, self.template_name, {'form': form})
 
 class SubjectUpdateView(AdminRequiredMixin, UpdateView):
@@ -544,7 +544,6 @@ class TeacherAssignmentListView(AdminRequiredMixin, ListView):
         except Exception as e:
             current_term = None
             next_term = None
-            print(f"DEBUG: EXCEPTION getting terms: {e}")
             messages.error(self.request, "Could not determine current/next term information.")
 
         context['current_term'] = current_term
@@ -682,7 +681,6 @@ class SubjectAssignmentListView(ListView):
         subject_assignments = SubjectAssignment.objects.all()
 
         if search_query:
-            print("Applying filters...")
             subject_assignments = subject_assignments.filter(
                 Q(teacher__user__first_name__icontains=search_query) |
                 Q(teacher__user__last_name__icontains=search_query) |
@@ -978,7 +976,6 @@ def approve_broadsheet(request, term_id, class_id):
 
     if request.method == "POST":
         updated_status = results.update(is_approved=True)
-        print(f"Updated {updated_status} Results")
         return JsonResponse({'message': f"Broadsheet for {class_obj.name} approved!"})
 
     return JsonResponse({'error': "Invalid request"}, status=400)
@@ -994,7 +991,6 @@ def archive_broadsheet(request, term_id):
         return JsonResponse({'message': f"Broadsheet for {term.name} archived!"})
 
     return JsonResponse({'error': "Invalid request"}, status=400)
-
 
 # Fee Assignment Views
 
@@ -1075,13 +1071,11 @@ class StudentFeeRecordListView(AdminRequiredMixin, ListView):
         Updates existing records via save() to trigger signals if amount changes.
         """
         if not active_term:
-            print("Sync aborted: No active term provided.") # Use logging in production
             return
 
         term_assignments = FeeAssignment.objects.filter(term=active_term).select_related('class_instance')
         if not term_assignments.exists():
-            print(f"Sync Info: No fee assignments found for active term {active_term}.")
-            return # Nothing to assign
+            return 
 
         assignments_by_class_id = {fa.class_instance_id: fa for fa in term_assignments}
 
@@ -1093,7 +1087,6 @@ class StudentFeeRecordListView(AdminRequiredMixin, ListView):
 
         student_map = {s_id: c_id for s_id, c_id in students_in_assigned_classes}
         if not student_map:
-            print(f"Sync Info: No active students found in classes with assignments for term {active_term}.")
             return # No students to process
 
         # Fetch existing SFRs for these specific students and term
@@ -1162,11 +1155,9 @@ class StudentFeeRecordListView(AdminRequiredMixin, ListView):
         if records_to_create_instances:
             try:
                 created_records = StudentFeeRecord.objects.bulk_create(records_to_create_instances)
-                print(f"Sync: Created {len(created_records)} new StudentFeeRecords.")
                 # messages.info(self.request, f"Created {len(created_records)} new fee records.") # Avoid messages in sync logic
             except IntegrityError as e:
                  # Handle potential unique constraint violations if sync runs concurrently (unlikely here)
-                 print(f"Sync Error during bulk_create: {e}")
                  pass
 
         # --- Update Existing Records Needing Save (Triggers Signals) ---
@@ -2422,6 +2413,77 @@ def grade_essay_exam_view(request, submission_id):
     }
     return render(request, 'exam/grade_essay_submission.html', context)
 
+# core/views.py (or admin/views.py)
+
+@login_required
+@user_passes_test(lambda u: u.is_superuser)
+def admin_leaderboard_view(request):
+    # --- Filter Logic ---
+    selected_term_id = request.GET.get('term_id')
+    selected_session_id = request.GET.get('session_id')
+
+    # Get all sessions and terms for the dropdown filters
+    all_sessions = Session.objects.all().order_by('-start_date')
+    all_terms = Term.objects.all().select_related('session').order_by('-start_date')
+
+    # Determine the term to display data for
+    display_term = None
+    if selected_term_id:
+        try:
+            display_term = Term.objects.get(pk=selected_term_id)
+        except (Term.DoesNotExist, ValueError):
+            pass # Will default to active term
+    
+    if not display_term:
+        display_term = Term.objects.filter(is_active=True).first()
+
+    # Filter terms based on selected session if any
+    if selected_session_id:
+        all_terms = all_terms.filter(session_id=selected_session_id)
+
+
+    # --- LEADERBOARD DATA GENERATION ---
+    leaderboard_data = {}
+    all_classes = Class.objects.all().order_by('order')
+
+    if display_term:
+        for class_instance in all_classes:
+            assignment_count_sub = AssignmentSubmission.objects.filter(student=OuterRef('pk'), assignment__term=display_term).values('student').annotate(c=Count('pk')).values('c')
+            assessment_count_sub = AssessmentSubmission.objects.filter(student=OuterRef('pk'), assessment__term=display_term).values('student').annotate(c=Count('pk')).values('c')
+            exam_count_sub = ExamSubmission.objects.filter(student=OuterRef('pk'), exam__term=display_term).values('student').annotate(c=Count('pk')).values('c')
+
+            class_leaderboard_qs = Student.objects.filter(
+                current_class=class_instance, status='active'
+            ).select_related('user').annotate(
+                num_assignments=Coalesce(Subquery(assignment_count_sub, output_field=IntegerField()), Value(0)),
+                num_assessments=Coalesce(Subquery(assessment_count_sub, output_field=IntegerField()), Value(0)),
+                num_exams=Coalesce(Subquery(exam_count_sub, output_field=IntegerField()), Value(0)),
+            ).annotate(
+                term_submission_count=F('num_assignments') + F('num_assessments') + F('num_exams')
+            ).annotate(
+                rank=Window(expression=Rank(), order_by=F('term_submission_count').desc())
+            ).order_by('rank', 'user__first_name')
+
+            leaderboard_data[class_instance.id] = {
+                'class_name': class_instance.name,
+                'top_students': class_leaderboard_qs[:5]
+            }
+            
+            leaderboard_data[class_instance.id] = {
+                'class_name': class_instance.name,
+                'school_level': class_instance.school_level,
+                'top_students': class_leaderboard_qs[:5]
+            }
+
+    context = {
+        'leaderboard_data': leaderboard_data,
+        'display_term': display_term,
+        'all_sessions': all_sessions,
+        'all_terms': all_terms,
+        'selected_session_id': int(selected_session_id) if selected_session_id else None,
+        'selected_term_id': display_term.id if display_term else None,
+    }
+    return render(request, 'setup/leaderboard_list.html', context)
 
 # === Post Management Views ===
 class ManagePostListView(AdminRequiredMixin, ListView):

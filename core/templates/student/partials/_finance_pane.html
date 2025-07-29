@@ -1,0 +1,14 @@
+{% load humanize student_filters %}
+
+{% with data=financial_data %}
+{% if data %}
+    <ul class="list-group list-group-flush">
+        <li class="list-group-item d-flex justify-content-between"><span>Net Fee:</span> <strong>₦{{ data.total_fee|floatformat:2|intcomma }}</strong></li>
+        <li class="list-group-item d-flex justify-content-between"><span>Paid:</span> <strong>₦{{ data.total_paid|floatformat:2|intcomma }}</strong></li>
+        <li class="list-group-item d-flex justify-content-between bg-light"><h5>Balance Due:</h5> <h5 class="text-danger">₦{{ data.outstanding_balance|floatformat:2|intcomma }}</h5></li>
+    </ul>
+    {% if data.has_waiver %}<div class="alert alert-success mt-3 text-center small p-2">Full Fee Waiver is Active</div>{% endif %}
+{% else %}
+    <p class="text-muted text-center">No financial record found for this term.</p>
+{% endif %}
+{% endwith %}

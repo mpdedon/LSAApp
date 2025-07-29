@@ -1,0 +1,124 @@
+{% extends 'base.html' %} {# Assuming it uses the admin base template #}
+{% load static %}
+
+{% block title %}Overall Class Leaderboards{% endblock %}
+{% block page_title %}Overall Class Leaderboards{% endblock %}
+{% block breadcrumb_page %}Leaderboards{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* Custom styles for the leaderboard page */
+    .leaderboard-card .accordion-button:not(.collapsed) {
+        background-color: var(--bs-primary-bg-subtle);
+        color: var(--bs-primary);
+        box-shadow: none;
+    }
+    .leaderboard-card .accordion-button:focus {
+        box-shadow: none;
+    }
+    .leaderboard-item .rank {
+        font-size: 1.1rem;
+        font-weight: 700;
+        width: 40px;
+        text-align: center;
+        color: #6c757d;
+    }
+    .leaderboard-item.rank-1 .rank { color: #d4af37; } /* Gold for #1 */
+    .leaderboard-item.rank-2 .rank { color: #c0c0c0; } /* Silver for #2 */
+    .leaderboard-item.rank-3 .rank { color: #cd7f32; } /* Bronze for #3 */
+</style>
+{% endblock %}
+
+
+{% block content %}
+<br>
+<div class="row justify-content-center">
+    <div class="col-xl-10 col-lg-12"> 
+        <div class="card shadow-sm leaderboard-card">
+            <div class="card-header bg-light">
+                <!-- Header and Filter Form -->
+                <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center">
+                    <h4 class="mb-2 mb-md-0">Class Performance Overview</h4>
+                    
+                    <form method="get" class="d-flex align-items-center gap-3">
+                        <div>
+                            <label for="session_id_select" class="form-label small mb-0 visually-hidden">Session:</label>
+                            <select name="session_id" id="session_id_select" class="form-select form-select-sm" onchange="this.form.submit()" title="Filter by Session">
+                                <option value="">All Sessions</option>
+                                {% for session in all_sessions %}
+                                    <option value="{{ session.id }}" {% if session.id == selected_session_id %}selected{% endif %}>
+                                        {{ session.name }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div>
+                            <label for="term_id_select" class="form-label small mb-0 visually-hidden">Term:</label>
+                            <select name="term_id" id="term_id_select" class="form-select form-select-sm" onchange="this.form.submit()" title="Filter by Term">
+                                <option value="">Select a Term...</option>
+                                {% for term in all_terms %}
+                                    <option value="{{ term.id }}" {% if term.id == selected_term_id %}selected{% endif %}>
+                                        {{ term }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="card-body">
+                {% if not display_term %}
+                    <div class="alert alert-info text-center">
+                        <i class="fas fa-info-circle me-2"></i>
+                        Please select a term using the filters above to view the leaderboards.
+                    </div>
+                {% else %}
+                    <p class="text-muted small mb-3">
+                        Showing top 5 students per class based on number of tasks submitted in <strong>{{ display_term }}</strong>.
+                    </p>
+                    <div class="accordion" id="leaderboardAccordion">
+                        {% for class_id, data in leaderboard_data.items %}
+                            <div class="accordion-item">
+                                <h2 class="accordion-header" id="heading-{{ class_id }}">
+                                    <button class="accordion-button {% if not forloop.first %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-{{ class_id }}">
+                                        <strong>{{ data.class_name }}</strong> <span class="badge bg-secondary ms-2">{{ data.school_level }}</span>
+                                    </button>
+                                </h2>
+                                <div id="collapse-{{ class_id }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}" data-bs-parent="#leaderboardAccordion">
+                                    <div class="accordion-body p-0">
+                                        {% if data.top_students %}
+                                            <ul class="list-group list-group-flush">
+                                                {% for student in data.top_students %}
+                                                <li class="list-group-item d-flex align-items-center leaderboard-item rank-{{ student.rank }}">
+                                                    <span class="rank">#{{ student.rank }}</span>
+                                                    {% if student.profile_image %}
+                                                        <img src="{{ student.profile_image.url }}" class="rounded-circle mx-2" style="width: 40px; height: 40px; object-fit: cover;" alt="{{ student.user.get_full_name }}">
+                                                    {% else %}
+                                                        <img src="{% static 'core/images/profile_images/default.jpg' %}" class="rounded-circle mx-2" style="width: 40px; height: 40px; object-fit: cover;" alt="Default Profile">
+                                                    {% endif %}
+                                                    <span class="flex-grow-1 fw-medium">{{ student.user.get_full_name }}</span>
+                                                    <span class="badge bg-primary rounded-pill">{{ student.term_submission_count }} tasks submitted</span>
+                                                </li>
+                                                {% endfor %}
+                                            </ul>
+                                        {% else %}
+                                            <div class="p-3 text-muted text-center">
+                                                <i class="fas fa-ghost me-2"></i>
+                                                No student submissions found for this class in the selected term.
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        {% empty %}
+                            <div class="alert alert-light mt-3">No classes with active students found.</div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{# --- END: Wrapper for Centering and Width Control --- #}
+{% endblock %}

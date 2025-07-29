@@ -1,0 +1,68 @@
+{% load static humanize student_filters %}
+
+<div class="accordion" id="comm-accordion-{{ student.user.id }}">
+    <!-- Teacher Contacts -->
+    <div class="accordion-item">
+        <h2 class="accordion-header"><button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-teachers-{{ student.user.id }}">Your Teachers</button></h2>
+        <div id="collapse-teachers-{{ student.user.id }}" class="accordion-collapse collapse show" data-bs-parent="#comm-accordion-{{ student.user.id }}">
+            <div class="accordion-body">
+                {% if class_teachers %}
+                    <ul class="list-unstyled">
+                    {% for teacher in class_teachers %}
+                        <li class="d-flex align-items-center mb-3">
+                            {% if teacher.profile_image %}
+                                <img src="{{ teacher.profile_image.url }}" class="rounded-circle me-3" style="width: 45px; height: 45px; object-fit: cover;" alt="{{ teacher.user.get_full_name }}">
+                            {% else %}
+                                <img src="{% static 'images/profile_images/default.jpg' %}" class="rounded-circle me-3" style="width: 45px; height: 45px; object-fit: cover;" alt="Default Profile Picture">
+                            {% endif %}
+                            <div>
+                                <div class="fw-bold">{{ teacher.user.get_full_name }}</div>
+                                <div class="text-muted small">{{ teacher.user.email }} | {{ teacher.contact }}</div>
+                            </div>
+                        </li>
+                    {% endfor %}
+                    </ul>
+                {% else %}
+                    <p class="text-muted">Teacher information is not yet available.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <!-- Send a Message -->
+    <div class="accordion-item">
+        <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-message-{{ student.user.id }}">Send a Message</button></h2>
+        <div id="collapse-message-{{ student.user.id }}" class="accordion-collapse collapse" data-bs-parent="#comm-accordion-{{ student.user.id }}">
+            <div class="accordion-body">
+                <form action="{% url 'send_message' %}" method="post">
+                    {% csrf_token %}
+                    {{ message_form.as_p }}
+                    <button type="submit" class="btn btn-primary btn-sm mt-2">Send Message</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <!-- Received Messages -->
+    <div class="accordion-item">
+        <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-received-{{ student.user.id }}">Received Messages</button></h2>
+        <div id="collapse-received-{{ student.user.id }}" class="accordion-collapse collapse" data-bs-parent="#comm-accordion-{{ student.user.id }}">
+            <div class="accordion-body">
+                {% if received_messages %}
+                    <div class="list-group">
+                    {% for message in received_messages|slice:":5" %}
+                        <div class="list-group-item">
+                            <div class="d-flex w-100 justify-content-between">
+                                <h6 class="mb-1">{{ message.title }}</h6>
+                                <small class="text-muted">{{ message.timestamp|naturaltime }}</small>
+                            </div>
+                            <p class="mb-1 small">{{ message.content|truncatewords:15 }}</p>
+                            <small class="text-muted">From: {{ message.sender.get_full_name }}</small>
+                        </div>
+                    {% endfor %}
+                    </div>
+                {% else %}
+                    <p class="text-muted">You have no new messages.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>

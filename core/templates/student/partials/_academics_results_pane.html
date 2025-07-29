@@ -1,0 +1,57 @@
+{% load static humanize student_filters %}
+
+<ul class="nav nav-pills mb-3" role="tablist">
+  <li class="nav-item" role="presentation"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#pills-current-result-{{student.user.id}}">Current Result</button></li>
+  <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#pills-past-results-{{student.user.id}}">Past Results</button></li>
+  <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#pills-leaderboard-{{student.user.id}}">Leaderboard</button></li>
+</ul>
+<div class="tab-content">
+  <div class="tab-pane fade show active" id="pills-current-result-{{student.user.id}}">
+    {% if result_data and financial_data.can_access_results %}
+        <div class="alert alert-success text-center">
+            <h5 class="alert-heading">Result is Ready!</h5>
+            <p>Your result for {{ term }} has been published.</p>
+            <a href="{% url 'view_student_result' student_id=student.user.id term_id=result_data.term.id %}" class="btn btn-success"><i class="bi bi-award me-2"></i>View Result Now</a>
+        </div>
+    {% elif financial_data.can_access_results == False and not financial_data.has_waiver %}
+        <div class="alert alert-warning text-center"><i class="bi bi-lock-fill me-2"></i>Your result is pending. Please complete fee payments to unlock.</div>
+    {% else %}
+        <p class="text-muted text-center">Result for the current term is not yet available.</p>
+    {% endif %}
+  </div>
+  <div class="tab-pane fade" id="pills-past-results-{{student.user.id}}">
+    {% if archived_results_data %}
+        <div class="list-group list-group-flush">
+            {% for res in archived_results_data %}
+                <a href="{% url 'view_student_result' student_id=res.student.user.id term_id=res.term.id %}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                    Result for {{ res.term.name }}<i class="bi bi-chevron-right"></i>
+                </a>
+            {% endfor %}
+        </div>
+    {% else %}
+        <p class="text-muted text-center">No past results found.</p>
+    {% endif %}
+  </div>
+  <!-- LEADERBOARD PANE -->
+  <div class="tab-pane fade" id="pills-leaderboard-{{student.user.id}}">
+      <ul class="list-group list-group-flush">
+        {% for ranked_student in class_leaderboard %}
+        <li class="list-group-item d-flex align-items-center p-2 {% if ranked_student.user.id == student.user.id %}bg-primary-subtle{% endif %}">
+            <span class="rank">#{{ ranked_student.rank }}</span>
+            {% if ranked_student.profile_image %}
+                <img src="{{ ranked_student.profile_image.url }}" class="rounded-circle mx-2" style="width: 35px; height: 35px; object-fit: cover;" alt="{{ ranked_student.user.get_full_name }}">
+            {% else %}
+                <img src="{% static 'core/images/profile_images/default.jpg' %}" class="rounded-circle mx-2" style="width: 35px; height: 35px; object-fit: cover;" alt="Default Profile Picture">
+            {% endif %}
+            <span class="flex-grow-1 fw-medium">{{ ranked_student.user.first_name }} {{ ranked_student.user.last_name|first }}.</span>
+            
+            {# THIS IS THE KEY: Use the correctly calculated field from the annotation #}
+            <span class="badge bg-light text-dark rounded-pill">{{ ranked_student.term_submission_count }} quests</span>
+        </li>
+        {% empty %}
+        <li class="list-group-item text-muted">Leaderboard is being updated.</li>
+        {% endfor %}
+    </ul>
+    <div class="text-center mt-2 small text-muted">Your Current Rank: #{{ current_student_rank }}</div>
+  </div>
+</div>
