@@ -1,0 +1,128 @@
+<h3 class="widget-title"><i class="bi bi-people-fill me-2"></i>Class & Grade Management</h3>
+<p class="text-muted mb-4">View students in your form class(es), input their non-academic records, and navigate to academic score entry sheets for all your assigned classes and subjects.</p>
+
+<!-- Nav tabs for sub-navigation WITHIN this main tab -->
+<ul class="nav nav-tabs nav-tabs-bordered mb-3" id="classManagementTabs" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active" id="form-classes-subtab" data-bs-toggle="tab" data-bs-target="#form-classes-content" type="button" role="tab">My Form Classes & Records</button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link" id="academic-scores-subtab" data-bs-toggle="tab" data-bs-target="#academic-scores-content" type="button" role="tab">Academic Score Entry</button>
+    </li>
+</ul>
+
+<div class="tab-content" id="classManagementTabsContent">
+
+    <!-- Sub-Tab Pane 1: Form Classes, Students, and Non-Academic Records -->
+    <div class="tab-pane fade show active" id="form-classes-content" role="tabpanel">
+        <h4 class="mt-2">Form Class Students</h4>
+        <p class="small text-muted">View students and enter non-academic records for the active term (<strong>{{ active_term.name|default:"N/A" }}</strong>).</p>
+        
+        {% if students_by_class %}
+            {% for class, students_list in students_by_class.items %}
+                <div class="card mb-4">
+                    <div class="card-header"><strong>{{ class.name }}</strong> ({{ students_list|length }} Students)</div>
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-hover table-striped mb-0">
+                                <thead><tr><th>Student Name</th><th>LSA No.</th><th>Guardian</th><th class="text-center">Actions</th></tr></thead>
+                                <tbody>
+                                {% for student in students_list %}
+                                    <tr>
+                                        <td class="align-middle">{{ student.user.get_full_name }}</td>
+                                        <td class="align-middle">{{ student.LSA_number }}</td>
+                                        <td class="align-middle">{% if student.student_guardian %}{{ student.student_guardian.user.get_full_name }}{% else %}<span class="text-muted small">N/A</span>{% endif %}</td>
+                                        <td class="text-center">
+                                            <a href="{% url 'mark_attendance' student.current_class.id %}" class="btn btn-sm btn-outline-primary" title="Attendance"><i class="bi bi-calendar-check"></i></a>
+                                            {% if student.student_guardian %}<a href="{% url 'compose_message' %}" class="btn btn-sm btn-outline-warning" title="Message Guardian"><i class="bi bi-envelope"></i></a>{% endif %}
+                                            <a href="{% url 'student_detail' student.user.pk %}" class="btn btn-sm btn-outline-info" title="Student Info"><i class="bi bi-person-lines-fill"></i></a>
+                                        </td>
+                                    </tr>
+                                {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+
+            <h4 class="mt-4">Non-Academic Records (Affective & Psychomotor Skills)</h4>
+            <div class="accordion" id="nonAcademicAccordion">
+            {% for class, students_list in students_by_class.items %}
+            {% for student in students_list %}
+                <div class="accordion-item">
+                    <h2 class="accordion-header" id="heading{{ student.pk }}"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ student.pk }}">{{ student.user.get_full_name }} - {{ student.LSA_number }} ({{ class.name }})</button></h2>
+                    <div id="collapse{{ student.pk }}" class="accordion-collapse collapse" data-bs-parent="#nonAcademicAccordion"><div class="accordion-body">
+                        <form method="POST" action="{% url 'update_result' student.pk active_term.id %}">
+                            {% csrf_token %}
+                            <div class="row"><div class="col-md-6 mb-4"><h6 class="text-muted">Character Skills</h6><div class="row">
+                                <div class="col-6 mb-2"><label for="punctuality{{ student.pk }}" class="form-label small">Punctuality</label><select name="punctuality" class="form-select form-select-sm"><option value="" {% if not student.result_for_term.punctuality %}selected{% endif %}>-</option>{% for i in "12345" %}<option value="{{ i }}" {% if student.result_for_term.punctuality|stringformat:"s" == i %}selected{% endif %}>{{ i }}</option>{% endfor %}</select></div>
+                                <div class="col-6 mb-2"><label for="diligence{{ student.pk }}" class="form-label small">Diligence</label><select name="diligence" class="form-select form-select-sm"><option value="" {% if not student.result_for_term.diligence %}selected{% endif %}>-</option>{% for i in "12345" %}<option value="{{ i }}" {% if student.result_for_term.diligence|stringformat:"s" == i %}selected{% endif %}>{{ i }}</option>{% endfor %}</select></div>
+                                <div class="col-6 mb-2"><label for="cooperation{{ student.pk }}" class="form-label small">Cooperation</label><select name="cooperation" class="form-select form-select-sm"><option value="" {% if not student.result_for_term.cooperation %}selected{% endif %}>-</option>{% for i in "12345" %}<option value="{{ i }}" {% if student.result_for_term.cooperation|stringformat:"s" == i %}selected{% endif %}>{{ i }}</option>{% endfor %}</select></div>
+                                <div class="col-6 mb-2"><label for="respectfulness{{ student.pk }}" class="form-label small">Respectfulness</label><select name="respectfulness" class="form-select form-select-sm"><option value="" {% if not student.result_for_term.respectfulness %}selected{% endif %}>-</option>{% for i in "12345" %}<option value="{{ i }}" {% if student.result_for_term.respectfulness|stringformat:"s" == i %}selected{% endif %}>{{ i }}</option>{% endfor %}</select></div>
+                            </div></div><div class="col-md-6 mb-4"><h6 class="text-muted">Physical Skills</h6><div class="row">
+                                <div class="col-6 mb-2"><label for="sportsmanship{{ student.pk }}" class="form-label small">Sportsmanship</label><select name="sportsmanship" class="form-select form-select-sm"><option value="" {% if not student.result_for_term.sportsmanship %}selected{% endif %}>-</option>{% for i in "12345" %}<option value="{{ i }}" {% if student.result_for_term.sportsmanship|stringformat:"s" == i %}selected{% endif %}>{{ i }}</option>{% endfor %}</select></div>
+                                <div class="col-6 mb-2"><label for="agility{{ student.pk }}" class="form-label small">Agility</label><select name="agility" class="form-select form-select-sm"><option value="" {% if not student.result_for_term.agility %}selected{% endif %}>-</option>{% for i in "12345" %}<option value="{{ i }}" {% if student.result_for_term.agility|stringformat:"s" == i %}selected{% endif %}>{{ i }}</option>{% endfor %}</select></div>
+                                <div class="col-6 mb-2"><label for="creativity{{ student.pk }}" class="form-label small">Creativity</label><select name="creativity" class="form-select form-select-sm"><option value="" {% if not student.result_for_term.creativity %}selected{% endif %}>-</option>{% for i in "12345" %}<option value="{{ i }}" {% if student.result_for_term.creativity|stringformat:"s" == i %}selected{% endif %}>{{ i }}</option>{% endfor %}</select></div>
+                                <div class="col-6 mb-2"><label for="hand_eye_coordination{{ student.pk }}" class="form-label small">Hand-Eye Coord.</label><select name="hand_eye_coordination" class="form-select form-select-sm"><option value="" {% if not student.result_for_term.hand_eye_coordination %}selected{% endif %}>-</option>{% for i in "12345" %}<option value="{{ i }}" {% if student.result_for_term.hand_eye_coordination|stringformat:"s" == i %}selected{% endif %}>{{ i }}</option>{% endfor %}</select></div>
+                            </div></div></div>
+                            <div class="mb-3"><label for="teacher_remarks{{ student.pk }}" class="form-label small">Teacher's Remarks</label><textarea name="teacher_remarks" class="form-control form-control-sm" rows="3">{{ student.result_for_term.teacher_remarks|default:"" }}</textarea></div>
+                            <div class="text-end"><button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-check-circle me-1"></i> Save for {{ student.user.first_name }}</button></div>
+                        </form>
+                    </div></div>
+                </div>
+            {% endfor %}
+            {% endfor %}
+            </div>
+        {% else %}
+            <div class="alert alert-light text-center"><p>You are not assigned as a form teacher to any class for the current active term.</p><p class="small text-muted mb-0">Non-academic records can only be entered for students in your designated form class.</p></div>
+        {% endif %}
+    </div>
+
+    <!-- Sub-Tab Pane 2: Academic Score Entry Form -->
+    <div class="tab-pane fade" id="academic-scores-content" role="tabpanel">
+        <h4 class="mt-2">Academic Scores (Tests, Assignments, Exams)</h4>
+        <p class="small text-muted">Select a class and subject to proceed to the score entry sheet for the active term (<strong>{{ active_term.name|default:"N/A" }}</strong>).</p>
+
+        <form id="academicScoreEntryForm">
+            <div class="row g-3 align-items-end">
+                <div class="col-md-5">
+                    <label for="score-class-select" class="form-label">Class</label>
+                    <select id="score-class-select" name="class_id" class="form-select" required>
+                        <option selected disabled value="">Choose a class...</option>
+                        {% for class in teacher_assigned_classes %}
+                            <option value="{{ class.id }}">{{ class.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-5">
+                    <label for="score-subject-select" class="form-label">Subject</label>
+                    <select id="score-subject-select" name="subject_id" class="form-select" required>
+                        <option selected disabled value="">Choose a subject...</option>
+                        {% for subject in teacher_subjects %}
+                             <option value="{{ subject.id }}">{{ subject.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">Input Scores</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+document.getElementById('academicScoreEntryForm')?.addEventListener('submit', function(e) {
+    e.preventDefault();
+    const classId = document.getElementById('score-class-select').value;
+    const subjectId = document.getElementById('score-subject-select').value;
+    const activeTermId = "{{ active_term.id }}";
+    if (classId && subjectId && activeTermId) {
+        const url = `/input_scores/${classId}/${subjectId}/${activeTermId}/`;
+        window.location.href = url;
+    } else {
+        alert('Please select both a class and a subject.');
+    }
+});
+</script>

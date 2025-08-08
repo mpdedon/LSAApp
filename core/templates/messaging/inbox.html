@@ -1,0 +1,193 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load i18n %}
+
+{% block title %}{{ page_title|default:"My Inbox" }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* 
+    ========================================================
+    COMPACT & MODERN INBOX STYLES v2 (CSS ONLY OVERHAUL)
+    ========================================================
+    */
+
+    /* Main layout: Two-column grid, taking up significant screen height */
+    .inbox-container {
+        display: grid;
+        grid-template-columns: 220px 1fr; /* Slimmer sidebar */
+        gap: 1rem; /* Reduced gap for compactness */
+        height: calc(100vh - 180px); /* Taller, adjust 180px based on your header/footer */
+        min-height: 550px;
+    }
+
+    /* Sidebar: Clean, with subtle borders */
+    .inbox-nav {
+        background-color: #f8f9fa; /* Light background for contrast */
+        border: 1px solid #dee2e6;
+        border-radius: 0.5rem;
+        padding: 0.75rem;
+    }
+    
+    .inbox-nav .btn {
+        font-weight: 500;
+    }
+    
+    .inbox-nav .nav-link {
+        color: #495057;
+        font-weight: 500;
+        font-size: 0.9rem; /* Smaller font for compactness */
+        padding: 0.5rem 0.75rem; /* Tighter padding */
+        margin-bottom: 0.25rem;
+        border-radius: 0.375rem;
+        display: flex;
+        align-items: center;
+        transition: background-color 0.15s ease, color 0.15s ease;
+    }
+
+    .inbox-nav .nav-link.active,
+    .inbox-nav .nav-link:not(.active):hover {
+        background-color: #0d6efd;
+        color: white;
+    }
+
+    /* Main Content Area: Clean card look */
+    .inbox-content {
+        background-color: #ffffff;
+        border: 1px solid #dee2e6;
+        border-radius: 0.5rem;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden; /* Crucial for internal scrolling */
+    }
+
+    .inbox-content .card-header {
+        padding: 0.75rem 1.25rem; /* Tighter header padding */
+        background-color: #ffffff;
+        border-bottom: 1px solid #dee2e6;
+    }
+
+    .inbox-content .card-header h4 {
+        font-size: 1.25rem; /* Smaller header font */
+    }
+
+    /* Conversation List: The scrollable part */
+    .conversation-list-container {
+        flex-grow: 1;
+        overflow-y: auto;
+    }
+
+    /* Individual Conversation Item: Denser and more informative */
+    .conversation-item {
+        padding: 0.75rem 1.25rem;
+        border-bottom: 1px solid #f1f1f1; /* Fainter separators */
+    }
+    .conversation-item:last-child {
+        border-bottom: none;
+    }
+
+    /* Unread message indicator */
+    .conversation-item.unread {
+        background-color: #f0f6ff;
+        font-weight: 700; /* Bolder text for unread items */
+    }
+    
+    .conversation-sender {
+        font-weight: 500;
+        font-size: 0.95rem;
+    }
+    .conversation-title {
+        font-size: 0.9rem;
+        color: #495057;
+    }
+    .conversation-preview {
+        font-size: 0.85rem;
+    }
+    
+    /* Empty state styling */
+    .inbox-empty-state {
+        text-align: center;
+        padding: 4rem 1rem;
+        color: #6c757d;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid my-4 main-content-below-navbar">
+    <div class="inbox-container">
+        <!-- Sidebar Navigation -->
+        <aside class="inbox-sidebar">
+            <div class="d-grid mb-3">
+                <a href="{% url 'compose_message' %}" class="btn btn-primary">
+                    <i class="bi bi-pencil-square me-1"></i> Compose
+                </a>
+            </div>
+            <ul class="nav nav-pills flex-column">
+                <li class="nav-item">
+                    <a class="nav-link active" href="{% url 'message_inbox' %}">
+                        <i class="bi bi-inbox-fill me-2" style="width: 20px;"></i> Inbox
+                        {% if unread_count > 0 %}
+                            <span class="badge bg-light text-primary rounded-pill ms-auto">{{ unread_count }}</span>
+                        {% endif %}
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#">
+                        <i class="bi bi-send-fill me-2" style="width: 20px;"></i> Sent
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="#">
+                        <i class="bi bi-archive-fill me-2" style="width: 20px;"></i> Archived
+                    </a>
+                </li>
+            </ul>
+        </aside>
+
+        <!-- Main Content: Conversation List -->
+        <main class="inbox-main">
+            <div class="card-header bg-white border-bottom d-flex justify-content-between align-items-center">
+                <h4 class="mb-0">Conversations</h4>
+            </div>
+            <div class="conversation-list-container">
+                {% if conversations %}
+                    <div class="list-group list-group-flush">
+                    {% for convo in conversations %}
+                        <a href="{% url 'message_thread' convo.id %}" class="list-group-item list-group-item-action conversation-item {% if not convo.is_read and convo.recipient == user %}unread{% endif %}">
+                            <div class="d-flex w-100 justify-content-between">
+                                {% comment %} --- THIS IS THE CORRECT, SAFE DJANGO LOGIC --- {% endcomment %}
+                                {% if convo.sender == user %}
+                                    <span class="conversation-sender">To: {{ convo.recipient.get_full_name|default:convo.recipient.username }}</span>
+                                {% else %}
+                                    <span class="conversation-sender">{{ convo.sender.get_full_name|default:convo.sender.username }}</span>
+                                {% endif %}
+                                <small class="text-muted flex-shrink-0 ms-2">{{ convo.sent_at|timesince }} ago</small>
+                            </div>
+                            <p class="mb-1 conversation-title text-truncate">{{ convo.title }}</p>
+                            <p class="mb-0 conversation-preview text-muted text-truncate">
+                                {% if convo.replies.last.sender == user %}You: 
+                                {% elif convo.sender == user and not convo.replies.last %}You: 
+                                {% endif %}
+                                {{ convo.replies.last.content|default:convo.content|striptags }}
+                            </p>
+                        </a>
+                    {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="inbox-empty-state">
+                        <i class="bi bi-envelope-open-heart" style="font-size: 4rem;"></i>
+                        <h5 class="mt-3 mb-1">Your inbox is sparkling clean</h5>
+                        <p>No new messages. Start a new conversation by clicking "Compose".</p>
+                    </div>
+                {% endif %}
+            </div>
+        </main>
+    </div>
+</div>
+{% endblock %}

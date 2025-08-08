@@ -11,12 +11,12 @@ from django.core.paginator import Paginator
 from django.utils import timezone
 from django.db import models
 from django.db.models import Q, Count, F, Sum, Subquery, OuterRef, IntegerField
-from django.http import HttpResponseForbidden
+from django.http import HttpResponseForbidden, Http404
 from datetime import date
 from decimal import Decimal, InvalidOperation
 from collections import defaultdict
-from core.teacher.forms import TeacherRegistrationForm, MessageForm
-from core.models import Teacher, Student, Guardian, Class, Subject, Attendance, Assessment, Exam
+from core.teacher.forms import TeacherRegistrationForm, MessageForm, ReplyForm
+from core.models import CustomUser, Teacher, Student, Guardian, Class, Subject, Attendance, Assessment, Exam
 from core.models import Assignment, Question, AssignmentSubmission, AssessmentSubmission, ExamSubmission, AcademicAlert
 from core.models import Session, Term, Message, SubjectResult, Result
 from core.subject_result.form import SubjectResultForm
@@ -439,7 +439,7 @@ def input_scores(request, class_id, subject_id, term_id):
         result_obj, _ = Result.objects.get_or_create(student=student, term=term)
         # Get or create the specific SubjectResult
         subject_result, _ = SubjectResult.objects.get_or_create(result=result_obj, subject=subject)
-        subject_results[student.user.id] = subject_result # Store by user ID for easier POST lookup
+        subject_results[student.user.id] = subject_result 
 
     if request.method == 'POST':
         all_forms_valid = True
@@ -448,10 +448,8 @@ def input_scores(request, class_id, subject_id, term_id):
         for student in students:
             subject_result = subject_results.get(student.user.id)
             if not subject_result:
-                 # Should not happen with get_or_create, but good to check
                  continue
 
-            # Create form instance with POST data, files, instance, and prefix
             form = SubjectResultForm(request.POST, instance=subject_result, prefix=str(student.user.id))
             forms_dict[student] = form # Store the bound form for rendering
 
@@ -459,19 +457,14 @@ def input_scores(request, class_id, subject_id, term_id):
                 forms_to_save.append(form) 
             else:
                 all_forms_valid = False
-                # Optional: Log errors for debugging
 
         if all_forms_valid:
-            # Save all valid forms
             for form in forms_to_save:
                 form.save()
             messages.success(request, f"{subject.name} scores for {class_obj.name} submitted successfully.")
-            # Redirect to broadsheet or another appropriate page
             return redirect('broadsheet', class_id=class_id, term_id=term_id)
         else:
-            # If any form is invalid, display errors
             messages.error(request, "Please correct the errors below.")
-            # The view will fall through to render the template with the forms_dict containing bound, invalid forms
 
     else: # GET request
         for student in students:
@@ -479,15 +472,15 @@ def input_scores(request, class_id, subject_id, term_id):
             forms_dict[student] = SubjectResultForm(instance=subject_result, prefix=str(student.user.id))
 
     context = {
-        'forms': forms_dict, # Pass the dictionary of forms
+        'forms': forms_dict, 
         'class': class_obj,
         'subject': subject,
         'term': term,
-        'students': students, # Pass students if needed separately (e.g., ordering)
+        'students': students, 
     }
     return render(request, 'teacher/input_scores.html', context)
 
-# --- Broadsheet View (Minor Refinements) ---
+# --- Broadsheet View  ---
 @login_required
 def broadsheet(request, class_id, term_id):
     class_obj = get_object_or_404(Class, id=class_id)
@@ -496,14 +489,14 @@ def broadsheet(request, class_id, term_id):
         session = Session.objects.get(is_active=True)
     except Session.DoesNotExist:
         messages.error(request, "No active session found.")
-        return redirect('teacher_dashboard') # Or appropriate error page
+        return redirect('teacher_dashboard') 
     except Session.MultipleObjectsReturned:
         messages.error(request, "Multiple active sessions found. Please resolve.")
         return redirect('teacher_dashboard')
 
     term = get_object_or_404(Term, id=term_id)
     # Get students enrolled in the class for this specific term/session if possible
-    students = Student.objects.filter(current_class=class_obj).order_by('user__last_name', 'user__first_name') # Or filter based on historical enrollment if needed
+    students = Student.objects.filter(current_class=class_obj).order_by('user__last_name', 'user__first_name') 
 
     # Get subjects assigned to this class in this term/session
     subjects = Subject.objects.filter(
@@ -525,7 +518,7 @@ def broadsheet(request, class_id, term_id):
         if result:
             # Get all SubjectResult entries for this Result (student/term)
             # Filter only for subjects relevant to *this* broadsheet view
-            subject_results_qs = result.subjectresult_set.filter(subject__in=subjects)
+            subject_results_qs = result.subject_results.filter(subject__in=subjects)
 
             for sr in subject_results_qs:
                  # Check if any score has been entered to consider it 'active'
@@ -538,21 +531,19 @@ def broadsheet(request, class_id, term_id):
 
                      student_subject_results[sr.subject.id] = sr
                      total_score_sum += sr.total_score()
-                     gpa_points_sum += Decimal(sr.calculate_grade_point()) # Ensure Decimal for precision
+                     gpa_points_sum += Decimal(sr.calculate_grade_point()) 
                      subject_count += 1
 
         # Calculate overall GPA for the student based *only* on subjects shown on this broadsheet
-        # Note: Result.calculate_gpa() might calculate based on *all* subjects in the Result,
-        # which might differ from the broadsheet's context if not all subjects are shown.
         # Here we calculate GPA based on the subjects included in `student_subject_results`.
         student_gpa = (gpa_points_sum / subject_count) if subject_count > 0 else Decimal('0.0')
         grade = sr.calculate_grade()
 
         results_data.append({
             'student': student,
-            'subject_results': student_subject_results, # Dict: {subject_id: SubjectResult instance}
-            'gpa': student_gpa.quantize(Decimal('0.01')), # Format GPA
-            'total_score': total_score_sum.quantize(Decimal('0.1')), # Sum of total_scores across subjects
+            'subject_results': student_subject_results, 
+            'gpa': student_gpa.quantize(Decimal('0.01')), 
+            'total_score': total_score_sum.quantize(Decimal('0.1')), 
             'grade': grade,
         })
 
@@ -560,14 +551,104 @@ def broadsheet(request, class_id, term_id):
     results_data.sort(key=lambda x: (-x['total_score'], -x['gpa']))
 
     context = {
-        # 'students': students, # Already part of results_data
         'class': class_obj,
         'term': term,
-        'results_data': results_data, # This contains student info and their results
-        'subjects': subjects, # List of subjects for table headers
+        'results_data': results_data,
+        'subjects': subjects, 
         'session': session,
     }
     return render(request, 'teacher/broadsheet.html', context)
+
+
+@login_required
+def sessional_broadsheet(request, class_id, session_id):
+    # Fetch core objects
+    class_obj = get_object_or_404(Class, id=class_id)
+    session = get_object_or_404(Session, id=session_id)
+    
+    # --- Authorization Check ---
+    try:
+        teacher = request.user.teacher
+        # Check if teacher is assigned to this class
+        if class_obj not in teacher.assigned_classes():
+            return HttpResponseForbidden("You are not authorized to view this broadsheet.")
+    except Teacher.DoesNotExist:
+        return HttpResponseForbidden("You must have a teacher profile to view this page.")
+
+    # Get all terms for this session, ordered
+    terms_in_session = Term.objects.filter(session=session).order_by('start_date')
+    if terms_in_session.count() == 0:
+        messages.warning(request, f"No terms found for the {session.name} session.")
+        # Redirect or render with a message
+        return redirect('teacher_dashboard')
+
+    # Get all subjects taught in this class for any term in this session
+    subjects_in_class = Subject.objects.filter(
+        class_assignments__class_assigned=class_obj,
+        class_assignments__term__in=terms_in_session
+    ).distinct().order_by('name')
+
+    students_in_class = Student.objects.filter(current_class=class_obj).select_related('user').order_by('user__last_name', 'user__first_name')
+
+    # --- Data Processing: Build a nested structure for the template ---
+    broadsheet_data = []
+    for student in students_in_class:
+        student_data = {
+            'student_obj': student,
+            'sessional_gpa': 0.0,
+            'subject_rows': [],
+        }
+
+        # Fetch all of this student's results for the session at once
+        student_term_results = Result.objects.filter(
+            student=student, 
+            term__in=terms_in_session
+        ).prefetch_related('subject_results__subject') # Efficiently prefetch related data
+
+        # Create a map for easy lookup: {term_id: {subject_id: score}}
+        scores_by_term_subject = defaultdict(dict)
+        for result in student_term_results:
+            for sr in result.subject_results.all():
+                scores_by_term_subject[result.term_id][sr.subject_id] = sr.total_score()
+
+        # Calculate Sessional GPA and build subject rows
+        term_gpas_found = []
+        for result in student_term_results:
+            if result.term_gpa is not None:
+                term_gpas_found.append(result.term_gpa)
+        
+        if term_gpas_found:
+            student_data['sessional_gpa'] = sum(term_gpas_found) / len(term_gpas_found)
+
+        # Structure data by subject for template rows
+        for subject in subjects_in_class:
+            term_scores = []
+            valid_scores_for_avg = []
+            for term in terms_in_session:
+                score = scores_by_term_subject.get(term.id, {}).get(subject.id)
+                term_scores.append(score)
+                if score is not None:
+                    valid_scores_for_avg.append(score)
+            
+            sessional_average = sum(valid_scores_for_avg) / len(valid_scores_for_avg) if valid_scores_for_avg else None
+            
+            student_data['subject_rows'].append({
+                'subject_name': subject.name,
+                'term_scores': term_scores,
+                'sessional_average': sessional_average
+            })
+        
+        broadsheet_data.append(student_data)
+
+    context = {
+        'teacher': teacher,
+        'class_obj': class_obj,
+        'session': session,
+        'terms_in_session': terms_in_session,
+        'subjects': subjects_in_class,
+        'broadsheet_data': broadsheet_data, 
+    }
+    return render(request, 'teacher/sessional_broadsheet.html', context)
 
 
 @login_required
@@ -590,55 +671,177 @@ def update_result(request, student_id, term_id):
     })
 
 @login_required
-def message_guardian(request, guardian_id):
-    if not request.user.is_authenticated or request.user.role != 'teacher':
-        messages.error(request, 'You do not have permission to view this page.')
-        return redirect('teacher_dashboard')
+def message_inbox(request):
+    """
+    A central, generic inbox for the logged-in user.
+    Shows received message threads.
+    """
+    user = request.user
 
-    teacher = get_object_or_404(Teacher, user=request.user)
+    conversations = Message.objects.filter(
+        (Q(recipient=user) | Q(sender=user)),
+        parent_message__isnull=True
+    ).select_related('sender', 'recipient', 'student_context__user').prefetch_related('replies').distinct().order_by('-updated_at')
 
-    try:
-        guardian = Guardian.objects.get(user_id=guardian_id)
-    except Guardian.DoesNotExist:
-        messages.error(request, 'Guardian not found.')
-        return redirect('teacher_dashboard')
+    Message.objects.filter(recipient=request.user, is_read=False).update(is_read=True)
+    unread_count = conversations.filter(recipient=user, is_read=False).count()
+    
+    context = {
+        'conversations': conversations,
+        'unread_count': unread_count, 
+        'page_title': "My Inbox"
+    }
 
-    # Fetch the associated student for the guardian
-    student = Student.objects.filter(student_guardian=guardian).first()  # Adjust this to match your schema
+    return render(request, 'messaging/inbox.html', context)
 
-    if not student:
-        messages.error(request, 'No student associated with this guardian.')
-        return redirect('teacher_dashboard')
 
+@login_required
+def compose_message(request):
+    """
+    A generic view for composing a message.
+    The list of possible recipients is determined by the sender's role.
+    Recipient and other context can be pre-selected via GET parameters.
+    """
+    sender = request.user
+    
+    # --- Determine the queryset of possible recipients based on the sender's role ---
+    recipient_qs = CustomUser.objects.none() 
+    student_context_qs = Student.objects.none() 
+
+    if sender.role == 'student':
+        # Students can message their teachers and admins
+        student = getattr(sender, 'student', None) 
+        if student:
+            teacher_ids = Teacher.objects.filter(
+                Q(teacherassignment__class_assigned=student.current_class) |
+                Q(subjectassignment__class_assigned=student.current_class)
+            ).values_list('user_id', flat=True)
+            recipient_qs = CustomUser.objects.filter(Q(id__in=teacher_ids) | Q(role='admin')).exclude(pk=sender.pk).distinct()
+            student_context_qs = Student.objects.filter(pk=student.pk)
+
+    elif sender.role == 'teacher':
+        # Teachers can message guardians of their students, colleagues, and admins
+        teacher = getattr(sender, 'teacher', None)
+        if teacher:
+            assigned_classes = teacher.assigned_classes()
+            students_taught = Student.objects.filter(current_class__in=assigned_classes, status='active')
+            guardian_ids = students_taught.filter(student_guardian__isnull=False).values_list('student_guardian__user_id', flat=True)
+            
+            colleague_ids = Teacher.objects.exclude(pk=teacher.pk).values_list('user_id', flat=True)
+            
+            recipient_qs = CustomUser.objects.filter(
+                Q(guardian__pk__in=guardian_ids) |
+                Q(id__in=colleague_ids) |
+                Q(role='admin')
+            ).distinct()
+            student_context_qs = students_taught
+
+    elif sender.role == 'guardian':
+        # Guardians can message teachers of their wards and admins
+        guardian = getattr(sender, 'guardian', None)
+        if guardian:
+            wards = guardian.students.all()
+            teacher_ids = Teacher.objects.filter(
+                Q(teacherassignment__class_assigned__in=wards.values_list('current_class', flat=True)) |
+                Q(subjectassignment__class_assigned__in=wards.values_list('current_class', flat=True))
+            ).values_list('user_id', flat=True)
+            recipient_qs = CustomUser.objects.filter(Q(id__in=teacher_ids) | Q(role='admin')).distinct()
+            student_context_qs = wards
+
+    elif sender.role == 'admin':
+        # Admins can message anyone
+        recipient_qs = CustomUser.objects.all().exclude(pk=sender.pk)
+        student_context_qs = Student.objects.filter(status='active')
+    
+    # --- Initialize variables for context ---
+    recipient_preselected = None
+    student_context = None
+    initial_form_data = {}
+
+    # --- Check for pre-selected data from GET parameters ---
+    recipient_id = request.GET.get('recipient_id')
+    student_context_id = request.GET.get('student_context_id')
+
+    if recipient_id:
+        try:
+            # Fetch the pre-selected recipient object to display their name
+            recipient_preselected = recipient_qs.get(pk=recipient_id)
+            initial_form_data['recipient'] = recipient_preselected
+        except CustomUser.DoesNotExist:
+            messages.error(request, "The specified recipient is invalid or you are not allowed to message them.")
+            return redirect('message_inbox')
+    
+    if student_context_id:
+        try:
+            student_context = student_context_qs.get(pk=student_context_id)
+            initial_form_data['student_context'] = student_context
+        except Student.DoesNotExist:
+            pass
+
+    # --- Handle Form Submission ---
     if request.method == 'POST':
-        form = MessageForm(request.POST)
+        form = MessageForm(request.POST, recipient_queryset=recipient_qs, student_queryset=student_context_qs)
         if form.is_valid():
-            try:
-                # Create the message with the correct Student instance
-                Message.objects.create(
-                    sender=request.user,
-                    recipient=guardian.user,  # Guardian's user object
-                    student=student,  # Pass the Student instance
-                    title=form.cleaned_data['title'],
-                    content=form.cleaned_data['content'],
-                )
-                messages.success(request, 'Message sent to the guardian!')
-                return redirect('teacher_dashboard')
-            except Exception as e:
-                print(f"Error while creating message: {e}")
-                messages.error(request, 'Failed to send the message. Please try again.')
-    else:
-        form = MessageForm()
+            message = form.save(commit=False)
+            message.sender = sender
+            message.save()
+            messages.success(request, "Message sent successfully!")
+            return redirect('message_inbox')
+    else: # GET request
+        form = MessageForm(initial=initial_form_data, recipient_queryset=recipient_qs, student_queryset=student_context_qs)
+    
+    context = {
+        'form': form,
+        'recipient_preselected': recipient_preselected, 
+        'student_context': student_context, 
+        'page_title': "Compose Message"
+    }
+    return render(request, 'messaging/compose_message.html', context)
 
-    return render(
-        request, 
-        'teacher/message_guardian.html',
-        {
-            'form': form,
-            'guardian_id': guardian_id,
-            'guardian_name': guardian.user.get_full_name()
-        }
-    )
+
+@login_required
+def message_thread(request, thread_id):
+    # Fetch the parent message of the thread
+    parent_message = get_object_or_404(Message, pk=thread_id, parent_message__isnull=True)
+
+    # Authorization check: user must be the sender or recipient
+    if request.user not in [parent_message.sender, parent_message.recipient]:
+        raise Http404
+
+    # Mark all messages in this thread as read by the current user
+    Message.objects.filter(
+        Q(pk=thread_id) | Q(parent_message_id=thread_id),
+        recipient=request.user, is_read=False
+    ).update(is_read=True)
+    
+    thread_messages = parent_message.replies.all().order_by('sent_at')
+
+    # Setup form for a new reply
+    reply_recipient = parent_message.sender if request.user == parent_message.recipient else parent_message.recipient
+    
+    if request.method == 'POST':
+        reply_form = ReplyForm(request.POST)
+        if reply_form.is_valid():
+            reply = reply_form.save(commit=False)
+            reply.sender = request.user
+            reply.recipient = reply_recipient
+            reply.parent_message = parent_message
+            if parent_message.student_context: # Carry over the student context
+                reply.student_context = parent_message.student_context
+            reply.save()
+            messages.success(request, "Reply sent.")
+            return redirect('message_thread', thread_id=thread_id)
+    else:
+        reply_form = MessageForm(initial={'title': f"Re: {parent_message.title}"})
+
+    context = {
+        'parent_message': parent_message,
+        'thread_messages': thread_messages,
+        'reply_form': reply_form,
+        'reply_recipient': reply_recipient,
+    }
+    return render(request, 'messaging/message_thread.html', context)
+
 
 @login_required
 def performance_chart_view(request, student_id):

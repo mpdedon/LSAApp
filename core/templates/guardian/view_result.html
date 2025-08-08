@@ -207,16 +207,15 @@
                     <h5>Term GPA</h5>
                 </div>
                 <div class="card-body text-center">
-                    <p class="gpa-value">{{ result.calculate_gpa|floatformat:2|default:"N/A" }}</p> {# Format GPA #}
+                    <p class="gpa-value">{{ term_gpa|floatformat:2|default:"N/A" }}</p> 
                 </div>
             </div>
-             <div class="signature-card mt-auto"> {# Push signature to bottom #}
+             <div class="signature-card mt-auto"> 
                  <div class="card-header">
                     <h5>Principal's Signature</h5>
                 </div>
                 <div class="card-body text-center">
                     <div class="signature-box">
-                        {# Use absolute URL from context for PDF #}
                         {% if signature_url %}
                         <img src="{{ signature_url }}" alt="Principal's Signature" >
                         {% else %}
@@ -235,9 +234,6 @@
                     <h5>Performance vs Class Average</h5>
                 </div>
                 <div class="card-body">
-                     {# Conditional rendering: Show canvas for HTML, placeholder for PDF #}
-                     {# NOTE: For PDF, you'd ideally generate this chart as an IMAGE server-side #}
-                     {#       and pass the image URL to embed here instead of the canvas. #}
                      {% if not is_pdf_render %}
                         <canvas id="performanceChart"></canvas>
                      {% else %}
@@ -251,7 +247,7 @@
         </div>
     </div>
 
-</div> {# End result-container #}
+</div> 
 
 <!-- Button to Download as PDF (Only shown in HTML view) -->
 {% if not is_pdf_render %}

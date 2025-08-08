@@ -19,7 +19,7 @@
                             {# ... your debug divs ... #}
                             <a href="{% url submit_url_name item.id %}?student_id={{ student_obj.user.id }}" class="list-group-item list-group-item-action ...">
                                 Student: {{ student_obj.user.get_full_name|default:student_obj.user.username }} 
-                                (Click to submit with User ID: {{ student_obj.user.id }})
+                                (Click to submit with User ID: {{ student_obj.user.name }})
                             </a>
                         {% endfor %}
                     </div>

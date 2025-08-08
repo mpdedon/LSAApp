@@ -11,12 +11,12 @@ from django.contrib.messages.views import SuccessMessageMixin
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
 from django.urls import reverse, reverse_lazy, NoReverseMatch
-from django.db.models import Count, Sum, Q, F, Window, OuterRef, Subquery, IntegerField, Value
+from django.db.models import Count, Sum, Q, F, Window, OuterRef, Subquery, IntegerField, Value, Prefetch
 from django.db.models.functions import Rank, Coalesce
 from collections import defaultdict
 from decimal import Decimal
 from core.models import CustomUser, Student, Teacher, Guardian, Assignment, Result, Attendance, Subject, Class, Payment, ClassSubjectAssignment
-from core.models import Session, Term, Message, Assessment, Exam, Notification, AssignmentSubmission, AcademicAlert
+from core.models import Session, Term, Message, Assessment, Exam, Notification, AssignmentSubmission, AcademicAlert, TeacherAssignment
 from core.models import FinancialRecord, StudentFeeRecord, AssessmentSubmission, ExamSubmission
 from django.db.models import Sum
 from django.views.generic.edit import FormView
@@ -161,8 +161,8 @@ def admin_dashboard(request):
         'subject_count': subject_count,
         'payment_count': payment_count,
         'recent_enrollments': recent_enrollments, 
-        'student_counts_by_class_labels': student_counts_by_class_labels, # Data for JS chart
-        'student_counts_by_class_data': student_counts_by_class_data,   # Data for JS chart
+        'student_counts_by_class_labels': student_counts_by_class_labels, 
+        'student_counts_by_class_data': student_counts_by_class_data,   
     }
 
     return render(request, 'setup/dashboard.html', context) 
@@ -300,21 +300,22 @@ def student_dashboard(request):
     context['archived_results_data'] = Result.objects.filter(student=student, term__is_active=False, is_approved=True, is_archived=True).select_related('term').order_by('-term__start_date')
     context['notifications'] = Notification.objects.filter(Q(audience='student') | Q(audience='all'), is_active=True).exclude(expiry_date__lt=now.date()).order_by('-created_at')
 
-    # Teachers for messaging
-    class_teachers = Teacher.objects.filter(
+    context['class_teachers'] = Teacher.objects.filter(
         teacherassignment__class_assigned=student.current_class,
         teacherassignment__term=active_term
     ).select_related('user').distinct()
-    context['class_teachers'] = class_teachers
 
-    teacher_users_queryset = CustomUser.objects.filter(teacher__in=class_teachers)
+    received_messages = Message.objects.filter(
+        recipient=request.user,
+        parent_message__isnull=True 
+    ).select_related('sender').order_by('-updated_at')
+    
+    unread_message_count = received_messages.filter(is_read=False).count()
 
-    # Pass this queryset to the form's constructor
-    message_form = MessageForm(teacher_queryset=teacher_users_queryset)
-    context['message_form'] = message_form
+    context['received_messages'] = received_messages
     
     # Received Messages
-    context['received_messages'] = Message.objects.filter(recipient=request.user, student=student).select_related('sender').order_by('-timestamp')
+    context['unread_message_count'] = unread_message_count
 
     return render(request, 'student/student_dashboard.html', context)
 
@@ -331,96 +332,137 @@ def teacher_dashboard(request):
         return redirect('home')
     
     teacher = Teacher.objects.get(user=request.user)
-    assigned_classes = teacher.current_classes()
-    students = Student.objects.filter(current_class__in=assigned_classes).distinct()
-    class_subjects = teacher.form_class_subjects()
-    subjects_taught = teacher.subjects_taught()                       
-    classes_subjects_taught = teacher.assigned_classes()
-    guardians = set(student.student_guardian for student in students if student.student_guardian is not None)
-    assignments = Assignment.objects.filter(teacher=teacher)
-    assessments = Assessment.objects.filter(created_by=teacher.user).order_by('-created_at')
-    exams = Exam.objects.filter(created_by=teacher.user).order_by('-created_at')
     
-    current_session = Session.objects.get(is_active=True)
-    current_term = Term.objects.filter(session=current_session, is_active=True).order_by('-start_date').first()
-
+    #guardians = set(student.student_guardian for student in students if student.student_guardian is not None)
+   
+    now = timezone.now()
+    active_term = Term.objects.filter(is_active=True).select_related('session').first()
     # Calculate weeks in the term
-    weeks = current_term.get_term_weeks
+    weeks = active_term.get_term_weeks
+    
+    teacher_assigned_classes_qs = teacher.assigned_classes().order_by('name')
+    form_teacher_classes_qs = teacher.current_classes().order_by('name')
+    subjects_taught_qs = teacher.subjects_taught()
+    
+    # --- CONTEXT FOR: Overview Tab ---
+    student_count = Student.objects.filter(current_class__in=teacher_assigned_classes_qs, status='active').count()
+    subject_count = subjects_taught_qs.count()
+    
+    upcoming_tasks = []
+    assignments = Assignment.objects.filter(teacher=teacher, due_date__gte=now, active=True, term=active_term).select_related('subject', 'class_assigned').order_by('due_date')[:3]
+    for item in assignments: upcoming_tasks.append({'type': 'Assignment', 'obj': item})
+    
+    assessments = Assessment.objects.filter(created_by=request.user, due_date__gte=now, is_approved=True, term=active_term).select_related('subject', 'class_assigned').order_by('due_date')[:3]
+    for item in assessments: upcoming_tasks.append({'type': 'Assessment', 'obj': item})
 
-    # Get the term to display from the request, default to the active one
+    exams = Exam.objects.filter(created_by=request.user, due_date__gte=now, is_approved=True, term=active_term).select_related('subject', 'class_assigned').order_by('due_date')[:3]
+    for item in exams: upcoming_tasks.append({'type': 'Exam', 'obj': item})
+    
+    upcoming_tasks.sort(key=lambda x: x['obj'].due_date)
+
+    pending_submissions = AssessmentSubmission.objects.filter(
+        assessment__created_by=request.user,
+        requires_manual_review=True, is_graded=False
+    ).select_related('student__user', 'assessment').order_by('submitted_at')[:5]
+    
+    notifications = Notification.objects.filter(
+        Q(audience='teacher') | Q(audience='all'),
+        is_active=True, expiry_date__gte=now.date()
+    ).order_by('-created_at')[:5]
+
+    # --- CONTEXT FOR: My Classes Tab & Non-Academic Grade Entry ---
+    students_by_class_dict = {}
+    if form_teacher_classes_qs.exists():
+        all_students_in_form_classes_qs = Student.objects.filter(
+            current_class__in=form_teacher_classes_qs, status='active'
+        ).select_related('user', 'student_guardian__user').order_by('user__last_name', 'user__first_name')
+        
+        if active_term:
+            student_results_for_term = Result.objects.filter(student__in=all_students_in_form_classes_qs, term=active_term)
+            results_map = {result.student_id: result for result in student_results_for_term}
+            for student in all_students_in_form_classes_qs:
+                student.result_for_term = results_map.get(student.pk, Result(student=student, term=active_term))
+        
+        for student in all_students_in_form_classes_qs:
+            if student.current_class not in students_by_class_dict:
+                students_by_class_dict[student.current_class] = []
+            students_by_class_dict[student.current_class].append(student)
+
+    # --- CONTEXT FOR: Manage Tasks Tab ---
+    all_assignments = Assignment.objects.filter(teacher=teacher).order_by('-created_at')
+    all_assessments = Assessment.objects.filter(created_by=request.user).order_by('-created_at')
+    all_exams = Exam.objects.filter(created_by=request.user).order_by('-created_at')
+    
+    # --- CONTEXT FOR: Leaderboard & Broadsheet Tabs ---
+    form_teacher_term_ids = TeacherAssignment.objects.filter(teacher=teacher).values_list('term_id', flat=True)
+    subjects_taught_by_teacher = subjects_taught_qs
+    subject_teacher_term_ids = ClassSubjectAssignment.objects.filter(subject__in=subjects_taught_by_teacher).values_list('term_id', flat=True)
+    all_involved_term_ids = set(form_teacher_term_ids) | set(subject_teacher_term_ids)
+    selectable_terms = Term.objects.filter(id__in=all_involved_term_ids).select_related('session').distinct().order_by('-start_date')
+    all_sessions = Session.objects.filter(terms__in=selectable_terms).distinct().order_by('-start_date')
+    
     selected_term_id = request.GET.get('term_id')
+    display_term = None
+    if selected_term_id and selected_term_id.isdigit():
+        display_term = selectable_terms.filter(pk=selected_term_id).first()
+    if not display_term:
+        display_term = active_term if active_term in selectable_terms else selectable_terms.first()
 
-    if selected_term_id:
-        try:
-            display_term = Term.objects.get(pk=selected_term_id)
-        except (Term.DoesNotExist, ValueError):
-            messages.warning(request, "Invalid term selected. Defaulting to the active term.")
-            display_term = current_term
-    else:
-        display_term = current_term
-
-    selectable_terms = Term.objects.filter(
-        teacherassignment__teacher=teacher
-    ).select_related('session').distinct().order_by('-start_date')
-
-    # --- LEADERBOARD DATA ---
     leaderboard_data = {}
     if display_term:
-
-        for class_instance in assigned_classes:
-            # --- Subqueries now filter by the selected 'display_term' ---
+        for class_instance in teacher_assigned_classes_qs:
+            # Subqueries for counting submissions
             assignment_count_sub = AssignmentSubmission.objects.filter(student=OuterRef('pk'), assignment__term=display_term).values('student').annotate(c=Count('pk')).values('c')
             assessment_count_sub = AssessmentSubmission.objects.filter(student=OuterRef('pk'), assessment__term=display_term).values('student').annotate(c=Count('pk')).values('c')
             exam_count_sub = ExamSubmission.objects.filter(student=OuterRef('pk'), exam__term=display_term).values('student').annotate(c=Count('pk')).values('c')
-
-            class_leaderboard_qs = Student.objects.filter(
-                current_class=class_instance, status='active'
-            ).select_related('user').annotate(
+            class_leaderboard_qs = Student.objects.filter(current_class=class_instance, status='active').select_related('user').annotate(
                 num_assignments=Coalesce(Subquery(assignment_count_sub, output_field=IntegerField()), Value(0)),
                 num_assessments=Coalesce(Subquery(assessment_count_sub, output_field=IntegerField()), Value(0)),
                 num_exams=Coalesce(Subquery(exam_count_sub, output_field=IntegerField()), Value(0)),
-            ).annotate(
-                term_submission_count=F('num_assignments') + F('num_assessments') + F('num_exams')
-            ).annotate(
-                rank=Window(expression=Rank(), order_by=F('term_submission_count').desc())
-            ).order_by('rank', 'user__first_name')
-
-            leaderboard_data[class_instance.id] = {
-                'class_name': class_instance.name,
-                'top_students': class_leaderboard_qs[:5]
-            }
-
-    # Create a dictionary to store the message count for each guardian
-    message_counts = (
-        Message.objects.filter(student__in=students)
-        .values('student')
-        .annotate(count=Count('id'))
-    )
-
-    # Transform into a dictionary for easy lookup
-    message_counts_dict = {msg['student']: msg['count'] for msg in message_counts}
+            ).annotate(term_submission_count=F('num_assignments') + F('num_assessments') + F('num_exams')) \
+             .annotate(rank=Window(expression=Rank(), order_by=F('term_submission_count').desc())) \
+             .order_by('rank', 'user__last_name', 'user__first_name')
+            leaderboard_data[class_instance.id] = {'class_name': class_instance.name, 'top_students': class_leaderboard_qs[:5]}
     
-    context = {
+    received_messages = Message.objects.filter(recipient=request.user).select_related('sender', 'student_context__user').order_by('-sent_at')
+
+    notifications = Notification.objects.filter(Q(audience='teacher') | Q(audience='all'), is_active=True, expiry_date__gte=timezone.now().date()).order_by('-created_at')
+
+    context = {        
+        # Overview Tab
         'teacher': teacher,
-        'assigned_classes': assigned_classes,
-        'students': students,
-        'class_subjects': class_subjects,
-        'subjects_taught': subjects_taught,
-        'classes_subjects_taught': classes_subjects_taught,
-        'guardians': guardians,
-        'current_term': current_term,
-        'weeks': weeks,
-        'assignments': assignments,
-        'assessments': assessments,
-        'exams': exams,
-        'message_counts': message_counts_dict,
+        'student_count': student_count,
+        'subject_count': subject_count,
+        'upcoming_tasks': upcoming_tasks,
+        'pending_submissions': pending_submissions,
+        'notifications': notifications,
+        'form_teacher_classes_count': form_teacher_classes_qs.count(),
+
+        # My Classes Tab
+        'students_by_class': students_by_class_dict,
+        'active_term': active_term,
+        
+        # Grade Entry Tab
+        'teacher_assigned_classes': teacher_assigned_classes_qs,
+        'teacher_subjects': teacher.assigned_subjects(),
+        
+        # Manage Tasks Tab
+        'all_assignments': all_assignments,
+        'all_assessments': all_assessments,
+        'all_exams': all_exams,
+        
+        # Broadsheets Tab
+        'all_sessions': all_sessions, 
+        
+        # Leaderboard Tab
         'leaderboard_data': leaderboard_data,
-        'display_term': display_term, 
+        'display_term': display_term,
         'selectable_terms': selectable_terms,
+        'received_messages': received_messages,
     }
 
     return render(request, 'teacher/teacher_dashboard.html', context)
-
+    
 # Guardian Dashboard View
 
 @login_required
@@ -434,6 +476,7 @@ def guardian_dashboard(request):
         return redirect('login') 
 
     students = guardian.students.all().select_related('user', 'current_class')
+    student_ids = students.values_list('pk', flat=True)
 
     try:
         current_session = Session.objects.get(is_active=True)
@@ -639,31 +682,7 @@ def guardian_dashboard(request):
                 'is_graded': submission_instance.is_graded if submission_instance else False,
             })
         exams_data[student.user.id] = exam_list_for_student
-    
-        # Fetch messages sent by any of these teachers regarding this student
-        student_messages = Message.objects.filter(
-            recipient=guardian.user,  # Ensure recipient is the guardian
-            student=student  # Ensure the message is related to this student
-        ).order_by('-timestamp')
-        # Initialize messages data for each student
-        if student.user.id not in messages_data:
-            messages_data[student.user.id] = {'messages': [], 'message_counts': {}}
         
-        # Populate messages
-        for message in student_messages:
-            date_key = message.timestamp.date()
-            messages_data[student.user.id]['messages'].append({
-                'id': message.id,  # Add message ID for toggle functionality
-                'content': message.content,
-                'title': message.title,  # Adjust to your Message model fields
-                'date': date_key,
-                'sender': message.sender.get_full_name(),  # Adjust for readability
-            })
-
-            # Populate message counts by sender
-        message_counts = student_messages.values('sender').annotate(count=Count('id'))
-        message_counts_dict = {msg['sender']: msg['count'] for msg in message_counts}
-        messages_data[student.user.id]['message_counts'] = message_counts_dict
         # Attendance data
         total_days = Attendance.objects.filter(student=student).count()
         present_days = Attendance.objects.filter(student=student, is_present=True).count()
@@ -684,6 +703,7 @@ def guardian_dashboard(request):
             }
             for log in logs
         ]
+
         # Retrieve StudentFeeRecord and FinancialRecord for the current term
         student_fee_record = StudentFeeRecord.objects.filter(student=student, term=current_term).first()
         financial_record = financial_records_dict.get(student_id)
@@ -712,11 +732,42 @@ def guardian_dashboard(request):
         archived_results = archived_results_dict.get(student_id)
         if archived_results:
             archived_results_data[student_id] = archived_results
+    
+    # --- START OF CONTEXT FOR COMMUNICATION PANE ---
+    received_messages = Message.objects.filter(
+        Q(parent_message__isnull=True) &
+        (
+            Q(recipient=request.user) | 
+            Q(recipient_id__in=student_ids) | 
+            Q(sender=request.user) 
+        )
+    ).select_related(
+        'sender', 
+        'recipient', 
+        'student_context__user'
+    ).prefetch_related(
+        Prefetch('replies', queryset=Message.objects.order_by('sent_at').select_related('sender', 'recipient'))
+    ).distinct().order_by('-updated_at') 
+
+    unread_message_count = Message.objects.filter(
+        (
+            Q(recipient=request.user) | 
+            Q(recipient_id__in=student_ids)
+        ),
+        is_read=False
+    ).count()
+ 
+    students_classes = students.values_list('current_class_id', flat=True)
+    guardian_teachers = Teacher.objects.filter(
+        Q(teacherassignment__class_assigned_id__in=students_classes) |
+        Q(subjectassignment__class_assigned_id__in=students_classes)
+    ).select_related('user').distinct().order_by('user__last_name', 'user__first_name')
 
     context = {
         'guardian': guardian,
         'students': students,
         'teachers': teachers,
+        'guardian_teachers': guardian_teachers,
         'assignments_data': dict(assignments_data), 
         'assessments_data': dict(assessments_data),
         'exams_data': dict(exams_data),
@@ -729,6 +780,8 @@ def guardian_dashboard(request):
         'notifications': notifications,
         'action_required_alerts': action_required_alerts,
         'recent_update_alerts': recent_update_alerts[:6],
+        'received_messages': received_messages,
+        'unread_message_count': unread_message_count,
     }
     return render(request, 'guardian/guardian_dashboard.html', context)
 

@@ -1,66 +1,115 @@
-{% load static humanize student_filters %}
+{% load static %}
 
-<div class="accordion" id="comm-accordion-{{ student.user.id }}">
-    <!-- Teacher Contacts -->
-    <div class="accordion-item">
-        <h2 class="accordion-header"><button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-teachers-{{ student.user.id }}">Your Teachers</button></h2>
-        <div id="collapse-teachers-{{ student.user.id }}" class="accordion-collapse collapse show" data-bs-parent="#comm-accordion-{{ student.user.id }}">
-            <div class="accordion-body">
-                {% if class_teachers %}
-                    <ul class="list-unstyled">
-                    {% for teacher in class_teachers %}
-                        <li class="d-flex align-items-center mb-3">
-                            {% if teacher.profile_image %}
-                                <img src="{{ teacher.profile_image.url }}" class="rounded-circle me-3" style="width: 45px; height: 45px; object-fit: cover;" alt="{{ teacher.user.get_full_name }}">
-                            {% else %}
-                                <img src="{% static 'images/profile_images/default.jpg' %}" class="rounded-circle me-3" style="width: 45px; height: 45px; object-fit: cover;" alt="Default Profile Picture">
-                            {% endif %}
-                            <div>
-                                <div class="fw-bold">{{ teacher.user.get_full_name }}</div>
-                                <div class="text-muted small">{{ teacher.user.email }} | {{ teacher.contact }}</div>
-                            </div>
-                        </li>
-                    {% endfor %}
-                    </ul>
+<h3 class="widget-title"><i class="bi bi-chat-left-text-fill me-2"></i>Communication Center</h3>
+
+<div class="card shadow-sm">
+    <div class="card-header">
+        <!-- Tab navigation for the communication pane -->
+        <ul class="nav nav-tabs card-header-tabs" id="studentCommTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="student-inbox-tab" data-bs-toggle="tab" data-bs-target="#student-inbox-panel" type="button" role="tab">
+                    <i class="bi bi-inbox-fill me-1"></i> Inbox
+                    {% if unread_message_count > 0 %}
+                        <span class="badge bg-danger rounded-pill ms-1">{{ unread_message_count }}</span>
+                    {% endif %}
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="student-notifications-tab" data-bs-toggle="tab" data-bs-target="#student-notifications-panel" type="button" role="tab">
+                    <i class="bi bi-bell-fill me-1"></i> School Notices
+                    {% if notifications %}
+                        <span class="badge bg-info rounded-pill ms-1">{{ notifications.count }}</span>
+                    {% endif %}
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="student-teachers-tab" data-bs-toggle="tab" data-bs-target="#student-teachers-panel" type="button" role="tab">
+                    <i class="bi bi-person-lines-fill me-1"></i> My Teachers
+                </button>
+            </li>
+        </ul>
+    </div>
+
+    <div class="card-body p-0">
+        <div class="tab-content" id="studentCommTabsContent">
+
+            <!-- Inbox Panel -->
+            <div class="tab-pane fade show active" id="student-inbox-panel" role="tabpanel">
+                <div class="p-3 border-bottom">
+                    <a href="{% url 'compose_message' %}" class="btn btn-primary w-100">
+                        <i class="bi bi-send-plus-fill me-1"></i> Compose New Message
+                    </a>
+                </div>
+                {% if received_messages %}
+                    <div class="list-group list-group-flush">
+                        {% for message in received_messages|slice:":5" %}
+                            <a href="{% url 'message_thread' message.id %}" class="list-group-item list-group-item-action py-3">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <h6 class="mb-1 {% if not message.is_read %}fw-bold text-primary{% endif %}">{{ message.title }}</h6>
+                                    <small class="text-muted">{{ message.sent_at|timesince }} ago</small>
+                                </div>
+                                <p class="mb-1 small">From: <strong>{{ message.sender.get_full_name|default:message.sender.username }}</strong></p>
+                                {% if message.replies.count > 0 %}<small class="text-muted">{{ message.replies.count }} replies</small>{% endif %}
+                            </a>
+                        {% endfor %}
+                    </div>
+                    {% if received_messages.count > 5 %}
+                    <div class="card-footer text-center">
+                        <a href="{% url 'message_inbox' %}">View Full Inbox</a>
+                    </div>
+                    {% endif %}
                 {% else %}
-                    <p class="text-muted">Teacher information is not yet available.</p>
+                    <div class="text-center text-muted p-4">Your inbox is empty.</div>
                 {% endif %}
             </div>
-        </div>
-    </div>
-    <!-- Send a Message -->
-    <div class="accordion-item">
-        <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-message-{{ student.user.id }}">Send a Message</button></h2>
-        <div id="collapse-message-{{ student.user.id }}" class="accordion-collapse collapse" data-bs-parent="#comm-accordion-{{ student.user.id }}">
-            <div class="accordion-body">
-                <form action="{% url 'send_message' %}" method="post">
-                    {% csrf_token %}
-                    {{ message_form.as_p }}
-                    <button type="submit" class="btn btn-primary btn-sm mt-2">Send Message</button>
-                </form>
-            </div>
-        </div>
-    </div>
-    <!-- Received Messages -->
-    <div class="accordion-item">
-        <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-received-{{ student.user.id }}">Received Messages</button></h2>
-        <div id="collapse-received-{{ student.user.id }}" class="accordion-collapse collapse" data-bs-parent="#comm-accordion-{{ student.user.id }}">
-            <div class="accordion-body">
-                {% if received_messages %}
-                    <div class="list-group">
-                    {% for message in received_messages|slice:":5" %}
-                        <div class="list-group-item">
-                            <div class="d-flex w-100 justify-content-between">
-                                <h6 class="mb-1">{{ message.title }}</h6>
-                                <small class="text-muted">{{ message.timestamp|naturaltime }}</small>
+
+            <!-- Notifications Panel -->
+            <div class="tab-pane fade" id="student-notifications-panel" role="tabpanel">
+                {% if notifications %}
+                    <div class="list-group list-group-flush">
+                        {% for notification in notifications|slice:":10" %}
+                            <div class="list-group-item py-3">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <h6 class="mb-1">{{ notification.title }}</h6>
+                                    <small class="text-muted">{{ notification.created_at|date:"d M, Y" }}</small>
+                                </div>
+                                <p class="mb-0 small">{{ notification.message|safe|linebreaksbr }}</p>
                             </div>
-                            <p class="mb-1 small">{{ message.content|truncatewords:15 }}</p>
-                            <small class="text-muted">From: {{ message.sender.get_full_name }}</small>
-                        </div>
-                    {% endfor %}
+                        {% endfor %}
                     </div>
                 {% else %}
-                    <p class="text-muted">You have no new messages.</p>
+                    <div class="text-center text-muted p-4">No new school notices.</div>
+                {% endif %}
+            </div>
+
+            <!-- Teacher Contacts Panel -->
+            <div class="tab-pane fade" id="student-teachers-panel" role="tabpanel">
+                {% if class_teachers %}
+                    <div class="list-group list-group-flush">
+                        {% for teacher in class_teachers %}
+                        <div class="list-group-item">
+                            <div class="d-flex align-items-center justify-content-between">
+                                <div class="d-flex align-items-center">
+                                    {% if teacher.profile_image %}
+                                        <img src="{{ teacher.profile_image.url }}" class="rounded-circle me-3" style="width: 45px; height: 45px; object-fit: cover;" alt="{{ teacher.user.get_full_name }}">
+                                    {% else %}
+                                        <img src="{% static 'images/profile_images/default.jpg' %}" class="rounded-circle me-3" style="width: 45px; height: 45px; object-fit: cover;" alt="Default Profile Picture">
+                                    {% endif %}
+                                    <div>
+                                        <div class="fw-bold">{{ teacher.user.get_full_name }}</div>
+                                        <div class="text-muted small">{{ teacher.user.email|default:"No email" }}</div>
+                                    </div>
+                                </div>
+                                {# Link to the generic compose view, pre-filling the recipient and student context #}
+                                <a href="{% url 'compose_message' %}?recipient_id={{ teacher.user.id }}&student_context_id={{ student.pk }}" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-send me-1"></i> Message
+                                </a>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center text-muted p-4">Teacher information is not yet available for your class.</div>
                 {% endif %}
             </div>
         </div>

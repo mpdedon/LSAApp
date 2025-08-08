@@ -1,0 +1,101 @@
+{% extends 'base.html' %}
+{% load static multiply %}
+
+{% block title %}Sessional Broadsheet - {{ class_obj.name }} ({{ session.name }}){% endblock %}
+
+{% block extra_head %}
+<style>
+    .broadsheet-table th, .broadsheet-table td {
+        text-align: center;
+        vertical-align: middle;
+        padding: 0.5rem;
+        font-size: 0.85rem;
+        white-space: nowrap;
+    }
+    .broadsheet-table thead th {
+        background-color: #343a40;
+        color: #fff;
+        position: sticky;
+        top: 0; /* Makes header sticky on scroll */
+        z-index: 1;
+    }
+    .student-name-col {
+        text-align: left;
+        position: sticky;
+        left: 0;
+        background-color: #f8f9fa; /* Light background for sticky column */
+        z-index: 2; /* Above sticky header */
+        width: 200px;
+    }
+    .subject-name-col {
+        text-align: left;
+        font-weight: 600;
+    }
+    .sessional-avg-col { background-color: #e9ecef; font-weight: bold; }
+    .sessional-gpa-col { background-color: #cfe2ff; font-weight: bold; }
+    @media print {
+        .no-print { display: none !important; }
+        .broadsheet-table { font-size: 10px; }
+        .broadsheet-table th, .broadsheet-table td { padding: 0.2rem; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid my-4 main-content-below-navbar">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h2 class="mb-0">Sessional Broadsheet</h2>
+            <p class="text-muted">Class: <strong>{{ class_obj.name }}</strong> | Session: <strong>{{ session.name }}</strong></p>
+        </div>
+        <div>
+            <a href="{% url 'teacher_dashboard' %}" class="btn btn-outline-secondary btn-sm no-print me-2"><i class="fas fa-arrow-left me-1"></i> Back to Dashboard</a>
+            <button onclick="window.print();" class="btn btn-primary btn-sm no-print"><i class="fas fa-print me-1"></i> Print Broadsheet</button>
+        </div>
+    </div>
+    
+    <div class="card shadow-sm">
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-bordered broadsheet-table">
+                    <thead>
+                        <tr>
+                            <th rowspan="2" class="student-name-col">Student Name</th>
+                            {% for subject in subjects %}
+                                <th colspan="{{ terms_in_session|length|add:1 }}">{{ subject.name }}</th>
+                            {% endfor %}
+                            <th rowspan="2" class="sessional-gpa-col">Sessional GPA</th>
+                        </tr>
+                        <tr>
+                            {% for subject in subjects %}
+                                {% for term in terms_in_session %}
+                                    <th>{{ term.get_name_display|slice:":1" }}T</th> {# e.g., 1T for 1st Term #}
+                                {% endfor %}
+                                <th class="sessional-avg-col">Avg</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for data in broadsheet_data %}
+                        <tr>
+                            <td class="student-name-col">{{ data.student_obj.user.get_full_name|default:data.student_obj.user.username }}</td>
+                            {% for subject_row in data.subject_rows %}
+                                {% for score in subject_row.term_scores %}
+                                    <td>{{ score|floatformat:1|default:"-" }}</td>
+                                {% endfor %}
+                                <td class="sessional-avg-col">{{ subject_row.sessional_average|floatformat:1|default:"-" }}</td>
+                            {% endfor %}
+                            <td class="sessional-gpa-col">{{ data.sessional_gpa|floatformat:2|default:"N/A" }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="{{ subjects|length|multiply:terms_in_session|length|add:2 }}" class="text-center py-4 text-muted">No students found in this class.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Sessional Broadsheets{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2 class="mb-0">Sessional Broadsheets</h2>
+        <div>
+            <a href="{% url 'termly_broadsheets' %}" class="btn btn-outline-secondary">
+                <i class="bi bi-table me-1"></i> View Termly Broadsheets
+            </a>
+            {# You can add a button to "Calculate All Sessional Results" here if needed #}
+        </div>
+    </div>
+    <p class="text-muted">Select an academic session to view the cumulative broadsheets for all classes. Sessional results provide an overview of student performance across all terms in a session.</p>
+
+    {% if sessions %}
+    <div class="list-group">
+        {% for session_obj in sessions %}
+            <a href="{% url 'admin_sessional_broadsheet' session_obj.id %}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                <span>
+                    View Broadsheets for <strong>{{ session_obj.name }}</strong>
+                    {% if session_obj.is_active %}<span class="badge bg-success ms-2">Active</span>{% endif %}
+                </span>
+                <i class="fas fa-chevron-right text-muted small"></i>
+            </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="alert alert-light text-center">No academic sessions found. Please create a session first.</div>
+    {% endif %}
+</div>
+{% endblock %}

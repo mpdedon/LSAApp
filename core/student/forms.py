@@ -130,26 +130,45 @@ class StudentRegistrationForm(UserCreationForm):
 class MessageForm(forms.ModelForm):
 
     recipient = forms.ModelChoiceField(
-        queryset=CustomUser.objects.none(), # Start with an empty queryset
-        label="Send To",
-        widget=forms.Select(attrs={'class': 'form-select form-select-sm'})
+        queryset=CustomUser.objects.none(), 
+        label="Recipient",
+        empty_label="-- Select Recipient --",
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    student_context = forms.ModelChoiceField(
+        queryset=Student.objects.none(), 
+        label="Regarding Student (Optional)",
+        required=False,
+        empty_label="-- General Message --",
+        widget=forms.Select(attrs={'class': 'form-select'})
     )
 
     class Meta:
         model = Message
-        fields = ['recipient', 'title', 'content']
+        fields = ['recipient', 'student_context', 'title', 'content']
         widgets = {
-            'title': forms.TextInput(attrs={'class': 'form-control form-control-sm', 'placeholder': 'Message Title'}),
-            'content': forms.Textarea(attrs={'class': 'form-control form-control-sm', 'rows': 4, 'placeholder': 'Type your message here...'}),
-        }
-        labels = {
-            'title': 'Subject',
-            'content': 'Message'
+            'title': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Message Subject'}),
+            'content': forms.Textarea(attrs={'class': 'form-control', 'rows': 5, 'placeholder': 'Type your message here...'}),
         }
 
     def __init__(self, *args, **kwargs):
-        teacher_queryset = kwargs.pop('teacher_queryset', None)
+        recipient_queryset = kwargs.pop('recipient_queryset', None)
+        student_queryset = kwargs.pop('student_queryset', None)
+        
         super().__init__(*args, **kwargs)
         
-        if teacher_queryset is not None:
-            self.fields['recipient'].queryset = teacher_queryset
+        if recipient_queryset is not None:
+            self.fields['recipient'].queryset = recipient_queryset
+        
+        if student_queryset is not None:
+            self.fields['student_context'].queryset = student_queryset
+
+
+class ReplyForm(forms.ModelForm):
+    class Meta:
+        model = Message
+        fields = ['title', 'content']
+        widgets = {
+            'title': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Message Subject'}),
+            'content': forms.Textarea(attrs={'class': 'form-control', 'rows': 5, 'placeholder': 'Type your message here...'}),
+        }

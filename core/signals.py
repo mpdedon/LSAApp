@@ -3,7 +3,7 @@
 from django.db.models.signals import post_save, post_delete
 from django.dispatch import receiver
 from django.utils import timezone
-from core.models import Student, Term, SchoolDay, Student, Result, FeeAssignment, StudentFeeRecord
+from core.models import Student, Term, SchoolDay, Student, Teacher, Guardian, Result, FeeAssignment, StudentFeeRecord
 from core.models import StudentFeeRecord, Payment, FinancialRecord, Term, Student, Holiday
 from core.models import (
     Assessment, Exam, Assignment, 
@@ -29,6 +29,45 @@ from datetime import timedelta
 #            template='emails/welcome_email.html',
 #            context={'user': instance}
 #        )
+
+
+@receiver(post_save, sender=CustomUser)
+def create_user_profile(sender, instance, created, **kwargs):
+    """
+    Automatically create a Guardian, Teacher, or Student profile
+    when a new CustomUser is created with a specific role.
+    """
+    if created: # Only run on initial creation
+        if instance.role == 'guardian':
+            Guardian.objects.create(user=instance)
+            print(f"Guardian profile created for user: {instance.username}")
+        elif instance.role == 'teacher':
+            # Teacher model has a required 'date_of_birth' field, so we need a placeholder.
+            # The admin will need to edit this later to a real date.
+            Teacher.objects.create(user=instance, date_of_birth=timezone.now().date())
+            print(f"Teacher profile created for user: {instance.username}")
+        elif instance.role == 'student':
+            # Student model also has required fields, provide placeholders.
+            Student.objects.create(
+                user=instance,
+                date_of_birth=timezone.now().date(),
+                gender='M', 
+                relationship='N/A' 
+            )
+            print(f"Student profile created for user: {instance.username}")
+
+@receiver(post_save, sender=CustomUser)
+def save_user_profile(sender, instance, **kwargs):
+    """
+    Ensure the related profile is saved when the user object is saved.
+    (This is often needed for OneToOneField relationships).
+    """
+    if instance.role == 'guardian' and hasattr(instance, 'guardian'): 
+        instance.guardian.save()
+    elif instance.role == 'teacher' and hasattr(instance, 'teacher'):
+        instance.teacher.save()
+    elif instance.role == 'student' and hasattr(instance, 'student'):
+        instance.student.save()
 
 
 # --- Signal to Manage SchoolDay Entries ---

@@ -1,0 +1,135 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load custom_filters %} {# Your custom filters for get_item, get_attribute #}
+
+{% block title %}Sessional Broadsheet for {{ session.name }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    .table-sm th, .table-sm td { padding: 0.4rem; vertical-align: middle; }
+    .vertical-text { writing-mode: vertical-rl; text-orientation: mixed; white-space: nowrap; }
+    .table-responsive { max-height: 80vh; overflow: auto; }
+    .accordion-button:not(.collapsed) { background-color: rgba(13, 110, 253, 0.1); color: #000; }
+    .table thead th { background-color: #f8f9fa; border-bottom-width: 2px; }
+    .subject-header { border-left: 2px solid #ccc; }
+    .summary-col { background-color: #e9ecef; } /* Light grey for summary columns */
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid my-4 main-content-below-navbar">
+    <div class="d-flex justify-content-between align-items-center mb-1">
+        <div>
+            <h2 class="mb-0">Sessional Broadsheet</h2>
+            <p class="text-muted mb-3">Session: <strong>{{ session.name }}</strong></p>
+        </div>
+        <div>
+            <a href="{% url 'sessional_broadsheets' %}" class="btn btn-outline-secondary btn-sm"><i class="fas fa-arrow-left me-1"></i> Back to Sessions</a>
+            <button onclick="window.print();" class="btn btn-outline-primary btn-sm"><i class="fas fa-print me-1"></i> Print</button>
+        </div>
+    </div>
+    {% if messages %}{% for message in messages %}<div class="alert alert-{{ message.tags }} alert-dismissible fade show">{{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>{% endfor %}{% endif %}
+
+    {% if sessional_broadsheets_data %}
+    <div class="accordion" id="sessionalBroadsheetAccordion">
+    {% for data in sessional_broadsheets_data %}
+        <div class="accordion-item">
+            <h2 class="accordion-header" id="heading{{ data.class.id }}">
+                <button class="accordion-button {% if not forloop.first %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ data.class.id }}">
+                    <strong>{{ data.class.name }}</strong>
+                    <span class="badge {% if data.is_all_approved %}bg-success{% else %}bg-warning text-dark{% endif %} ms-3">{% if data.is_all_approved %}Approved & Published{% else %}Pending Approval{% endif %}</span>
+                </button>
+            </h2>
+            <div id="collapse{{ data.class.id }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}" data-bs-parent="#sessionalBroadsheetAccordion">
+                <div class="accordion-body p-2">
+                    <div class="d-flex justify-content-end mb-2">
+                        {% if not data.is_all_approved %}
+                        <button class="btn btn-success btn-sm approve-sessional-btn" 
+                                data-url="{% url 'approve_sessional_broadsheet' session.id data.class.id %}">
+                            <i class="fas fa-check-circle me-1"></i> Approve & Publish for {{ data.class.name }}
+                        </button>
+                        {% endif %}
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-striped table-sm small">
+                            <thead class="table-light">
+                                <!-- First Header Row: Subject Names -->
+                                <tr>
+                                    <th rowspan="2" class="align-middle" style="min-width: 150px;">Student Name</th>
+                                    {% for subject in data.subjects %}
+                                        <th colspan="{{ terms_in_session|length|add:1 }}" class="text-center subject-header">{{ subject.name }}</th>
+                                    {% endfor %}
+                                    <th rowspan="2" class="text-center vertical-text summary-col">Sessional Average</th>
+                                    <th rowspan="2" class="text-center vertical-text summary-col">Sessional GPA</th>
+                                    <th rowspan="2" class="text-center align-middle summary-col">Rank</th>
+                                </tr>
+                                <!-- Second Header Row: Term Names -->
+                                <tr>
+                                    {% for subject in data.subjects %}
+                                        {% for term in terms_in_session %}
+                                            <th class="text-center vertical-text" style="font-weight: normal;">{{ term.name|slice:":5" }}.</th>
+                                        {% endfor %}
+                                        <th class="text-center vertical-text table-info">Avg</th>
+                                    {% endfor %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for student_data in data.sessional_results_data %}
+                                <tr>
+                                    <td>{{ student_data.student_obj.user.get_full_name }}</td>
+                                    {% for subject_row in student_data.subject_rows %}
+                                        {% for term_score in subject_row.term_scores %}
+                                            <td class="text-center">{{ term_score|floatformat:1|default:"-" }}</td>
+                                        {% endfor %}
+                                        <td class="text-center table-info fw-bold">{{ subject_row.sessional_average|floatformat:1|default:"-" }}</td>
+                                    {% endfor %}
+                                    <td class="text-center fw-bold summary-col">{{ student_data.sessional_average|floatformat:2|default:"-" }}</td>
+                                    <td class="text-center fw-bold summary-col">{{ student_data.sessional_gpa|floatformat:2|default:"-" }}</td>
+                                    <td class="text-center fw-bold summary-col">{{ forloop.counter }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    {% endfor %}
+    </div>
+    {% else %}
+    <div class="alert alert-info">No class broadsheets to display for this session.</div>
+    {% endif %}
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    document.querySelectorAll('.approve-sessional-btn').forEach(button => {
+        button.addEventListener('click', function(e) {
+            e.preventDefault();
+            const url = this.getAttribute('data-url');
+            const csrfToken = '{{ csrf_token }}';
+
+            if (confirm('Are you sure you want to approve and publish this sessional broadsheet? This will make it visible to students and parents.')) {
+                fetch(url, {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' },
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.message) {
+                        alert(data.message);
+                        window.location.reload(); // Reload to see updated status
+                    } else if (data.error) {
+                        alert('Error: ' + data.error);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error:', error);
+                    alert('An unexpected error occurred.');
+                });
+            }
+        });
+    });
+});
+</script>
+{% endblock %}
