@@ -5,12 +5,13 @@ from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
+from django.http import HttpResponse, Http404
 from django.views import View
 from django.core.paginator import Paginator
 from django.db.models import Q
 from core.models import Student, Assignment, AssignmentSubmission, Teacher, CustomUser, Message
 from core.models import Assessment, AssessmentSubmission, Exam, ExamSubmission, AcademicAlert 
-from .forms import StudentRegistrationForm, MessageForm
+from .forms import StudentRegistrationForm, MessageForm, ReplyForm
 from core.assignment.forms import AssignmentSubmissionForm
 
 # Student Views
@@ -437,29 +438,174 @@ def submit_exam(request, exam_id):
     })
 
 
-def message_teacher(request):
-    student = get_object_or_404(Student, user=request.user)
+@login_required
+def message_inbox(request):
+    """
+    A central, generic inbox for the logged-in user.
+    Shows received message threads.
+    """
+    user = request.user
+
+    conversations = Message.objects.filter(
+        (Q(recipient=user) | Q(sender=user)),
+        parent_message__isnull=True
+    ).select_related('sender', 'recipient', 'student_context__user').prefetch_related('replies').distinct().order_by('-updated_at')
+
+    Message.objects.filter(recipient=request.user, is_read=False).update(is_read=True)
+    unread_count = conversations.filter(recipient=user, is_read=False).count()
     
-    # We need to populate the form's queryset for recipients
-    class_teachers = Teacher.objects.filter(
-        teacherassignment__class_assigned=student.current_class,
-        teacherassignment__term__is_active=True
-    ).select_related('user').distinct()
-    teacher_users_queryset = CustomUser.objects.filter(teacher__in=class_teachers)
+    context = {
+        'conversations': conversations,
+        'unread_count': unread_count, 
+        'page_title': "My Inbox"
+    }
 
-    # Pass the POST data AND the dynamic queryset to the form
-    form = MessageForm(request.POST, teacher_queryset=teacher_users_queryset)
+    return render(request, 'messaging/inbox.html', context)
 
-    if form.is_valid():
-        message = form.save(commit=False)
-        message.sender = request.user
-        message.student = student # Associate the message with the sending student
-        message.save()
-        messages.success(request, "Your message has been sent successfully!")
+
+@login_required
+def compose_message(request):
+    """
+    A generic view for composing a message.
+    The list of possible recipients is determined by the sender's role.
+    Recipient and other context can be pre-selected via GET parameters.
+    """
+    sender = request.user
+    
+    # --- Determine the queryset of possible recipients based on the sender's role ---
+    recipient_qs = CustomUser.objects.none() 
+    student_context_qs = Student.objects.none() 
+
+    if sender.role == 'student':
+        # Students can message their teachers and admins
+        student = getattr(sender, 'student', None) 
+        if student:
+            teacher_ids = Teacher.objects.filter(
+                Q(teacherassignment__class_assigned=student.current_class) |
+                Q(subjectassignment__class_assigned=student.current_class)
+            ).values_list('user_id', flat=True)
+            recipient_qs = CustomUser.objects.filter(Q(id__in=teacher_ids) | Q(role='admin')).exclude(pk=sender.pk).distinct()
+            student_context_qs = Student.objects.filter(pk=student.pk)
+
+    elif sender.role == 'teacher':
+        # Teachers can message guardians of their students, colleagues, and admins
+        teacher = getattr(sender, 'teacher', None)
+        if teacher:
+            assigned_classes = teacher.assigned_classes()
+            students_taught = Student.objects.filter(current_class__in=assigned_classes, status='active')
+            guardian_ids = students_taught.filter(student_guardian__isnull=False).values_list('student_guardian__user_id', flat=True)
+            
+            colleague_ids = Teacher.objects.exclude(pk=teacher.pk).values_list('user_id', flat=True)
+            
+            recipient_qs = CustomUser.objects.filter(
+                Q(guardian__pk__in=guardian_ids) |
+                Q(id__in=colleague_ids) |
+                Q(role='admin')
+            ).distinct()
+            student_context_qs = students_taught
+
+    elif sender.role == 'guardian':
+        # Guardians can message teachers of their wards and admins
+        guardian = getattr(sender, 'guardian', None)
+        if guardian:
+            wards = guardian.students.all()
+            teacher_ids = Teacher.objects.filter(
+                Q(teacherassignment__class_assigned__in=wards.values_list('current_class', flat=True)) |
+                Q(subjectassignment__class_assigned__in=wards.values_list('current_class', flat=True))
+            ).values_list('user_id', flat=True)
+            recipient_qs = CustomUser.objects.filter(Q(id__in=teacher_ids) | Q(role='admin')).distinct()
+            student_context_qs = wards
+
+    elif sender.role == 'admin':
+        # Admins can message anyone
+        recipient_qs = CustomUser.objects.all().exclude(pk=sender.pk)
+        student_context_qs = Student.objects.filter(status='active')
+    
+    # --- Initialize variables for context ---
+    recipient_preselected = None
+    student_context = None
+    initial_form_data = {}
+
+    # --- Check for pre-selected data from GET parameters ---
+    recipient_id = request.GET.get('recipient_id')
+    student_context_id = request.GET.get('student_context_id')
+
+    if recipient_id:
+        try:
+            # Fetch the pre-selected recipient object to display their name
+            recipient_preselected = recipient_qs.get(pk=recipient_id)
+            initial_form_data['recipient'] = recipient_preselected
+        except CustomUser.DoesNotExist:
+            messages.error(request, "The specified recipient is invalid or you are not allowed to message them.")
+            return redirect('message_inbox')
+    
+    if student_context_id:
+        try:
+            student_context = student_context_qs.get(pk=student_context_id)
+            initial_form_data['student_context'] = student_context
+        except Student.DoesNotExist:
+            pass
+
+    # --- Handle Form Submission ---
+    if request.method == 'POST':
+        form = MessageForm(request.POST, recipient_queryset=recipient_qs, student_queryset=student_context_qs)
+        if form.is_valid():
+            message = form.save(commit=False)
+            message.sender = sender
+            message.save()
+            messages.success(request, "Message sent successfully!")
+            return redirect('message_inbox')
+    else: # GET request
+        form = MessageForm(initial=initial_form_data, recipient_queryset=recipient_qs, student_queryset=student_context_qs)
+    
+    context = {
+        'form': form,
+        'recipient_preselected': recipient_preselected, 
+        'student_context': student_context, 
+        'page_title': "Compose Message"
+    }
+    return render(request, 'messaging/compose_message.html', context)
+
+
+@login_required
+def message_thread(request, thread_id):
+    # Fetch the parent message of the thread
+    parent_message = get_object_or_404(Message, pk=thread_id, parent_message__isnull=True)
+
+    # Authorization check: user must be the sender or recipient
+    if request.user not in [parent_message.sender, parent_message.recipient]:
+        raise Http404
+
+    # Mark all messages in this thread as read by the current user
+    Message.objects.filter(
+        Q(pk=thread_id) | Q(parent_message_id=thread_id),
+        recipient=request.user, is_read=False
+    ).update(is_read=True)
+    
+    thread_messages = parent_message.replies.all().order_by('sent_at')
+
+    # Setup form for a new reply
+    reply_recipient = parent_message.sender if request.user == parent_message.recipient else parent_message.recipient
+    
+    if request.method == 'POST':
+        reply_form = ReplyForm(request.POST)
+        if reply_form.is_valid():
+            reply = reply_form.save(commit=False)
+            reply.sender = request.user
+            reply.recipient = reply_recipient
+            reply.parent_message = parent_message
+            if parent_message.student_context: # Carry over the student context
+                reply.student_context = parent_message.student_context
+            reply.save()
+            messages.success(request, "Reply sent.")
+            return redirect('message_thread', thread_id=thread_id)
     else:
-        # If the form is invalid, store the errors in messages to display on the dashboard
-        for field, errors in form.errors.items():
-            for error in errors:
-                messages.error(request, f"{field.title()}: {error}")
-    
-    return redirect('student_dashboard') 
+        reply_form = MessageForm(initial={'title': f"Re: {parent_message.title}"})
+
+    context = {
+        'parent_message': parent_message,
+        'thread_messages': thread_messages,
+        'reply_form': reply_form,
+        'reply_recipient': reply_recipient,
+    }
+    return render(request, 'messaging/message_thread.html', context)

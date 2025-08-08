@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static humanize message_filters %}
+{% load crispy_forms_tags %}
 
 {% block title %}Guardian Dashboard{% endblock %}
 
@@ -100,7 +101,12 @@
                     </li>
                 </ul>
                 <div class="mt-auto pt-3">
-                     <a href="{% url 'logout' %}" class="btn btn-outline-secondary w-100">Logout</a>
+                    <form method="POST" action="{% url 'logout' %}" class="d-inline">
+                        {% csrf_token %}
+                        <button type="submit" class="dropdown-item text-danger">
+                          <i class="fas fa-sign-out-alt fa-fw me-2"></i>Logout
+                        </button>
+                      </form>
                 </div>
             </div>
         </aside>

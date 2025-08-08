@@ -4,6 +4,7 @@ from django.core.exceptions import ValidationError
 from django.contrib.auth.models import AbstractUser
 from django.conf import settings
 from django.db.models import Sum, Avg, Q, F
+from django.db.models.functions import Coalesce
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.functional import cached_property
@@ -692,9 +693,8 @@ class Question(models.Model):
     assignment = models.ForeignKey(Assignment, related_name='questions', on_delete=models.CASCADE)
     question_type = models.CharField(max_length=3, choices=QUESTION_TYPES)
     question_text = models.TextField()
-    # For MCQ/SCQ questions, store choices as JSON
     options = models.JSONField(null=True, blank=True)
-    correct_answer = models.CharField(max_length=255, null=True, blank=True)  # For MCQ/SCQ correct answer
+    correct_answer = models.CharField(max_length=255, null=True, blank=True)  
 
     @property
     def options_list(self):
@@ -715,8 +715,8 @@ class AssignmentSubmission(models.Model):
     assignment = models.ForeignKey(Assignment, related_name='submissions', on_delete=models.CASCADE)
     submitted_at = models.DateTimeField(default=timezone.now)
     answers = models.JSONField()  # Store answers as JSON for simplicity
-    grade = models.FloatField(null=True, blank=True)  # Auto-graded for SCQ/MCQ
-    feedback = models.TextField(null=True, blank=True)  # Teacher feedback for essay/manual grading
+    grade = models.FloatField(null=True, blank=True)  
+    feedback = models.TextField(null=True, blank=True)  
     is_completed = models.BooleanField(default=False)
 
     def calculate_grade(self):
@@ -877,7 +877,7 @@ class Exam(models.Model):
 class ExamSubmission(models.Model):
     exam = models.ForeignKey('Exam', on_delete=models.CASCADE, related_name='submissions_for_exam')
     student = models.ForeignKey('Student', on_delete=models.CASCADE)
-    answers = models.JSONField()  # Stores the student's answers
+    answers = models.JSONField()  
     score = models.IntegerField(null=True, blank=True)
     submitted_at = models.DateTimeField(default=timezone.now)
     is_graded = models.BooleanField(default=False)
@@ -929,6 +929,85 @@ class AcademicAlert(models.Model):
         ordering = ['-date_created']
 
 
+class SubjectResult(models.Model):
+    """
+    Stores all scores for ONE subject within ONE term's result sheet.
+    This is the lowest level of academic record.
+    """
+    subject = models.ForeignKey(Subject, on_delete=models.CASCADE)
+    result = models.ForeignKey('Result', on_delete=models.CASCADE, related_name='subject_results')
+    
+    continuous_assessment_1 = models.DecimalField(max_digits=4, decimal_places=1, null=True, blank=True, validators=[MaxValueValidator(10.0)])
+    continuous_assessment_2 = models.DecimalField(max_digits=4, decimal_places=1, null=True, blank=True, validators=[MaxValueValidator(10.0)])
+    continuous_assessment_3 = models.DecimalField(max_digits=4, decimal_places=1, null=True, blank=True, validators=[MaxValueValidator(10.0)])
+    assignment = models.DecimalField(max_digits=4, decimal_places=1, null=True, blank=True, validators=[MaxValueValidator(10.0)])
+    oral_test = models.DecimalField(max_digits=4, decimal_places=1, null=True, blank=True, validators=[MaxValueValidator(20.0)])
+    exam_score = models.DecimalField(max_digits=4, decimal_places=1, null=True, blank=True, validators=[MaxValueValidator(40.0)])
+    
+    is_finalized = models.BooleanField(default=False)
+
+    class Meta:
+        unique_together = ('result', 'subject')
+        ordering = ['subject__name']
+
+    def __str__(self):
+        student_name = self.result.student.user.get_full_name() if self.result.student else "Unknown Student"
+        subject_name = self.subject.name if self.subject else "Unknown Subject"
+        status = 'Finalized' if self.is_finalized else 'Draft'
+        return f"{student_name} - {subject_name} ({status})"
+
+    def total_score(self) -> Decimal:
+        """Calculates the total score for this subject. Returns a Decimal."""
+        total = sum(filter(None, [
+            self.continuous_assessment_1, self.continuous_assessment_2, self.continuous_assessment_3,
+            self.assignment, self.oral_test, self.exam_score
+        ]))
+        return Decimal(total).quantize(Decimal('0.1'))
+
+    def calculate_grade(self) -> str:
+        """Determines the letter grade based on the total score."""
+        score = self.total_score()
+        if score >= 80: return 'A'
+        elif score >= 65: return 'B'
+        elif score >= 55: return 'C'
+        elif score >= 45: return 'D'
+        elif score >= 40: return 'E'
+        else: return 'F'
+
+    def calculate_grade_point(self) -> float:
+        """Determines the grade point (e.g., for GPA calculation)."""
+        score = self.total_score()
+        if score >= 80: return 5.0
+        elif score >= 65: return 4.0
+        elif score >= 55: return 3.0
+        elif score >= 45: return 2.0
+        elif score >= 40: return 1.0
+        else: return 0.0
+
+    @classmethod
+    def get_class_average(cls, subject, term, class_obj) -> Decimal:
+        """Calculates the average total score for a subject in a specific class and term."""
+        subject_results_in_class = cls.objects.filter(
+            subject=subject,
+            result__term=term,
+            result__student__current_class=class_obj)
+        
+        aggregation_queryset = subject_results_in_class.annotate(
+            total_per_student=(
+                Coalesce(F('continuous_assessment_1'), Decimal(0)) +
+                Coalesce(F('continuous_assessment_2'), Decimal(0)) +
+                Coalesce(F('continuous_assessment_3'), Decimal(0)) +
+                Coalesce(F('assignment'), Decimal(0)) +
+                Coalesce(F('oral_test'), Decimal(0)) +
+                Coalesce(F('exam_score'), Decimal(0))
+            )
+        )
+        
+        aggregation = aggregation_queryset.aggregate(class_avg=Avg('total_per_student'))
+        avg = aggregation.get('class_avg')
+        return avg.quantize(Decimal('0.1')) if avg is not None else Decimal('0.0')
+    
+
 class Result(models.Model):
     student = models.ForeignKey('Student', on_delete=models.CASCADE)
     term = models.ForeignKey('Term', on_delete=models.CASCADE)
@@ -955,133 +1034,127 @@ class Result(models.Model):
 
     is_approved = models.BooleanField(default=False)
     is_archived = models.BooleanField(default=False)
+    is_published = models.BooleanField(default=False, help_text="Controls visibility to students/parents")
     
-    def total_continuous_assessment(self, subject):
-        return sum(getattr(self, f'{subject}_ca{i}', 0) for i in range(1, 4))
+    total_score = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True)
+    average_score = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    term_gpa = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)
+    performance_change = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True,
+        help_text="Percentage change in average score from the previous term.")
 
-    def total_assignments(self, subject):
-        return sum(getattr(self, f'{subject}_assignment{i}', 0) for i in range(1, 4))
-    
-    def total_exam_score(self, subject):
-        return sum(getattr(self, f'{subject}_exam_score{i}', 0) for i in range(1, 4))
-
-    def overall_score(self, subject):
-        return (
-            self.total_continuous_assessment(subject)
-            + self.total_assignments(subject)
-            + getattr(self, f'{subject}_exam_score', 0)
-        )
+    class Meta:
+        unique_together = ('student', 'term')
+        ordering = ['-term__start_date']
 
     def __str__(self):
-        return f"{self.student.user.get_full_name()} - {self.term}"
-    
-    def calculate_gpa(self):
-        subject_results = self.subjectresult_set.filter(
-                Q(continuous_assessment_1__isnull=False) |
-                Q(continuous_assessment_2__isnull=False) |
-                Q(continuous_assessment_3__isnull=False) |
-                Q(assignment__isnull=False) |
-                Q(oral_test__isnull=False) |
-                Q(exam_score__isnull=False)
-            )
-        total_weighted_grade_points = 0
-        total_weights = 0
+        return f"Result for {self.student.user.get_full_name()} - {self.term}"
 
-        for subject_result in subject_results:
-            subject_weight = subject_result.subject.subject_weight
-            grade_point = subject_result.calculate_grade_point()
-            total_weighted_grade_points += grade_point * subject_weight
-            total_weights += subject_weight
+    def calculate_term_summary(self, save=True):
+        """Calculates and saves the total score, average, and GPA for this term."""
+        subject_results_qs = self.subject_results.all().select_related('subject')
+        
+        # Filter out subjects where no scores were entered at all
+        scored_subjects = [sr for sr in subject_results_qs if sr.total_score() > 0]
+        
+        if not scored_subjects:
+            self.total_score, self.average_score, self.term_gpa = Decimal('0.00'), Decimal('0.00'), Decimal('0.00')
+        else:
+            self.total_score = sum(sr.total_score() for sr in scored_subjects)
+            self.average_score = self.total_score / len(scored_subjects)
+            
+            total_weighted_grade_points, total_weights = Decimal('0.0'), Decimal('0.0')
+            for sr in scored_subjects:
+                weight = Decimal(getattr(sr.subject, 'subject_weight', 1)) 
+                total_weighted_grade_points += Decimal(sr.calculate_grade_point()) * weight
+                total_weights += weight
+            self.term_gpa = (total_weighted_grade_points / total_weights) if total_weights > 0 else Decimal('0.00')
+        
+        if save:
+            self.save(update_fields=['total_score', 'average_score', 'term_gpa'])
 
-        if total_weights > 0:
-            return round(total_weighted_grade_points / total_weights, 2)
-        return 0.0
+
+class SessionalResult(models.Model):
+    student = models.ForeignKey(Student, on_delete=models.CASCADE)
+    session = models.ForeignKey(Session, on_delete=models.CASCADE)
     
-    
-class SubjectResult(models.Model):
-    subject = models.ForeignKey(Subject, on_delete=models.CASCADE)
-    result = models.ForeignKey(Result, on_delete=models.CASCADE)
-    continuous_assessment_1 = models.DecimalField(max_digits=4, validators=[MaxValueValidator(10.0)], decimal_places=1, null=True, blank=True)
-    continuous_assessment_2 = models.DecimalField(max_digits=4, validators=[MaxValueValidator(10.0)], decimal_places=1, null=True, blank=True)
-    continuous_assessment_3 = models.DecimalField(max_digits=4, validators=[MaxValueValidator(10.0)], decimal_places=1, null=True, blank=True)
-    assignment = models.DecimalField(max_digits=4, validators=[MaxValueValidator(10.0)], decimal_places=1, null=True, blank=True)
-    oral_test = models.DecimalField(max_digits=4, validators=[MaxValueValidator(20.0)], decimal_places=1, null=True, blank=True)
-    exam_score = models.DecimalField(max_digits=4, validators=[MaxValueValidator(40.0)], decimal_places=1, null=True, blank=True)
-    is_finalized = models.BooleanField(default=False) # Default to False initially
+    subject_summary_json = models.JSONField(default=dict, blank=True, help_text="Stores subject-wise term scores and averages for the session")
+    average_score = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
+    sessional_gpa = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)
+    is_approved = models.BooleanField(default=False)
+    is_published = models.BooleanField(default=False)
+
+    class Meta:
+        unique_together = ('student', 'session')
+        ordering = ['-session__start_date']
 
     def __str__(self):
-        student_name = self.result.student.user.get_full_name() if self.result.student else "Unknown Student"
-        subject_name = self.subject.name if self.subject else "Unknown Subject"
-        status = 'Finalized' if self.is_finalized else 'Draft'
-        return f"{student_name} - {subject_name} ({status})"
+        return f"Sessional Result for {self.student.user.get_full_name()} - {self.session}"
 
-    def total_score(self):
-        # Ensure Decimal conversion for consistent arithmetic
-        ca1 = self.continuous_assessment_1 or 0
-        ca2 = self.continuous_assessment_2 or 0
-        ca3 = self.continuous_assessment_3 or 0
-        assignment = self.assignment or 0
-        oral_test = self.oral_test or 0
-        exam_score = self.exam_score or 0
-        # Cast to Decimal if they are not already, although model fields should be
-        total = Decimal(ca1) + Decimal(ca2) + Decimal(ca3) + Decimal(assignment) + Decimal(oral_test) + Decimal(exam_score)
-        return total.quantize(Decimal('0.1')) # Keep one decimal place
+    def calculate_sessional_summary(self, save=True):
+        terms_in_session = Term.objects.filter(session=self.session)
+        term_results = Result.objects.filter(student=self.student, term__in=terms_in_session, term_gpa__isnull=False)
+        subjects = Subject.objects.filter(subjectresult__result__in=term_results).distinct()
+        
+        sessional_subject_summary = {}
+        for subject in subjects:
+            term_scores_map = {}
+            scores_found = []
+            for term in terms_in_session:
+                sr = SubjectResult.objects.filter(result__student=self.student, result__term=term, subject=subject).first()
+                score = sr.total_score() if sr else None
+                term_scores_map[f'term_{term.id}_score'] = float(score) if score is not None else None
+                if score is not None: scores_found.append(score)
+            sessional_subject_summary[str(subject.id)] = {
+                'subject_name': subject.name, 'term_scores': term_scores_map,
+                'sessional_average': float(sum(scores_found) / len(scores_found)) if scores_found else 0.0
+            }
+        
+        self.subject_summary_json = sessional_subject_summary
+        term_gpas = [res.term_gpa for res in term_results if res.term_gpa is not None]
+        self.sessional_gpa = sum(term_gpas) / len(term_gpas) if term_gpas else Decimal('0.00')
+        term_averages = [res.average_score for res in term_results if res.average_score is not None]
+        self.average_score = sum(term_averages) / len(term_averages) if term_averages else Decimal('0.00')
 
-    @classmethod
-    def get_class_average(cls, subject, term, class_obj):
-        # More specific filtering is needed for a meaningful class average
-        results_in_term = Result.objects.filter(term=term, student__current_class=class_obj)
-        subject_results = cls.objects.filter(subject=subject, result__in=results_in_term)
+        if save: self.save()
 
-        # Aggregate sum of components, handling NULLs
-        aggregation = subject_results.aggregate(
-            avg_total=Avg(
-                F('continuous_assessment_1') + F('continuous_assessment_2') +
-                F('continuous_assessment_3') + F('assignment') +
-                F('oral_test') + F('exam_score'),
-                # Provide default=0 if a component is NULL before summing
-                # Note: Direct sum with F objects handles NULLs reasonably in newer Django versions
-                # but explicit Coalesce might be safer if issues arise
-                output_field=models.DecimalField()
-            )
-        )
-        avg = aggregation['avg_total']
-        return avg.quantize(Decimal('0.1')) if avg is not None else Decimal('0.0')
 
-    def calculate_grade(self):
-        score = self.total_score()
-        if score >= 80: return 'A'
-        elif score >= 65: return 'B'
-        elif score >= 55: return 'C'
-        elif score >= 45: return 'D'
-        elif score >= 40: return 'E'
-        else: return 'F'
+class CumulativeRecord(models.Model):
+    student = models.OneToOneField(Student, on_delete=models.CASCADE, primary_key=True)
+    cumulative_gpa = models.DecimalField(max_digits=4, decimal_places=2, default=0.00)
+    session_gpa_history_json = models.JSONField(default=dict, blank=True)
+    last_updated = models.DateTimeField(auto_now=True)
 
-    def calculate_grade_point(self):
-        score = self.total_score() # Use total score for points calculation
-        if score >= 80: return 5.0
-        elif score >= 65: return 4.0
-        elif score >= 55: return 3.0
-        elif score >= 45: return 2.0
-        elif score >= 40: return 1.0
-        else: return 0.0
-    
+    def __str__(self):
+        return f"Cumulative Record for {self.student.user.get_full_name()}"
+
+    def update_cumulative_gpa(self, save=True):
+        sessional_results = SessionalResult.objects.filter(student=self.student, is_approved=True, sessional_gpa__isnull=False).order_by('session__start_date')
+        gpa_history = {str(res.session.id): float(res.sessional_gpa) for res in sessional_results}
+        sessional_gpas = [res.sessional_gpa for res in sessional_results]
+        self.session_gpa_history_json = gpa_history
+        self.cumulative_gpa = sum(sessional_gpas) / len(sessional_gpas) if sessional_gpas else Decimal('0.00')
+
+        if save: self.save()
+
 
 class Message(models.Model):
-    sender = models.ForeignKey(CustomUser, related_name='sent_messages', on_delete=models.CASCADE)
-    recipient = models.ForeignKey(CustomUser, related_name='received_messages', on_delete=models.CASCADE)
-    student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='messages')
-    title = models.CharField(max_length=255, default="")
+    sender = models.ForeignKey(settings.AUTH_USER_MODEL,  on_delete=models.SET_NULL, null=True, related_name='sent_messages' )
+    recipient = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='received_messages')
+    student_context = models.ForeignKey('Student', on_delete=models.SET_NULL, null=True, blank=True, related_name='related_messages')
+    parent_message = models.ForeignKey('self', on_delete=models.CASCADE, null=True, blank=True, related_name='replies')
+    title = models.CharField(max_length=255)
     content = models.TextField()
-    timestamp = models.DateTimeField(auto_now_add=True)
-    is_unread = models.BooleanField(default=True)
+    is_read = models.BooleanField(default=False)
+    sent_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
-    def clean(self):
-        if not self.student:
-            raise ValidationError("A student must be associated with the message.")
-    
+    class Meta:
+        ordering = ['-sent_at']
+
     def __str__(self):
-        return f"Message from {self.sender} to {self.recipient}"
+        sender_name = self.sender.username if self.sender else "[Deleted User]"
+        recipient_name = self.recipient.username if self.recipient else "[Deleted User]"
+        return f'From {sender_name} to {recipient_name}: "{self.title}"'
     
 
 class SchoolDay(models.Model):

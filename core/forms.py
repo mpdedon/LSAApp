@@ -1,7 +1,7 @@
 # core/forms.py
 from django import forms
 from django.contrib.auth.forms import UserCreationForm
-from core.models import CustomUser, Subject, Session, Term, Result, Notification
+from core.models import CustomUser, Student, Subject, Session, Term, Result, Notification, Message
 
 
 class CustomUserCreationForm(UserCreationForm):
@@ -94,3 +94,50 @@ class ContactForm(forms.Form):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.label_suffix = ""
+
+
+class MessageForm(forms.ModelForm):
+
+    recipient = forms.ModelChoiceField(
+        queryset=CustomUser.objects.none(), 
+        label="Recipient",
+        empty_label="-- Select Recipient --",
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+    student_context = forms.ModelChoiceField(
+        queryset=Student.objects.none(), 
+        label="Regarding Student (Optional)",
+        required=False,
+        empty_label="-- General Message --",
+        widget=forms.Select(attrs={'class': 'form-select'})
+    )
+
+    class Meta:
+        model = Message
+        fields = ['recipient', 'student_context', 'title', 'content']
+        widgets = {
+            'title': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Message Subject'}),
+            'content': forms.Textarea(attrs={'class': 'form-control', 'rows': 5, 'placeholder': 'Type your message here...'}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        recipient_queryset = kwargs.pop('recipient_queryset', None)
+        student_queryset = kwargs.pop('student_queryset', None)
+        
+        super().__init__(*args, **kwargs)
+        
+        if recipient_queryset is not None:
+            self.fields['recipient'].queryset = recipient_queryset
+        
+        if student_queryset is not None:
+            self.fields['student_context'].queryset = student_queryset
+
+
+class ReplyForm(forms.ModelForm):
+    class Meta:
+        model = Message
+        fields = ['title', 'content']
+        widgets = {
+            'title': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Message Subject'}),
+            'content': forms.Textarea(attrs={'class': 'form-control', 'rows': 5, 'placeholder': 'Type your message here...'}),
+        }

@@ -1,0 +1,175 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+{% load static %}
+
+{% block title %}Conversation: {{ parent_message.title }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    /*
+    ========================================================
+    MODERN & COMPACT MESSAGE THREAD STYLES
+    ========================================================
+    */
+    .thread-header {
+        border-bottom: 1px solid #dee2e6;
+        padding-bottom: 1rem;
+        margin-bottom: 1rem;
+    }
+    .thread-container {
+        display: flex;
+        flex-direction: column;
+        height: calc(100vh - 250px); /* Adjust 250px based on header/footer/margins */
+        min-height: 500px;
+        background-color: #ffffff;
+    }
+    .thread-body {
+        flex-grow: 1;
+        overflow-y: auto; /* Makes the message area scrollable */
+        padding: 1.5rem;
+    }
+    .message-group {
+        display: flex;
+        margin-bottom: 1.5rem;
+        gap: 1rem;
+    }
+    .message-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        object-fit: cover;
+        flex-shrink: 0;
+    }
+    .message-content {
+        max-width: 80%;
+    }
+    .message-bubble {
+        padding: 0.75rem 1.25rem;
+        border-radius: 1rem;
+        line-height: 1.5;
+        width: fit-content;
+    }
+    .message-bubble p:last-child {
+        margin-bottom: 0;
+    }
+    .message-meta {
+        font-size: 0.75rem;
+        color: #6c757d;
+        margin-top: 0.5rem;
+    }
+    /* Styles for the logged-in user's messages (sender) */
+    .message-group.is-sender {
+        flex-direction: row-reverse; /* Align avatar to the right */
+    }
+    .message-group.is-sender .message-bubble {
+        background-color: #0d6efd;
+        color: white;
+        border-bottom-right-radius: 0.25rem;
+    }
+    .message-group.is-sender .message-meta {
+        text-align: right;
+    }
+    /* Styles for the other person's messages (recipient) */
+    .message-group.is-recipient {
+        flex-direction: row;
+    }
+    .message-group.is-recipient .message-bubble {
+        background-color: #e9ecef;
+        color: #212529;
+        border-bottom-left-radius: 0.25rem;
+    }
+    .reply-form-container {
+        padding: 1.5rem;
+        border-top: 1px solid #dee2e6;
+        background-color: #f8f9fa;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container my-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-9 col-xl-8"> {# <<<< KEY: This controls the width (60-75% on large screens) #}
+            
+            <div class="thread-header d-flex align-items-center">
+                <a href="{% url 'message_inbox' %}" class="btn btn-outline-secondary me-3"><i class="bi bi-arrow-left"></i></a>
+                <div>
+                    <h3 class="h4 mb-0">{{ parent_message.title }}</h3>
+                    {% if parent_message.student_context %}
+                        <p class="text-muted mb-0 small">Regarding: {{ parent_message.student_context.user.get_full_name }}</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="thread-container">
+                    <!-- Message Bubbles -->
+                    <div class="thread-body" id="message-thread-body">
+                        <!-- Parent Message -->
+                        {% with message=parent_message %}
+                            <div class="message-group {% if message.sender == user %}is-sender{% else %}is-recipient{% endif %}">
+                                {% if message.sender.teacher.profile_image %}
+                                    <img src="{{ message.sender.teacher.profile_image.url }}" alt="{{ message.sender.username }}" class="message-avatar">
+                                {% elif message.sender.student_profile.profile_image %}
+                                    <img src="{{ message.sender.student_profile.profile_image.url }}" alt="{{ message.sender.username }}" class="message-avatar">
+                                {% elif message.sender.guardian_profile.profile_image %}
+                                    <img src="{{ message.sender.guardian_profile.profile_image.url }}" alt="{{ message.sender.username }}" class="message-avatar">
+                                {% else %}
+                                    <img src="{% static 'images/profile_images/default.jpg' %}" alt="Default Avatar" class="message-avatar">
+                                {% endif %}
+                                <div class="message-content">
+                                    <div class="message-bubble">{{ message.content|linebreaksbr }}</div>
+                                    <div class="message-meta">{{ message.sender.first_name }} · {{ message.sent_at|date:"d M, P" }}</div>
+                                </div>
+                            </div>
+                        {% endwith %}
+                        
+                        <!-- Replies -->
+                        {% for reply in thread_messages %}
+                            <div class="message-group {% if reply.sender == user %}is-sender{% else %}is-recipient{% endif %}">
+                                {% if reply.sender.teacher.profile_image %}
+                                    <img src="{{ reply.sender.teacher.profile_image.url }}" alt="{{ reply.sender.username }}" class="message-avatar">
+                                {% elif reply.sender.student_profile.profile_image %}
+                                    <img src="{{ reply.sender.student_profile.profile_image.url }}" alt="{{ reply.sender.username }}" class="message-avatar">
+                                {% elif reply.sender.guardian_profile.profile_image %}
+                                    <img src="{{ reply.sender.guardian_profile.profile_image.url }}" alt="{{ reply.sender.username }}" class="message-avatar">
+                                {% else %}
+                                    <img src="{% static 'images/profile_images/default.jpg' %}" alt="Default Avatar" class="message-avatar">
+                                {% endif %}
+                                <div class="message-content">
+                                    <div class="message-bubble">{{ reply.content|linebreaksbr }}</div>
+                                    <div class="message-meta">{% if reply.sender == user %}You{% else %}{{ reply.sender.first_name }}{% endif %} · {{ reply.sent_at|date:"d M, P" }}</div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+
+                    <!-- Reply Form -->
+                    <div class="reply-form-container">
+                        <form method="POST">
+                            {% csrf_token %}
+                            {{ reply_form.content.label_tag }}
+                            {{ reply_form.content }}
+                            <div class="d-none">{{ reply_form.title }}</div>
+                            <button type="submit" class="btn btn-primary mt-2 w-100">
+                                <i class="bi bi-send-fill me-1"></i> Send Reply
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<script>
+    // Auto-scroll to the bottom of the message thread
+    document.addEventListener('DOMContentLoaded', function() {
+        const threadBody = document.getElementById('message-thread-body');
+        if (threadBody) {
+            threadBody.scrollTop = threadBody.scrollHeight;
+        }
+    });
+</script>
+{% endblock %}

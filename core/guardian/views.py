@@ -14,10 +14,11 @@ from django.http import HttpResponse, Http404
 from django.views import View
 from django.core.paginator import Paginator
 from django.db.models import Q
+from decimal import Decimal
 from playwright.sync_api import sync_playwright
-from .forms import GuardianRegistrationForm
-from core.models import Guardian, Term, Session, FinancialRecord, Student, Result, Subject, SubjectResult, Attendance
-from core.models import Assignment, Assessment, Exam, AssessmentSubmission, ExamSubmission, AcademicAlert
+from .forms import GuardianRegistrationForm, MessageForm, ReplyForm
+from core.models import CustomUser, Guardian, Term, Teacher, Session, FinancialRecord, Student, Result, Subject, SubjectResult, Attendance
+from core.models import Assignment, Assessment, Exam, AssessmentSubmission, ExamSubmission, Message
 from core.assignment.forms import AssignmentSubmission, AssignmentSubmissionForm
 
 
@@ -569,7 +570,7 @@ def view_assessment_result(request, assessment_id):
     if render_select_page:
         return render(request, 'results/select_student.html', select_context) 
     if not student:
-        return redirect('guardian_dashboard' if hasattr(request.user, 'guardian_profile') else 'student_dashboard')
+        return redirect('guardian_dashboard' if hasattr(request.user, 'guardian') else 'student_dashboard')
 
     try:
         submission = AssessmentSubmission.objects.get(assessment=assessment, student=student)
@@ -634,76 +635,153 @@ def view_assessment_result(request, assessment_id):
     return render(request, 'results/view_result_detail.html', context)
 
 
-@login_required
 def view_exam_result(request, exam_id):
     exam = get_object_or_404(Exam, id=exam_id)
     student, render_select_page, select_context = _get_student_for_result_view(
         request, exam, 'Exam', 'view_exam_result', 'submit_exam'
     )
+
     if render_select_page:
-        return render(request, 'results/select_student_for_result.html', select_context)
+        return render(request, 'results/select_student.html', select_context) 
     if not student:
-        return redirect('guardian_dashboard' if hasattr(request.user, 'guardian_profile') else 'student_dashboard')
-    # ... rest of the logic similar to view_assessment_result ...
+        return redirect('guardian_dashboard' if hasattr(request.user, 'guardian') else 'student_dashboard')
+
     try:
         submission = ExamSubmission.objects.get(exam=exam, student=student)
     except ExamSubmission.DoesNotExist:
-        messages.warning(request, f"No submission found for exam '{exam.title}' for {student.user.get_full_name()}.")
+        messages.warning(request, f"No submission found for '{exam.title}' for {student.user.get_full_name()}.")
         return redirect('view_exam', exam_id=exam.id)
 
-    questions_with_answers = []
-    for question in exam.questions.all().order_by('id'): 
-        student_answer_data = submission.answers.get(str(question.id))
-        questions_with_answers.append({
+    questions_data_for_template = []
+    for question in exam.questions.all().order_by('id'):
+        student_answer_raw = submission.answers.get(str(question.id)) # Raw stored answer
+        
+        # Determine if student's answer was correct (for SCQ/MCQ)
+        is_overall_correct_display = None
+        if question.question_type != 'ES':
+            is_overall_correct_display = question.is_option_correct(student_answer_raw)
+
+        # Prepare options with status for display
+        options_with_status = []
+        if question.question_type in ['SCQ', 'MCQ']:
+            all_available_options = question.options_list() # List of all options for this question
+            
+            # Get the list of correct answers for this question
+            correct_answers_for_question_set = set()
+            if question.correct_answer:
+                if ',' in question.correct_answer: # Assuming MCQ correct answers are comma-separated
+                    correct_answers_for_question_set = set(opt.strip().lower() for opt in question.correct_answer.split(','))
+                else: # SCQ or MCQ with single correct answer string
+                    correct_answers_for_question_set.add(str(question.correct_answer).strip().lower())
+
+            # Get the student's choices for this question (ensure it's a list for MCQs)
+            student_choices_for_question_list = []
+            if question.question_type == 'MCQ' and isinstance(student_answer_raw, list):
+                student_choices_for_question_list = [str(sa).strip().lower() for sa in student_answer_raw]
+            elif student_answer_raw is not None: # SCQ or Essay (treat as single choice for this list)
+                student_choices_for_question_list = [str(student_answer_raw).strip().lower()]
+            
+            for opt_text in all_available_options:
+                opt_text_lower = str(opt_text).strip().lower()
+                options_with_status.append({
+                    'text': opt_text,
+                    'is_correct': opt_text_lower in correct_answers_for_question_set,
+                    'is_student_choice': opt_text_lower in student_choices_for_question_list,
+                })
+        
+        questions_data_for_template.append({
+            'question_instance': question, 
             'question_text': question.question_text,
             'question_type': question.question_type,
-            'options': question.options_list(),
-            'correct_answer': question.correct_answer,
-            'student_answer': student_answer_data,
-            'is_correct_display': question.is_option_correct(student_answer_data) if question.question_type != 'ES' else None,
+            'options_detailed': options_with_status, 
+            'student_answer_display': student_answer_raw, # The raw answer for "Your Answer" section
+            'correct_answer_model': question.correct_answer, # The model's correct_answer string for essays/SCQ display
+            'is_correct_display': is_overall_correct_display, # Overall correctness for card border
         })
-    
+
     context = {
-        'item': exam, 'submission': submission, 'questions_with_answers': questions_with_answers,
-        'item_type_verbose': 'Exam', 'student_viewing': student,
+        'item': exam,
+        'submission': submission,
+        'questions_with_answers': questions_data_for_template,
+        'item_type_verbose': 'Exam',
+        'student_viewing': student,
     }
     return render(request, 'results/view_result_detail.html', context)
 
 
-@login_required
 def view_assignment_result(request, assignment_id):
     assignment = get_object_or_404(Assignment, id=assignment_id)
     student, render_select_page, select_context = _get_student_for_result_view(
         request, assignment, 'Assignment', 'view_assignment_result', 'submit_assignment'
     )
+
     if render_select_page:
-        return render(request, 'results/select_student_for_result.html', select_context)
+        return render(request, 'results/select_student.html', select_context) 
     if not student:
-        return redirect('guardian_dashboard' if hasattr(request.user, 'guardian_profile') else 'student_dashboard')
-    # ... rest of the logic similar to view_assessment_result ...
+        return redirect('guardian_dashboard' if hasattr(request.user, 'guardian') else 'student_dashboard')
+
     try:
         submission = AssignmentSubmission.objects.get(assignment=assignment, student=student)
     except AssignmentSubmission.DoesNotExist:
-        messages.warning(request, f"No submission found for assignment '{assignment.title}' for {student.user.get_full_name()}.")
+        messages.warning(request, f"No submission found for '{assignment.title}' for {student.user.get_full_name()}.")
         return redirect('view_assignment', assignment_id=assignment.id)
 
-    questions_with_answers = []
+    questions_data_for_template = []
     for question in assignment.questions.all().order_by('id'):
-        student_answer_data = submission.answers.get(str(question.id))
-        questions_with_answers.append({
+        student_answer_raw = submission.answers.get(str(question.id)) # Raw stored answer
+        
+        # Determine if student's answer was correct (for SCQ/MCQ)
+        is_overall_correct_display = None
+        if question.question_type != 'ES':
+            is_overall_correct_display = question.is_option_correct(student_answer_raw)
+
+        # Prepare options with status for display
+        options_with_status = []
+        if question.question_type in ['SCQ', 'MCQ']:
+            all_available_options = question.options_list() # List of all options for this question
+            
+            # Get the list of correct answers for this question
+            correct_answers_for_question_set = set()
+            if question.correct_answer:
+                if ',' in question.correct_answer: # Assuming MCQ correct answers are comma-separated
+                    correct_answers_for_question_set = set(opt.strip().lower() for opt in question.correct_answer.split(','))
+                else: # SCQ or MCQ with single correct answer string
+                    correct_answers_for_question_set.add(str(question.correct_answer).strip().lower())
+
+            # Get the student's choices for this question (ensure it's a list for MCQs)
+            student_choices_for_question_list = []
+            if question.question_type == 'MCQ' and isinstance(student_answer_raw, list):
+                student_choices_for_question_list = [str(sa).strip().lower() for sa in student_answer_raw]
+            elif student_answer_raw is not None: # SCQ or Essay (treat as single choice for this list)
+                student_choices_for_question_list = [str(student_answer_raw).strip().lower()]
+            
+            for opt_text in all_available_options:
+                opt_text_lower = str(opt_text).strip().lower()
+                options_with_status.append({
+                    'text': opt_text,
+                    'is_correct': opt_text_lower in correct_answers_for_question_set,
+                    'is_student_choice': opt_text_lower in student_choices_for_question_list,
+                })
+        
+        questions_data_for_template.append({
+            'question_instance': question, 
             'question_text': question.question_text,
             'question_type': question.question_type,
-            'options': question.options_list,
-            'correct_answer': question.correct_answer,
-            'student_answer': student_answer_data,
-            'is_correct_display': question.is_option_correct(student_answer_data) if hasattr(question, 'is_option_correct') and question.question_type != 'ES' else None,
+            'options_detailed': options_with_status, 
+            'student_answer_display': student_answer_raw, # The raw answer for "Your Answer" section
+            'correct_answer_model': question.correct_answer, # The model's correct_answer string for essays/SCQ display
+            'is_correct_display': is_overall_correct_display, # Overall correctness for card border
         })
-    
+
     context = {
-        'item': assignment, 'submission': submission, 'questions_with_answers': questions_with_answers,
-        'item_type_verbose': 'Assignment', 'student_viewing': student,
+        'item': assignment,
+        'submission': submission,
+        'questions_with_answers': questions_data_for_template, # Pass the processed list
+        'item_type_verbose': 'Assessment',
+        'student_viewing': student,
     }
     return render(request, 'results/view_result_detail.html', context)
+
 
 def export_guardians(request):
     # Implement export logic here
@@ -756,11 +834,11 @@ def view_student_result(request, student_id, term_id):
         try:
             profile_image_url = build_absolute_uri(request, student.profile_image.url)
         except Exception as e:
-            print(f"Error building profile image URL: {e}") # Log error but continue
+            print(f"Error building profile image URL: {e}")
 
     # Attendance Data
-    total_days = Attendance.objects.filter(student=student, term=term).count() # Filter by term too? Adjust if needed.
-    present_days = Attendance.objects.filter(student=student, term=term, is_present=True).count() # Filter by term too?
+    total_days = Attendance.objects.filter(student=student, term=term).count() 
+    present_days = Attendance.objects.filter(student=student, term=term, is_present=True).count() 
     absent_days = total_days - present_days
     attendance_percentage = (present_days / total_days * 100) if total_days > 0 else 0
 
@@ -768,7 +846,7 @@ def view_student_result(request, student_id, term_id):
         'total_days': total_days,
         'present_days': present_days,
         'absent_days': absent_days,
-        'attendance_percentage': round(attendance_percentage, 1), # Round for display
+        'attendance_percentage': round(attendance_percentage, 1), 
     }
 
     # Teacher and Principal Remarks
@@ -786,11 +864,24 @@ def view_student_result(request, student_id, term_id):
     subject_results_query = SubjectResult.objects.filter(
         result=result,
         subject__in=subjects_in_class_term,
-    ).select_related('subject') # Optimize subject name lookup
+    ).select_related('subject') 
+
+    gpa_points_sum = Decimal('0.0')
+    total_weights = Decimal('0.0')
+    scored_subjects_count = 0
+
+    for sr in subject_results_query:
+        if sr.total_score() > 0: # Only include subjects with scores in GPA calculation
+            weight = Decimal(getattr(sr.subject, 'subject_weight', 1))
+            gpa_points_sum += Decimal(sr.calculate_grade_point()) * weight
+            total_weights += weight
+            scored_subjects_count += 1
+            
+    term_gpa = (gpa_points_sum / total_weights) if total_weights > 0 else Decimal('0.00')
 
     # Prepare data for Chart.js and potentially for PDF (if chart is rendered as image later)
     chart_data = []
-    subject_results_list = [] # Keep the queryset for the main template table
+    subject_results_list = [] 
     for sr in subject_results_query:
         class_average = sr.get_class_average(sr.subject, term, class_obj) 
         total_score_val = sr.total_score() 
@@ -816,6 +907,7 @@ def view_student_result(request, student_id, term_id):
         'session': session, 
         'class_obj': class_obj,
         'subject_results': subject_results_list, 
+        'term_gpa': term_gpa,
         'chart_data_json': json.dumps(chart_data), 
         'attendance_data': attendance_data,
         'teacher_comment': teacher_remarks,
@@ -823,7 +915,7 @@ def view_student_result(request, student_id, term_id):
         'profile_image_url': profile_image_url,
         'school_logo_url': school_logo_url,
         'signature_url': signature_url,
-        'is_pdf_render': False, # Flag for conditional rendering in template (optional)
+        'is_pdf_render': False, 
     }
 
     # --- PDF Download Handling ---
@@ -831,7 +923,7 @@ def view_student_result(request, student_id, term_id):
         if HTML is None:
             return HttpResponse("PDF generation library (WeasyPrint) is not installed or configured correctly.", status=501) # 501 Not Implemented
 
-        context['is_pdf_render'] = True # Set flag for PDF context
+        context['is_pdf_render'] = True 
 
         # Render HTML to string using the SAME template
         html_string = render_to_string('guardian/view_result.html', context)
@@ -882,3 +974,176 @@ def view_student_result(request, student_id, term_id):
         return response
 
     return render(request, 'guardian/view_result.html', context)
+
+
+@login_required
+def message_inbox(request):
+    """
+    A central, generic inbox for the logged-in user.
+    Shows received message threads.
+    """
+    user = request.user
+
+    conversations = Message.objects.filter(
+        (Q(recipient=user) | Q(sender=user)),
+        parent_message__isnull=True
+    ).select_related('sender', 'recipient', 'student_context__user').prefetch_related('replies').distinct().order_by('-updated_at')
+
+    Message.objects.filter(recipient=request.user, is_read=False).update(is_read=True)
+    unread_count = conversations.filter(recipient=user, is_read=False).count()
+    
+    context = {
+        'conversations': conversations,
+        'unread_count': unread_count, 
+        'page_title': "My Inbox"
+    }
+
+    return render(request, 'messaging/inbox.html', context)
+
+
+@login_required
+def compose_message(request):
+    """
+    A generic view for composing a message.
+    The list of possible recipients is determined by the sender's role.
+    Recipient and other context can be pre-selected via GET parameters.
+    """
+    sender = request.user
+    
+    # --- Determine the queryset of possible recipients based on the sender's role ---
+    recipient_qs = CustomUser.objects.none() 
+    student_context_qs = Student.objects.none() 
+
+    if sender.role == 'student':
+        # Students can message their teachers and admins
+        student = getattr(sender, 'student', None) 
+        if student:
+            teacher_ids = Teacher.objects.filter(
+                Q(teacherassignment__class_assigned=student.current_class) |
+                Q(subjectassignment__class_assigned=student.current_class)
+            ).values_list('user_id', flat=True)
+            recipient_qs = CustomUser.objects.filter(Q(id__in=teacher_ids) | Q(role='admin')).exclude(pk=sender.pk).distinct()
+            student_context_qs = Student.objects.filter(pk=student.pk)
+
+    elif sender.role == 'teacher':
+        # Teachers can message guardians of their students, colleagues, and admins
+        teacher = getattr(sender, 'teacher', None)
+        if teacher:
+            assigned_classes = teacher.assigned_classes()
+            students_taught = Student.objects.filter(current_class__in=assigned_classes, status='active')
+            guardian_ids = students_taught.filter(student_guardian__isnull=False).values_list('student_guardian__user_id', flat=True)
+            
+            colleague_ids = Teacher.objects.exclude(pk=teacher.pk).values_list('user_id', flat=True)
+            
+            recipient_qs = CustomUser.objects.filter(
+                Q(guardian__pk__in=guardian_ids) |
+                Q(id__in=colleague_ids) |
+                Q(role='admin')
+            ).distinct()
+            student_context_qs = students_taught
+
+    elif sender.role == 'guardian':
+        # Guardians can message teachers of their wards and admins
+        guardian = getattr(sender, 'guardian', None)
+        if guardian:
+            wards = guardian.students.all()
+            teacher_ids = Teacher.objects.filter(
+                Q(teacherassignment__class_assigned__in=wards.values_list('current_class', flat=True)) |
+                Q(subjectassignment__class_assigned__in=wards.values_list('current_class', flat=True))
+            ).values_list('user_id', flat=True)
+            recipient_qs = CustomUser.objects.filter(Q(id__in=teacher_ids) | Q(role='admin')).distinct()
+            student_context_qs = wards
+
+    elif sender.role == 'admin':
+        # Admins can message anyone
+        recipient_qs = CustomUser.objects.all().exclude(pk=sender.pk)
+        student_context_qs = Student.objects.filter(status='active')
+    
+    # --- Initialize variables for context ---
+    recipient_preselected = None
+    student_context = None
+    initial_form_data = {}
+
+    # --- Check for pre-selected data from GET parameters ---
+    recipient_id = request.GET.get('recipient_id')
+    student_context_id = request.GET.get('student_context_id')
+
+    if recipient_id:
+        try:
+            # Fetch the pre-selected recipient object to display their name
+            recipient_preselected = recipient_qs.get(pk=recipient_id)
+            initial_form_data['recipient'] = recipient_preselected
+        except CustomUser.DoesNotExist:
+            messages.error(request, "The specified recipient is invalid or you are not allowed to message them.")
+            return redirect('message_inbox')
+    
+    if student_context_id:
+        try:
+            student_context = student_context_qs.get(pk=student_context_id)
+            initial_form_data['student_context'] = student_context
+        except Student.DoesNotExist:
+            pass
+
+    # --- Handle Form Submission ---
+    if request.method == 'POST':
+        form = MessageForm(request.POST, recipient_queryset=recipient_qs, student_queryset=student_context_qs)
+        if form.is_valid():
+            message = form.save(commit=False)
+            message.sender = sender
+            message.save()
+            messages.success(request, "Message sent successfully!")
+            return redirect('message_inbox')
+    else: # GET request
+        form = MessageForm(initial=initial_form_data, recipient_queryset=recipient_qs, student_queryset=student_context_qs)
+    
+    context = {
+        'form': form,
+        'recipient_preselected': recipient_preselected, 
+        'student_context': student_context, 
+        'page_title': "Compose Message"
+    }
+    return render(request, 'messaging/compose_message.html', context)
+
+
+@login_required
+def message_thread(request, thread_id):
+    # Fetch the parent message of the thread
+    parent_message = get_object_or_404(Message, pk=thread_id, parent_message__isnull=True)
+
+    # Authorization check: user must be the sender or recipient
+    if request.user not in [parent_message.sender, parent_message.recipient]:
+        raise Http404
+
+    # Mark all messages in this thread as read by the current user
+    Message.objects.filter(
+        Q(pk=thread_id) | Q(parent_message_id=thread_id),
+        recipient=request.user, is_read=False
+    ).update(is_read=True)
+    
+    thread_messages = parent_message.replies.all().order_by('sent_at')
+
+    # Setup form for a new reply
+    reply_recipient = parent_message.sender if request.user == parent_message.recipient else parent_message.recipient
+    
+    if request.method == 'POST':
+        reply_form = ReplyForm(request.POST)
+        if reply_form.is_valid():
+            reply = reply_form.save(commit=False)
+            reply.sender = request.user
+            reply.recipient = reply_recipient
+            reply.parent_message = parent_message
+            if parent_message.student_context: # Carry over the student context
+                reply.student_context = parent_message.student_context
+            reply.save()
+            messages.success(request, "Reply sent.")
+            return redirect('message_thread', thread_id=thread_id)
+    else:
+        reply_form = MessageForm(initial={'title': f"Re: {parent_message.title}"})
+
+    context = {
+        'parent_message': parent_message,
+        'thread_messages': thread_messages,
+        'reply_form': reply_form,
+        'reply_recipient': reply_recipient,
+    }
+    return render(request, 'messaging/message_thread.html', context)

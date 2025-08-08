@@ -1,0 +1,130 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load custom_filters %} {# Load your custom filters file #}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="card shadow-sm">
+        <div class="card-header bg-success text-white d-flex justify-content-between align-items-center">
+            <h4 class="mb-0">📊 Broadsheet for {{ term.name }}</h4>
+            <a href="{% url 'termly_broadsheets' %}" class="btn btn-warning btn-sm">⬅ Back to Term Broadsheets</a>
+        </div>
+        <div class="card-body">
+            <div class="accordion" id="broadsheetAccordion">
+                {% for data in broadsheets %} {# Using 'data' from your view #}
+                <div class="accordion-item">
+                    <h2 class="accordion-header" id="heading{{ data.class.id }}">
+                        <button class="accordion-button {% if not forloop.first %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ data.class.id }}" aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}">
+                            📚 {{ data.class.name }}
+                        </button>
+                    </h2>
+                    <div id="collapse{{ data.class.id }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}" data-bs-parent="#broadsheetAccordion">
+                        <div class="accordion-body">
+                            <div class="table-responsive">
+                                <table class="table table-bordered table-striped">
+                                    <thead class="bg-light">
+                                        <tr>
+                                            <th>Student</th>
+                                            {% for subject in data.subjects %}
+                                                <th>{{ subject.name }}</th>
+                                            {% endfor %}
+                                            <th>Total Score</th>
+                                            <th>GPA</th>
+                                            <th>Approval</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for result_data in data.results_data %}
+                                        <tr>
+                                            <td><strong>{{ result_data.student.user.get_full_name }}</strong></td>
+                                    
+                                            {% for subject in data.subjects %}
+                                                {% with subject_result=result_data.subject_results|dict_key:subject.id %}
+                                                    <td>{{ subject_result.total_score|default_if_none:"-" }}</td>
+                                                {% endwith %}
+                                            {% endfor %}
+                                    
+                                            <td><strong>{{ result_data.total_score|floatformat:1 }}</strong></td>
+                                            <td><span class="badge bg-info">{{ result_data.gpa|floatformat:2 }}</span></td>
+                                            <td>
+                                                {% if result_data.is_approved %}
+                                                    <span class="badge bg-success">✅ Approved</span>
+                                                {% else %}
+                                                    <span class="badge bg-danger">❌ Not Approved</span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="text-center mt-3">
+                                {% if not data.is_all_approved %}
+                                    <button class="btn btn-success approve-btn" 
+                                            data-url="{% url 'approve_termly_broadsheet' term.id data.class.id %}">
+                                        ✅ Approve Broadsheet
+                                    </button>
+                                {% else %}
+                                    <span class="badge bg-success p-2">✅ Broadsheet Approved</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            {# This archive button was outside the loop, affecting the whole term #}
+            <div class="text-center mt-4">
+                <button class="btn btn-dark archive-btn" data-url="{% url 'archive_termly_broadsheet' term.id %}">
+                    📂 Archive All Results for {{ term.name }}
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Approve Broadsheet
+    document.querySelectorAll('.approve-btn').forEach(button => {
+        button.addEventListener('click', function(e) {
+            const url = this.getAttribute('data-url');
+            const csrfToken = '{{ csrf_token }}';
+            if (confirm('Are you sure you want to approve this broadsheet?')) {
+                fetch(url, {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    alert(data.message || data.error);
+                    window.location.reload();
+                })
+                .catch(error => console.error('Error:', error));
+            }
+        });
+    });
+
+    // Archive Broadsheet for Term
+    document.querySelectorAll('.archive-btn').forEach(button => {
+        button.addEventListener('click', function(e) {
+            const url = this.getAttribute('data-url');
+            const csrfToken = '{{ csrf_token }}';
+            if (confirm('Are you sure you want to archive all results for this term? This action is usually final.')) {
+                fetch(url, {
+                    method: 'POST',
+                    headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' }
+                })
+                .then(response => response.json())
+                .then(data => {
+                    alert(data.message || data.error);
+                    window.location.reload();
+                })
+                .catch(error => console.error('Error:', error));
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

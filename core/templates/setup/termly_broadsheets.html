@@ -10,7 +10,7 @@
             <ul class="list-group">
                 {% for term in page_obj %}
                     <li class="list-group-item d-flex justify-content-between align-items-center">
-                        <a href="{% url 'view_broadsheet' term.id %}" class="text-decoration-none">
+                        <a href="{% url 'termly_broadsheet' term.id %}" class="text-decoration-none">
                             <strong>{{ term.name }}</strong> ({{ term.session }})
                         </a>
                         <span class="badge bg-info text-white">{{ term.start_date|date:"M Y" }} - {{ term.end_date|date:"M Y" }}</span>

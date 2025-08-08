@@ -1,30 +1,119 @@
-{% load static humanize message_filters %}
+{% load static %}
 
-<div class="card">
-    <div class="card-header"><h5 class="mb-0">Messages from Teachers</h5></div>
-    <div class="card-body">
-        {% with student_messages_data=messages_data|get_item:student.user.id %}
-        {% if student_messages_data.messages %}
-            <div class="list-group">
-                {% for message in student_messages_data.messages|slice:":10" %} {# Show most recent 10 #}
-                    <a class="list-group-item list-group-item-action" data-bs-toggle="collapse" href="#message-{{ message.id }}">
-                        <div class="d-flex w-100 justify-content-between">
-                            <h6 class="mb-1">{{ message.title }}</h6>
-                            <small class="text-muted">{{ message.date|date:"d M Y" }}</small>
-                        </div>
-                        <p class="mb-1 text-truncate">{{ message.content }}</p>
-                        <small class="text-muted">From: {{ message.sender }}</small>
-                    </a>
-                    <div class="collapse" id="message-{{ message.id }}">
-                        <div class="card card-body mt-2 bg-light border-0">
-                            {{ message.content|linebreaksbr }}
-                        </div>
+<h3 class="widget-title"><i class="bi bi-chat-left-text-fill me-2"></i>Communication Center</h3>
+
+<div class="card shadow-sm">
+    <div class="card-header">
+        <!-- Tab navigation -->
+        <ul class="nav nav-tabs card-header-tabs" id="guardianCommTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="guardian-inbox-tab" data-bs-toggle="tab" data-bs-target="#guardian-inbox-panel" type="button" role="tab">
+                    <i class="bi bi-inbox-fill me-1"></i> Inbox
+                    {% if unread_message_count > 0 %}
+                        <span class="badge bg-danger rounded-pill ms-1">{{ unread_message_count }}</span>
+                    {% endif %}
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="guardian-compose-tab" data-bs-toggle="tab" data-bs-target="#guardian-compose-panel" type="button" role="tab">
+                    <i class="bi bi-send-plus-fill me-1"></i> Compose
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="guardian-notifications-tab" data-bs-toggle="tab" data-bs-target="#guardian-notifications-panel" type="button" role="tab">
+                    <i class="bi bi-bell-fill me-1"></i> School Notices
+                    {% if notifications %}
+                        <span class="badge bg-info rounded-pill ms-1">{{ notifications.count }}</span>
+                    {% endif %}
+                </button>
+            </li>
+        </ul>
+    </div>
+
+    <div class="card-body p-0">
+        <div class="tab-content" id="guardianCommTabsContent">
+            <!-- Inbox Panel -->
+            <div class="tab-pane fade show active" id="guardian-inbox-panel" role="tabpanel">
+                {% if received_messages %}
+                    <div class="list-group list-group-flush">
+                        {% for message in received_messages|slice:":7" %}
+                            <a href="{% url 'message_thread' message.id %}" class="list-group-item list-group-item-action py-3">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <h6 class="mb-1 {% if not message.is_read %}fw-bold text-primary{% endif %}">{{ message.title }}</h6>
+                                    <small class="text-muted">{{ message.sent_at|timesince }} ago</small>
+                                </div>
+                                <p class="mb-1 small">From: <strong>{{ message.sender.get_full_name|default:message.sender.username }}</strong></p>
+                                {% if message.student_context %}
+                                    <small class="text-muted">Regarding: {{ message.student_context.user.get_full_name }}</small>
+                                {% endif %}
+                            </a>
+                        {% endfor %}
                     </div>
-                {% endfor %}
+                    {% if received_messages.count > 7 %}
+                    <div class="card-footer text-center">
+                        <a href="{% url 'message_inbox' %}">View Full Inbox</a>
+                    </div>
+                    {% endif %}
+                {% else %}
+                    <div class="text-center text-muted p-4">Your inbox is empty.</div>
+                {% endif %}
             </div>
-        {% else %}
-            <p class="text-muted text-center">No messages regarding this student.</p>
-        {% endif %}
-        {% endwith %}
+
+            <!-- Notifications Panel -->
+            <div class="tab-pane fade" id="guardian-notifications-panel" role="tabpanel">
+                {% if notifications %}
+                    <div class="list-group list-group-flush">
+                        {% for notification in notifications|slice:":10" %}
+                            <div class="list-group-item py-3">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <h6 class="mb-1">{{ notification.title }}</h6>
+                                    <small class="text-muted">{{ notification.created_at|date:"d M, Y" }}</small>
+                                </div>
+                                <p class="mb-0 small">{{ notification.message|safe|linebreaksbr }}</p>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="text-center text-muted p-4">No new school notices.</div>
+                {% endif %}
+            </div>
+
+            <!-- Compose Panel -->
+            <div class="tab-pane fade" id="guardian-compose-panel" role="tabpanel">
+                <div class="p-3">
+                    <form method="POST" action="{% url 'compose_message' %}">
+                        {% csrf_token %}
+                        <div class="mb-3">
+                            <label for="recipient" class="form-label">To</label>
+                            <select name="recipient" class="form-select" required>
+                                <option value="" selected disabled>-- Select a Teacher or Admin --</option>
+                                {% for teacher in guardian_teachers %}
+                                    <option value="{{ teacher.user.id }}">{{ teacher.user.get_full_name }} (Teacher)</option>
+                                {% endfor %}
+                                {# You can add Admin users here if needed #}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="student_context" class="form-label">Regarding (Which Child)</label>
+                            <select name="student_context" class="form-select" required>
+                                <option value="" selected disabled>-- Select Your Child --</option>
+                                {% for student in students %}
+                                    <option value="{{ student.pk }}">{{ student.user.get_full_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label for="title" class="form-label">Subject</label>
+                            <input type="text" name="title" class="form-control" required>
+                        </div>
+                        <div class="mb-3">
+                             <label for="content" class="form-label">Message</label>
+                            <textarea name="content" class="form-control" rows="4" required></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Send Message</button>
+                    </form>
+                </div>
+            </div>
+        </div>
     </div>
 </div>

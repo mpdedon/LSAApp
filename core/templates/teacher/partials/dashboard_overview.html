@@ -1,0 +1,18 @@
+<h3 class="widget-title"><i class="bi bi-speedometer2 me-2"></i>At a Glance</h3>
+<div class="row g-4">
+    <div class="col-md-6 col-xl-3"><div class="card bg-info bg-gradient text-white h-100"><div class="card-body text-center"><div class="fs-1 fw-bold">{{ form_teacher_classes_count|default:0 }}</div><div class="small">Form Class(es)</div></div><a href="#classes" onclick="new bootstrap.Tab(document.getElementById('classes-tab')).show();" class="card-footer text-white text-decoration-none text-center small stretched-link">View Details <i class="bi bi-arrow-right-circle"></i></a></div></div>
+    <div class="col-md-6 col-xl-3"><div class="card bg-success bg-gradient text-white h-100"><div class="card-body text-center"><div class="fs-1 fw-bold">{{ student_count|default:0 }}</div><div class="small">Total Students</div></div><a href="#classes" onclick="new bootstrap.Tab(document.getElementById('classes-tab')).show();" class="card-footer text-white text-decoration-none text-center small stretched-link">View Students <i class="bi bi-arrow-right-circle"></i></a></div></div>
+    <div class="col-md-6 col-xl-3"><div class="card bg-secondary bg-gradient text-white h-100"><div class="card-body text-center"><div class="fs-1 fw-bold">{{ subject_count|default:0 }}</div><div class="small">Subjects Taught</div></div><a href="#scores" onclick="new bootstrap.Tab(document.getElementById('scores-tab')).show();" class="card-footer text-white text-decoration-none text-center small stretched-link">View Subjects <i class="bi bi-arrow-right-circle"></i></a></div></div>
+    <div class="col-md-6 col-xl-3"><div class="card bg-warning bg-gradient text-dark h-100"><div class="card-body text-center"><div class="fs-1 fw-bold">{{ pending_submissions.count|default:0 }}</div><div class="small">Submissions to Grade</div></div><a href="#scores" onclick="new bootstrap.Tab(document.getElementById('scores-tab')).show();" class="card-footer text-dark text-decoration-none text-center small stretched-link">Grade Now <i class="bi bi-arrow-right-circle"></i></a></div></div>
+</div>
+<hr class="my-4">
+<div class="row g-4">
+    <div class="col-lg-6">
+        <h3 class="widget-title"><i class="bi bi-list-check me-2"></i>Upcoming Tasks</h3>
+        {% if upcoming_tasks %}<div class="list-group">{% for task in upcoming_tasks %}<div class="list-group-item"><div class="d-flex w-100 justify-content-between"><h6 class="mb-1">{{ task.obj.title }} <span class="badge bg-secondary fw-normal">{{ task.type }}</span></h6><small class="task-deadline">Due {{ task.obj.due_date|date:"D, M d" }}</small></div><p class="mb-1 small text-muted">For {{ task.obj.class_assigned.name }} - {{ task.obj.subject.name }}</p></div>{% endfor %}</div>{% else %}<div class="alert alert-light text-center">No upcoming tasks.</div>{% endif %}
+    </div>
+    <div class="col-lg-6">
+        <h3 class="widget-title"><i class="bi bi-bell me-2"></i>Notifications</h3>
+        {% if notifications %}<div class="list-group">{% for n in notifications %}<div class="list-group-item"><p class="mb-0 small">{{ n.message }}</p></div>{% endfor %}</div>{% else %}<div class="alert alert-light text-center">No notifications.</div>{% endif %}
+    </div>
+</div>

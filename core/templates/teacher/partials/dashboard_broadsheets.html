@@ -1,0 +1,33 @@
+<h3 class="widget-title"><i class="bi bi-table me-2"></i>Results Broadsheets</h3>
+<p class="text-muted mb-4">Select a class to view its termly or sessional broadsheet. The sessional broadsheet provides a cumulative overview of all terms within a session.</p>
+
+<div class="row">
+    <!-- Termly Broadsheet Selection -->
+    <div class="col-md-6"><div class="card h-100"><div class="card-header"><strong>Termly Broadsheet</strong></div><div class="card-body">
+        <form id="termlyBroadsheetForm">
+            <div class="mb-3"><label for="termly-class-select" class="form-label">Select Class</label><select id="termly-class-select" name="class_id" class="form-select" required><option selected disabled value="">Choose...</option>{% for class in teacher_assigned_classes %}<option value="{{ class.id }}">{{ class.name }}</option>{% endfor %}</select></div>
+            <div class="mb-3"><label for="termly-term-select" class="form-label">Select Term</label><select id="termly-term-select" name="term_id" class="form-select" required><option selected disabled value="">Choose...</option>{% for term in selectable_terms %}<option value="{{ term.id }}">{{ term }}</option>{% endfor %}</select></div>
+            <div class="d-grid"><button type="submit" class="btn btn-primary">View Termly Broadsheet</button></div>
+        </form>
+    </div></div></div>
+
+    <!-- Sessional Broadsheet Selection -->
+    <div class="col-md-6"><div class="card h-100"><div class="card-header"><strong>Sessional Broadsheet</strong></div><div class="card-body">
+        <form id="sessionalBroadsheetForm">
+             <div class="mb-3"><label for="sessional-class-select" class="form-label">Select Class</label><select id="sessional-class-select" name="class_id" class="form-select" required><option selected disabled value="">Choose...</option>{% for class in teacher_assigned_classes %}<option value="{{ class.id }}">{{ class.name }}</option>{% endfor %}</select></div>
+             <div class="mb-3"><label for="sessional-session-select" class="form-label">Select Session</label><select id="sessional-session-select" name="session_id" class="form-select" required><option selected disabled value="">Choose...</option>{% for session in all_sessions %}<option value="{{ session.id }}">{{ session.name }}</option>{% endfor %}</select></div>
+             <div class="d-grid"><button type="submit" class="btn btn-success">View Sessional Broadsheet</button></div>
+        </form>
+    </div></div></div>
+</div>
+
+<script>
+document.getElementById('termlyBroadsheetForm').addEventListener('submit', function(e) {
+    e.preventDefault(); const classId = document.getElementById('termly-class-select').value; const termId = document.getElementById('termly-term-select').value;
+    if (classId && termId) { const url = `/teacher/broadsheet/${classId}/${termId}/`; window.location.href = url; } else { alert('Please select a class and a term.'); }
+});
+document.getElementById('sessionalBroadsheetForm').addEventListener('submit', function(e) {
+    e.preventDefault(); const classId = document.getElementById('sessional-class-select').value; const sessionId = document.getElementById('sessional-session-select').value;
+    if (classId && sessionId) { const url = `/teacher/broadsheet/sessional/${classId}/${sessionId}/`; window.location.href = url; } else { alert('Please select a class and a session.'); }
+});
+</script>

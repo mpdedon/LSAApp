@@ -34,19 +34,20 @@ from core.views import TermListView, TermDetailView, TermCreateView, TermUpdateV
 from core.views import promote_student, repeat_student, demote_student, mark_dormant_student, mark_left_student, mark_active
 from core.views import create_assessment, admin_assessment_list, approve_assessment, pending_assessments, view_assessment, admin_delete_assessment, assessment_submissions_list, class_subjects
 from core.views import create_exam, admin_exam_list, approve_exam, pending_exams, view_exam, admin_delete_exam, exam_submissions_list
-from core.views import broadsheets, view_broadsheet, approve_broadsheet, archive_broadsheet, admin_leaderboard_view
+from core.views import broadsheets, termly_broadsheet, approve_termly_broadsheet, archive_termly_broadsheet, admin_leaderboard_view
+from core.views import sessional_broadsheets, admin_sessional_broadsheet, approve_sessional_broadsheet, archive_sessional_broadsheet
 from core.views import FeeAssignmentCreateView, FeeAssignmentListView, FeeAssignmentUpdateView, FeeAssignmentDetailView, FeeAssignmentDeleteView, StudentFeeRecordListView
 from core.views import PaymentCreateView, PaymentListView, PaymentUpdateView, PaymentDetailView, PaymentDeleteView, FinancialRecordListView
-from core.views import StudentClassEnrollmentView, StudentEnrollmentsView
+from core.views import StudentClassEnrollmentView, StudentEnrollmentsView, message_inbox, message_thread, compose_message
 from core.views import AssignSubjectView, AssignTeacherView, AssignClassSubjectView, ClassSubjectRolloverView, DeleteClassSubjectAssigmentView
 from core.views import TeacherAssignmentListView, TeacherAssignmentRolloverView, TeacherAssignmentUpdateView, TeacherAssignmentDetailView, TeacherAssignmentDeleteView
 from core.views import SubjectCreateView, SubjectListView, SubjectUpdateView, SubjectDetailView, SubjectDeleteView
 from core.views import PostCreateView, PostUpdateView, PostDeleteView, ManagePostListView
 from core.views import CategoryCreateView, CategoryUpdateView, ManageCategoryListView, TagCreateView, TagUpdateView, ManageTagListView
 from core.student.views import StudentListView, StudentCreateView, StudentUpdateView, StudentDetailView, StudentDeleteView, BulkUpdateStudentsView, export_students, student_reports
-from core.student.views import submit_assignment, submit_assessment, submit_exam, message_teacher
+from core.student.views import submit_assignment, submit_assessment, submit_exam
 from core.teacher.views import TeacherListView, TeacherCreateView, TeacherUpdateView, TeacherDetailView, TeacherDeleteView, TeacherBulkActionView, export_teachers, teacher_reports
-from core.teacher.views import input_scores, broadsheet, mark_attendance, attendance_log, message_guardian, update_result, view_na_result, grade_essay_questions
+from core.teacher.views import input_scores, broadsheet, sessional_broadsheet, mark_attendance, attendance_log, update_result, view_na_result, grade_essay_questions
 from core.teacher.views import create_assignment, add_question, grade_assignment, view_submitted_assignments, update_assignment, delete_assignment, assignment_detail, assignment_list
 from core.teacher.views import create_assessment, teacher_assessment_list, view_assessment, update_assessment, delete_assessment, grade_essay_assessment
 from core.teacher.views import create_exam, teacher_exam_list, view_exam, update_exam, delete_exam, grade_essay_exam
@@ -131,15 +132,27 @@ urlpatterns = [
     path('terms/<int:pk>/delete/', TermDeleteView.as_view(), name='term_delete'),
     path('terms/<int:pk>/activate/', activate_term_view, name='term_activate'), 
 
+    # Internal Messaging URLs
+
+    path('messages/', message_inbox, name='message_inbox'),
+    path('messages/compose/', compose_message, name='compose_message'),
+    path('messages/thread/<int:thread_id>/', message_thread, name='message_thread'),
+
     # Enrollment URLs
     path('setup/enrol_student/', StudentClassEnrollmentView, name='enrol_student'),
     path('student/<int:student_id>/enrollments/', StudentEnrollmentsView, name='view_enrollments'),
     path('setup/promote_students', PromoteStudentView.as_view(), name='promote_students'),
-    path('all_broadsheets/', broadsheets, name='all_broadsheets'),
-    path('broadsheets/<int:term_id>/', view_broadsheet, name='view_broadsheet'),
-    path('broadsheets/approve/<int:term_id>/<int:class_id>/', approve_broadsheet, name='approve_broadsheet'),
-    path('broadsheets/archive/<int:term_id>/', archive_broadsheet, name='archive_broadsheet'),
+
+    # Broadsheet URLs
+    path('all_broadsheets/', broadsheets, name='termly_broadsheets'),
+    path('broadsheets/term/<int:term_id>/', termly_broadsheet, name='termly_broadsheet'),
+    path('broadsheets/approve/<int:term_id>/<int:class_id>/', approve_termly_broadsheet, name='approve_termly_broadsheet'),
+    path('broadsheets/archive/<int:term_id>/', archive_termly_broadsheet, name='archive_termly_broadsheet'),
     path('admin-leaderboards/', admin_leaderboard_view, name='admin_leaderboard_list'),
+    path('session-broadsheets', sessional_broadsheets, name='sessional_broadsheets'),
+    path('broadsheets/session/<int:session_id>/', admin_sessional_broadsheet, name='admin_sessional_broadsheet'),
+    path('broadsheets/approve/<int:session_id>/<int:class_id>/', approve_sessional_broadsheet, name='approve_sessional_broadsheet'),
+    path('broadsheets/archive/<int:session_id>/', archive_sessional_broadsheet, name='archive_sessional_broadsheet'),
 
     # Subject & Teacher Assignment URLs
     path('assign_teacher/', AssignTeacherView, name='assign_teacher'),
@@ -171,7 +184,6 @@ urlpatterns = [
     path('dormant/<int:pk>/', mark_dormant_student, name='mark_dormant_student'),
     path('left/<int:pk>/', mark_left_student, name='mark_left_student'),
     path('mark_active/<int:pk>/', mark_active, name='mark_active'),
-    path('dashboard/send-message/', message_teacher, name='send_message'),
 
     # Teacher URLs
     path('teachers/', TeacherListView.as_view(), name='teacher_list'),
@@ -186,8 +198,7 @@ urlpatterns = [
     path('input_scores/<int:class_id>/<int:subject_id>/<int:term_id>/', input_scores, name='input_scores'),
     path('update_result/student/<int:student_id>/result/<int:term_id>/update/', update_result, name='update_result'),
     path('view_na_result/<int:student_id>/<int:term_id>/', view_na_result, name='view_na_result'),
-    path('broadsheet/<int:class_id>/<int:term_id>/', broadsheet, name='broadsheet'),
-    path('message_guardian/<int:guardian_id>/', message_guardian, name='message_guardian'),
+    path('teacher/broadsheet/<int:class_id>/<int:term_id>/', broadsheet, name='broadsheet'),
     path('teachers/export/', export_teachers, name='export_teachers'),
     path('teachers/reports/', teacher_reports, name='teacher_reports'),
     path('assignments/create/', create_assignment, name='create_assignment'),
@@ -250,6 +261,8 @@ urlpatterns = [
     path('results/<int:pk>/update/', ResultUpdateView.as_view(), name='result_update'),
     path('results/<int:pk>/', ResultDetailView.as_view(), name='result_detail'),
     path('results/<int:pk>/delete/', ResultDeleteView.as_view(), name='result_delete'),
+    path('teacher/broadsheet/sessional/<int:class_id>/<int:session_id>/', sessional_broadsheet, name='sessional_broadsheet'),
+    #path('results/sessional/<int:student_id>/<int:session_id>/', sessional_result_view, name='sessional_result'),
 
     # Payment URLs
     path('payments/', PaymentListView.as_view(), name='payment_list'),

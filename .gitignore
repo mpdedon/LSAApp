@@ -47,8 +47,8 @@ db.sqlite3-journal
 
 # Ignore local media and static files collected by collectstatic
 # The slash at the beginning ensures it only matches at the project root
-/mediafiles/
-/staticfiles/
+#/mediafiles/
+#/staticfiles/
 # If you have a different STATIC_ROOT or MEDIA_ROOT, add them here
 # e.g., /public/static/
 
