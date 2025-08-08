@@ -119,7 +119,7 @@ class Migration(migrations.Migration):
             fields=[
                 ('user', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, primary_key=True, related_name='guardian', serialize=False, to=settings.AUTH_USER_MODEL)),
                 ('gender', models.CharField(choices=[('M', 'Male'), ('F', 'Female')], default='M', max_length=1)),
-                ('profile_image', models.ImageField(default='profile_images/default.jpg', upload_to='profile_images/')),
+                ('profile_image', models.ImageField(default='images/default.jpg', upload_to='profile_images/')),
                 ('contact', models.CharField(max_length=15, null=True)),
                 ('address', models.TextField()),
                 ('status', models.CharField(choices=[('active', 'Active'), ('dormant', 'Dormant'), ('left', 'Left School')], default='active', max_length=10)),
@@ -130,7 +130,7 @@ class Migration(migrations.Migration):
             fields=[
                 ('user', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, primary_key=True, related_name='student', serialize=False, to=settings.AUTH_USER_MODEL)),
                 ('LSA_number', models.CharField(max_length=20, null=True, unique=True)),
-                ('profile_image', models.ImageField(default='profile_images/default.jpg', upload_to='profile_images/')),
+                ('profile_image', models.ImageField(default='images/default.jpg', upload_to='profile_images/')),
                 ('date_of_birth', models.DateField()),
                 ('gender', models.CharField(choices=[('M', 'Male'), ('F', 'Female')], max_length=1)),
                 ('relationship', models.CharField(max_length=50)),
@@ -143,7 +143,7 @@ class Migration(migrations.Migration):
             fields=[
                 ('user', models.OneToOneField(on_delete=django.db.models.deletion.CASCADE, primary_key=True, related_name='teacher', serialize=False, to=settings.AUTH_USER_MODEL)),
                 ('employee_id', models.CharField(max_length=20, null=True, unique=True)),
-                ('profile_image', models.ImageField(default='profile_images/default.jpg', upload_to='profile_images/')),
+                ('profile_image', models.ImageField(default='images/default.jpg', upload_to='profile_images/')),
                 ('date_of_birth', models.DateField()),
                 ('gender', models.CharField(choices=[('M', 'Male'), ('F', 'Female')], default='M', max_length=1)),
                 ('contact', models.CharField(max_length=15, null=True)),

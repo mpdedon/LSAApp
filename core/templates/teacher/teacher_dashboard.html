@@ -23,11 +23,11 @@
 {% block content %}
 <div class="container-fluid py-4 main-content-below-navbar">
     <div class="dashboard-header d-flex flex-column flex-md-row align-items-center">
-        {% if teacher.profile_image %}
-            <img src="{{ teacher.profile_image.url }}" class="rounded-circle me-md-4 mb-3 mb-md-0 profile-img-header" alt="Profile Photo">
-        {% else %}
-            <img src="{% static 'core/images/profile_images/default.jpg' %}" class="rounded-circle me-md-4 mb-3 mb-md-0 profile-img-header" alt="Default Profile Photo">
-        {% endif %}
+        {#{% if teacher.profile_image %}#}
+        {#   <img src="{{ teacher.profile_image.url }}" class="rounded-circle me-md-4 mb-3 mb-md-0 profile-img-header" alt="Profile Photo">#}
+        {#{% else %}#}
+        {#     <img src="{% static 'core/images/default.jpg' %}" class="rounded-circle me-md-4 mb-3 mb-md-0 profile-img-header" alt="Default Profile Photo">#}
+        {#{% endif %}#}
         <div class="text-center text-md-start">
             <h2 class="h3 mb-1">Welcome, {{ teacher.user.first_name|default:teacher.user.username }}!</h2>
             <p class="mb-0">Your central hub for managing your classes and academic tasks.</p>

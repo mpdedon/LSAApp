@@ -115,7 +115,7 @@
                                 {% elif message.sender.guardian_profile.profile_image %}
                                     <img src="{{ message.sender.guardian_profile.profile_image.url }}" alt="{{ message.sender.username }}" class="message-avatar">
                                 {% else %}
-                                    <img src="{% static 'images/profile_images/default.jpg' %}" alt="Default Avatar" class="message-avatar">
+                                    <img src="{% static 'images/images/default.jpg' %}" alt="Default Avatar" class="message-avatar">
                                 {% endif %}
                                 <div class="message-content">
                                     <div class="message-bubble">{{ message.content|linebreaksbr }}</div>
@@ -134,7 +134,7 @@
                                 {% elif reply.sender.guardian_profile.profile_image %}
                                     <img src="{{ reply.sender.guardian_profile.profile_image.url }}" alt="{{ reply.sender.username }}" class="message-avatar">
                                 {% else %}
-                                    <img src="{% static 'images/profile_images/default.jpg' %}" alt="Default Avatar" class="message-avatar">
+                                    <img src="{% static 'images/default.jpg' %}" alt="Default Avatar" class="message-avatar">
                                 {% endif %}
                                 <div class="message-content">
                                     <div class="message-bubble">{{ reply.content|linebreaksbr }}</div>
