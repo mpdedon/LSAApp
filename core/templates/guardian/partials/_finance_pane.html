@@ -1,64 +1,102 @@
 {% load static humanize message_filters %}
 
-{% with data=financial_data|get_item:student.user.id %}
-<div class="card">
-    <div class="card-header"><h5 class="mb-0">Financial Summary (Current Term)</h5></div>
+<div class="card shadow-sm mb-4">
     <div class="card-body">
-        {% if data %}
-        <div class="row text-center g-3">
-            <div class="col-md-6"><div class="card bg-light p-2"><div class="stat-card-title">Net Fee</div><div class="stat-card-value">₦{{ data.total_fee|floatformat:2|intcomma }}</div></div></div>
-            <div class="col-md-6"><div class="card bg-light p-2"><div class="stat-card-title">Discount</div><div class="stat-card-value text-success">₦{{ data.total_discount|floatformat:2|intcomma }}</div></div></div>
-            <div class="col-md-6"><div class="card bg-light p-2"><div class="stat-card-title">Total Paid</div><div class="stat-card-value text-info">₦{{ data.total_paid|floatformat:2|intcomma }}</div></div></div>
-            <div class="col-md-6"><div class="card bg-light p-2"><div class="stat-card-title">Balance Due</div><div class="stat-card-value text-danger">₦{{ data.outstanding_balance|floatformat:2|intcomma }}</div></div></div>
-        </div>
-        <div class="mt-3">
-            <h6 class="text-muted">Payment Progress</h6>
-            <div class="progress" style="height: 25px;">
-                <div class="progress-bar" role="progressbar" style="width: {{ data.payment_percentage|default:0 }}%;" aria-valuenow="{{ data.payment_percentage|default:0 }}">{{ data.payment_percentage|floatformat:0 }}%</div>
-            </div>
-        </div>
-        {% if data.has_waiver %}<div class="alert alert-success mt-3 text-center"><strong>Full Fee Waiver Applied</strong></div>{% endif %}
-        {% else %}
-        <p class="text-muted text-center">No financial record available for the current term.</p>
-        {% endif %}
-    </div>
-</div>
-{% endwith %}
-
-<div class="card mt-4">
-    <div class="card-header"><h5 class="mb-0">Results</h5></div>
-    <div class="card-body">
-        <h6 class="card-title">Current Term Result</h6>
-        {% with result=result_data|get_item:student.user.id data=financial_data|get_item:student.user.id %}
-            {% if result %}
-                <p>Result for the current term is available.</p>
-                <a href="{% url 'view_student_result' result.student.user.id result.term.id %}" class="btn btn-primary">View Current Result</a>
-            {% elif data.can_access_results == False %}
-                <div class="alert alert-warning">Result is pending. Access will be granted once at least 80% of the term's fee is paid. Current balance: <strong>₦{{ data.outstanding_balance|floatformat:2|intcomma }}</strong></div>
-            {% else %}
-                <p class="text-muted">Result for the current term has not been published yet.</p>
-            {% endif %}
-        {% endwith %}
-
-        <hr>
-        <h6 class="card-title">Archived Results</h6>
-        {% with archived_results=archived_results_data|get_item:student.user.id %}
-        {% if archived_results %}
-            <div class="accordion" id="archivedResultsAccordion-{{ student.id }}">
-                {% for archive in archived_results %}
-                <div class="accordion-item">
-                    <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-archive-{{ archive.id }}">Result for {{ archive.term.name }}</button></h2>
-                    <div id="collapse-archive-{{ archive.id }}" class="accordion-collapse collapse" data-bs-parent="#archivedResultsAccordion-{{ student.id }}">
-                        <div class="accordion-body">
-                            <a href="{% url 'view_student_result' archive.student.user.id archive.term.id %}" class="btn btn-info btn-sm">View Result</a>
+        <!-- Section 1: Financial Summary -->
+        <div class="mb-4">
+            <h6 class="card-subtitle mb-2 text-muted"><i class="bi bi-wallet2 me-2"></i>Financial Summary Section</h6>
+            {% with data=financial_data|get_item:student.user.id %}
+            <div class="card">
+                <div class="card-header"><h5 class="mb-0">Financial Summary for {{current_term.name}} {{current_session.name}}</h5></div>
+                <div class="card-body">
+                    {% if data %}
+                    <div class="row text-center g-3">
+                        <div class="col-md-6"><div class="card bg-light p-2"><div class="stat-card-title">Net Fee</div><div class="stat-card-value">₦{{ data.total_fee|floatformat:2|intcomma }}</div></div></div>
+                        <div class="col-md-6"><div class="card bg-light p-2"><div class="stat-card-title">Discount</div><div class="stat-card-value text-success">₦{{ data.total_discount|floatformat:2|intcomma }}</div></div></div>
+                        <div class="col-md-6"><div class="card bg-light p-2"><div class="stat-card-title">Total Paid</div><div class="stat-card-value text-info">₦{{ data.total_paid|floatformat:2|intcomma }}</div></div></div>
+                        <div class="col-md-6"><div class="card bg-light p-2"><div class="stat-card-title">Balance Due</div><div class="stat-card-value text-danger">₦{{ data.outstanding_balance|floatformat:2|intcomma }}</div></div></div>
+                    </div>
+                    <div class="mt-3">
+                        <h6 class="text-muted">Payment Progress</h6>
+                        <div class="progress" style="height: 25px;">
+                            <div class="progress-bar" role="progressbar" style="width: {{ data.payment_percentage|default:0 }}%;" aria-valuenow="{{ data.payment_percentage|default:0 }}">{{ data.payment_percentage|floatformat:0 }}%</div>
                         </div>
                     </div>
+                    {% if data.has_waiver %}<div class="alert alert-success mt-3 text-center"><strong>Full Fee Waiver Applied</strong></div>{% endif %}
+                    {% else %}
+                    <p class="text-muted text-center">No financial record available for the current term.</p>
+                    {% endif %}
                 </div>
-                {% endfor %}
             </div>
-        {% else %}
-            <p class="text-muted">No archived results found for this student.</p>
-        {% endif %}
-        {% endwith %}
+            {% endwith %}
+        </div>
+
+        <hr>
+
+        <!-- Section 2: Academic Reports -->
+        <div class="mt-4">
+            <h6 class="card-subtitle mb-3 text-muted"><i class="bi bi-file-earmark-ruled me-2"></i>Academic Reports</h6>
+            
+            <div class="mb-3">
+                <strong>Current Period:</strong>
+                {% with term_result=result_data|get_item:student.pk sessional_result=sessional_results_data|get_item:student.pk fin_data=financial_data|get_item:student.pk %}
+                    {% if term_result and term_result.is_published %}
+                        <a href="{% url 'view_termly_result' student_id=student.pk term_id=term_result.term.id %}" class="btn btn-primary btn-sm d-block mb-2">
+                            View {{ term_result.term.name }} Result
+                        </a>
+                    {% elif fin_data and not fin_data.can_access_results %}
+                        <div class="alert alert-warning small p-2">Termly result access is restricted due to outstanding fees.</div>
+                    {% else %}
+                        <p class="text-muted small">Result for the current term is not yet published.</p>
+                    {% endif %}
+
+                    {% if sessional_result and sessional_result.is_published %}
+                        <a href="{% url 'view_sessional_result' student_id=student.pk session_id=sessional_result.session.id %}" class="btn btn-success btn-sm d-block mb-2">
+                            View {{ term_result.term.session.name }} Sessional Report
+                        </a>
+                    {% else %}
+                        <p class="text-muted small">Report for the current session is not yet published.</p>
+                    {% endif %}
+                {% endwith %}
+            </div>
+
+            <div>
+                <strong>Archived Reports:</strong>
+                {% with past_sessional_results=archived_sessional_results_data|get_item:student.pk past_term_results=archived_results_data|get_item:student.pk %}
+                    {% if not past_sessional_results and not past_term_results %}
+                        <p class="text-muted small">No archived reports found.</p>
+                    {% else %}
+                        <div class="list-group mt-2">
+                            {% for archive in past_sessional_results %}
+                                <a href="{% url 'view_sessional_result' student_id=student.pk session_id=archive.session.id %}" class="list-group-item list-group-item-action list-group-item-light py-2">
+                                    {{ archive.session.name }} Report
+                                </a>
+                            {% endfor %}
+                            {% for archive in past_term_results %}
+                                <a href="{% url 'view_termly_result' student_id=student.pk term_id=archive.term.id %}" class="list-group-item list-group-item-action list-group-item-light py-2">
+                                    {{ archive.term.name }} ({{ archive.term.session.name }})
+                                </a>
+                            {% endfor %}
+                        </div>
+                    {% endif %}
+                {% endwith %}
+            </div>
+        </div>
     </div>
 </div>
+
+<style>
+/* Custom style for the avatar placeholder */
+.avatar-placeholder {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background-color: #6c757d; /* Bootstrap secondary */
+    color: white;
+    font-weight: 500;
+    font-size: 0.9rem;
+}
+</style>

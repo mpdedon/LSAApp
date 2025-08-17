@@ -36,13 +36,13 @@
 
                 <dt class="col-sm-3">Form Teacher:</dt>
                 <dd class="col-sm-9">
-                    {% with form_teacher=class_instance.form_teacher %} {# Use method directly #}
+                    {% with form_teacher=class_instance.form_teacher %}
                         {% if form_teacher %}
                            <i class="fas fa-user-tie text-muted me-1"></i>
                            {% if form_teacher.user %}
                                {{ form_teacher.user.get_full_name }}
                            {% else %}
-                               {{ form_teacher }} {# Fallback if no user linked #}
+                               {{ form_teacher }} 
                            {% endif %}
                         {% else %}
                            <span class="text-danger fst-italic"><i class="fas fa-exclamation-circle me-1"></i>Not Assigned</span>
@@ -53,7 +53,7 @@
                 <dt class="col-sm-3">Student Count:</dt>
                 <dd class="col-sm-9">
                      <span class="badge rounded-pill bg-primary">
-                        <i class="fas fa-users me-1"></i> {{ class_instance.students.count }}
+                        <i class="fas fa-users me-1"></i> {{ class_instance.enrolled_students.count }}
                      </span>
                 </dd>
 
@@ -76,8 +76,8 @@
                 <i class="fas fa-plus me-1"></i> Enroll Student
             </a>
          </div>
-         <div class="card-body p-0"> {# Remove padding for list group #}
-            {% with students=class_instance.students.all %}
+         <div class="card-body p-0"> 
+            {% with students=class_instance.enrolled_students.all %}
                 {% if students %}
                 <ul class="list-group list-group-flush">
                     {% for student in students %}

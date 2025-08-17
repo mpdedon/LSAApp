@@ -609,3 +609,5 @@ def message_thread(request, thread_id):
         'reply_recipient': reply_recipient,
     }
     return render(request, 'messaging/message_thread.html', context)
+
+

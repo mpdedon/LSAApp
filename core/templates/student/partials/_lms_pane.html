@@ -4,7 +4,7 @@
 <div class="row g-3">
     {% for subject in subjects %}
     <div class="col-md-6">
-        <a href="#" class="card text-decoration-none text-dark quest-card"> {# FUTURE: Link to LMS subject page #}
+        <a href="#" class="card text-decoration-none text-dark quest-card"> 
             <div class="card-body d-flex align-items-center p-3">
                 <div class="quest-icon bg-primary-subtle text-primary"><i class="bi bi-book"></i></div>
                 <div class="quest-title ms-3">{{ subject.name }}</div>
@@ -16,13 +16,61 @@
     <div class="col-12"><p class="text-muted">No subjects assigned for this term.</p></div>
     {% endfor %}
 </div>
-<hr class="my-4">
-<h5>External Resources</h5>
-<div class="list-group list-group-flush">
-    <a href="https://www.khanacademy.org/" target="_blank" class="list-group-item list-group-item-action">Khan Academy</a>
-    <a href="https://bayna.org/" target="_blank" class="list-group-item list-group-item-action">Bayna - Learn Quranic Arabic</a>
-    <a href="https://www.codecademy.com/" target="_blank" class="list-group-item list-group-item-action">Codecademy - Learn to Code</a>
-    <a href="https://www.nasa.gov/learning-resources/" target="_blank" class="list-group-item list-group-item-action">NASA Learning Resources</a>
+<<hr class="my-4">
+<h5 class="fw-bold">External Learning Resources</h5>
+<p class="text-muted small">Explore these recommended platforms to supplement your learning journey.</p>
+<div class="list-group">
+    <!-- Core Academics -->
+    <a href="https://www.khanacademy.org/" target="_blank" class="list-group-item list-group-item-action">
+        <i class="bi bi-calculator-fill me-2 text-success"></i>
+        Khan Academy - Free lessons in Math, Science, and more.
+    </a>
+    
+   <!-- Islamic & Arabic Studies -->
+   <a href="https://kalamullah.com/learning-arabic.html" target="_blank" class="list-group-item list-group-item-action">
+    <i class="bi bi-collection-fill me-2 text-info"></i>
+    Kalamullah - A vast free library of books for learning Arabic.
+</a>
+    <a href="https://yaqeeninstitute.org/" target="_blank" class="list-group-item list-group-item-action">
+        <i class="bi bi-moon-stars-fill me-2 text-primary"></i>
+        Yaqeen Institute - In-depth articles and videos on Islamic topics.
+    </a>
+    
+    <!-- Technology & Coding -->
+    <a href="https://www.freecodecamp.org/" target="_blank" class="list-group-item list-group-item-action">
+        <i class="bi bi-code-slash me-2 text-dark"></i>
+        freeCodeCamp - Learn to code with hands-on projects and certifications.
+    </a>
+    <a href="https://scratch.mit.edu/" target="_blank" class="list-group-item list-group-item-action">
+        <i class="bi bi-puzzle-fill me-2 text-warning"></i>
+        Scratch - A creative coding platform for beginners from MIT.
+    </a>
+
+    <!-- Reading & Literature -->
+    <a href="https://www.gutenberg.org/" target="_blank" class="list-group-item list-group-item-action">
+        <i class="bi bi-journals me-2 text-secondary"></i>
+        Project Gutenberg - A free library of over 70,000 classic eBooks.
+    </a>
+
+    <!-- Languages -->
+    <a href="https://www.duolingo.com/" target="_blank" class="list-group-item list-group-item-action">
+        <i class="bi bi-translate me-2 text-success"></i>
+        Duolingo - Fun, gamified lessons to learn new languages.
+    </a>
+    
+    <!-- STEM & Critical Thinking -->
+    <a href="https://brilliant.org/" target="_blank" class="list-group-item list-group-item-action">
+        <i class="bi bi-lightbulb-fill me-2 text-warning"></i>
+        Brilliant.org - Interactive problem-solving in Math, Science, and CS.
+    </a>
+    <a href="https://ed.ted.com/" target="_blank" class="list-group-item list-group-item-action">
+        <i class="bi bi-camera-video-fill me-2 text-danger"></i>
+        TED-Ed - Engaging animated educational videos on diverse subjects.
+    </a>
+    
+    <!-- Arts & Culture -->
+    <a href="https://artsandculture.google.com/" target="_blank" class="list-group-item list-group-item-action">
+        <i class="bi bi-palette-fill me-2 text-primary"></i>
+        Google Arts & Culture - Explore art, history, and culture from around the world.
+    </a>
 </div>
-
-

@@ -52,7 +52,7 @@ from core.teacher.views import create_assignment, add_question, grade_assignment
 from core.teacher.views import create_assessment, teacher_assessment_list, view_assessment, update_assessment, delete_assessment, grade_essay_assessment
 from core.teacher.views import create_exam, teacher_exam_list, view_exam, update_exam, delete_exam, grade_essay_exam
 from core.guardian.views import GuardianListView, GuardianCreateView, GuardianUpdateView, GuardianDetailView, GuardianDeleteView, GuardianBulkActionView
-from core.guardian.views import financial_record_detail, view_student_result, export_guardians, guardian_reports
+from core.guardian.views import financial_record_detail, view_termly_result, view_sessional_result, export_guardians, guardian_reports
 from core.guardian.views import submit_assignment, submit_assessment, submit_exam
 from core.guardian.views import view_assignment_result, view_assessment_result, view_exam_result
 from core.classes.views import ClassListView, ClassCreateView, ClassUpdateView, ClassDetailView, ClassDeleteView, EnrollStudentView
@@ -150,9 +150,9 @@ urlpatterns = [
     path('broadsheets/archive/<int:term_id>/', archive_termly_broadsheet, name='archive_termly_broadsheet'),
     path('admin-leaderboards/', admin_leaderboard_view, name='admin_leaderboard_list'),
     path('session-broadsheets', sessional_broadsheets, name='sessional_broadsheets'),
-    path('broadsheets/session/<int:session_id>/', admin_sessional_broadsheet, name='admin_sessional_broadsheet'),
-    path('broadsheets/approve/<int:session_id>/<int:class_id>/', approve_sessional_broadsheet, name='approve_sessional_broadsheet'),
-    path('broadsheets/archive/<int:session_id>/', archive_sessional_broadsheet, name='archive_sessional_broadsheet'),
+    path('session-broadsheets/session/<int:session_id>/', admin_sessional_broadsheet, name='admin_sessional_broadsheet'),
+    path('session-broadsheets/approve/<int:session_id>/<int:class_id>/', approve_sessional_broadsheet, name='approve_sessional_broadsheet'),
+    path('session-broadsheets/archive/<int:session_id>/', archive_sessional_broadsheet, name='archive_sessional_broadsheet'),
 
     # Subject & Teacher Assignment URLs
     path('assign_teacher/', AssignTeacherView, name='assign_teacher'),
@@ -226,7 +226,8 @@ urlpatterns = [
     path('guardians/export/', export_guardians, name='export_guardians'),
     path('guardians/reports/', guardian_reports, name='guardian_reports'),
     path('guardian/financial_record/<int:student_id>/', financial_record_detail, name='financial_record_detail'),
-    path('guardian/student/<int:student_id>/result/<int:term_id>/', view_student_result, name='view_student_result'), 
+    path('guardian/student/<int:student_id>/result/term/<int:term_id>/', view_termly_result, name='view_termly_result'), 
+    path('guardian/student/<int:student_id>/result/session/<int:session_id>/', view_sessional_result, name='view_sessional_result'), 
     
     # Class URLs
     path('classes/', ClassListView.as_view(), name='class_list'),

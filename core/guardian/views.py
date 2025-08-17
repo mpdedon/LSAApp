@@ -10,15 +10,16 @@ from django.contrib.auth.decorators import login_required, user_passes_test
 from django.contrib import messages
 from django.conf import settings
 from django.template.loader import render_to_string
-from django.http import HttpResponse, Http404
+from django.http import HttpResponse, Http404, HttpResponseForbidden
 from django.views import View
 from django.core.paginator import Paginator
-from django.db.models import Q
-from decimal import Decimal
+from django.db.models import Q, Sum, Count, Avg, F, DecimalField, Case, When, Value
+from django.db.models.functions import Cast
+from decimal import Decimal, InvalidOperation
 from playwright.sync_api import sync_playwright
 from .forms import GuardianRegistrationForm, MessageForm, ReplyForm
 from core.models import CustomUser, Guardian, Term, Teacher, Session, FinancialRecord, Student, Result, Subject, SubjectResult, Attendance
-from core.models import Assignment, Assessment, Exam, AssessmentSubmission, ExamSubmission, Message
+from core.models import Assignment, Assessment, Exam, AssessmentSubmission, ExamSubmission, Message, CumulativeRecord, SessionalResult, StudentFeeRecord
 from core.assignment.forms import AssignmentSubmission, AssignmentSubmissionForm
 
 
@@ -694,9 +695,9 @@ def view_exam_result(request, exam_id):
             'question_text': question.question_text,
             'question_type': question.question_type,
             'options_detailed': options_with_status, 
-            'student_answer_display': student_answer_raw, # The raw answer for "Your Answer" section
-            'correct_answer_model': question.correct_answer, # The model's correct_answer string for essays/SCQ display
-            'is_correct_display': is_overall_correct_display, # Overall correctness for card border
+            'student_answer_display': student_answer_raw, 
+            'correct_answer_model': question.correct_answer, 
+            'is_correct_display': is_overall_correct_display, 
         })
 
     context = {
@@ -804,7 +805,7 @@ def build_absolute_uri(request, path):
     return request.build_absolute_uri(settings.STATIC_URL + path.lstrip('/'))
 
 
-def view_student_result(request, student_id, term_id):
+def view_termly_result(request, student_id, term_id):
     """
     Displays a student's result for a specific term and allows PDF download.
     """
@@ -879,6 +880,18 @@ def view_student_result(request, student_id, term_id):
             
     term_gpa = (gpa_points_sum / total_weights) if total_weights > 0 else Decimal('0.00')
 
+    cumulative_record, _ = CumulativeRecord.objects.get_or_create(student=student)
+    
+    if result.term_gpa is None or result.performance_change is None:
+        result.calculate_term_summary()
+        result.refresh_from_db()
+
+    cumulative_gpa = cumulative_record.cumulative_gpa
+    
+    # If this is the student's very first term result, the cumulative GPA is just this term's GPA
+    if Result.objects.filter(student=student).count() == 1:
+        cumulative_gpa = result.term_gpa
+
     # Prepare data for Chart.js and potentially for PDF (if chart is rendered as image later)
     chart_data = []
     subject_results_list = [] 
@@ -908,6 +921,7 @@ def view_student_result(request, student_id, term_id):
         'class_obj': class_obj,
         'subject_results': subject_results_list, 
         'term_gpa': term_gpa,
+        'cumulative_gpa': cumulative_gpa,
         'chart_data_json': json.dumps(chart_data), 
         'attendance_data': attendance_data,
         'teacher_comment': teacher_remarks,
@@ -921,7 +935,7 @@ def view_student_result(request, student_id, term_id):
     # --- PDF Download Handling ---
     if "download" in request.GET and request.GET["download"] == "pdf":
         if HTML is None:
-            return HttpResponse("PDF generation library (WeasyPrint) is not installed or configured correctly.", status=501) # 501 Not Implemented
+            return HttpResponse("PDF generation library (WeasyPrint) is not installed or configured correctly.", status=500) 
 
         context['is_pdf_render'] = True 
 
@@ -955,7 +969,7 @@ def view_student_result(request, student_id, term_id):
             pdf_file = io.BytesIO()
             html.write_pdf(
                 target=pdf_file,
-                stylesheets=[css], # Pass the loaded CSS object or list of paths
+                stylesheets=[css], 
                 font_config=font_config # Needed if using CSS object method
             )
             pdf_file.seek(0) # Rewind the buffer
@@ -973,14 +987,168 @@ def view_student_result(request, student_id, term_id):
 
         return response
 
-    return render(request, 'guardian/view_result.html', context)
+    return render(request, 'guardian/view_termly_result.html', context)
+
+
+@login_required
+def view_sessional_result(request, student_id, session_id):
+    """
+    Displays a student's sessional result, performance change, and cumulative GPA.
+    This view is designed to be robust, efficient, and clear.
+    """
+    # 1. ===== Fetch Core Objects and Perform Checks =====
+    try:
+        student = get_object_or_404(Student.objects.select_related('user', 'current_class', 'cumulative_record'), pk=student_id)
+        session = get_object_or_404(Session, id=session_id)
+    except Http404:
+        messages.error(request, "The requested student or session could not be found.")
+        return redirect('home')
+
+    # Permissions Check
+    user = request.user
+    if not (user.is_superuser or student.user == user or (hasattr(user, 'guardian') and student in user.guardian.students.all())):
+        return HttpResponseForbidden("You are not authorized to view this result.")
+
+    # Financial Access Check
+    terms_in_session = Term.objects.filter(session=session).order_by('start_date')
+    can_view_result = True
+    if not (request.user.is_superuser or hasattr(request.user, 'teacher')):
+        # Get total fees and payments for the entire session
+        sessional_financials = FinancialRecord.objects.filter(
+            student=student, term__in=terms_in_session
+        )
+        
+        is_blocked = False
+        for record in sessional_financials:
+            if not record.can_access_results:
+                is_blocked = True
+                break 
+        
+        if is_blocked:
+            can_view_result = False
+    
+
+    # 2. ===== Calculate/Fetch Sessional & Cumulative Data =====
+    sessional_result, created = SessionalResult.objects.get_or_create(student=student, session=session)
+    if created or sessional_result.sessional_gpa is None:
+        sessional_result.calculate_sessional_summary(save=True)
+        sessional_result.refresh_from_db()
+
+    student.cumulative_record.update_cumulative_gpa(save=True)
+    cumulative_gpa = student.cumulative_record.cumulative_gpa
+
+    # 3. ===== Prepare Data for the Template =====
+
+    # Get subjects the student actually took in this session
+    subjects_in_session = Subject.objects.filter(
+        subjectresult__result__student=student,
+        subjectresult__result__term__in=terms_in_session
+    ).distinct().order_by('name')
+
+    # Sessional Attendance
+    sessional_attendance = Attendance.objects.filter(student=student, term__in=terms_in_session).aggregate(
+        total_days=Count('id'), present_days=Count('id', filter=Q(is_present=True))
+    )
+    sessional_total_days = sessional_attendance.get('total_days', 0)
+    sessional_present_days = sessional_attendance.get('present_days', 0)
+    
+    # Broadsheet/Table and Chart Data
+    subject_rows = []
+    chart_data = []
+    class_obj = student.current_class
+
+    all_class_sessional_results = SessionalResult.objects.filter(
+        session=session,
+        student__current_class=class_obj,
+    )
+    
+    # Step 2: Loop through subjects and calculate averages in Python.
+    for subject in subjects_in_session:
+        subject_id_str = str(subject.id)
+        
+        # Get the current student's data
+        subject_summary = sessional_result.subject_summary_json.get(subject_id_str, {})
+        student_sessional_avg = subject_summary.get('sessional_average')
+        
+        subject_rows.append({
+            'subject_name': subject.name,
+            'term_scores': [subject_summary.get('term_scores', {}).get(f'term_{term.id}_score') for term in terms_in_session],
+            'sessional_average': student_sessional_avg
+        })
+        
+        # Calculate Class Average for this subject in Python
+        class_scores_for_subject = []
+        for class_member_result in all_class_sessional_results:
+            # Safely extract the sessional average for this subject from each student's JSON
+            member_subject_summary = class_member_result.subject_summary_json.get(subject_id_str, {})
+            member_avg_score = member_subject_summary.get('sessional_average')
+
+            # CRITICAL: Safely convert to a number, ignoring bad data like "none" or None
+            if member_avg_score is not None:
+                try:
+                    class_scores_for_subject.append(Decimal(member_avg_score))
+                except (InvalidOperation, TypeError):
+                    # This will skip any value that is not a valid number (e.g., "none")
+                    continue
+        
+        # Calculate the final class average
+        class_sessional_avg = (sum(class_scores_for_subject) / len(class_scores_for_subject)) if class_scores_for_subject else None
+
+        chart_data.append({
+            'subject': subject.name,
+            'student_average': float(student_sessional_avg) if student_sessional_avg is not None else 0.0,
+            'class_average': float(class_sessional_avg) if class_sessional_avg is not None else 0.0
+        })
+
+    # 4. ===== Final Context =====
+    context = {
+        'student': student,
+        'session': session,
+        'terms_in_session': terms_in_session,
+        'sessional_result': sessional_result,
+        'cumulative_gpa': cumulative_gpa,
+        'subject_rows': subject_rows,
+        'sessional_attendance_data': {
+            'total_days': sessional_total_days,
+            'present_days': sessional_present_days,
+            'absent_days': sessional_total_days - sessional_present_days,
+            'percentage': round((sessional_present_days / sessional_total_days * 100), 1) if sessional_total_days > 0 else 0
+        },
+        'chart_data_json': json.dumps(chart_data),
+        'is_published': sessional_result.is_published,
+        'is_pdf_render': False, # Flag for PDF rendering
+        'school_logo_url': build_absolute_uri(request, 'images/logo.jpg'), # Example
+        'signature_url': build_absolute_uri(request, 'images/signature.png'), # Example
+    }
+
+    # --- PDF Download Handling ---
+    if "download" in request.GET and request.GET["download"] == "pdf":
+        if HTML is None:
+            return HttpResponse("PDF generation library is not available.", status=501)
+        
+        context['is_pdf_render'] = True
+        html_string = render_to_string('student/view_sessional_result.html', context)
+        try:
+            css_path = settings.STATICFILES_DIRS[0] / 'css' / 'result_styles.css'
+            html = HTML(string=html_string, base_url=request.build_absolute_uri('/'))
+            pdf_file = html.write_pdf(stylesheets=[CSS(filename=css_path)])
+            
+            response = HttpResponse(pdf_file, content_type='application/pdf')
+            student_name_safe = "".join(c for c in student.user.get_full_name() if c.isalnum() or c in " _-").rstrip()
+            session_name_safe = "".join(c for c in session.name if c.isalnum() or c in " _-").rstrip()
+            response['Content-Disposition'] = f'attachment; filename="{student_name_safe}_sessional_result_{session_name_safe}.pdf"'
+            return response
+        except Exception as e:
+            print(f"Error generating PDF: {e}")
+            return HttpResponse(f"An error occurred during PDF generation: {e}", status=500)
+
+    return render(request, 'guardian/view_sessional_result.html', context)
 
 
 @login_required
 def message_inbox(request):
     """
-    A central, generic inbox for the logged-in user.
-    Shows received message threads.
+    A central, generic inbox for the logged-in user. Shows received message threads.
     """
     user = request.user
 
@@ -1005,8 +1173,6 @@ def message_inbox(request):
 def compose_message(request):
     """
     A generic view for composing a message.
-    The list of possible recipients is determined by the sender's role.
-    Recipient and other context can be pre-selected via GET parameters.
     """
     sender = request.user
     
@@ -1147,3 +1313,6 @@ def message_thread(request, thread_id):
         'reply_recipient': reply_recipient,
     }
     return render(request, 'messaging/message_thread.html', context)
+
+
+

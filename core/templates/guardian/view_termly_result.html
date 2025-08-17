@@ -1,17 +1,15 @@
-{% extends 'base.html' %} {# Or a minimal base_print.html if preferred for PDF #}
+{% extends 'base.html' %} 
 {% load static %}
 
 {% block title %}Result for {{ student.user.get_full_name }} - {{ term }}{% endblock %}
 
 {% block extra_head %} {# Load dedicated CSS #}
   <link rel="stylesheet" href="{% static 'css/result_styles.css' %}">
-  {# Include Bootstrap if base doesn't, needed for grid #}
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
 {% endblock %}
 
 
 {% block content %}
-{# Remove outer container from base if it exists, let this container control width #}
 <div class="result-container">
     <!-- School Header Section -->
     <div class="result-header">
@@ -202,27 +200,40 @@
     <div class="summary-section row mb-4 g-4">
         <!-- GPA and Signature Column -->
         <div class="col-md-4 d-flex flex-column">
-            <div class="gpa-card mb-4">
-                 <div class="card-header">
-                    <h5>Term GPA</h5>
-                </div>
+            <!-- Term GPA -->
+            <div class="gpa-card mb-3">
+                <div class="card-header"><h5>Term GPA</h5></div>
                 <div class="card-body text-center">
-                    <p class="gpa-value">{{ term_gpa|floatformat:2|default:"N/A" }}</p> 
+                    <p class="gpa-value">{{ result.term_gpa|floatformat:2|default:"N/A" }}</p>
                 </div>
             </div>
-             <div class="signature-card mt-auto"> 
-                 <div class="card-header">
-                    <h5>Principal's Signature</h5>
-                </div>
+            <!-- Cumulative GPA -->
+            <div class="gpa-card mb-3 bg-light">
+                <div class="card-header"><h5>Cumulative GPA</h5></div>
                 <div class="card-body text-center">
-                    <div class="signature-box">
-                        {% if signature_url %}
-                        <img src="{{ signature_url }}" alt="Principal's Signature" >
+                    <p class="gpa-value">{{ cumulative_gpa|floatformat:2|default:"N/A" }}</p>
+                    <small class="text-muted">Overall Academic Progress</small>
+                </div>
+            </div>
+            <!-- Performance Change -->
+            <div class="gpa-card mb-auto">
+                <div class="card-header"><h5>Performance Change</h5></div>
+                <div class="card-body text-center">
+                    {% if result.performance_change is not None %}
+                        {% if result.performance_change > 0 %}
+                            <p class="gpa-value text-success"><i class="fas fa-arrow-up me-2"></i>+{{ result.performance_change|floatformat:1 }}%</p>
+                            <small class="text-muted">Improvement from previous term</small>
+                        {% elif result.performance_change < 0 %}
+                            <p class="gpa-value text-danger"><i class="fas fa-arrow-down me-2"></i>{{ result.performance_change|floatformat:1 }}%</p>
+                            <small class="text-muted">Decline from previous term</small>
                         {% else %}
-                        <span class="text-muted small">(Signature Placeholder)</span>
+                            <p class="gpa-value text-secondary"><i class="fas fa-minus me-2"></i>0.0%</p>
+                            <small class="text-muted">Maintained performance</small>
                         {% endif %}
-                    </div>
-                    <p class="signature-caption">Principal</p>
+                    {% else %}
+                        <p class="gpa-value text-muted">-</p>
+                        <small class="text-muted">First term record.</small>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -268,7 +279,6 @@
 </script>
 
 <!-- Chart.js Library & Initialization -->
-{# Use a specific Chart.js version for stability or latest via cdnjs/jsdelivr #}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
 <script>
     document.addEventListener('DOMContentLoaded', function() {
@@ -382,6 +392,6 @@
         }
     });
 </script>
-{% endif %} {# End of {% if not is_pdf_render %} for scripts #}
+{% endif %} 
 
-{% endblock %} {# End of block content #}
+{% endblock %} 

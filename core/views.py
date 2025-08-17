@@ -22,7 +22,7 @@ from core.models import Session, Term, CustomUser, Student, Teacher, Guardian, N
 from core.models import Class, Subject, FeeAssignment, Enrollment, Payment, Assessment, Exam
 from core.models import SubjectAssignment, TeacherAssignment, ClassSubjectAssignment
 from core.models import SubjectResult, Result, StudentFeeRecord, FinancialRecord, Message
-from core.models import OnlineQuestion, AssignmentSubmission, AssessmentSubmission, ExamSubmission, SessionalResult
+from core.models import OnlineQuestion, AssignmentSubmission, AssessmentSubmission, ExamSubmission, SessionalResult, CumulativeRecord
 from core.utils import get_current_term, get_next_term   
 from core.forms import ClassSubjectAssignmentForm, NonAcademicSkillsForm, NotificationForm, ContactForm, MessageForm, ReplyForm
 from core.session.forms import SessionForm
@@ -1030,31 +1030,44 @@ def sessional_broadsheets(request):
 def admin_sessional_broadsheet(request, session_id):
     session = get_object_or_404(Session, id=session_id)
     terms_in_session = Term.objects.filter(session=session).order_by('start_date')
-    
+
     if not terms_in_session.exists():
         messages.warning(request, f"No terms found for the {session.name} session.")
-        return redirect('sessional_broadsheets')
+        return redirect('sessional_broadsheets') 
 
     classes_in_session = Class.objects.filter(
         enrolled_students__result__term__in=terms_in_session
-    ).distinct().order_by('name')
+    ).distinct().order_by('order') 
 
     sessional_broadsheets_data = []
     for class_obj in classes_in_session:
+        print(f"\n  Processing Class: '{class_obj.name}'")
         subjects_in_class = Subject.objects.filter(
             class_assignments__class_assigned=class_obj,
             class_assignments__term__in=terms_in_session
         ).distinct().order_by('name')
 
-        students_in_class = Student.objects.filter(result__term__in=terms_in_session, result__student__current_class=class_obj)\
-            .distinct().select_related('user').order_by('user__last_name', 'user__first_name')
+        students_in_class = Student.objects.filter(
+            result__term__in=terms_in_session, 
+            result__student__current_class=class_obj 
+        ).distinct().select_related('user').order_by('user__last_name', 'user__first_name')
 
         class_sessional_results_data = []
-        for student in students_in_class:
-            sessional_result, created = SessionalResult.objects.get_or_create(student=student, session=session)
-            if created or not sessional_result.subject_summary_json:
-                sessional_result.calculate_sessional_summary(save=True)
 
+        sessional_results_for_class = SessionalResult.objects.filter(
+            student__in=students_in_class,
+            session=session
+        )
+        sessional_results_map = {res.student_id: res for res in sessional_results_for_class}
+        
+        for student in students_in_class:
+            sessional_result = sessional_results_map.get(student.pk)
+            
+            if not sessional_result:
+                sessional_result, _ = SessionalResult.objects.get_or_create(student=student, session=session)
+                sessional_result.calculate_and_save_summary()
+                sessional_result.refresh_from_db()
+            
             student_data = {
                 'student_obj': student,
                 'sessional_gpa': sessional_result.sessional_gpa,
@@ -1062,7 +1075,7 @@ def admin_sessional_broadsheet(request, session_id):
                 'is_approved': sessional_result.is_approved,
                 'subject_rows': []
             }
-            
+          
             for subject in subjects_in_class:
                 subject_summary = sessional_result.subject_summary_json.get(str(subject.id), {})
                 term_scores = [subject_summary.get('term_scores', {}).get(f'term_{term.id}_score') for term in terms_in_session]
@@ -1074,10 +1087,21 @@ def admin_sessional_broadsheet(request, session_id):
         
         class_sessional_results_data.sort(key=lambda x: x['sessional_gpa'] or Decimal('0.0'), reverse=True)
 
+        is_approved_flag = all(res['is_approved'] for res in class_sessional_results_data) if class_sessional_results_data else False
+        
+        if is_approved_flag:
+            status_text = "Approved & Published"
+            status_class = "bg-success"
+        else:
+            status_text = "Pending Approval"
+            status_class = "bg-warning text-dark"
+
         sessional_broadsheets_data.append({
             'class': class_obj, 'subjects': subjects_in_class,
             'sessional_results_data': class_sessional_results_data,
-            'is_all_approved': all(res['is_approved'] for res in class_sessional_results_data)
+'           is_all_approved': is_approved_flag,
+            'status_text': status_text,         
+            'status_class': status_class,  
         })
     
     context = {
@@ -1092,23 +1116,58 @@ def admin_sessional_broadsheet(request, session_id):
 def approve_sessional_broadsheet(request, session_id, class_id):
     if request.method != "POST":
         return JsonResponse({'error': "Invalid request method."}, status=400)
-    
+      
     session = get_object_or_404(Session, id=session_id)
     class_obj = get_object_or_404(Class, id=class_id)
-    students_in_class = Student.objects.filter(current_class=class_obj)
 
-    updated_count = SessionalResult.objects.filter(student__in=students_in_class, session=session)\
-                                         .update(is_approved=True, is_published=True)
+    # Step 1: Find the students we are targeting.
+    student_pks_to_update = Result.objects.filter(
+        term__session=session,
+        student__current_class=class_obj
+    ).values_list('student__pk', flat=True).distinct()
 
-    messages.success(request, f"Sessional broadsheet for {class_obj.name} ({session.name}) has been approved and published.")
-    return JsonResponse({'message': 'Approval successful!', 'updated_count': updated_count})
+    if not student_pks_to_update:
+        message_text = f"No student results found for {class_obj.name} in {session.name} to approve."
+        return JsonResponse({'message': message_text, 'updated_count': 0})
+    
+    # Step 2: Find the SessionalResult objects that match these criteria.
+    updated_count = SessionalResult.objects.filter(
+        student_id__in=student_pks_to_update, 
+        session=session
+    ).update(is_approved=True, is_published=True)
+    
+    if updated_count > 0:
+        print(f"  - Triggering Cumulative GPA update for {len(student_pks_to_update)} students...")
+        
+        students_to_update_cgpa = Student.objects.filter(
+            pk__in=student_pks_to_update
+        ).select_related('cumulative_record')
+        
+        cgpa_updated_count = 0
+        for student in students_to_update_cgpa:
+            try:
+                cumulative_record = student.cumulative_record
+                cumulative_record.update_cumulative_gpa()
+                cgpa_updated_count += 1
+            except CumulativeRecord.DoesNotExist:
+                new_cr = CumulativeRecord.objects.create(student=student)
+                new_cr.update_cumulative_gpa()
+                cgpa_updated_count += 1
+                
+        print(f"  - CGPA update method called for {cgpa_updated_count} students.")
+
+        message_text = f"Sessional broadsheet for {class_obj.name} ({session.name}) has been approved and published for {updated_count} students."
+        return JsonResponse({'message': message_text, 'updated_count': updated_count})
+    else:
+        message_text = f"No sessional results needed updating for {class_obj.name} ({session.name}). They may already be approved."
+        return JsonResponse({'message': message_text, 'updated_count': 0})
 
 
 @user_passes_test(lambda u: u.is_superuser)
 def archive_sessional_broadsheet(request, session_id):
 
     session = get_object_or_404(Session, session_id)
-    results = Result.objects.filter(session=session)
+    results = SubjectResult.objects.filter(session=session)
 
     if request.method == "POST":
         results.update(is_archived=True)

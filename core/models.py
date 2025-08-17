@@ -280,7 +280,7 @@ class Student(models.Model):
  
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, primary_key=True, related_name='student')    
     LSA_number = models.CharField(max_length=20, unique=True, null=True)
-    profile_image = models.ImageField(upload_to='profile_images/', default='profile_images/default.jpg')
+    profile_image = models.ImageField(upload_to='profile_images/', default='images/default.jpg')
     date_of_birth = models.DateField()
     gender = models.CharField(max_length=1, choices=GENDER_CHOICES)
     student_guardian = models.ForeignKey('Guardian', on_delete=models.SET_NULL, null=True, related_name='students')
@@ -390,7 +390,7 @@ class Guardian(models.Model):
 
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, primary_key=True, related_name='guardian')
     gender = models.CharField(max_length=1, choices=GENDER_CHOICES, default='M')
-    profile_image = models.ImageField(upload_to='profile_images/', default='profile_images/default.jpg')
+    profile_image = models.ImageField(upload_to='profile_images/', default='images/default.jpg')
     contact = models.CharField(max_length=15, null=True)
     address = models.TextField()
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='active')
@@ -417,7 +417,7 @@ class Teacher(models.Model):
 
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, primary_key=True, related_name='teacher')
     employee_id = models.CharField(max_length=20, unique=True, null=True)
-    profile_image = models.ImageField(upload_to='profile_images/', default='profile_images/default.jpg')
+    profile_image = models.ImageField(upload_to='profile_images/', default='images/default.jpg')
     date_of_birth = models.DateField()
     gender = models.CharField(max_length=1, choices=GENDER_CHOICES, default='M')
     contact = models.CharField(max_length=15, null=True)
@@ -1049,37 +1049,58 @@ class Result(models.Model):
     def __str__(self):
         return f"Result for {self.student.user.get_full_name()} - {self.term}"
 
-    def calculate_term_summary(self, save=True):
-        """Calculates and saves the total score, average, and GPA for this term."""
-        subject_results_qs = self.subject_results.all().select_related('subject')
-        
-        # Filter out subjects where no scores were entered at all
-        scored_subjects = [sr for sr in subject_results_qs if sr.total_score() > 0]
+    def get_previous_term_result(self):
+        """Finds the Result object for the same student from the immediately preceding term."""
+        previous_terms = Term.objects.filter(start_date__lt=self.term.start_date).order_by('-start_date')
+        for prev_term in previous_terms:
+            previous_result = Result.objects.filter(student=self.student, term=prev_term).first()
+            if previous_result and previous_result.average_score is not None:
+                return previous_result
+        return None
+
+    def calculate_term_summary(self):
+        """Calculates all summary fields for this term and saves the instance."""
+        subject_results = self.subject_results.all().select_related('subject')
+        scored_subjects = [sr for sr in subject_results if sr.total_score() > 0]
         
         if not scored_subjects:
             self.total_score, self.average_score, self.term_gpa = Decimal('0.00'), Decimal('0.00'), Decimal('0.00')
         else:
             self.total_score = sum(sr.total_score() for sr in scored_subjects)
             self.average_score = self.total_score / len(scored_subjects)
-            
-            total_weighted_grade_points, total_weights = Decimal('0.0'), Decimal('0.0')
+            # GPA Calculation
+            total_weighted_points, total_weights = Decimal('0.0'), Decimal('0.0')
             for sr in scored_subjects:
-                weight = Decimal(getattr(sr.subject, 'subject_weight', 1)) 
-                total_weighted_grade_points += Decimal(sr.calculate_grade_point()) * weight
+                weight = Decimal(getattr(sr.subject, 'subject_weight', 1))
+                total_weighted_points += Decimal(sr.calculate_grade_point()) * weight
                 total_weights += weight
-            self.term_gpa = (total_weighted_grade_points / total_weights) if total_weights > 0 else Decimal('0.00')
+            self.term_gpa = (total_weighted_points / total_weights) if total_weights > 0 else Decimal('0.00')
+
+        # Calculate Performance Change
+        previous_result = self.get_previous_term_result()
+        if previous_result and self.average_score is not None:
+            prev_avg = previous_result.average_score
+            if prev_avg > 0:
+                change = ((self.average_score - prev_avg) / prev_avg) * 100
+                self.performance_change = change
+            elif self.average_score > 0:
+                self.performance_change = Decimal('100.00') 
+            else:
+                self.performance_change = Decimal('0.00')
+        else:
+            self.performance_change = None 
         
-        if save:
-            self.save(update_fields=['total_score', 'average_score', 'term_gpa'])
+        self.save()
 
 
 class SessionalResult(models.Model):
     student = models.ForeignKey(Student, on_delete=models.CASCADE)
     session = models.ForeignKey(Session, on_delete=models.CASCADE)
     
-    subject_summary_json = models.JSONField(default=dict, blank=True, help_text="Stores subject-wise term scores and averages for the session")
+    subject_summary_json = models.JSONField(default=dict, blank=True)
     average_score = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
     sessional_gpa = models.DecimalField(max_digits=4, decimal_places=2, null=True, blank=True)
+    performance_change = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True)
     is_approved = models.BooleanField(default=False)
     is_published = models.BooleanField(default=False)
 
@@ -1090,36 +1111,56 @@ class SessionalResult(models.Model):
     def __str__(self):
         return f"Sessional Result for {self.student.user.get_full_name()} - {self.session}"
 
-    def calculate_sessional_summary(self, save=True):
-        terms_in_session = Term.objects.filter(session=self.session)
-        term_results = Result.objects.filter(student=self.student, term__in=terms_in_session, term_gpa__isnull=False)
-        subjects = Subject.objects.filter(subjectresult__result__in=term_results).distinct()
-        
-        sessional_subject_summary = {}
-        for subject in subjects:
-            term_scores_map = {}
-            scores_found = []
-            for term in terms_in_session:
-                sr = SubjectResult.objects.filter(result__student=self.student, result__term=term, subject=subject).first()
-                score = sr.total_score() if sr else None
-                term_scores_map[f'term_{term.id}_score'] = float(score) if score is not None else None
-                if score is not None: scores_found.append(score)
-            sessional_subject_summary[str(subject.id)] = {
-                'subject_name': subject.name, 'term_scores': term_scores_map,
-                'sessional_average': float(sum(scores_found) / len(scores_found)) if scores_found else 0.0
-            }
-        
-        self.subject_summary_json = sessional_subject_summary
-        term_gpas = [res.term_gpa for res in term_results if res.term_gpa is not None]
-        self.sessional_gpa = sum(term_gpas) / len(term_gpas) if term_gpas else Decimal('0.00')
-        term_averages = [res.average_score for res in term_results if res.average_score is not None]
-        self.average_score = sum(term_averages) / len(term_averages) if term_averages else Decimal('0.00')
+    def get_previous_sessional_result(self):
+        """Finds the SessionalResult object for the same student from the previous session."""
+        previous_sessions = Session.objects.filter(start_date__lt=self.session.start_date).order_by('-start_date')
+        for prev_session in previous_sessions:
+            previous_sessional_result = SessionalResult.objects.filter(student=self.student, session=prev_session).first()
+            if previous_sessional_result and previous_sessional_result.average_score is not None:
+                return previous_sessional_result
+        return None
 
-        if save: self.save()
+    def calculate_sessional_summary(self, save=True):
+        """Calculates and saves the sessional GPA, average, and performance change."""
+        terms_in_session = Term.objects.filter(session=self.session)
+        term_results = Result.objects.filter(student=self.student, term__in=terms_in_session, is_approved=True)
+        
+        if not term_results.exists():
+            self.sessional_gpa, self.average_score = Decimal('0.00'), Decimal('0.00')
+        else:
+            # Calculate Sessional GPA (True Weighted Average)
+            total_weighted_points_session, total_weights_session = Decimal('0.0'), Decimal('0.0')
+            for term_res in term_results:
+                for sr in term_res.subject_results.all().select_related('subject'):
+                    weight = Decimal(getattr(sr.subject, 'subject_weight', 1))
+                    total_weighted_points_session += Decimal(sr.calculate_grade_point()) * weight
+                    total_weights_session += weight
+            self.sessional_gpa = (total_weighted_points_session / total_weights_session) if total_weights_session > 0 else Decimal('0.00')
+            
+            # Calculate Sessional Average (Simple average of term averages)
+            term_averages = [res.average_score for res in term_results if res.average_score is not None]
+            self.average_score = sum(term_averages) / len(term_averages) if term_averages else Decimal('0.00')
+
+        # Calculate Sessional Performance Change
+        previous_sessional_result = self.get_previous_sessional_result()
+        if previous_sessional_result and self.average_score is not None:
+            prev_avg = previous_sessional_result.average_score
+            if prev_avg > 0:
+                change = ((self.average_score - prev_avg) / prev_avg) * 100
+                self.performance_change = change
+            elif self.average_score > 0:
+                self.performance_change = Decimal('100.00')
+            else:
+                self.performance_change = Decimal('0.00')
+        else:
+            self.performance_change = None
+
+        if save:
+            self.save()
 
 
 class CumulativeRecord(models.Model):
-    student = models.OneToOneField(Student, on_delete=models.CASCADE, primary_key=True)
+    student = models.OneToOneField(Student, on_delete=models.CASCADE, primary_key=True, related_name='cumulative_record')
     cumulative_gpa = models.DecimalField(max_digits=4, decimal_places=2, default=0.00)
     session_gpa_history_json = models.JSONField(default=dict, blank=True)
     last_updated = models.DateTimeField(auto_now=True)

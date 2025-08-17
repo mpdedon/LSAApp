@@ -17,7 +17,7 @@ from collections import defaultdict
 from decimal import Decimal
 from core.models import CustomUser, Student, Teacher, Guardian, Assignment, Result, Attendance, Subject, Class, Payment, ClassSubjectAssignment
 from core.models import Session, Term, Message, Assessment, Exam, Notification, AssignmentSubmission, AcademicAlert, TeacherAssignment
-from core.models import FinancialRecord, StudentFeeRecord, AssessmentSubmission, ExamSubmission
+from core.models import FinancialRecord, StudentFeeRecord, AssessmentSubmission, ExamSubmission, SessionalResult
 from django.db.models import Sum
 from django.views.generic.edit import FormView
 from django.contrib import messages
@@ -479,12 +479,10 @@ def guardian_dashboard(request):
     student_ids = students.values_list('pk', flat=True)
 
     try:
-        current_session = Session.objects.get(is_active=True)
-        current_term = Term.objects.get(session=current_session, is_active=True)
+        current_term = Term.objects.filter(is_active=True).select_related('session').first()
+        current_session = current_term.session if current_term else None
     except (Session.DoesNotExist, Term.DoesNotExist, Session.MultipleObjectsReturned, Term.MultipleObjectsReturned) as e:
         messages.warning(request, f"Could not determine the active academic period: {e}. Some data may be unavailable.")
-        current_session = None
-        current_term = None
 
     archived_terms = Term.objects.filter(is_active=False).order_by('-start_date')
 
@@ -576,12 +574,17 @@ def guardian_dashboard(request):
     results_qs = Result.objects.filter(student_id__in=student_ids, term=current_term, is_approved=True)
     results_dict = {res.student_id: res for res in results_qs}
 
+    sessional_result_qs = SessionalResult.objects.filter(student_id__in=student_ids, session=current_session, is_approved=True)
+    sessional_results_dict = {sres.student_id: sres for sres in sessional_result_qs}
+
     # All relevant archived results
     archived_results_qs = Result.objects.filter(student_id__in=student_ids, term__in=archived_terms, is_approved=True, is_archived=True).select_related('term')
     archived_results_dict = defaultdict(list)
     for res in archived_results_qs:
         archived_results_dict[res.student_id].append(res)
     
+    archived_sessional_results = SessionalResult.objects.filter(student_id__in=student_ids, session__is_active=False, is_published=True).select_related('session').order_by('-session__start_date')
+
     for student in students:
 
         student_id = student.user.id
@@ -721,17 +724,22 @@ def guardian_dashboard(request):
         else: 
             financial_data[student_id] = {'can_access_results': False, 'outstanding_balance': 'N/A'} 
 
-        # --- RESULT DATA ---
-        result = results_dict.get(student_id)
-        if result and financial_data[student_id]['can_access_results']: 
-            result_data[student_id] = result
-        else:
-            result_data[student_id] = None
-        
-        # --- ARCHIVED RESULT DATA ---
-        archived_results = archived_results_dict.get(student_id)
-        if archived_results:
-            archived_results_data[student_id] = archived_results
+    # --- RESULT DATA ---
+    term_results = Result.objects.filter(student_id__in=student_ids, term=current_term, is_published=True)
+    result_data = {res.student_id: res for res in term_results}
+    # Sessional
+    sessional_results = SessionalResult.objects.filter(student_id__in=student_ids, session=current_session, is_published=True)
+    sessional_results_data = {sres.student_id: sres for sres in sessional_results}
+    # Archived
+    archived_results = Result.objects.filter(student_id__in=students, term__is_active=False, is_published=True).select_related('term__session')
+    archived_results_data = defaultdict(list)
+    for res in archived_results:
+        archived_results_data[res.student_id].append(res)
+    
+    archived_sessional_results = SessionalResult.objects.filter(student_id__in=student_ids, session__is_active=False, is_published=True).select_related('session')
+    archived_sessional_results_data = defaultdict(list)
+    for sres in archived_sessional_results:
+        archived_sessional_results_data[sres.student_id].append(sres)
     
     # --- START OF CONTEXT FOR COMMUNICATION PANE ---
     received_messages = Message.objects.filter(
@@ -767,6 +775,8 @@ def guardian_dashboard(request):
         'guardian': guardian,
         'students': students,
         'teachers': teachers,
+        'current_term': current_term,
+        'current_session': current_session,
         'guardian_teachers': guardian_teachers,
         'assignments_data': dict(assignments_data), 
         'assessments_data': dict(assessments_data),
@@ -776,6 +786,8 @@ def guardian_dashboard(request):
         'attendance_logs': attendance_logs,
         'financial_data': financial_data,
         'result_data': result_data,
+        'sessional_results_data': sessional_results_data,
+        'archived_sessional_results_data': archived_sessional_results_data,
         'archived_results_data': archived_results_data,
         'notifications': notifications,
         'action_required_alerts': action_required_alerts,

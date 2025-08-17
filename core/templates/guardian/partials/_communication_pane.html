@@ -23,7 +23,7 @@
                 <button class="nav-link" id="guardian-notifications-tab" data-bs-toggle="tab" data-bs-target="#guardian-notifications-panel" type="button" role="tab">
                     <i class="bi bi-bell-fill me-1"></i> School Notices
                     {% if notifications %}
-                        <span class="badge bg-info rounded-pill ms-1">{{ notifications.count }}</span>
+                        <span class="badge bg-info rounded-pill ms-1">{{ notifications|length }}</span>
                     {% endif %}
                 </button>
             </li>

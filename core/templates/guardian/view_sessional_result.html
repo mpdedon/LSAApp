@@ -1,0 +1,207 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Sessional Result for {{ student.user.get_full_name }} - {{ session.name }}{% endblock %}
+
+{% block extra_head %}
+  <link rel="stylesheet" href="{% static 'css/result_styles.css' %}">
+  {# The sessional theme will be handled by custom classes below #}
+  <style>
+    .sessional-header {
+        background: linear-gradient(135deg, hsl(0, 0%, 96%) 0%, hwb(150 95% 3%) 100%); /* Bootstrap Success Gradient */
+        color: white;
+    }
+    .sessional-card-header {
+        background-color: rgba(208, 227, 231, 0.1); /* Light green tint */
+        font-weight: 600;
+    }
+    .sessional-summary-col {
+        background-color: #d1e7dd; /* Light green for summary columns */
+    }
+    .sessional-gpa-card .card-header { background-color: #198754; color: white; }
+    .cumulative-gpa-card .card-header { background-color: #6c757d; color: white; }
+  </style>
+{% endblock %}
+
+{% block content %}
+<div class="result-container">
+    <!-- School Header -->
+    <div class="result-header sessional-header">
+        <img src="{{ school_logo_url }}" alt="LearnSwift Academia Logo" class="logo">
+        <h1>LearnSwift Academia</h1>
+        <p class="lead">Sessional Academic Report ({{ session.name }})</p>
+    </div>
+
+    <!-- Student Information Section -->
+    <div class="student-info-section row mb-4 align-items-center">
+        <div class="col-md-3 text-center text-md-start mb-3 mb-md-0">
+            {% if student.profile_image and student.profile_image.url %}<img src="{{ student.profile_image.url }}" alt="Profile" class="student-profile-img">{% else %}<div class="student-profile-img bg-secondary d-flex align-items-center justify-content-center text-white fs-1 rounded-circle">{{ student.user.first_name.0 }}{{ student.user.last_name.0 }}</div>{% endif %}
+        </div>
+        <div class="col-md-9 student-details text-center text-md-start">
+            <h2>{{ student.user.get_full_name }}</h2>
+            <p><strong>Class:</strong> {{ student.current_class }} <span class="mx-2">|</span> <strong>LSA No:</strong> {{ student.LSA_number }}</p>
+        </div>
+    </div>
+
+   <!-- Sessional Attendance (Enhanced, as-is structure) -->
+   <div class="skills-attendance-section row mb-5">
+    <div class="col-md-12">
+        <div class="card shadow-sm border-0"> {# Added border-0 for a cleaner look #}
+            <div class="card-header bg-light text-center border-0 pt-3">
+                <h5 class="mb-0 fw-bold text-secondary"><i class="bi bi-calendar-check-fill me-2"></i>Sessional Attendance Summary</h5>
+            </div>
+            <div class="card-body d-flex justify-content-around text-center p-4">
+                
+                <div class="info-item">
+                    <span class="info-value fs-2 fw-bolder text-dark">{{ sessional_attendance_data.total_days|default:0 }}</span>
+                    <span class="info-label d-block text-muted">Total School Days</span>
+                </div>
+
+                <div class="vr"></div> {# Vertical rule for separation #}
+
+                <div class="info-item">
+                    <span class="info-value fs-2 fw-bolder text-success">{{ sessional_attendance_data.present_days|default:0 }}</span>
+                    <span class="info-label d-block text-muted">Days Present</span>
+                </div>
+
+                <div class="vr"></div> {# Vertical rule for separation #}
+
+                <div class="info-item">
+                    <span class="info-value fs-2 fw-bolder text-danger">{{ sessional_attendance_data.absent_days|default:0 }}</span>
+                    <span class="info-label d-block text-muted">Days Absent</span>
+                </div>
+
+                <div class="vr"></div> {# Vertical rule for separation #}
+
+                <div class="info-item">
+                    <span class="info-value fs-2 fw-bolder text-primary">{{ sessional_attendance_data.percentage|default:"0.0" }}%</span>
+                    <span class="info-label d-block text-muted">Attendance Rate</span>
+                </div>
+
+            </div>
+        </div>
+    </div>
+</div>
+
+    <!-- Academic Performance Table -->
+    <div class="academic-records-section mb-4">
+        <div class="academic-records-card">
+            <div class="card-header sessional-card-header"><h3>Academic Performance - {{ session.name }}</h3></div>
+            <div class="card-body p-0"><div class="table-responsive">
+                <table class="table academic-table table-bordered mb-0">
+                    <thead>
+                        <tr>
+                            <th style="min-width: 200px;">Subject</th>
+                            {% for term in terms_in_session %}<th class="text-center">{{ term.name }}</th>{% endfor %}
+                            <th class="text-center table-active">Sessional Average</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in subject_rows %}
+                        <tr>
+                            <td>{{ row.subject_name }}</td>
+                            {% for score in row.term_scores %}<td class="text-center">{{ score|floatformat:1|default:"-" }}</td>{% endfor %}
+                            <td class="text-center table-active fw-bold">{{ row.sessional_average|floatformat:1|default:"-" }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="{{ terms_in_session|length|add:2 }}" class="text-center text-muted py-4">No academic records found for this session.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div></div>
+        </div>
+    </div>
+
+    <!-- Sessional & Cumulative Summary Section -->
+    <div class="summary-section row mb-4 g-4">
+        <!-- Performance Chart Column -->
+        <div class="col-md-8">
+            <div class="chart-card h-100">
+                <div class="card-header sessional-card-header"><h5>Sessional Performance vs Class Average</h5></div>
+                <div class="card-body">
+                     {% if not is_pdf_render %}
+                        <canvas id="sessionalPerformanceChart"></canvas>
+                     {% else %}
+                        <div class="chart-placeholder">Chart data is available in the online view.</div>
+                     {% endif %}
+                </div>
+            </div>
+        </div>
+        <!-- Summary Cards Column -->
+        <div class="col-md-4 d-flex flex-column">
+            <div class="gpa-card mb-3 sessional-gpa-card">
+                <div class="card-header"><h5>Sessional GPA</h5></div>
+                <div class="card-body text-center"><p class="gpa-value">{{ sessional_result.sessional_gpa|floatformat:2|default:"N/A" }}</p></div>
+            </div>
+            <div class="gpa-card mb-3 cumulative-gpa-card">
+                <div class="card-header"><h5>Cumulative GPA</h5></div>
+                <div class="card-body text-center"><p class="gpa-value">{{ cumulative_gpa|floatformat:2|default:"N/A" }}</p></div>
+            </div>
+            <div class="gpa-card mb-auto">
+                <div class="card-header sessional-card-header"><h5>Sessional Performance</h5></div>
+                <div class="card-body text-center">
+                    {% if sessional_result.performance_change is not None %}
+                        {% if sessional_result.performance_change > 0 %}<p class="gpa-value text-success"><i class="fas fa-arrow-up me-2"></i>+{{ sessional_result.performance_change|floatformat:1 }}%</p><small class="text-muted">Improvement from previous session</small>
+                        {% elif sessional_result.performance_change < 0 %}<p class="gpa-value text-danger"><i class="fas fa-arrow-down me-2"></i>{{ sessional_result.performance_change|floatformat:1 }}%</p><small class="text-muted">Decline from previous session</small>
+                        {% else %}<p class="gpa-value text-secondary"><i class="fas fa-minus me-2"></i>0.0%</p><small class="text-muted">Maintained performance</small>{% endif %}
+                    {% else %}<p class="gpa-value text-muted">-</p><small class="text-muted">First session record.</small>{% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Buttons -->
+    <div class="download-button-container">
+        {% if not is_pdf_render %}
+        <button onclick="window.print();" class="btn btn-secondary btn-lg shadow-sm">
+            <i class="fas fa-print me-2"></i> Print Result
+        </button>
+        <a href="?download=pdf" class="btn btn-primary btn-lg shadow-sm">
+            <i class="fas fa-file-pdf me-2"></i> Download as PDF
+        </a>
+        {% endif %}
+    </div>
+    <br>
+</div>
+
+{% if not is_pdf_render %}
+<script type="application/json" id="sessional_chart_data_json">{{ chart_data_json|safe }}</script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const chartDataEl = document.getElementById('sessional_chart_data_json');
+    const canvasEl = document.getElementById('sessionalPerformanceChart');
+    if (chartDataEl && canvasEl) {
+        try {
+            const chartData = JSON.parse(chartDataEl.textContent);
+            const labels = chartData.map(d => d.subject);
+            const studentAverages = chartData.map(d => d.student_average);
+            const classAverages = chartData.map(d => d.class_average);
+            new Chart(canvasEl.getContext('2d'), {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Student\'s Sessional Average', data: studentAverages,
+                        backgroundColor: 'rgba(25, 135, 84, 0.7)', // Success color
+                        borderColor: 'rgba(25, 135, 84, 1)', borderWidth: 1
+                    }, {
+                        label: 'Class Sessional Average', data: classAverages,
+                        backgroundColor: 'rgba(108, 117, 125, 0.7)', // Secondary color
+                        borderColor: 'rgba(108, 117, 125, 1)', borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    scales: { y: { beginAtZero: true, max: 100 } },
+                    plugins: { title: { display: true, text: 'Sessional Performance by Subject' } }
+                }
+            });
+        } catch (e) {
+            console.error("Error initializing sessional chart:", e);
+        }
+    }
+});
+</script>
+{% endif %}
+{% endblock %}

@@ -1,5 +1,6 @@
 from django import template
 from django.apps import apps
+from django.db import models
 
 register = template.Library()
 
@@ -35,5 +36,14 @@ def get_submission(submission_model_name_str, item_instance, student_instance):
 
 # You might also need a filter for model_name_lower if not available
 @register.filter
-def model_name_lower(obj):
-    return obj._meta.model_name.lower()
+def model_name_lower(value):
+    if isinstance(value, models.Model):
+        return value._meta.model_name.lower()
+    # Check if the value is a model class
+    elif isinstance(value, type) and issubclass(value, models.Model):
+         return value._meta.model_name.lower()
+    # If it's already a string, just return it lowercased
+    elif isinstance(value, str):
+        return value.lower()
+    # For any other type, return an empty string to avoid errors
+    return ""

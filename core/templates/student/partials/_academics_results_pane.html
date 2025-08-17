@@ -9,9 +9,14 @@
   <div class="tab-pane fade show active" id="pills-current-result-{{student.user.id}}">
     {% if result_data and financial_data.can_access_results %}
         <div class="alert alert-success text-center">
-            <h5 class="alert-heading">Result is Ready!</h5>
+            <h5 class="alert-heading">Term Result is Ready!</h5>
             <p>Your result for {{ term }} has been published.</p>
-            <a href="{% url 'view_student_result' student_id=student.user.id term_id=result_data.term.id %}" class="btn btn-success"><i class="bi bi-award me-2"></i>View Result Now</a>
+            <a href="{% url 'view_termly_result' student_id=student.user.id term_id=result_data.term.id %}" class="btn btn-success"><i class="bi bi-award me-2"></i>View Result Now</a>
+        </div>
+        <div class="alert alert-success text-center">
+            <h5 class="alert-heading">Session Result is Ready!</h5>
+            <p>Your result for {{ session }} has been published.</p>
+            <a href="{% url 'view_sessional_result' student.user.id session.id %}" class="btn btn-success"><i class="bi bi-award me-2"></i>View Result Now</a>
         </div>
     {% elif financial_data.can_access_results == False and not financial_data.has_waiver %}
         <div class="alert alert-warning text-center"><i class="bi bi-lock-fill me-2"></i>Your result is pending. Please complete fee payments to unlock.</div>
@@ -23,7 +28,14 @@
     {% if archived_results_data %}
         <div class="list-group list-group-flush">
             {% for res in archived_results_data %}
-                <a href="{% url 'view_student_result' student_id=res.student.user.id term_id=res.term.id %}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                <a href="{% url 'view_termly_result' student_id=res.student.user.id term_id=res.term.id %}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                    Result for {{ res.term.name }}<i class="bi bi-chevron-right"></i>
+                </a>
+            {% endfor %}
+        </div>
+        <div class="list-group list-group-flush">
+            {% for res in archived_results_data %}
+                <a href="{% url 'view_sessional_result' student_id=res.student.user.id session_id=res.term.session.id %}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
                     Result for {{ res.term.name }}<i class="bi bi-chevron-right"></i>
                 </a>
             {% endfor %}

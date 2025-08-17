@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
-{% load custom_filters %} {# Your custom filters for get_item, get_attribute #}
+{% load custom_filters %}
 
 {% block title %}Sessional Broadsheet for {{ session.name }}{% endblock %}
 
@@ -12,21 +12,15 @@
     .accordion-button:not(.collapsed) { background-color: rgba(13, 110, 253, 0.1); color: #000; }
     .table thead th { background-color: #f8f9fa; border-bottom-width: 2px; }
     .subject-header { border-left: 2px solid #ccc; }
-    .summary-col { background-color: #e9ecef; } /* Light grey for summary columns */
+    .summary-col { background-color: #e9ecef; }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="container-fluid my-4 main-content-below-navbar">
     <div class="d-flex justify-content-between align-items-center mb-1">
-        <div>
-            <h2 class="mb-0">Sessional Broadsheet</h2>
-            <p class="text-muted mb-3">Session: <strong>{{ session.name }}</strong></p>
-        </div>
-        <div>
-            <a href="{% url 'sessional_broadsheets' %}" class="btn btn-outline-secondary btn-sm"><i class="fas fa-arrow-left me-1"></i> Back to Sessions</a>
-            <button onclick="window.print();" class="btn btn-outline-primary btn-sm"><i class="fas fa-print me-1"></i> Print</button>
-        </div>
+        <div><h2 class="mb-0">Sessional Broadsheet</h2><p class="text-muted mb-3">Session: <strong>{{ session.name }}</strong></p></div>
+        <div><a href="{% url 'sessional_broadsheets' %}" class="btn btn-outline-secondary btn-sm"><i class="fas fa-arrow-left me-1"></i> Back to Sessions</a><button onclick="window.print();" class="btn btn-outline-primary btn-sm"><i class="fas fa-print me-1"></i> Print</button></div>
     </div>
     {% if messages %}{% for message in messages %}<div class="alert alert-{{ message.tags }} alert-dismissible fade show">{{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button></div>{% endfor %}{% endif %}
 
@@ -37,40 +31,38 @@
             <h2 class="accordion-header" id="heading{{ data.class.id }}">
                 <button class="accordion-button {% if not forloop.first %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse{{ data.class.id }}">
                     <strong>{{ data.class.name }}</strong>
-                    <span class="badge {% if data.is_all_approved %}bg-success{% else %}bg-warning text-dark{% endif %} ms-3">{% if data.is_all_approved %}Approved & Published{% else %}Pending Approval{% endif %}</span>
+                    
+                    {# ADD an ID to the badge for easy targeting by JavaScript #}
+                    <span id="status-badge-{{ data.class.id }}" class="badge {% if data.is_all_approved %}bg-success{% else %}bg-warning text-dark{% endif %} ms-3">
+                        {% if data.is_all_approved %}Approved & Published{% else %}Pending Approval{% endif %}
+                    </span>
+
                 </button>
             </h2>
             <div id="collapse{{ data.class.id }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}" data-bs-parent="#sessionalBroadsheetAccordion">
                 <div class="accordion-body p-2">
-                    <div class="d-flex justify-content-end mb-2">
+                    <div class="d-flex justify-content-end mb-2" id="approval-button-container-{{ data.class.id }}">
                         {% if not data.is_all_approved %}
                         <button class="btn btn-success btn-sm approve-sessional-btn" 
-                                data-url="{% url 'approve_sessional_broadsheet' session.id data.class.id %}">
+                                data-url="{% url 'approve_sessional_broadsheet' session.id data.class.id %}"
+                                data-class-id="{{ data.class.id }}"> {# Add data-class-id for targeting #}
                             <i class="fas fa-check-circle me-1"></i> Approve & Publish for {{ data.class.name }}
                         </button>
                         {% endif %}
                     </div>
                     <div class="table-responsive">
+                        {# The table structure is correct and remains unchanged #}
                         <table class="table table-bordered table-striped table-sm small">
                             <thead class="table-light">
-                                <!-- First Header Row: Subject Names -->
                                 <tr>
                                     <th rowspan="2" class="align-middle" style="min-width: 150px;">Student Name</th>
-                                    {% for subject in data.subjects %}
-                                        <th colspan="{{ terms_in_session|length|add:1 }}" class="text-center subject-header">{{ subject.name }}</th>
-                                    {% endfor %}
+                                    {% for subject in data.subjects %}<th colspan="{{ terms_in_session|length|add:1 }}" class="text-center subject-header">{{ subject.name }}</th>{% endfor %}
                                     <th rowspan="2" class="text-center vertical-text summary-col">Sessional Average</th>
                                     <th rowspan="2" class="text-center vertical-text summary-col">Sessional GPA</th>
                                     <th rowspan="2" class="text-center align-middle summary-col">Rank</th>
                                 </tr>
-                                <!-- Second Header Row: Term Names -->
                                 <tr>
-                                    {% for subject in data.subjects %}
-                                        {% for term in terms_in_session %}
-                                            <th class="text-center vertical-text" style="font-weight: normal;">{{ term.name|slice:":5" }}.</th>
-                                        {% endfor %}
-                                        <th class="text-center vertical-text table-info">Avg</th>
-                                    {% endfor %}
+                                    {% for subject in data.subjects %}{% for term in terms_in_session %}<th class="text-center vertical-text" style="font-weight: normal;">{{ term.name|slice:":5" }}.</th>{% endfor %}<th class="text-center vertical-text table-info">Avg</th>{% endfor %}
                                 </tr>
                             </thead>
                             <tbody>
@@ -78,9 +70,7 @@
                                 <tr>
                                     <td>{{ student_data.student_obj.user.get_full_name }}</td>
                                     {% for subject_row in student_data.subject_rows %}
-                                        {% for term_score in subject_row.term_scores %}
-                                            <td class="text-center">{{ term_score|floatformat:1|default:"-" }}</td>
-                                        {% endfor %}
+                                        {% for term_score in subject_row.term_scores %}<td class="text-center">{{ term_score|floatformat:1|default:"-" }}</td>{% endfor %}
                                         <td class="text-center table-info fw-bold">{{ subject_row.sessional_average|floatformat:1|default:"-" }}</td>
                                     {% endfor %}
                                     <td class="text-center fw-bold summary-col">{{ student_data.sessional_average|floatformat:2|default:"-" }}</td>
@@ -106,26 +96,64 @@ document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.approve-sessional-btn').forEach(button => {
         button.addEventListener('click', function(e) {
             e.preventDefault();
+            
             const url = this.getAttribute('data-url');
+            const classId = this.getAttribute('data-class-id'); // Get the class ID
             const csrfToken = '{{ csrf_token }}';
 
-            if (confirm('Are you sure you want to approve and publish this sessional broadsheet? This will make it visible to students and parents.')) {
+            if (confirm('Are you sure you want to approve and publish this sessional broadsheet?')) {
+                // Optionally provide visual feedback that something is happening
+                this.innerHTML = '<i class="fas fa-spinner fa-spin me-1"></i> Approving...';
+                this.disabled = true;
+
                 fetch(url, {
                     method: 'POST',
                     headers: { 'X-CSRFToken': csrfToken, 'Content-Type': 'application/json' },
                 })
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) { throw new Error('Network response was not ok.'); }
+                    return response.json();
+                })
                 .then(data => {
-                    if (data.message) {
-                        alert(data.message);
-                        window.location.reload(); // Reload to see updated status
+                    if (data.message && data.updated_count > 0) {
+                        // --- DYNAMIC UPDATE LOGIC ---
+                        
+                        // 1. Find the button's container and remove the button
+                        const buttonContainer = document.getElementById(`approval-button-container-${classId}`);
+                        if (buttonContainer) {
+                            buttonContainer.innerHTML = ''; // Or button.remove();
+                        }
+
+                        // 2. Find the status badge by its new ID
+                        const statusBadge = document.getElementById(`status-badge-${classId}`);
+                        if (statusBadge) {
+                            // 3. Update the badge's text and classes
+                            statusBadge.textContent = 'Approved & Published';
+                            statusBadge.classList.remove('bg-warning', 'text-dark');
+                            statusBadge.classList.add('bg-success');
+                        }
+                        
+                        // 4. Optionally show a temporary success message without a disruptive alert
+                        // (e.g., using a toast notification library)
+                        console.log(data.message); // Log success to console
+
                     } else if (data.error) {
-                        alert('Error: ' + data.error);
+                        alert('Server Error: ' + data.error);
+                        // Re-enable the button on error
+                        button.innerHTML = '<i class="fas fa-check-circle me-1"></i> Approve & Publish';
+                        button.disabled = false;
+                    } else {
+                        // Handle case where updated_count is 0 (already approved)
+                        alert(data.message || "No records needed updating.");
+                        button.remove(); // Remove the button since it's no longer needed
                     }
                 })
                 .catch(error => {
-                    console.error('Error:', error);
-                    alert('An unexpected error occurred.');
+                    console.error('Fetch Error:', error);
+                    alert('An unexpected error occurred. Please check the developer console.');
+                     // Re-enable the button on fetch error
+                    button.innerHTML = '<i class="fas fa-check-circle me-1"></i> Approve & Publish';
+                    button.disabled = false;
                 });
             }
         });

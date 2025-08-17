@@ -37,11 +37,11 @@
             <div class="row align-items-center">
                 <div class="col-md-4 text-center text-md-start mb-3 mb-md-0">
                     <div class="text-center">
-                        {% if student.profile_image %}
-                            <img src="{{ student.profile_image.url }}" class="rounded-circle profile-avatar" alt="{{ student.user.get_full_name }}'s Profile Picture">
-                        {% else %}
-                            <img src="{% static 'images/default.jpg' %}" class="rounded-circle profile-avatar" alt="Default Profile Picture">
-                        {% endif %}
+                        {#{% if student.profile_image %}#}
+                        {#    <img src="{{ student.profile_image.url }}" class="rounded-circle profile-avatar" alt="{{ student.user.get_full_name }}'s Profile Picture">#}
+                        {#{% else %}#}
+                        {#    <img src="{% static 'images/default.jpg' %}" class="rounded-circle profile-avatar" alt="Default Profile Picture">#}
+                        {#{% endif %}#}
                     </div>
                     <div class="mt-2">
                         <h5 class="fw-bold mb-0">{{ student.user.get_full_name }}</h5>
