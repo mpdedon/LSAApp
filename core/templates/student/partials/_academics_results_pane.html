@@ -35,7 +35,7 @@
         </div>
         <div class="list-group list-group-flush">
             {% for res in archived_results_data %}
-                <a href="{% url 'view_sessional_result' student_id=res.student.user.id session_id=res.term.session.id %}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                <a href="{% url 'view_sessional_result' res.student.user.id res.term.session.id %}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
                     Result for {{ res.term.name }}<i class="bi bi-chevron-right"></i>
                 </a>
             {% endfor %}

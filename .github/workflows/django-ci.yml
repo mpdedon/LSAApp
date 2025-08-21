@@ -1,0 +1,76 @@
+name: Django CI/CD Checks
+
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11"]
+
+    services:
+      postgres:
+        image: postgres:13-alpine
+        env:
+          POSTGRES_DB: test_lsaapp
+          POSTGRES_USER: test_user
+          POSTGRES_PASSWORD: test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install System Dependencies
+      run: sudo apt-get update && sudo apt-get install -y libpq-dev
+
+    - name: Install Python Dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    # --- THIS IS THE NEW, BULLETPROOF STEP ---
+    - name: Create .env file for CI
+      run: |
+        echo "SECRET_KEY=dummy-secret-key-for-ci-only-never-use-in-prod" >> .env
+        echo "DEBUG=False" >> .env
+        echo "DATABASE_URL=postgres://test_user:test_password@localhost:5432/test_lsaapp" >> .env
+        echo "CSRF_TRUSTED_ORIGINS=http://localhost" >> .env
+        # Add any other required env vars that your settings.py needs to load
+        # For example, if you have a required SENDGRID_API_KEY without a default:
+
+    - name: Verify .env file creation
+      run: |
+        echo "--- Contents of .env file: ---"
+        cat .env
+        echo "----------------------------"
+
+    - name: Run Django System Checks
+      # This step will now read the .env file we just created
+      run: python manage.py check --deploy --fail-level ERROR
+        
+    - name: Run Tests
+      # This step will also read the .env file.
+      # If tests need DEBUG=True, we can create a separate .env file for it or modify it.
+      # For now, let's keep it simple.
+      run: python manage.py test
+        
+    - name: Attempt to Run Collectstatic
+      # This step will also read the .env file.
+      run: python manage.py collectstatic --noinput --dry-run

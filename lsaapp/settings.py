@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 from pathlib import Path
 import os
 from dotenv import load_dotenv
+from decouple import config, Csv
 import dj_database_url
 
 
@@ -21,22 +22,9 @@ import dj_database_url
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(os.path.join(BASE_DIR, '.env'))
 
-print(f"--- DEBUG from settings.py: .env file loaded. DATABASE_URL is: {os.getenv('DATABASE_URL')} ---")
-# --- Step 2: Core Settings (SECRET_KEY, DEBUG, ALLOWED_HOSTS) ---
-
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.getenv('SECRET_KEY')
-if not SECRET_KEY:
-    # Use a dummy key for local dev if not set, but raise error if DEBUG is False
-    if os.getenv('DJANGO_ENV') == 'production':
-        raise ValueError("No SECRET_KEY set for production environment!")
-    SECRET_KEY = 'django-insecure-dummy-key-for-local-development-only'
-
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DEBUG', 'False').lower() == 'true'
-
-ALLOWED_HOSTS = os.environ.get('DJANGO_ALLOWED_HOSTS', '*,localhost:8001,127.0.0.1:8001,0.0.0.0:8000,learnswift.icu').split(',')
-# Application definition
+SECRET_KEY = config('SECRET_KEY')
+DEBUG = config('DEBUG', default=False, cast=bool)
+ALLOWED_HOSTS = config('DJANGO_ALLOWED_HOSTS', cast=Csv(), default='127.0.0.1,localhost')
 
 # --- Step 3: Application Definition ---
 
@@ -47,6 +35,7 @@ INSTALLED_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
+    'whitenoise.runserver_nostatic',
     'django.contrib.staticfiles',
     'django.contrib.sites',
     'django.contrib.sitemaps',
@@ -55,6 +44,7 @@ INSTALLED_APPS = [
     'django.contrib.humanize',
     'django_ckeditor_5',
     'reportlab',
+    'anymail',
 ]
 
 SITE_ID = 1
@@ -137,7 +127,7 @@ else:
 # --- Step 5: Password, Auth, and Internationalization ---
 
 AUTH_USER_MODEL = 'core.CustomUser'
-AUTH_PASSWORD_VALIDATORS = [ # Keep these
+AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
 ]
 
@@ -154,13 +144,10 @@ USE_TZ = True
 # --- Step 6: Static and Media Files ---
 
 STATIC_URL = '/static/'
-STATIC_ROOT = BASE_DIR / "staticfiles"
-STATICFILES_DIRS = [
-    #os.path.join(BASE_DIR, 'core/static')
-    ]
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 
 MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+MEDIA_ROOT = BASE_DIR / 'mediafiles'
 
 STORAGES = {
     "default": {
@@ -171,25 +158,19 @@ STORAGES = {
     },
 }
 
-if os.getenv('DJANGO_ENV') == 'production': 
-    STATICFILES_DIRS.append(MEDIA_ROOT)
-
 # --- Step 7: Default PK and Security Settings ---
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Security settings should be controlled by environment variables
+CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', cast=Csv(), default='http://localhost:8000,http://127.0.0.1:8000')
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-SECURE_SSL_REDIRECT = os.getenv('SECURE_SSL_REDIRECT', 'False').lower() == 'true'
-SESSION_COOKIE_SECURE = os.getenv('SESSION_COOKIE_SECURE', 'False').lower() == 'true'
-CSRF_COOKIE_SECURE = os.getenv('CSRF_COOKIE_SECURE', 'False').lower() == 'true'
-
-# Trust Render's proxy for CSRF
-CSRF_TRUSTED_ORIGINS_STR = os.getenv('CSRF_TRUSTED_ORIGINS', 'http://localhost:8001,http://127.0.0.1:8001')
-CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in CSRF_TRUSTED_ORIGINS_STR.split(',')]
+SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', default=False, cast=bool)
+SESSION_COOKIE_SECURE = config('SESSION_COOKIE_SECURE', default=False, cast=bool)
+CSRF_COOKIE_SECURE = config('CSRF_COOKIE_SECURE', default=False, cast=bool)
 
 # Set a session timeout (optional)
-SESSION_EXPIRE_AT_BROWSER_CLOSE = True
+SESSION_EXPIRE_AT_BROWSER_CLOSE = False
 
 LOG_DIR = '/tmp/logs'
 if not os.path.exists(LOG_DIR):
@@ -207,7 +188,7 @@ LOGGING = {
             'level': 'ERROR',
             'class': 'logging.FileHandler',
             'filename': os.path.join(LOG_DIR, 'error.log'),
-            'mode': 'a',  # Append mode
+            'mode': 'a',  
         },
     },
     'loggers': {
@@ -219,8 +200,22 @@ LOGGING = {
     },
 }
 
+# --- SENTRY ERROR TRACKING ---
 
-# --- Step 8: CKEditor Configuration (Keep your existing config) ---
+SENTRY_DSN = config('SENTRY_DSN', default=None)
+if SENTRY_DSN and not DEBUG: 
+    import sentry_sdk
+    from sentry_sdk.integrations.django import DjangoIntegration
+
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        integrations=[DjangoIntegration()],      
+        traces_sample_rate=0.25,
+        send_default_pii=True
+    )
+    print("Sentry error tracking is enabled for production.")
+
+# --- Step 8: CKEditor Configuration ---
 
 customColorPalette = [
         {

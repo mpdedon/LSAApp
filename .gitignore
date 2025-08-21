@@ -45,6 +45,7 @@ venv.bak/
 db.sqlite3
 db.sqlite3-journal
 
+mediafiles
 # Ignore local media and static files collected by collectstatic
 # The slash at the beginning ensures it only matches at the project root
 #/mediafiles/
