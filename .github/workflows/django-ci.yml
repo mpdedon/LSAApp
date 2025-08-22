@@ -45,32 +45,29 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    # --- THIS IS THE NEW, BULLETPROOF STEP ---
     - name: Create .env file for CI
       run: |
-        echo "SECRET_KEY=dummy-secret-key-for-ci-only-never-use-in-prod" >> .env
+        echo "SECRET_KEY=dummy-secret-key-for-ci-only" >> .env
         echo "DEBUG=False" >> .env
-        echo "DATABASE_URL=postgres://test_user:test_password@localhost:5432/test_lsaapp" >> .env
+        # --- THIS IS THE FIX ---
+        # We add `?sslmode=disable` to the end of the DATABASE_URL.
+        # dj-database-url will parse this and set ssl_require=False.
+        echo "DATABASE_URL=postgres://test_user:test_password@localhost:5432/test_lsaapp?sslmode=disable" >> .env
         echo "CSRF_TRUSTED_ORIGINS=http://localhost" >> .env
-        # Add any other required env vars that your settings.py needs to load
-        # For example, if you have a required SENDGRID_API_KEY without a default:
+        echo "SENDGRID_API_KEY=dummy-sendgrid-key-for-ci" >> .env
 
     - name: Verify .env file creation
-      run: |
-        echo "--- Contents of .env file: ---"
-        cat .env
-        echo "----------------------------"
+      run: cat .env
 
     - name: Run Django System Checks
-      # This step will now read the .env file we just created
       run: python manage.py check --deploy --fail-level ERROR
         
     - name: Run Tests
-      # This step will also read the .env file.
-      # If tests need DEBUG=True, we can create a separate .env file for it or modify it.
-      # For now, let's keep it simple.
+      # We need to set DEBUG=True for the test run, which can be done by overriding the .env file value
+      # An easy way is to just set it as a step-level env var.
+      env:
+        DEBUG: 'True'
       run: python manage.py test
         
     - name: Attempt to Run Collectstatic
-      # This step will also read the .env file.
       run: python manage.py collectstatic --noinput --dry-run
