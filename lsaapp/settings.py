@@ -26,6 +26,13 @@ SECRET_KEY = config('SECRET_KEY')
 DEBUG = config('DEBUG', default=False, cast=bool)
 ALLOWED_HOSTS = config('DJANGO_ALLOWED_HOSTS', cast=Csv(), default='127.0.0.1,localhost')
 
+# --- ADD THIS DEBUG LINE ---
+print("!!! --- SETTINGS CHECK --- !!!")
+print(f"DEBUG from env is: {config('DEBUG', default='NOT SET')}")
+print(f"RAW DJANGO_ALLOWED_HOSTS from env: {os.environ.get('DJANGO_ALLOWED_HOSTS', 'NOT FOUND')}")
+print(f"FINAL ALLOWED_HOSTS list: {ALLOWED_HOSTS}")
+print("!!! --- END SETTINGS CHECK --- !!!")
+
 # --- Step 3: Application Definition ---
 
 INSTALLED_APPS = [

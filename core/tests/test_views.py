@@ -9,7 +9,7 @@ from core.models import (
     Student, Guardian, Class, Session, Term, FeeAssignment,
     StudentFeeRecord, Payment, FinancialRecord
 )
-from core.forms import PaymentForm # Adjust import path
+from core.payment.forms import PaymentForm # Adjust import path
 
 CustomUser = get_user_model()
 
