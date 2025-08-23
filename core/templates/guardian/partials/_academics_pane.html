@@ -17,7 +17,7 @@
         <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-assess-{{ student.id }}">Assessments</button></h2>
         <div id="collapse-assess-{{ student.id }}" class="accordion-collapse collapse" data-bs-parent="#academics-accordion-{{ student.id }}">
             <div class="accordion-body">
-                {% with student_assessments=assessments_data|get_item:student.user.id %}
+                {% with student_assessments=assessments_data|get_iterable_item:student.user.id %}
                     {% include 'guardian/partials/_assessment_exam_details.html' with items=student_assessments student=student type='assessment' %}
                 {% endwith %}
             </div>
@@ -28,7 +28,7 @@
         <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-exam-{{ student.id }}">Exams</button></h2>
         <div id="collapse-exam-{{ student.id }}" class="accordion-collapse collapse" data-bs-parent="#academics-accordion-{{ student.id }}">
             <div class="accordion-body">
-                {% with student_exams=exams_data|get_item:student.user.id %}
+                {% with student_exams=exams_data|get_iterable_item:student.user.id %}
                      {% include 'guardian/partials/_assessment_exam_details.html' with items=student_exams student=student type='exam' %}
                 {% endwith %}
             </div>

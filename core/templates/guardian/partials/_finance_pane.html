@@ -62,7 +62,7 @@
 
             <div>
                 <strong>Archived Reports:</strong>
-                {% with past_sessional_results=archived_sessional_results_data|get_item:student.pk past_term_results=archived_results_data|get_item:student.pk %}
+                {% with past_sessional_results=archived_sessional_results_data|get_iterable_item:student.pk past_term_results=archived_results_data|get_iterable_item:student.pk %}
                     {% if not past_sessional_results and not past_term_results %}
                         <p class="text-muted small">No archived reports found.</p>
                     {% else %}
