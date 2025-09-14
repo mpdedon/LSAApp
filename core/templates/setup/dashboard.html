@@ -261,22 +261,37 @@
         </div>
     </div>
     <!-- === End Column 5 === -->
-     <!-- Column 6: Charts/Reports Placeholder -->
+
+    <!-- === Column: Data & LMS  === -->
     <div class="col-lg-6 col-xl-4">
         <div class="card shadow-sm h-100">
-             <div class="card-header bg-light fw-bold">
-                <i class="fas fa-chart-bar me-2 text-secondary"></i>Data Overview
+            <div class="card-header bg-light fw-bold">
+                <i class="fas fa-chart-bar me-2 text-secondary"></i>Data & LMS
             </div>
+            
+            <!-- Chart goes in the card body -->
             <div class="card-body">
-                <p class="text-muted small">Charts and key reports will appear here.</p>
-                {# Placeholder for the student distribution chart #}
-                <canvas id="studentDistributionChart" height="200"></canvas> {# Give it an ID and maybe height #}
-                {# Add other chart placeholders #}
+                <p class="text-muted small">A high-level overview of key school metrics.</p>
+                <canvas id="studentDistributionChart" height="200"></canvas>
+            </div>
+            
+            <!-- Action links go in a list-group below the body -->
+            <div class="list-group list-group-flush">
+                <a href="{% url 'lsalms:admin_lms_dashboard' %}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                    <span><i class="fas fa-tachometer-alt fa-fw me-2 text-muted"></i>LMS Mission Control</span>
+                    <i class="fas fa-chevron-right text-muted small"></i>
+                </a>
+                <a href="{% url 'admin:lsalms_course_changelist' %}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                    <span><i class="fas fa-book-open fa-fw me-2 text-muted"></i>Manage All Courses (Django Admin)</span>
+                    <i class="fas fa-chevron-right text-muted small"></i>
+                </a>
+                <a href="{% url 'admin:lsalms_learningtrack_changelist' %}" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center">
+                    <span><i class="fas fa-route fa-fw me-2 text-muted"></i>Manage Learning Tracks</span>
+                    <i class="fas fa-chevron-right text-muted small"></i>
+                </a>
             </div>
         </div>
     </div>
-
-
 </div>
 <!-- === End Main Content Row === -->
 
@@ -333,7 +348,6 @@
 
 
 {% block extra_js %}
-{# Ensure Chart.js is loaded (maybe in base_with_sidebar.html?) #}
 {# <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script> #}
 <script>
 document.addEventListener('DOMContentLoaded', function() {

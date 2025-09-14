@@ -805,127 +805,105 @@ def build_absolute_uri(request, path):
     return request.build_absolute_uri(settings.STATIC_URL + path.lstrip('/'))
 
 
+@login_required
 def view_termly_result(request, student_id, term_id):
     """
     Displays a student's result for a specific term and allows PDF download.
     """
-    if HTML is None:
-        # WeasyPrint not installed, handle gracefully (e.g., disable PDF download)
-        pass
-
     try:
-        student = get_object_or_404(Student.objects.select_related('user', 'current_class'), user_id=student_id)
+        # Use student_id (which is user_id/pk for Student model)
+        student = get_object_or_404(Student.objects.select_related('user', 'current_class', 'cumulative_record'), pk=student_id)
         term = get_object_or_404(Term.objects.select_related('session'), id=term_id)
         session = term.session
         class_obj = student.current_class
-        result = get_object_or_404(Result.objects.select_related('term__session'), student=student, term=term)
 
-    except Http404 as e:
-        return HttpResponse("Result data not found.", status=404)
+        # Get or create the result object. get_or_create is safer.
+        result, _ = Result.objects.get_or_create(student=student, term=term)
+
+    except Http404:
+        messages.error(request, "The requested result data could not be found.")
+        return redirect('home') # Or a more appropriate dashboard
     except Exception as e:
-        return HttpResponse("An error occurred while retrieving result data.", status=500)
+        messages.error(request, f"An unexpected error occurred: {e}")
+        return redirect('home')
 
-    # --- Permissions Check ---
+    # --- Permissions & Financial Checks ---
+    user = request.user
+    is_guardian_of_student = hasattr(user, 'guardian') and student in user.guardian.students.all()
+    is_self = (student.user == user)
+    
+    if not (user.is_superuser or is_self or is_guardian_of_student):
+        return HttpResponseForbidden("You are not authorized to view this result.")
+
     financial_record = FinancialRecord.objects.filter(student=student, term=term).first()
     can_view_result = (not financial_record) or (financial_record and financial_record.can_access_results) 
-
-    # --- Prepare Data for Template ---
-    profile_image_url = None
-    if student.profile_image:
-        try:
-            profile_image_url = build_absolute_uri(request, student.profile_image.url)
-        except Exception as e:
-            print(f"Error building profile image URL: {e}")
-
-    # Attendance Data
-    total_days = Attendance.objects.filter(student=student, term=term).count() 
-    present_days = Attendance.objects.filter(student=student, term=term, is_present=True).count() 
-    absent_days = total_days - present_days
-    attendance_percentage = (present_days / total_days * 100) if total_days > 0 else 0
-
-    attendance_data = {
-        'total_days': total_days,
-        'present_days': present_days,
-        'absent_days': absent_days,
-        'attendance_percentage': round(attendance_percentage, 1), 
-    }
-
-    # Teacher and Principal Remarks
-    teacher_remarks = result.teacher_remarks
-    principal_remarks = result.principal_remarks
-
-    # Fetch Subject Results and Class Averages
-    subjects_in_class_term = Subject.objects.filter(
-        class_assignments__class_assigned=class_obj,
-        class_assignments__session=session,
-        class_assignments__term=term
-    ).distinct()
-
-    # Fetch finalized results for these subjects only
-    subject_results_query = SubjectResult.objects.filter(
-        result=result,
-        subject__in=subjects_in_class_term,
-    ).select_related('subject') 
-
-    gpa_points_sum = Decimal('0.0')
-    total_weights = Decimal('0.0')
-    scored_subjects_count = 0
-
-    for sr in subject_results_query:
-        if sr.total_score() > 0: # Only include subjects with scores in GPA calculation
-            weight = Decimal(getattr(sr.subject, 'subject_weight', 1))
-            gpa_points_sum += Decimal(sr.calculate_grade_point()) * weight
-            total_weights += weight
-            scored_subjects_count += 1
-            
-    term_gpa = (gpa_points_sum / total_weights) if total_weights > 0 else Decimal('0.00')
-
-    cumulative_record, _ = CumulativeRecord.objects.get_or_create(student=student)
-    
-    if result.term_gpa is None or result.performance_change is None:
+    if not (user.is_superuser or hasattr(user, 'teacher')) and not can_view_result:
+        return render(request, 'student/result_access_denied.html', {'student': student, 'term': term})
+        
+    # --- Just-in-Time Calculation (Fail-safe) ---
+    # If summary fields are empty, calculate and save them now.
+    if result.term_gpa is None or result.total_score is None or result.performance_change is None:
+        print(f"INFO: Calculating summary on-the-fly for result ID {result.id}...")
         result.calculate_term_summary()
-        result.refresh_from_db()
+        result.refresh_from_db() # Reload the instance to get the newly saved values
 
+    # --- Fetch and Prepare ALL Data for Template ---
+    
+    # Absolute URLs for PDF rendering
+    profile_image_url = build_absolute_uri(request, student.profile_image.url) if student.profile_image else None
+    school_logo_url = build_absolute_uri(request, 'images/logo.jpg')
+    signature_url = build_absolute_uri(request, 'images/signature.png')
+
+    # Attendance Data (using the stored value on the result if available, otherwise calculate)
+    if result.attendance_percentage is not None:
+        attendance_data = {'attendance_percentage': result.attendance_percentage}
+    else:
+        total_days = Attendance.objects.filter(student=student, term=term).count() 
+        present_days = Attendance.objects.filter(student=student, term=term, is_present=True).count()
+        attendance_percentage = (present_days / total_days * 100) if total_days > 0 else 0
+        attendance_data = {
+            'total_days': total_days,
+            'present_days': present_days,
+            'absent_days': total_days - present_days,
+            'attendance_percentage': round(attendance_percentage, 1), 
+        }
+    
+    # Subject Results for the table
+    subject_results_list = result.subject_results.select_related('subject').order_by('subject__name')
+
+    # Cumulative GPA (ensure the record is up-to-date)
+    cumulative_record = student.cumulative_record
+    cumulative_record.update_cumulative_gpa() 
     cumulative_gpa = cumulative_record.cumulative_gpa
     
-    # If this is the student's very first term result, the cumulative GPA is just this term's GPA
+    # Handle first-term-ever case for cumulative GPA display
     if Result.objects.filter(student=student).count() == 1:
         cumulative_gpa = result.term_gpa
 
-    # Prepare data for Chart.js and potentially for PDF (if chart is rendered as image later)
+    # Chart Data
     chart_data = []
-    subject_results_list = [] 
-    for sr in subject_results_query:
-        class_average = sr.get_class_average(sr.subject, term, class_obj) 
+    for sr in subject_results_list:
+        class_average = SubjectResult.get_class_average(sr.subject, term, class_obj) 
         total_score_val = sr.total_score() 
-
-        # Append full object for template table
-        subject_results_list.append(sr)
-
-        # Append data for JSON chart (convert Decimals to float here)
         chart_data.append({
             'subject': sr.subject.name,
             'total_score': float(total_score_val) if total_score_val is not None else 0.0,
             'class_average': float(class_average) if class_average is not None else 0.0
         })
 
-    # --- Context for Template Rendering ---
-    school_logo_url = build_absolute_uri(request, 'images/logo.jpg') # Use your actual logo path
-    signature_url = build_absolute_uri(request, 'images/signature.png') # Use your actual signature path
-
+    # --- Final Context Dictionary ---
     context = {
         'student': student,
-        'result': result,
+        'result': result, # Contains term_gpa, performance_change, remarks, skills
         'term': term,
         'session': session, 
         'class_obj': class_obj,
         'subject_results': subject_results_list, 
-        'term_gpa': term_gpa,
         'cumulative_gpa': cumulative_gpa,
         'chart_data_json': json.dumps(chart_data), 
         'attendance_data': attendance_data,
-        'teacher_comment': teacher_remarks,
-        'principal_comment': principal_remarks,
+        'teacher_comment': result.teacher_remarks,
+        'principal_comment': result.principal_remarks,
         'profile_image_url': profile_image_url,
         'school_logo_url': school_logo_url,
         'signature_url': signature_url,

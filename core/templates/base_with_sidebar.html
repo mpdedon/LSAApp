@@ -9,7 +9,7 @@
     <meta name="description" content="LearnSwift Academia Admin Area"/>
     <meta name="author" content="LearnSwift Academia" />
     <link rel="canonical" href="{{ request.build_absolute_uri }}" />
-    <meta name="robots" content="noindex, nofollow"/> {# Prevent indexing of admin areas #}
+    <meta name="robots" content="noindex, nofollow"/> 
 
     <!-- Favicon -->
     <link rel="icon" href="{% static 'images/favicon.ico' %}" type="image/x-icon">
@@ -181,7 +181,8 @@
                             <li><a href="{% url 'admin_assessment_list' %}" class="link-light rounded">Assessments (CA)</a></li>
                             <li><a href="{% url 'admin_exam_list' %}" class="link-light rounded">Exams</a></li>
                             <li><a href="#" class="link-light rounded">Enter/Approve Results</a></li>
-                            <li><a href="{% url 'all_broadsheets' %}" class="link-light rounded">Broadsheets</a></li>
+                            <li><a href="{% url 'termly_broadsheets' %}" class="link-light rounded">Broadsheets</a></li>
+                            <li><a href="{% url 'sessionall_broadsheets' %}" class="link-light rounded">Broadsheets</a></li>
                         </ul>
                     </div>
                 </li>

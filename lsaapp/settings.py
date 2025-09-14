@@ -25,11 +25,13 @@ load_dotenv(os.path.join(BASE_DIR, '.env'))
 SECRET_KEY = config('SECRET_KEY')
 DEBUG = config('DEBUG', default=False, cast=bool)
 ALLOWED_HOSTS = config('DJANGO_ALLOWED_HOSTS', cast=Csv(), default='127.0.0.1,localhost')
+GEMINI_API_KEY = config('GEMINI_API_KEY', default=None)
 
 # --- Step 3: Application Definition ---
 
 INSTALLED_APPS = [
     'core',
+    'lsalms',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',

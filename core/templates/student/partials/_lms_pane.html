@@ -1,22 +1,52 @@
 {% load humanize student_filters %}
 
-<p class="text-muted">Select a subject to access notes, videos, and practice with our AI Tutor.</p>
-<div class="row g-3">
-    {% for subject in subjects %}
-    <div class="col-md-6">
-        <a href="#" class="card text-decoration-none text-dark quest-card"> 
-            <div class="card-body d-flex align-items-center p-3">
-                <div class="quest-icon bg-primary-subtle text-primary"><i class="bi bi-book"></i></div>
-                <div class="quest-title ms-3">{{ subject.name }}</div>
-                <i class="bi bi-arrow-right-circle-fill ms-auto text-light-emphasis"></i>
-            </div>
-        </a>
+{% if lms_internal_enrollments or lms_external_enrollments %}
+    <!-- School Learning Section -->
+    {% if lms_internal_enrollments %}
+    <h5 class="fw-bold">My School Subjects</h5>
+    <p class="text-muted small">Access learning materials for your current classes.</p>
+    <div class="row g-3">
+        {% for enrollment in lms_internal_enrollments %}
+        <div class="col-md-6">
+            <a href="{% url 'lsalms:course_detail' slug=enrollment.course.slug %}" class="card text-decoration-none text-dark quest-card"> 
+                <div class="card-body d-flex align-items-center p-3">
+                    <div class="quest-icon bg-primary-subtle text-primary"><i class="bi bi-building"></i></div>
+                    <div class="quest-title ms-3">{{ enrollment.course.title }}</div>
+                    <i class="bi bi-arrow-right-circle-fill ms-auto text-light-emphasis"></i>
+                </div>
+            </a>
+        </div>
+        {% endfor %}
     </div>
-    {% empty %}
-    <div class="col-12"><p class="text-muted">No subjects assigned for this term.</p></div>
-    {% endfor %}
-</div>
-<<hr class="my-4">
+    <hr class="my-4">
+    {% endif %}
+
+    <!-- Online Academy Section -->
+    {% if lms_external_enrollments %}
+    <h5 class="fw-bold">My Online Academy Courses</h5>
+    <p class="text-muted small">Continue your subscribed online courses.</p>
+    <div class="row g-3">
+        {% for enrollment in lms_external_enrollments %}
+        <div class="col-md-6">
+            <a href="{% url 'lsalms:course_detail' slug=enrollment.course.slug %}" class="card text-decoration-none text-dark quest-card"> 
+                <div class="card-body d-flex align-items-center p-3">
+                    <div class="quest-icon bg-success-subtle text-success"><i class="bi bi-globe2"></i></div>
+                    <div class="quest-title ms-3">{{ enrollment.course.title }}</div>
+                    <i class="bi bi-arrow-right-circle-fill ms-auto text-light-emphasis"></i>
+                </div>
+            </a>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+{% else %}
+    <div class="text-center p-4 bg-light rounded">
+        <i class="bi bi-bookshelf fs-1 text-muted"></i>
+        <p class="mt-2 mb-0">Your learning materials and online courses will appear here once you are enrolled.</p>
+    </div>
+{% endif %}
+<hr class="my-4">
 <h5 class="fw-bold">External Learning Resources</h5>
 <p class="text-muted small">Explore these recommended platforms to supplement your learning journey.</p>
 <div class="list-group">

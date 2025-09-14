@@ -7,7 +7,7 @@
             <h6 class="card-subtitle mb-2 text-muted"><i class="bi bi-wallet2 me-2"></i>Financial Summary Section</h6>
             {% with data=financial_data|get_item:student.user.id %}
             <div class="card">
-                <div class="card-header"><h5 class="mb-0">Financial Summary for {{current_term.name}} {{current_session.name}}</h5></div>
+                <div class="card-header"><h5 class="mb-0">Financial Summary for {{active_term.name}} {{active_session.name}}</h5></div>
                 <div class="card-body">
                     {% if data %}
                     <div class="row text-center g-3">

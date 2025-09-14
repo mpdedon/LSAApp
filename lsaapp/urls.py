@@ -302,6 +302,8 @@ urlpatterns = [
     path('exam/<int:exam_id>/submissions/', exam_submissions_list, name='exam_submissions_list'),
     path('grade-essay-exam/<int:submission_id>/', grade_essay_exam, name='grade_essay_exam'),
     path('exam/<int:exam_id>/result/', view_exam_result, name='view_exam_result'),
+
+    path('lms/', include('lsalms.urls', namespace='lsalms')),
 ]
 
 # Specify the fully qualified module path

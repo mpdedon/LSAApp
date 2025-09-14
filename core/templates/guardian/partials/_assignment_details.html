@@ -2,20 +2,30 @@
 
 {% if assignments.details %}
     <ul class="list-group list-group-flush">
-        {% for item in assignments.details %}
+        {% for item_data in assignments.details %}
         <li class="list-group-item d-flex justify-content-between align-items-center">
             <div>
-                <h6 class="mb-0">{{ item.title }}</h6>
-                <small class="text-muted">Due: {{ item.due_date|date:"d M Y, P" }}{% if item.is_past_due and not item.has_submitted %}<span class="badge bg-danger ms-1">Overdue</span>{% endif %}</small>
+                {# Access the assignment object via 'obj' #}
+                <h6 class="mb-0">{{ item_data.obj.title }}</h6>
+                <small class="text-muted">Due: {{ item_data.obj.due_date|date:"d M Y, P" }}
+                    {% if item_data.obj.has_expired and not item_data.submitted %}<span class="badge bg-danger ms-1">Overdue</span>{% endif %}
+                </small>
             </div>
             <div class="ms-2">
-                {% if item.has_submitted %}<a href="{% url 'view_assignment_result' item.submission_id %}" class="btn btn-sm btn-info">View Result</a>
-                {% elif item.is_past_due %}<button class="btn btn-sm btn-secondary" disabled>Past Due</button>
-                {% else %}<a href="{% url 'submit_assignment' item.id %}" class="btn btn-sm btn-primary">Submit</a>{% endif %}
+                {% if item_data.submitted %}
+                    {# You need a URL for viewing a submission result #}
+                    {# <a href="{% url 'view_assignment_result' item_data.obj.id %}" class="btn btn-sm btn-success">Viewed</a> #}
+                    <span class="badge bg-success">Submitted</span>
+                {% elif item_data.obj.has_expired %}
+                    <button class="btn btn-sm btn-secondary" disabled>Past Due</button>
+                {% else %}
+                    {# Access the assignment ID via 'obj.id' #}
+                    <a href="{% url 'submit_assignment' item_data.obj.id %}?student_id={{ student.pk }}" class="btn btn-sm btn-primary">Submit</a>
+                {% endif %}
             </div>
         </li>
         {% endfor %}
     </ul>
 {% else %}
-    <p class="text-center text-muted">No active assignments found.</p>
+    <p class="text-center text-muted">No active assignments found for this student.</p>
 {% endif %}

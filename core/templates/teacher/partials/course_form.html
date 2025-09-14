@@ -1,0 +1,85 @@
+<!-- lsalms/templates/lsalms/teacher/course_form.html -->
+
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}
+    {% if form.instance.pk %}
+        Edit Course: {{ form.instance.title }}
+    {% else %}
+        Create a New Course
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow-sm">
+                <div class="card-body p-4 p-md-5">
+                    <h2 class="card-title text-center fw-bold mb-4">
+                        {% if form.instance.pk %}
+                            Edit Course Details
+                        {% else %}
+                            Create a New Course
+                        {% endif %}
+                    </h2>
+                    
+                    <form method="post" novalidate>
+                        {% csrf_token %}
+                        
+                        {{ form|crispy }}
+
+                        <div class="d-grid gap-2 mt-4">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                {% if form.instance.pk %}
+                                    Save Changes
+                                {% else %}
+                                    Create Course & Proceed to Builder
+                                {% endif %}
+                            </button>
+                            <a href="{% url 'teacher_dashboard' %}" class="btn btn-outline-secondary">Cancel</a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const courseTypeSelect = document.getElementById('id_course_type');
+    const internalFields = document.querySelectorAll('.internal-field');
+    const externalFields = document.querySelectorAll('.external-field');
+
+    function toggleCourseFields() {
+        const selectedType = courseTypeSelect.value;
+        
+        if (selectedType === 'INTERNAL') {
+            // Show internal fields and their parent containers
+            internalFields.forEach(field => field.closest('.mb-3').style.display = 'block');
+            // Hide external fields and their parent containers
+            externalFields.forEach(field => field.closest('.mb-3').style.display = 'none');
+        } else if (selectedType === 'EXTERNAL') {
+            // Hide internal fields
+            internalFields.forEach(field => field.closest('.mb-3').style.display = 'none');
+            // Show external fields
+            externalFields.forEach(field => field.closest('.mb-3').style.display = 'block');
+        } else {
+            // Hide both if nothing is selected
+            internalFields.forEach(field => field.closest('.mb-3').style.display = 'none');
+            externalFields.forEach(field => field.closest('.mb-3').style.display = 'none');
+        }
+    }
+
+    // Add event listener to the dropdown
+    courseTypeSelect.addEventListener('change', toggleCourseFields);
+    
+    // Run the function on page load to set the initial state
+    toggleCourseFields();
+});
+</script>
+{% endblock %}

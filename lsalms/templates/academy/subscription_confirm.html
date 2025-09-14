@@ -1,0 +1,74 @@
+<!-- lsalms/templates/lsalms/academy/subscription_confirm.html -->
+
+{% extends 'base.html' %}
+
+{% load humanize %}
+
+{% block title %}Confirm Subscription{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-7 col-md-9">
+
+            <div class="text-center mb-4">
+                <h1 class="h2 fw-bold">Confirm Your Enrollment</h1>
+                <p class="text-muted">You're just one step away from starting your learning journey.</p>
+            </div>
+
+            <div class="card shadow-sm">
+                <div class="card-body p-4">
+                    <h5 class="card-title mb-3">Order Summary</h5>
+                    
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                            Course Title
+                            <span class="fw-bold text-end">{{ course.title }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                            Enrolling Student
+                            <span>{{ student.user.get_full_name }}</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                            Access Duration
+                            <span>1-Year Access</span>
+                        </li>
+                        <li class="list-group-item d-flex justify-content-between align-items-center px-0 bg-light mt-3">
+                            <strong class="fs-5">Total Price</strong>
+                            <strong class="fs-5 text-primary">
+                                {% if course.is_subscription_based and course.subscription_fee > 0 %}
+                                    ₦{{ course.subscription_fee|intcomma }}
+                                {% else %}
+                                    Free
+                                {% endif %}
+                            </strong>
+                        </li>
+                    </ul>
+                    
+                    <hr>
+
+                    <!-- This form POSTs to the final action view -->
+                    <form method="post" action="{% url 'lsalms:subscribe_to_course' course_id=course.id %}">
+                        {% csrf_token %}
+                        <p class="small text-muted text-center">By clicking below, you agree to our Terms of Service. This is a placeholder for a real payment gateway.</p>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                {% if course.is_subscription_based and course.subscription_fee > 0 %}
+                                    Confirm & Proceed
+                                {% else %}
+                                    Confirm & Enroll for Free
+                                {% endif %}
+                            </button>
+                        </div>
+                    </form>
+                    
+                </div>
+                <div class="card-footer text-center bg-white border-0">
+                    <a href="{% url 'lsalms:academy_course_detail' slug=course.slug %}" class="text-muted small">Cancel and return to course page</a>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}

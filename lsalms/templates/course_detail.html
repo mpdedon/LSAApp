@@ -1,0 +1,125 @@
+<!-- lsalms/templates/lsalms/course_detail.html -->
+
+{% extends 'base.html' %}
+{% load lsalms_extras %} 
+
+{% block title %}Course: {{ course.title }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    .course-header {
+        background: linear-gradient(135deg, rgba(44, 50, 232, 0.8), rgba(108, 117, 125, 0.8)), url('https://source.unsplash.com/1600x900/?education,library') no-repeat center center;
+        background-size: cover;
+        color: white;
+    }
+    .module-accordion .accordion-button {
+        font-weight: 500;
+        font-size: 1.1rem;
+    }
+    .lesson-link {
+        color: var(--bs-dark);
+        text-decoration: none;
+        transition: background-color 0.2s ease-in-out;
+    }
+    .lesson-link:hover {
+        background-color: #f8f9fa;
+    }
+    .lesson-link .lesson-icon {
+        color: var(--bs-primary);
+    }
+    .lesson-link .lesson-status-icon {
+        font-size: 1.2rem;
+        color: #198754; /* Green for completed */
+    }
+</style>
+{% endblock %}
+
+
+{% block content %}
+<div class="course-header text-center py-5">
+    <div class="container">
+        <h1 class="display-4 fw-bold">{{ course.title }}</h1>
+        <p class="lead col-lg-8 mx-auto">{{ course.learning_objectives|truncatewords:30 }}</p>
+        <p class="text-white-50">Taught by: {{ course.teacher.get_full_name }}</p>
+    </div>
+</div>
+
+<div class="container my-5">
+    <div class="row g-5">
+        <!-- Left Column: Curriculum -->
+        <div class="col-lg-8">
+            <h2 class="mb-4">Course Curriculum</h2>
+            
+            {% for module in course.modules.all %}
+                <div class="accordion module-accordion mb-3" id="accordionModule{{ module.pk }}">
+                    <div class="accordion-item">
+                        <h2 class="accordion-header" id="headingModule{{ module.pk }}">
+                            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseModule{{ module.pk }}">
+                                {{ module.title }}
+                            </button>
+                        </h2>
+                        <div id="collapseModule{{ module.pk }}" class="accordion-collapse collapse show" data-bs-parent="#accordionModule{{ module.pk }}">
+                            <div class="accordion-body p-0">
+                                <div class="list-group list-group-flush">
+                                    {% for lesson in module.lessons.all %}
+                                        <a href="{% url 'lsalms:lesson_detail' pk=lesson.pk %}" class="lesson-link list-group-item list-group-item-action d-flex justify-content-between align-items-center py-3">
+                                            <div class="d-flex align-items-center">
+                                                <i class="fas fa-play-circle fa-fw me-3 lesson-icon fs-4"></i>
+                                                <div>
+                                                    <h6 class="mb-0 fw-bold">{{ lesson.title }}</h6>
+                                                    <small class="text-muted">{{ lesson.estimated_duration }} min</small>
+                                                </div>
+                                            </div>
+                                            <!-- We will add logic here later to show a checkmark if completed -->
+                                            <!-- <i class="fas fa-check-circle lesson-status-icon"></i> -->
+                                        </a>
+                                    {% empty %}
+                                        <div class="list-group-item">No lessons in this module yet.</div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% empty %}
+                <div class="p-4 bg-light rounded text-center">
+                    <p class="mb-0">The curriculum for this course is still being developed. Please check back soon!</p>
+                </div>
+            {% endfor %}
+        </div>
+
+        <!-- Right Column: Course Info (Now with dynamic progress) -->
+        <div class="col-lg-4">
+            <div class="card shadow-sm position-sticky" style="top: 80px;">
+                <div class="card-body">
+                    <h5 class="card-title mb-3">About This Course</h5>
+                    <ul class="list-unstyled">
+                        {# ... (the other list items for module/lesson count) ... #}
+                    </ul>
+                    <hr>
+                    <h6 class="fw-bold">Your Progress</h6>
+
+                    <!-- === THE FIX: DYNAMIC PROGRESS BAR === -->
+                    <div class="progress" style="height: 10px;">
+                        <div class="progress-bar" role="progressbar" style="width: {{ progress_percent }}%;" aria-valuenow="{{ progress_percent }}" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                    <small class="text-muted">{{ progress_percent }}% Complete</small>
+                    
+                    <!-- === THE FIX: DYNAMIC "CONTINUE" BUTTON === -->
+                    {% if next_lesson %}
+                        <a href="{% url 'lsalms:lesson_detail' pk=next_lesson.pk %}" class="btn btn-primary w-100 mt-3">
+                            Continue to: {{ next_lesson.title }}
+                        </a>
+                    {% elif progress_percent == 100 %}
+                        <a href="#" class="btn btn-success w-100 mt-3 disabled">
+                            <i class="fas fa-check-circle me-1"></i> Course Complete!
+                        </a>
+                    {% else %}
+                        <a href="{% url 'lsalms:course_detail' slug=course.slug %}" class="btn btn-primary w-100 mt-3">Start Course</a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

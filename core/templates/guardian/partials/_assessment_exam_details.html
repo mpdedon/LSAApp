@@ -1,24 +1,42 @@
-{% load static humanize message_filters %}
-
-{% if items %}
+{% if tasks_data and tasks_data.details %}
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <h6 class="text-muted small mb-0">PROGRESS</h6>
+        <span class="small">{{ tasks_data.completed }}/{{ tasks_data.total }} DONE</span>
+    </div>
+    <div class="progress mb-3" style="height: 10px;">
+        <div class="progress-bar {% if type == 'exam' %}bg-success{% else %}bg-primary{% endif %}" role="progressbar" style="width: {{ tasks_data.completion_percentage }}%;"></div>
+    </div>
     <ul class="list-group list-group-flush">
-        {% for item in items %}
-        <li class="list-group-item d-flex justify-content-between align-items-center">
-            <div>
-                <h6 class="mb-0">{{ item.title }}</h6>
-                <small class="text-muted">Due: {{ item.due_date|date:"d M Y, P" }}{% if item.is_past_due and not item.has_submitted %}<span class="badge bg-danger ms-1">Overdue</span>{% endif %}</small>
-            </div>
-            <div class="ms-2">
-                {% if item.has_submitted %}
-                    <a href="{% if type == 'assessment' %}{% url 'view_assessment_result' item.submission_id %}{% else %}{% url 'view_exam_result' item.submission_id %}{% endif %}" class="btn btn-sm btn-info">
-                        Result {% if item.is_graded %}(Graded){% else %}(Pending){% endif %}
-                    </a>
-                {% elif item.is_past_due %}<button class="btn btn-sm btn-secondary" disabled>Past Due</button>
-                {% else %}<a href="{% if type == 'assessment' %}{% url 'submit_assessment' item.id %}{% else %}{% url 'submit_exam' item.id %}{% endif %}" class="btn btn-sm {% if type == 'exam' %}btn-success{% else %}btn-primary{% endif %}">Start</a>{% endif %}
-            </div>
-        </li>
+        {% for item_data in tasks_data.details %}
+        {% with item=item_data.obj %}
+            <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                <div>
+                    <h6 class="mb-0">{{ item.title }}</h6>
+                    <small class="text-muted">Due: {{ item.due_date|date:"d M Y, P" }}
+                        {% if item.is_due and not item_data.submitted %}
+                            <span class="badge bg-danger ms-1">Overdue</span>
+                        {% endif %}
+                    </small>
+                </div>
+                <div class="ms-2">
+                    {% if item_data.submitted %}
+                        <a href="{% if item_data.submission_id %}{% if type == 'assessment' %}{% url 'view_assessment_result' item_data.submission_id %}{% else %}{% url 'view_exam_result' item_data.submission_id %}{% endif %}{% else %}#{% endif %}" 
+                           class="btn btn-sm btn-info">
+                            Result {% if item_data.is_graded %}(Graded){% else %}(Pending){% endif %}
+                        </a>
+                    {% elif item.is_due %}
+                        <button class="btn btn-sm btn-secondary" disabled>Past Due</button>
+                    {% else %}
+                        <a href="{% if type == 'assessment' %}{% url 'submit_assessment' item.id %}?student_id={{ student.pk }}{% else %}{% url 'submit_exam' item.id %}?student_id={{ student.pk }}{% endif %}" 
+                           class="btn btn-sm {% if type == 'exam' %}btn-success{% else %}btn-primary{% endif %}">
+                            Start
+                        </a>
+                    {% endif %}
+                </div>
+            </li>
+        {% endwith %}
         {% endfor %}
     </ul>
 {% else %}
-    <p class="text-center text-muted">No {{ type }}s currently available.</p>
+    <p class="text-center text-muted">No {{ type }}s currently available for this student.</p>
 {% endif %}

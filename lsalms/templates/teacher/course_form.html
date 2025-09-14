@@ -1,0 +1,320 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}
+    {% if form.instance.pk %}
+        Course Settings: {{ form.instance.get_course_title }}
+    {% else %}
+        Create New Course
+    {% endif %}
+{% endblock %}
+
+{% block extra_head %}
+<style>
+    .form-section { background-color: #fff; padding: 2rem; border-radius: 0.75rem; box-shadow: 0 4px 20px rgba(0,0,0,0.05); }
+    .form-section h4 { border-bottom: 2px solid #e9ecef; padding-bottom: 0.75rem; margin-bottom: 1.5rem; font-weight: 600; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-11">
+            <div class="text-center mb-5">
+                <h1 class="h2 fw-bold">
+                    {% if form.instance.pk %}
+                        Course Settings
+                    {% else %}
+                        Create a New Course
+                    {% endif %}
+                </h1>
+            </div>
+            
+            <!-- === SINGLE UNIFIED FORM WRAPPER === -->
+            <form method="post" novalidate>
+                {% csrf_token %}
+                <div class="row g-4">
+                    <!-- Left Column: Core Course Details Form -->
+                    <div class="col-md-6">
+                        <div class="form-section h-100">
+                            <h4><i class="fas fa-info-circle me-2 text-primary"></i>Core Details</h4>
+                            {{ form|crispy }}
+                        </div>
+                    </div>
+
+                    <!-- Right Column: Dynamic Grading Scheme -->
+                    <div class="col-md-6">
+                        <div class="form-section h-100">
+                            <h4><i class="fas fa-percentage me-2 text-primary"></i>Grading Scheme</h4>
+                            
+                            {% if not form.instance.pk %}
+                                <div class="alert alert-info small h-100 d-flex align-items-center">
+                                    <i class="fas fa-info-circle me-2"></i>
+                                    The grading scheme can be set after the course is created and graded activities are linked.
+                                </div>
+                            {% else %}
+                                <p class="text-muted small">Set the percentage weight for each graded activity.</p>
+                                
+                                <!-- We will submit weights via a separate button/form, but display it here -->
+                                <div id="gradingSchemeWrapper">
+                                    <!-- Assignments Category -->
+                                    <div class="mb-4" data-category="assignments">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <h6 class="mb-0 fw-bold">Assignments</h6>
+                                            <span class="badge bg-light text-dark category-subtotal">{{ grading_scheme.assignments.subtotal }}%</span>
+                                        </div>
+                                        <div class="progress" style="height: 5px;"><div class="progress-bar" role="progressbar" style="width: {{ grading_scheme.assignments.subtotal }}%;"></div></div>
+                                        {% if grading_scheme.assignments.activities %}
+                                            <ul class="list-group list-group-flush mt-2">
+                                                {% for activity in grading_scheme.assignments.activities %}
+                                                    <li class="list-group-item d-flex align-items-center px-0">
+                                                        <div class="flex-grow-1"><span class="fw-bold">{{ activity.activity_object.title }}</span></div>
+                                                        <div class="input-group" style="width: 100px;"><input type="number" class="form-control form-control-sm weight-input" form="gradingWeightsForm" name="weight-{{ activity.pk }}" value="{{ activity.weight }}" min="0" max="100" required><span class="input-group-text">%</span></div>
+                                                    </li>
+                                                {% endfor %}
+                                            </ul>
+                                        {% endif %}
+                                    </div>
+
+                                    <!-- Assessments Category -->
+                                    <div class="mb-4" data-category="assessments">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <h6 class="mb-0 fw-bold">Assessments</h6>
+                                            <span class="badge bg-light text-dark category-subtotal">{{ grading_scheme.assessments.subtotal }}%</span>
+                                        </div>
+                                        <div class="progress" style="height: 5px;"><div class="progress-bar bg-info" role="progressbar" style="width: {{ grading_scheme.assessments.subtotal }}%;"></div></div>
+                                        {% if grading_scheme.assessments.activities %}
+                                            <ul class="list-group list-group-flush mt-2">
+                                                {% for activity in grading_scheme.assessments.activities %}
+                                                     <li class="list-group-item d-flex align-items-center px-0">
+                                                        <div class="flex-grow-1"><span class="fw-bold">{{ activity.activity_object.title }}</span></div>
+                                                        <div class="input-group" style="width: 100px;"><input type="number" class="form-control form-control-sm weight-input" form="gradingWeightsForm" name="weight-{{ activity.pk }}" value="{{ activity.weight }}" min="0" max="100" required><span class="input-group-text">%</span></div>
+                                                    </li>
+                                                {% endfor %}
+                                            </ul>
+                                        {% endif %}
+                                    </div>
+                                    
+                                    <!-- ... Repeat for Exams ... -->
+                                    <!-- Exams Category -->
+                                    <div class="mb-4" data-category="exams">
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <h6 class="mb-0 fw-bold">Exams</h6>
+                                            <span class="badge bg-light text-dark category-subtotal">{{ grading_scheme.exams.subtotal }}%</span>
+                                        </div>
+                                        <div class="progress" style="height: 5px;">
+                                            <div class="progress-bar bg-danger" role="progressbar" style="width: {{ grading_scheme.exams.subtotal }}%;" ></div>
+                                        </div>
+                                        {% if grading_scheme.exams.activities %}
+                                            <ul class="list-group list-group-flush mt-2">
+                                                {% for activity in grading_scheme.exams.activities %}
+                                                    <li class="list-group-item d-flex align-items-center px-0">
+                                                        <div class="flex-grow-1">
+                                                            <span class="fw-bold">{{ activity.activity_object.title }}</span>
+                                                            <small class="d-block text-muted">Max Score: {{ activity.max_score }} points</small>
+                                                        </div>
+                                                        <div class="input-group" style="width: 100px;">
+                                                            <input type="number" class="form-control form-control-sm weight-input" form="gradingWeightsForm" name="weight-{{ activity.pk }}" value="{{ activity.weight }}" min="0" max="100" required>
+                                                            <span class="input-group-text">%</span>
+                                                        </div>
+                                                    </li>
+                                                {% endfor %}
+                                            </ul>
+                                        {% else %}
+                                            <p class="small text-muted fst-italic mt-2">No exams linked in the Course Builder yet.</p>
+                                        {% endif %}
+                                    </div>
+                                    <hr>
+                                    <!-- Overall Total -->
+                                     <div>
+                                        <div class="d-flex justify-content-between align-items-center mb-2">
+                                            <h5 class="mb-0">Total Weight</h5>
+                                            <span id="overallTotalBadge" class="fw-bold fs-5 {% if total_weight != 100 %}text-danger{% else %}text-success{% endif %}">
+                                                {{ total_weight }} / 100 %
+                                            </span>
+                                        </div>
+                                        <div class="progress" style="height: 10px;">
+                                            <div id="overallTotalProgress" class="progress-bar {% if total_weight > 100 %}bg-danger{% elif total_weight == 100 %}bg-success{% else %}bg-primary{% endif %}" role="progressbar" style="width: {% if total_weight > 100 %}100{% else %}{{ total_weight }}{% endif %}%;"></div>
+                                        </div>
+                                        {% if total_weight != 100 and graded_activities %}
+                                            <p class="text-danger small text-center mt-2">Warning: Total weight must equal 100% for accurate final grading.</p>
+                                        {% endif %}
+                                    </div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Main Action Buttons -->
+                <div class="d-grid gap-2 mt-4">
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        {% if form.instance.pk %}
+                            Save All Changes
+                        {% else %}
+                            Create Course & Continue
+                        {% endif %}
+                    </button>
+                    <!-- This separate form is ONLY for updating weights -->
+                    <form id="gradingWeightsForm" class="d-none" method="post" action="{% if form.instance.pk %}{% url 'lsalms:update_weights' course_id=form.instance.pk %}{% endif %}">{% csrf_token %}</form>
+                    <button type="submit" form="gradingWeightsForm" class="btn btn-outline-primary" {% if not form.instance.pk %}disabled{% endif %}>Update Weights Only</button>
+                </div>
+            </form> <!-- END OF SINGLE UNIFIED FORM -->
+            
+            <div class="text-center mt-3">
+                <a href="{% if form.instance.pk %}{% url 'lsalms:course_manage' slug=form.instance.slug %}{% else %}{% url 'teacher_dashboard' %}{% endif %}" class="text-muted">
+                    Cancel
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    
+    // === PART 1: Your Existing Show/Hide Logic for Course Type ===
+    // This code is preserved and will continue to work as intended.
+    const courseTypeSelect = document.getElementById('id_course_type');
+    if (courseTypeSelect) {
+        const internalFields = document.querySelectorAll('.internal-field');
+        const externalFields = document.querySelectorAll('.external-field');
+
+        function toggleCourseFields() {
+            const selectedType = courseTypeSelect.value;
+            
+            if (selectedType === 'INTERNAL') {
+                internalFields.forEach(field => field.closest('div.mb-3').style.display = 'block');
+                externalFields.forEach(field => field.closest('div.mb-3').style.display = 'none');
+            } else if (selectedType === 'EXTERNAL') {
+                internalFields.forEach(field => field.closest('div.mb-3').style.display = 'none');
+                externalFields.forEach(field => field.closest('div.mb-3').style.display = 'block');
+            } else {
+                internalFields.forEach(field => field.closest('div.mb-3').style.display = 'none');
+                externalFields.forEach(field => field.closest('div.mb-3').style.display = 'none');
+            }
+        }
+
+        courseTypeSelect.addEventListener('change', toggleCourseFields);
+        toggleCourseFields(); // Run on page load for initial state
+    }
+
+
+    // === PART 2: NEW "Chained Dropdown" Logic for Subjects ===
+    // This code is added to work alongside the logic above.
+    const classSelect = document.getElementById('id_linked_class');
+    const subjectSelect = document.getElementById('id_subject');
+    const url = "{% url 'lsalms:api_get_subjects_for_class' %}";
+
+    if (classSelect && subjectSelect) {
+        classSelect.addEventListener('change', function() {
+            const classId = this.value;
+
+            // Clear the subject dropdown and show a loading message
+            subjectSelect.innerHTML = '<option value="">Loading subjects...</option>';
+            subjectSelect.disabled = true;
+
+            if (!classId) {
+                subjectSelect.innerHTML = '<option value="">Select a class first</option>';
+                subjectSelect.disabled = false;
+                return;
+            }
+
+            // Fetch the subjects from our API view
+            fetch(`${url}?class_id=${classId}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    subjectSelect.innerHTML = ''; // Clear the loading message
+                    
+                    if (data.error) {
+                        console.error('API Error fetching subjects:', data.error);
+                        subjectSelect.innerHTML = '<option value="">Error loading subjects</option>';
+                        return;
+                    }
+
+                    if (data.length === 0) {
+                        subjectSelect.innerHTML = '<option value="">No subjects assigned to this class</option>';
+                    } else {
+                        subjectSelect.innerHTML = '<option value="">---------</option>'; // Add the default empty option
+                        data.forEach(function(subject) {
+                            const option = new Option(subject.name, subject.id);
+                            subjectSelect.add(option);
+                        });
+                    }
+                })
+                .catch(error => {
+                    console.error('Fetch error:', error);
+                    subjectSelect.innerHTML = '<option value="">Could not load subjects</option>';
+                })
+                .finally(() => {
+                    subjectSelect.disabled = false; // Always re-enable the dropdown
+                });
+        });
+        
+        // Trigger the change event on page load if a class is already selected (for edit forms)
+        if (classSelect.value) {
+            classSelect.dispatchEvent(new Event('change'));
+        }
+    }
+
+    // === PART 3: NEW, ROBUST Live Grading Scheme Updates ===
+
+    const gradingWrapper = document.getElementById('gradingSchemeWrapper');
+    if (gradingWrapper) {
+        const weightInputs = gradingWrapper.querySelectorAll('.weight-input');
+        
+        function updateTotals() {
+            let overallTotal = 0;
+            
+            // Find each category block
+            gradingWrapper.querySelectorAll('[data-category]').forEach(categoryWrapper => {
+                let categorySubtotal = 0;
+                categoryWrapper.querySelectorAll('.weight-input').forEach(input => {
+                    categorySubtotal += parseInt(input.value, 10) || 0;
+                });
+
+                // Update the UI for this specific category
+                const subtotalBadge = categoryWrapper.querySelector('.category-subtotal');
+                const progressBar = categoryWrapper.querySelector('.progress-bar');
+                if (subtotalBadge) subtotalBadge.textContent = `${categorySubtotal}%`;
+                if (progressBar) progressBar.style.width = `${categorySubtotal}%`;
+
+                overallTotal += categorySubtotal;
+            });
+
+            // Update the overall total UI
+            const totalWeightSpan = document.getElementById('overallTotalBadge');
+            const totalProgressBar = document.getElementById('overallTotalProgress');
+            
+            if (totalWeightSpan) {
+                totalWeightSpan.textContent = `${overallTotal} / 100 %`;
+                totalWeightSpan.classList.toggle('text-danger', overallTotal !== 100);
+                totalWeightSpan.classList.toggle('text-success', overallTotal === 100);
+            }
+            if (totalProgressBar) {
+                totalProgressBar.style.width = `${overallTotal > 100 ? 100 : overallTotal}%`; // Cap bar at 100%
+                totalProgressBar.classList.toggle('bg-danger', overallTotal > 100);
+                totalProgressBar.classList.toggle('bg-success', overallTotal === 100);
+                totalProgressBar.classList.toggle('bg-primary', overallTotal < 100);
+            }
+        }
+
+        weightInputs.forEach(input => {
+            input.addEventListener('input', updateTotals);
+        });
+
+        // Run once on page load to set the initial state
+        updateTotals();
+    }
+});
+</script>
+{% endblock %}

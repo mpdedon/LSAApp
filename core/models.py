@@ -974,15 +974,16 @@ class SubjectResult(models.Model):
         elif score >= 40: return 'E'
         else: return 'F'
 
-    def calculate_grade_point(self) -> float:
+    def calculate_grade_point(self) -> Decimal:
         """Determines the grade point (e.g., for GPA calculation)."""
         score = self.total_score()
-        if score >= 80: return 5.0
-        elif score >= 65: return 4.0
-        elif score >= 55: return 3.0
-        elif score >= 45: return 2.0
-        elif score >= 40: return 1.0
-        else: return 0.0
+        score = self.total_score()
+        if score >= 80: return Decimal('5.0')
+        elif score >= 65: return Decimal('4.0')
+        elif score >= 55: return Decimal('3.0')
+        elif score >= 45: return Decimal('2.0')
+        elif score >= 40: return Decimal('1.0')
+        else: return Decimal('0.0')
 
     @classmethod
     def get_class_average(cls, subject, term, class_obj) -> Decimal:
@@ -1123,40 +1124,45 @@ class SessionalResult(models.Model):
     def calculate_sessional_summary(self, save=True):
         """Calculates and saves the sessional GPA, average, and performance change."""
         terms_in_session = Term.objects.filter(session=self.session)
-        term_results = Result.objects.filter(student=self.student, term__in=terms_in_session, is_approved=True)
-        
-        if not term_results.exists():
-            self.sessional_gpa, self.average_score = Decimal('0.00'), Decimal('0.00')
-        else:
-            # Calculate Sessional GPA (True Weighted Average)
-            total_weighted_points_session, total_weights_session = Decimal('0.0'), Decimal('0.0')
-            for term_res in term_results:
-                for sr in term_res.subject_results.all().select_related('subject'):
-                    weight = Decimal(getattr(sr.subject, 'subject_weight', 1))
-                    total_weighted_points_session += Decimal(sr.calculate_grade_point()) * weight
-                    total_weights_session += weight
-            self.sessional_gpa = (total_weighted_points_session / total_weights_session) if total_weights_session > 0 else Decimal('0.00')
-            
-            # Calculate Sessional Average (Simple average of term averages)
-            term_averages = [res.average_score for res in term_results if res.average_score is not None]
-            self.average_score = sum(term_averages) / len(term_averages) if term_averages else Decimal('0.00')
+        term_results = Result.objects.filter(
+            student=self.student, 
+            term__in=terms_in_session, 
+            is_approved=True,
+            is_published=True # Use published results for official sessional records
+        ).prefetch_related('subject_results__subject') # Prefetch for efficiency
 
-        # Calculate Sessional Performance Change
+        if not term_results:
+            self.sessional_gpa, self.average_score, self.performance_change = Decimal('0.00'), Decimal('0.00'), None
+            if save: self.save()
+            return
+
+        # --- CORRECTED GPA CALCULATION (True Weighted Average) ---
+        total_weighted_points_session = Decimal('0.0')
+        total_weights_session = Decimal('0.0')
+        for term_res in term_results:
+            for sr in term_res.subject_results.all():
+                if sr.total_score() > 0:
+                    weight = Decimal(getattr(sr.subject, 'subject_weight', 1))
+                    # This now uses the Decimal-returning method
+                    total_weighted_points_session += sr.calculate_grade_point() * weight
+                    total_weights_session += weight
+        self.sessional_gpa = (total_weighted_points_session / total_weights_session) if total_weights_session > 0 else Decimal('0.00')
+        
+        # Calculate Sessional Average (Simple average of term averages)
+        term_averages = [res.average_score for res in term_results if res.average_score is not None]
+        self.average_score = sum(term_averages) / len(term_averages) if term_averages else Decimal('0.00')
+        
+        # Calculate Performance Change
         previous_sessional_result = self.get_previous_sessional_result()
         if previous_sessional_result and self.average_score is not None:
             prev_avg = previous_sessional_result.average_score
-            if prev_avg > 0:
-                change = ((self.average_score - prev_avg) / prev_avg) * 100
-                self.performance_change = change
-            elif self.average_score > 0:
-                self.performance_change = Decimal('100.00')
-            else:
-                self.performance_change = Decimal('0.00')
+            if prev_avg > 0: self.performance_change = ((self.average_score - prev_avg) / prev_avg) * 100
+            elif self.average_score > 0: self.performance_change = Decimal('100.00')
+            else: self.performance_change = Decimal('0.00')
         else:
             self.performance_change = None
 
-        if save:
-            self.save()
+        if save: self.save()
 
 
 class CumulativeRecord(models.Model):

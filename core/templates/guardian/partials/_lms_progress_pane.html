@@ -1,0 +1,127 @@
+{% load lsalms_extras humanize %}
+
+{% with lms_data=lms_student_data %}
+    {% if lms_data %}
+        
+        <!-- School Class Learning Section -->
+        {% if lms_data.internal %}
+        <h5 class="mt-3 fw-bold">School Class Learning</h5>
+        <p class="text-muted small">Progress in courses linked to {{ student.user.first_name }}'s regular class subjects.</p>
+        <div class="row g-3">
+            {% for enrollment in lms_data.internal %}
+                <div class="col-md-6">
+                    <div class="card h-100 lms-card shadow-sm">
+                        <div class="card-body">
+                            <h6 class="card-title fw-bold">{{ enrollment.course.get_course_title }}</h6>
+                            <small class="text-muted d-block mb-3">Taught by: {{ enrollment.course.teacher.get_full_name }}</small>
+
+                            <!-- Course Engagement Section -->
+                            <div class="mb-3">
+                                <label class="form-label small text-uppercase fw-bold text-muted">Course Engagement</label>
+                                <div class="progress" style="height: 10px;" title="{{ enrollment.progress_percentage }}% Complete">
+                                    <div class="progress-bar" role="progressbar" style="width: {{ enrollment.progress_percentage }}%;" aria-valuenow="{{ enrollment.progress_percentage }}"></div>
+                                </div>
+                                <div class="d-flex justify-content-between small mt-1">
+                                    <span class="text-muted">{{ enrollment.progress_percentage }}% Complete</span>
+                                    <span class="fw-bold">{{ enrollment.completed_lessons }} / {{ enrollment.total_lessons }} Lessons</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Final Grade Section -->
+                            <div class="mb-3">
+                                <label class="form-label small text-uppercase fw-bold text-muted">Final Grade</label>
+                                <div class="p-2 bg-light rounded text-center">
+                                    {% if enrollment.grade_report and enrollment.grade_report.final_score is not None %}
+                                        <h4 class="fw-bold mb-0 text-primary">{{ enrollment.grade_report.final_score|floatformat:0 }}<small>%</small></h4>
+                                    {% else %}
+                                        <h4 class="fw-bold mb-0 text-muted">N/A</h4>
+                                        <small class="text-muted">Not yet graded</small>
+                                    {% endif %}
+                                </div>
+                            </div>
+
+                            <ul class="list-unstyled text-muted small mt-3 mb-0">
+                                {% if enrollment.last_activity_date %}
+                                    <li><i class="fas fa-history fa-fw me-1"></i> Last activity: {{ enrollment.last_activity_date|naturaltime }}</li>
+                                {% else %}
+                                    <li><i class="fas fa-hourglass-start fa-fw me-1"></i> Course not started yet</li>
+                                {% endif %}
+                            </ul>
+                        </div>
+                        <a href="{% url 'lsalms:course_detail' slug=enrollment.course.slug %}" class="stretched-link"></a>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <!-- Online Academy Section (with the same new design) -->
+        {% if lms_data.external %}
+        <hr class="my-4">
+        <h5 class="mt-3 fw-bold">Online Academy Subscriptions</h5>
+        <div class="row g-3">
+             {% for enrollment in lms_data.external %}
+                <div class="col-md-6">
+                    <div class="card h-100 lms-card shadow-sm border-success">
+                        <div class="card-body">
+                            <h6 class="card-title fw-bold">{{ enrollment.course.title }}</h6>
+                            <small class="text-muted d-block mb-3">Subscription ends: {{ enrollment.subscription_end_date|date:"d M Y" }}</small>
+
+                            <!-- Course Engagement Section -->
+                            <div class="mb-3">
+                                <label class="form-label small text-uppercase fw-bold text-muted">Course Engagement</label>
+                                <div class="progress" style="height: 10px;" title="{{ enrollment.progress_percentage }}% Complete">
+                                    <div class="progress-bar bg-success" role="progressbar" style="width: {{ enrollment.progress_percentage }}%;"></div>
+                                </div>
+                                <div class="d-flex justify-content-between small mt-1">
+                                    <span class="text-muted">{{ enrollment.progress_percentage }}% Complete</span>
+                                    <span class="fw-bold">{{ enrollment.completed_lessons }} / {{ enrollment.total_lessons }} Lessons</span>
+                                </div>
+                            </div>
+                            
+                            <!-- Final Grade Section -->
+                            <div class="mb-3">
+                                <label class="form-label small text-uppercase fw-bold text-muted">Final Grade</label>
+                                <div class="p-2 bg-light rounded text-center">
+                                    {% if enrollment.grade_report and enrollment.grade_report.final_score is not None %}
+                                        <h4 class="fw-bold mb-0 text-success">{{ enrollment.grade_report.final_score|floatformat:0 }}<small>%</small></h4>
+                                    {% else %}
+                                        <h4 class="fw-bold mb-0 text-muted">N/A</h4>
+                                        <small class="text-muted">Not yet graded</small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            <ul class="list-unstyled text-muted small mt-3 mb-0">
+                                {% if enrollment.last_activity_date %}
+                                    <li><i class="fas fa-history fa-fw me-1"></i> Last activity: {{ enrollment.last_activity_date|naturaltime }}</li>
+                                {% else %}
+                                    <li><i class="fas fa-hourglass-start fa-fw me-1"></i> Course not started yet</li>
+                                {% endif %}
+                            </ul>
+                        </div>
+                        <a href="{% url 'lsalms:course_detail' slug=enrollment.course.slug %}" class="stretched-link"></a>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+    {% else %}
+    <div class="text-center p-4 bg-light rounded">
+        <i class="bi bi-bookshelf fs-1 text-muted"></i>
+        <p class="mt-2 mb-0 fw-bold">{{ student.user.first_name }} is not yet enrolled in any active LMS courses.</p>
+        <p class="text-muted small">Enrollment in school subject courses is automatic once a teacher publishes the course.</p>
+    </div>
+    {% endif %}
+{% endwith %}
+
+<style>
+    /* Add this to a central CSS file or a <style> block in your base.html for best practice */
+    .lms-card {
+        transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+    }
+    .lms-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 8px 30px rgba(0,0,0,0.1) !important;
+    }
+</style>

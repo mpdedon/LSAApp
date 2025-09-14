@@ -11,13 +11,15 @@ from django.contrib.messages.views import SuccessMessageMixin
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
 from django.urls import reverse, reverse_lazy, NoReverseMatch
-from django.db.models import Count, Sum, Q, F, Window, OuterRef, Subquery, IntegerField, Value, Prefetch
+from django.db.models import Count, Sum, Q, F, Window, OuterRef, Subquery, IntegerField, Value, Prefetch, Max
 from django.db.models.functions import Rank, Coalesce
 from collections import defaultdict
 from decimal import Decimal
 from core.models import CustomUser, Student, Teacher, Guardian, Assignment, Result, Attendance, Subject, Class, Payment, ClassSubjectAssignment
 from core.models import Session, Term, Message, Assessment, Exam, Notification, AssignmentSubmission, AcademicAlert, TeacherAssignment
 from core.models import FinancialRecord, StudentFeeRecord, AssessmentSubmission, ExamSubmission, SessionalResult
+from lsalms.models import Course, CourseEnrollment
+from lsalms.services import update_course_grade_for_student
 from django.db.models import Sum
 from django.views.generic.edit import FormView
 from django.contrib import messages
@@ -237,7 +239,7 @@ def student_dashboard(request):
     context['current_student_rank'] = current_student_rank_info.rank if current_student_rank_info else 'N/A'
 
 
-    # --- 2. PREPARE "QUESTS" (UNIFIED TASK LIST) ---
+    # --- 2. PREPARE "QUESTS"  ---
     upcoming_quests = []
     # Fetch all submissions for this student at once
     submitted_assignment_ids = set(AssignmentSubmission.objects.filter(student=student).values_list('assignment_id', flat=True))
@@ -316,6 +318,14 @@ def student_dashboard(request):
     
     # Received Messages
     context['unread_message_count'] = unread_message_count
+
+    # Fetch all active enrollments for the student
+    enrollments = CourseEnrollment.objects.filter(student=student).select_related('course', 'grade_report')
+    active_enrollments = [e for e in enrollments if e.is_active and e.course.status == 'PUBLISHED']
+
+    # Separate them by type for the template
+    context['lms_internal_enrollments'] = [e for e in active_enrollments if e.course.course_type == 'INTERNAL']
+    context['lms_external_enrollments'] = [e for e in active_enrollments if e.course.course_type == 'EXTERNAL']
 
     return render(request, 'student/student_dashboard.html', context)
 
@@ -427,6 +437,8 @@ def teacher_dashboard(request):
     received_messages = Message.objects.filter(recipient=request.user).select_related('sender', 'student_context__user').order_by('-sent_at')
 
     notifications = Notification.objects.filter(Q(audience='teacher') | Q(audience='all'), is_active=True, expiry_date__gte=timezone.now().date()).order_by('-created_at')
+    
+    lms_courses = Course.objects.filter(teacher=teacher.user).order_by('-updated_at')
 
     context = {        
         # Overview Tab
@@ -459,6 +471,9 @@ def teacher_dashboard(request):
         'display_term': display_term,
         'selectable_terms': selectable_terms,
         'received_messages': received_messages,
+
+        # LMS Tab
+        'lms_courses': lms_courses,
     }
 
     return render(request, 'teacher/teacher_dashboard.html', context)
@@ -466,334 +481,251 @@ def teacher_dashboard(request):
 # Guardian Dashboard View
 
 @login_required
-@user_passes_test(lambda u: u.role == 'guardian')
+@user_passes_test(lambda u: hasattr(u, 'guardian')) # More robust role check
 def guardian_dashboard(request):
-  
     try:
-        guardian = get_object_or_404(Guardian, user=request.user)
+        guardian = Guardian.objects.select_related('user').get(user=request.user)
     except Guardian.DoesNotExist:
         messages.error(request, "Guardian profile not found.")
-        return redirect('login') 
+        return redirect('logout') 
 
-    students = guardian.students.all().select_related('user', 'current_class')
-    student_ids = students.values_list('pk', flat=True)
+    # --- Base QuerySets ---
+    wards_qs = guardian.students.all().select_related('user', 'current_class')
+    ward_pks = wards_qs.values_list('pk', flat=True)
+    
+    active_term = Term.objects.filter(is_active=True).select_related('session').first()
+    active_session = active_term.session if active_term else None
 
-    try:
-        current_term = Term.objects.filter(is_active=True).select_related('session').first()
-        current_session = current_term.session if current_term else None
-    except (Session.DoesNotExist, Term.DoesNotExist, Session.MultipleObjectsReturned, Term.MultipleObjectsReturned) as e:
-        messages.warning(request, f"Could not determine the active academic period: {e}. Some data may be unavailable.")
-
-    archived_terms = Term.objects.filter(is_active=False).order_by('-start_date')
-
-    teachers = Teacher.objects.none()
-    student_class_ids = students.exclude(current_class__isnull=True).values_list('current_class_id', flat=True).distinct()
-    if student_class_ids and current_term:
-        # This uses the ClassSubjectAssignment model.
-        subjects_assigned_to_classes = ClassSubjectAssignment.objects.filter(
-            class_assigned_id__in=student_class_ids,
-            term=current_term
-        ).values_list('subject_id', flat=True)
-
-        teachers = Teacher.objects.filter(
-            subjectassignment__class_assigned_id__in=student_class_ids,
-            subjectassignment__subject_id__in=subjects_assigned_to_classes,
-            subjectassignment__term=current_term
-        ).distinct().select_related('user')
+    # --- Pre-fetch all data needed for all wards in bulk ---
 
     assignments_data = defaultdict(lambda: {'details': [], 'total': 0, 'completed': 0, 'pending': 0, 'completion_percentage': 0})
-    assessments_data = defaultdict(list) 
-    exams_data = defaultdict(list)
-    messages_data = defaultdict(list)
-    attendance_data = {}
-    attendance_logs = {}
-    financial_data = {}
-    result_data = {}
-    archived_results_data = defaultdict(list)
-    
-    notifications = Notification.objects.filter(
-        Q(audience='guardian') | Q(audience='all'),
-        is_active=True
-    ).exclude(
-        expiry_date__lt=timezone.now().date()
-    ).order_by('-created_at')
+    assessments_data = defaultdict(lambda: {'details': [], 'total': 0, 'completed': 0, 'pending': 0, 'completion_percentage': 0})
+    exams_data = defaultdict(lambda: {'details': [], 'total': 0, 'completed': 0, 'pending': 0, 'completion_percentage': 0})
 
-    all_potential_alerts = AcademicAlert.objects.filter(
-            student__in=students,
-            due_date__gte = timezone.now()
-        ).select_related(
-            'student__user', 'source_user'
-        ).order_by('-date_created')
-
-    # Get IDs of submissions made by these students to avoid showing 'Take It' for completed tasks
-    completed_assessment_ids = set(AssessmentSubmission.objects.filter(student__in=students).values_list('assessment_id', flat=True))
-    completed_exam_ids = set(ExamSubmission.objects.filter(student__in=students).values_list('exam_id', flat=True))
-    completed_assignment_ids = set(AssignmentSubmission.objects.filter(student__in=students).values_list('assignment_id', flat=True))
-
-    action_required_alerts = []
-    recent_update_alerts = []
-
-    for alert in all_potential_alerts:
-        # Determine the action status
-        is_actionable = False
-        if alert.due_date:
-            # Compare the .date() part of the due_date with today's date
-            is_overdue = alert.due_date.date() < timezone.now().date()
-        else:
-            is_overdue = False
-        if alert.alert_type == 'assessment_available' and alert.related_object_id not in completed_assessment_ids and not is_overdue:
-            is_actionable = True
-        elif alert.alert_type == 'exam_available' and alert.related_object_id not in completed_exam_ids and not is_overdue:
-            is_actionable = True
-        elif alert.alert_type == 'assignment_available' and alert.related_object_id not in completed_assignment_ids and not is_overdue:
-            is_actionable = True
+    if wards_qs.exists():
+        ward_class_ids = wards_qs.values_list('current_class_id', flat=True)
         
-        # --- Prepare data for template ---
-        # Clean up display text for 'alert_type'
-        cleaned_display_type = alert.alert_type.replace('_', ' ').title()
+        # --- Assignments ---
+        all_assignments = Assignment.objects.filter(class_assigned_id__in=ward_class_ids, active=True, term=active_term)
+        submitted_assignments = AssignmentSubmission.objects.filter(student__in=wards_qs, assignment__in=all_assignments).values('student_id', 'assignment_id', 'id')
+        
+        submitted_assign_map = defaultdict(dict)
+        for sub in submitted_assignments:
+            submitted_assign_map[sub['student_id']][sub['assignment_id']] = {'id': sub['id']}
 
-        alert_data = {
-            'instance': alert,
-            'cleaned_display_type': cleaned_display_type,
-            'is_overdue': is_overdue,
-            'is_actionable': is_actionable,
-        }
-
-        if is_actionable:
-            action_required_alerts.append(alert_data)
-        else:
-            recent_update_alerts.append(alert_data)
-
-    student_ids = [s.user.id for s in students]
-
-    # All relevant financial records
-    financial_records_qs = FinancialRecord.objects.filter(student_id__in=student_ids, term=current_term).select_related('student')
-    financial_records_dict = {fr.student_id: fr for fr in financial_records_qs}
-
-    # All relevant results
-    results_qs = Result.objects.filter(student_id__in=student_ids, term=current_term, is_approved=True)
-    results_dict = {res.student_id: res for res in results_qs}
-
-    sessional_result_qs = SessionalResult.objects.filter(student_id__in=student_ids, session=current_session, is_approved=True)
-    sessional_results_dict = {sres.student_id: sres for sres in sessional_result_qs}
-
-    # All relevant archived results
-    archived_results_qs = Result.objects.filter(student_id__in=student_ids, term__in=archived_terms, is_approved=True, is_archived=True).select_related('term')
-    archived_results_dict = defaultdict(list)
-    for res in archived_results_qs:
-        archived_results_dict[res.student_id].append(res)
-    
-    archived_sessional_results = SessionalResult.objects.filter(student_id__in=student_ids, session__is_active=False, is_published=True).select_related('session').order_by('-session__start_date')
-
-    for student in students:
-
-        student_id = student.user.id
-
-        # Assignments data
-        all_class_assignments = Assignment.objects.filter(
-            class_assigned=student.current_class,
-            active=True
-        ).order_by('due_date')
-
-        completed_assignment_ids = set(
-            AssignmentSubmission.objects.filter(student=student, assignment__in=all_class_assignments, is_completed=True)
-            .values_list('assignment_id', flat=True)
-        )
-
-        assignment_details_for_student = []
-        total_relevant_assignments = 0
-        completed_count = 0
-
-        for assign in all_class_assignments:
-            is_past_due = assign.due_date < timezone.now() if assign.due_date else False
-            has_submitted = assign.id in completed_assignment_ids
-            submission_instance = AssignmentSubmission.objects.filter(student=student, assignment=assign).first() # Get submission for result link
-
-            # Only count assignments that are not past due OR have been submitted towards "total/pending"
-            if not is_past_due or has_submitted:
-                total_relevant_assignments +=1
-                if has_submitted:
-                    completed_count +=1
+        for student in wards_qs:
+            student_tasks = [a for a in all_assignments if a.class_assigned_id == student.current_class_id]
             
-            assignment_details_for_student.append({
-                'id': assign.id,
-                'title': assign.title,
-                'due_date': assign.due_date,
-                'is_past_due': is_past_due,
-                'has_submitted': has_submitted,
-                'submission_id': submission_instance.id if submission_instance else None,
+            details = []
+            for task in student_tasks:
+                submission_info = submitted_assign_map.get(student.pk, {}).get(task.id, {})
+                details.append({
+                    'obj': task,
+                    'submitted': task.id in submitted_assign_map.get(student.pk, {}),
+                    'submission_id': submission_info.get('id')
+                })
+            
+            completed_count = sum(1 for item in details if item['submitted'])
+            total_count = len(details)
+            assignments_data[student.pk] = {
+                'details': details,
+                'total': total_count,
+                'completed': completed_count,
+                'pending': total_count - completed_count,
+                'completion_percentage': (completed_count / total_count * 100) if total_count > 0 else 0
+            }
+
+        # --- Assessments (now mimics the Assignment pattern exactly) ---
+        all_assessments = Assessment.objects.filter(class_assigned_id__in=ward_class_ids, is_approved=True, term=active_term)
+        submitted_assessments = AssessmentSubmission.objects.filter(student__in=wards_qs, assessment__in=all_assessments).values('student_id', 'assessment_id', 'id', 'is_graded')
+        
+        submitted_assess_map = defaultdict(dict)
+        for sub in submitted_assessments:
+            submitted_assess_map[sub['student_id']][sub['assessment_id']] = {'id': sub['id'], 'is_graded': sub['is_graded']}
+
+        for student in wards_qs:
+            student_tasks = [a for a in all_assessments if a.class_assigned_id == student.current_class_id]
+            
+            details = []
+            for task in student_tasks:
+                submission_info = submitted_assess_map.get(student.pk, {}).get(task.id, {})
+                details.append({
+                    'obj': task,
+                    'submitted': task.id in submitted_assess_map.get(student.pk, {}),
+                    'submission_id': submission_info.get('id'),
+                    'is_graded': submission_info.get('is_graded', False)
                 })
 
-        assignments_data[student.user.id]['details'] = assignment_details_for_student
-        assignments_data[student.user.id]['total'] = total_relevant_assignments
-        assignments_data[student.user.id]['completed'] = completed_count
-        assignments_data[student.user.id]['pending'] = total_relevant_assignments - completed_count
-        assignments_data[student.user.id]['completion_percentage'] = (completed_count / total_relevant_assignments * 100) if total_relevant_assignments > 0 else 0
-
-        # Assessments and exams data
-        all_class_assessments = Assessment.objects.filter(
-            class_assigned=student.current_class,
-            is_approved=True 
-        ).order_by('due_date')
-
-        submitted_assessment_ids = set(
-            AssessmentSubmission.objects.filter(student=student, assessment__in=all_class_assessments)
-            .values_list('assessment_id', flat=True)
-        )
-        
-        assessment_list_for_student = []
-        for assess in all_class_assessments:
-            is_past_due = assess.due_date < timezone.now() if assess.due_date else False
-            has_submitted = assess.id in submitted_assessment_ids
-            submission_instance = AssessmentSubmission.objects.filter(student=student, assessment=assess).first()
-
-            assessment_list_for_student.append({
-                'id': assess.id,
-                'title': assess.title,
-                'due_date': assess.due_date,
-                'is_past_due': is_past_due,
-                'has_submitted': has_submitted,
-                'submission_id': submission_instance.id if submission_instance else None,
-                'is_graded': submission_instance.is_graded if submission_instance else False,
-            })
-        assessments_data[student.user.id] = assessment_list_for_student
-        
-        # === Exams Data ===
-        all_class_exams = Exam.objects.filter(
-            class_assigned=student.current_class,
-            is_approved=True
-        ).order_by('due_date')
-
-        submitted_exam_ids = set(
-            ExamSubmission.objects.filter(student=student, exam__in=all_class_exams)
-            .values_list('exam_id', flat=True)
-        )
-
-        exam_list_for_student = []
-        for ex in all_class_exams:
-            is_past_due = ex.due_date < timezone.now() if ex.due_date else False
-            has_submitted = ex.id in submitted_exam_ids
-            submission_instance = ExamSubmission.objects.filter(student=student, exam=ex).first()
-
-            exam_list_for_student.append({
-                'id': ex.id,
-                'title': ex.title,
-                'due_date': ex.due_date,
-                'is_past_due': is_past_due,
-                'has_submitted': has_submitted,
-                'submission_id': submission_instance.id if submission_instance else None,
-                'is_graded': submission_instance.is_graded if submission_instance else False,
-            })
-        exams_data[student.user.id] = exam_list_for_student
-        
-        # Attendance data
-        total_days = Attendance.objects.filter(student=student).count()
-        present_days = Attendance.objects.filter(student=student, is_present=True).count()
-        attendance_data[student.user.id] = {
-            'total_days': total_days,
-            'present_days': present_days,
-            'absent_days': total_days - present_days,
-            'attendance_percentage': (present_days / total_days * 100) if total_days > 0 else 0
-        }
-
-        # Detailed logs
-        logs = Attendance.objects.filter(student=student).order_by('-date')  # Recent logs first
-        attendance_logs[student.user.id] = [
-            {
-                'date': log.date,
-                'status': 'Present' if log.is_present else 'Absent',
-                'remarks': log.remarks if hasattr(log, 'remarks') else ''
+            completed_count = sum(1 for item in details if item['submitted'])
+            total_count = len(details)
+            assessments_data[student.pk] = {
+                'details': details,
+                'total': total_count,
+                'completed': completed_count,
+                'pending': total_count - completed_count,
+                'completion_percentage': (completed_count / total_count * 100) if total_count > 0 else 0
             }
-            for log in logs
-        ]
 
-        # Retrieve StudentFeeRecord and FinancialRecord for the current term
-        student_fee_record = StudentFeeRecord.objects.filter(student=student, term=current_term).first()
-        financial_record = financial_records_dict.get(student_id)
-        if financial_record:
-            financial_data[student_id] = {
-                'total_fee': financial_record.total_fee,
-                'total_discount': financial_record.total_discount,
-                'total_paid': financial_record.total_paid,
-                'outstanding_balance': financial_record.outstanding_balance,
-                'can_access_results': financial_record.can_access_results,
-                'is_fully_paid': financial_record.is_fully_paid,
-                'has_waiver': financial_record.has_waiver,
-                'payment_percentage': (financial_record.total_paid / financial_record.total_fee * 100) if financial_record.total_fee > 0 else (100 if financial_record.is_fully_paid else 0),
+        # --- Exams (now mimics the Assignment pattern exactly) ---
+        all_exams = Exam.objects.filter(class_assigned_id__in=ward_class_ids, is_approved=True, term=active_term)
+        submitted_exams = ExamSubmission.objects.filter(student__in=wards_qs, exam__in=all_exams).values('student_id', 'exam_id', 'id', 'is_graded')
+
+        submitted_exam_map = defaultdict(dict)
+        for sub in submitted_exams:
+            submitted_exam_map[sub['student_id']][sub['exam_id']] = {'id': sub['id'], 'is_graded': sub['is_graded']}
+            
+        for student in wards_qs:
+            student_tasks = [e for e in all_exams if e.class_assigned_id == student.current_class_id]
+
+            details = []
+            for task in student_tasks:
+                submission_info = submitted_exam_map.get(student.pk, {}).get(task.id, {})
+                details.append({
+                    'obj': task,
+                    'submitted': task.id in submitted_exam_map.get(student.pk, {}),
+                    'submission_id': submission_info.get('id'),
+                    'is_graded': submission_info.get('is_graded', False)
+                })
+            
+            completed_count = sum(1 for item in details if item['submitted'])
+            total_count = len(details)
+            exams_data[student.pk] = {
+                'details': details,
+                'total': total_count,
+                'completed': completed_count,
+                'pending': total_count - completed_count,
+                'completion_percentage': (completed_count / total_count * 100) if total_count > 0 else 0
             }
-        else: 
-            financial_data[student_id] = {'can_access_results': False, 'outstanding_balance': 'N/A'} 
-
-    # --- RESULT DATA ---
-    term_results = Result.objects.filter(student_id__in=student_ids, term=current_term, is_published=True)
-    result_data = {res.student_id: res for res in term_results}
-    # Sessional
-    sessional_results = SessionalResult.objects.filter(student_id__in=student_ids, session=current_session, is_published=True)
-    sessional_results_data = {sres.student_id: sres for sres in sessional_results}
-    # Archived
-    archived_results = Result.objects.filter(student_id__in=students, term__is_active=False, is_published=True).select_related('term__session')
+    # 2. Financials
+    financial_records = FinancialRecord.objects.filter(student_id__in=ward_pks, term=active_term)
+    financial_data = {fr.student_id: fr for fr in financial_records}
+    
+    # 3. Results (Termly, Sessional, Archived)
+    result_data = {res.student_id: res for res in Result.objects.filter(student_id__in=ward_pks, term=active_term, is_published=True)}
+    sessional_results_data = {sres.student_id: sres for sres in SessionalResult.objects.filter(student_id__in=ward_pks, session=active_session, is_published=True)}
+    
+    archived_results = Result.objects.filter(student_id__in=ward_pks, term__is_active=False, is_published=True).select_related('term__session')
     archived_results_data = defaultdict(list)
-    for res in archived_results:
-        archived_results_data[res.student_id].append(res)
+    for res in archived_results: archived_results_data[res.student_id].append(res)
     
-    archived_sessional_results = SessionalResult.objects.filter(student_id__in=student_ids, session__is_active=False, is_published=True).select_related('session')
+    archived_sessional_results = SessionalResult.objects.filter(student_id__in=ward_pks, session__is_active=False, is_published=True).select_related('session')
     archived_sessional_results_data = defaultdict(list)
-    for sres in archived_sessional_results:
-        archived_sessional_results_data[sres.student_id].append(sres)
-    
-    # --- START OF CONTEXT FOR COMMUNICATION PANE ---
-    received_messages = Message.objects.filter(
-        Q(parent_message__isnull=True) &
-        (
-            Q(recipient=request.user) | 
-            Q(recipient_id__in=student_ids) | 
-            Q(sender=request.user) 
-        )
-    ).select_related(
-        'sender', 
-        'recipient', 
-        'student_context__user'
-    ).prefetch_related(
-        Prefetch('replies', queryset=Message.objects.order_by('sent_at').select_related('sender', 'recipient'))
-    ).distinct().order_by('-updated_at') 
+    for sres in archived_sessional_results: archived_sessional_results_data[sres.student_id].append(sres)
 
-    unread_message_count = Message.objects.filter(
-        (
-            Q(recipient=request.user) | 
-            Q(recipient_id__in=student_ids)
-        ),
-        is_read=False
-    ).count()
- 
-    students_classes = students.values_list('current_class_id', flat=True)
+    # 4. Alerts & Notifications
+    action_required_alerts = [] 
+    recent_update_alerts = []
+
+    notifications = Notification.objects.filter(Q(audience='guardian') | Q(audience='all'), is_active=True).exclude(expiry_date__lt=timezone.now().date()).order_by('-created_at')
+
+    # 5. Messages
+    message_threads = Message.objects.filter(
+        Q(parent_message__isnull=True) & (Q(recipient=request.user) | Q(recipient_id__in=ward_pks) | Q(sender=request.user))
+    ).select_related('sender', 'recipient', 'student_context__user').prefetch_related(
+        Prefetch('replies', queryset=Message.objects.order_by('sent_at').select_related('sender'))
+    ).distinct().order_by('-updated_at')
+    unread_message_count = Message.objects.filter(Q(recipient=request.user) | Q(recipient_id__in=ward_pks), is_read=False).count()
+
+    # 6. Teachers
+    ward_class_ids = wards_qs.exclude(current_class__isnull=True).values_list('current_class_id', flat=True).distinct()
     guardian_teachers = Teacher.objects.filter(
-        Q(teacherassignment__class_assigned_id__in=students_classes) |
-        Q(subjectassignment__class_assigned_id__in=students_classes)
+        Q(teacherassignment__class_assigned_id__in=ward_class_ids) | Q(subjectassignment__class_assigned_id__in=ward_class_ids)
     ).select_related('user').distinct().order_by('user__last_name', 'user__first_name')
+
+    lms_student_data = {}
+    if ward_pks:        
+        # Get total lesson count for each relevant course
+        lesson_counts_per_course = Course.objects.filter(
+            enrollments__student_id__in=ward_pks
+        ).annotate(
+            total_lessons=Count('modules__lessons', distinct=True)
+        ).values('id', 'total_lessons')
+        total_lessons_map = {item['id']: item['total_lessons'] for item in lesson_counts_per_course}
+
+        # Get completed lesson count for each relevant enrollment
+        completed_lessons_per_enrollment = CourseEnrollment.objects.filter(
+            student_id__in=ward_pks
+        ).annotate(
+            completed_lessons=Count('lesson_progress', distinct=True)
+        ).values('id', 'completed_lessons')
+        completed_lessons_map = {item['id']: item['completed_lessons'] for item in completed_lessons_per_enrollment}
+
+        # Get the last activity date for each relevant enrollment
+        last_activity_per_enrollment = CourseEnrollment.objects.filter(
+            student_id__in=ward_pks
+        ).annotate(
+            last_activity=Max('lesson_progress__completed_at')
+        ).values('id', 'last_activity')
+        last_activity_map = {item['id']: item['last_activity'] for item in last_activity_per_enrollment}
+
+        # Fetch enrollments to loop through for grade updates
+        enrollments_for_grading = CourseEnrollment.objects.filter(
+            student_id__in=ward_pks
+        ).select_related('course', 'student')
+
+        for enrollment in enrollments_for_grading:
+            if enrollment.is_active:
+                # This populates/updates the CourseGrade table in the database
+                update_course_grade_for_student(course=enrollment.course, student=enrollment.student)
+           
+        # Now, re-fetch the enrollments, this time with the newly calculated grade_report
+        final_enrollments = CourseEnrollment.objects.filter(
+            student_id__in=ward_pks
+        ).select_related('course', 'grade_report', 'student')
+
+        # Loop through the final list and attach all the data we calculated in Phase 1
+        for enrollment in final_enrollments:
+            total_lessons = total_lessons_map.get(enrollment.course_id, 0)
+            completed_lessons = completed_lessons_map.get(enrollment.id, 0)
+            
+            enrollment.total_lessons = total_lessons
+            enrollment.completed_lessons = completed_lessons
+            enrollment.last_activity_date = last_activity_map.get(enrollment.id)
+            
+            if total_lessons > 0:
+                enrollment.progress_percentage = int((completed_lessons / total_lessons) * 100)
+            else:
+                enrollment.progress_percentage = 0
+                       
+        # Initialize the dictionary for all wards
+        for ward_id in ward_pks:
+            lms_student_data[ward_id] = {'internal': [], 'external': []}
+            
+        # Distribute the fully-enhanced enrollment objects into the dictionary
+        for enrollment in final_enrollments:
+            if enrollment.is_active:
+                if enrollment.course.course_type == 'INTERNAL':
+                    lms_student_data[enrollment.student_id]['internal'].append(enrollment)
+                else:
+                    lms_student_data[enrollment.student_id]['external'].append(enrollment)
+
 
     context = {
         'guardian': guardian,
-        'students': students,
-        'teachers': teachers,
-        'current_term': current_term,
-        'current_session': current_session,
-        'guardian_teachers': guardian_teachers,
-        'assignments_data': dict(assignments_data), 
-        'assessments_data': dict(assessments_data),
-        'exams_data': dict(exams_data),
-        'messages_data': messages_data,
-        'attendance_data': attendance_data,
-        'attendance_logs': attendance_logs,
+        'students': wards_qs,
+        'active_session': active_session,
+        'active_term': active_term,
+
+        'assignments_data': assignments_data, 
+        'assessments_data': assessments_data,
+        'exams_data': exams_data,
+        
         'financial_data': financial_data,
         'result_data': result_data,
         'sessional_results_data': sessional_results_data,
-        'archived_sessional_results_data': archived_sessional_results_data,
         'archived_results_data': archived_results_data,
+        'archived_sessional_results_data': archived_sessional_results_data,
+
         'notifications': notifications,
         'action_required_alerts': action_required_alerts,
-        'recent_update_alerts': recent_update_alerts[:6],
-        'received_messages': received_messages,
+        'recent_update_alerts': recent_update_alerts,
+
+        'message_threads': message_threads,
         'unread_message_count': unread_message_count,
+        'guardian_teachers': guardian_teachers,
+
+        'lms_student_data': lms_student_data,
+
     }
     return render(request, 'guardian/guardian_dashboard.html', context)
 

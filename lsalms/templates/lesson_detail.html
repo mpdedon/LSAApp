@@ -1,0 +1,136 @@
+{% extends 'base.html' %}
+
+{% block title %}Lesson: {{ lesson.title }}{% endblock %}
+
+{% block content %}
+<div class="container my-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-9">
+            <!-- Lesson Header -->
+            <div class="mb-4">
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb">
+                        <li class="breadcrumb-item"><a href="{% url 'student_dashboard' %}">Dashboard</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'lsalms:course_detail' slug=lesson.module.course.slug %}">{{ lesson.module.course.title }}</a></li>
+                        <li class="breadcrumb-item active" aria-current="page">{{ lesson.title }}</li>
+                    </ol>
+                </nav>
+                <h1 class="fw-bold">{{ lesson.title }}</h1>
+            </div>
+
+            <!-- Content Blocks -->
+            {% for block in lesson.content_blocks.all %}
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header bg-light">
+                        <h5 class="mb-0">{{ block.title }}</h5>
+                    </div>
+                    <div class="card-body">
+                        {% if block.content_type == 'TEXT' %}
+                            {{ block.rich_text|safe }}
+                        {% elif block.content_type == 'VIDEO' and block.media_url %}
+                            <div class="ratio ratio-16x9">
+                                <iframe src="{{ block.media_url }}" title="{{ block.title }}" allowfullscreen></iframe>
+                            </div>
+                        {% elif block.content_type == 'IMAGE' and block.media_file %}
+                            <img src="{{ block.media_file.url }}" class="img-fluid rounded" alt="{{ block.title }}">
+                        {% elif block.content_type == 'FILE' and block.media_file %}
+                            <a href="{{ block.media_file.url }}" class="btn btn-outline-primary" download>
+                                <i class="fas fa-download me-2"></i>Download: {{ block.title }}
+                            </a>
+                        {% elif block.content_type == 'ASSIGNMENT' and block.linked_assignment %}
+                            <div class="alert alert-info">
+                                <h4 class="alert-heading">Graded Assignment</h4>
+                                <p>This lesson includes a graded assignment: <strong>{{ block.linked_assignment.title }}</strong>.</p>
+                                <hr>
+                                <a href="#" class="btn btn-primary">Go to Assignment</a>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            {% endfor %}
+            
+            <!-- === ACTION BUTTONS & NAVIGATION (THE FIX) === -->
+            <div class="mt-5 p-4 bg-light rounded d-flex justify-content-between align-items-center">
+                <div>
+                    <h5 class="mb-1">Lesson Complete?</h5>
+                    <p class="mb-0 text-muted">Mark this lesson as complete to update your progress.</p>
+                </div>
+                <!-- 
+                    The button now has an ID for our script to find.
+                    We use data-* attributes to pass necessary info to the script.
+                -->
+                <button id="markCompleteBtn" 
+                        class="btn btn-success btn-lg" 
+                        data-lesson-id="{{ lesson.id }}"
+                        data-complete-url="{% url 'lsalms:mark_lesson_complete' lesson_id=lesson.id %}">
+                    <i class="fas fa-check-circle me-2"></i>Mark as Complete
+                </button>
+            </div>
+
+            <!-- Optional: Previous/Next Lesson Navigation -->
+            <div class="d-flex justify-content-between mt-4">
+                <a href="#" class="btn btn-outline-secondary">&laquo; Previous Lesson</a>
+                <a href="#" class="btn btn-outline-secondary">Next Lesson &raquo;</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const markCompleteBtn = document.getElementById('markCompleteBtn');
+    
+    if (markCompleteBtn) {
+        markCompleteBtn.addEventListener('click', function() {
+            const lessonId = this.dataset.lessonId;
+            const url = this.dataset.completeUrl;
+            const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+
+            // 1. Provide immediate user feedback
+            this.disabled = true;
+            this.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...`;
+
+            // 2. Send the request to the backend
+            fetch(url, {
+                method: 'POST',
+                headers: {
+                    'X-CSRFToken': csrftoken,
+                    'Content-Type': 'application/json'
+                },
+                // body: JSON.stringify({ lesson_id: lessonId }) // Body is optional if ID is in URL
+            })
+            .then(response => {
+                if (!response.ok) {
+                    // Handle server errors
+                    return response.json().then(err => { throw new Error(err.message || 'Server error') });
+                }
+                return response.json();
+            })
+            .then(data => {
+                // 3. Handle a successful response
+                console.log(data.message);
+                this.classList.remove('btn-success');
+                this.classList.add('btn-outline-success');
+                this.innerHTML = `<i class="fas fa-check-circle me-2"></i>Completed!`;
+                // The button remains disabled to prevent re-submission
+            })
+            .catch(error => {
+                // 4. Handle any errors
+                console.error('Error marking lesson complete:', error);
+                alert(`An error occurred: ${error.message}`);
+                // Re-enable the button so the user can try again
+                this.disabled = false;
+                this.innerHTML = `<i class="fas fa-check-circle me-2"></i>Mark as Complete`;
+            });
+        });
+    }
+});
+</script>
+{% endblock %}
+
+
+
+                    

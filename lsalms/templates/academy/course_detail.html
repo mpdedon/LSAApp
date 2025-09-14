@@ -1,0 +1,71 @@
+<!-- lsalms/templates/lsalms/academy/course_detail.html -->
+
+{% extends 'base.html' %}
+{% load humanize lsalms_extras %}
+
+{% block title %}{{ course.title }} | Online Academy{% endblock %}
+
+{% block content %}
+<div class="container py-5">
+    <div class="row g-5">
+        <div class="col-lg-8">
+            <nav aria-label="breadcrumb" style="--bs-breadcrumb-divider: '>';">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'lsalms:academy_hub' %}">Academy</a></li>
+                    <li class="breadcrumb-item active" aria-current="page">{{ course.title }}</li>
+                </ol>
+            </nav>
+            <h1 class="display-5 fw-bold">{{ course.title }}</h1>
+            <p class="lead text-muted">{{ course.description }}</p>
+            <hr>
+            <h4 class="mt-4 mb-3">What you'll learn</h4>
+            <div class="lh-lg">{{ course.learning_objectives|linebreaksbr }}</div>
+            <hr>
+            <h4 class="mt-4 mb-3">Curriculum</h4>
+            {% for module in course.modules.all %}
+                <div class="accordion mb-2">
+                    <div class="accordion-item">
+                        <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapseModule{{ module.pk }}">{{ module.title }}</button></h2>
+                        <div id="collapseModule{{ module.pk }}" class="accordion-collapse collapse">
+                            <div class="list-group list-group-flush">
+                                {% for lesson in module.lessons.all %}
+                                    <div class="list-group-item"><i class="fas fa-lock text-muted me-2"></i>{{ lesson.title }}</div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+        <div class="col-lg-4">
+            <div class="card shadow-sm position-sticky" style="top: 80px;">
+                <div class="card-body text-center">
+                    <h5 class="card-title">Get Full Access</h5>
+                    <p class="display-4 fw-bold text-primary my-3">
+                        {% if course.is_subscription_based and course.subscription_fee > 0 %}
+                            ₦{{ course.subscription_fee|intcomma }}
+                        {% else %}
+                            Free
+                        {% endif %}
+                    </p>
+                    {% if is_enrolled %}
+                         <a href="{% url 'lsalms:course_detail' slug=course.slug %}" class="btn btn-success btn-lg w-100 disabled">
+                            <i class="fas fa-check-circle me-2"></i>You are Enrolled
+                        </a>
+                    {% else %}
+                        <a href="{% url 'lsalms:course_subscription_confirm' slug=course.slug %}" class="btn btn-primary btn-lg w-100">
+                            {% if course.is_subscription_based and course.subscription_fee > 0 %}
+                                Subscribe Now
+                            {% else %}
+                                Enroll for Free
+                            {% endif %}
+                        </a>
+                    {% endif %}
+                    <hr>
+                    <p class="small text-muted">Taught by: <strong>{{ course.teacher.get_full_name }}</strong></p>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

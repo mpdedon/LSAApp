@@ -1,0 +1,205 @@
+{% extends 'base.html' %}
+{% load humanize %}
+
+{% block title %}LMS Mission Control{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* Add a slightly softer background for the entire page */
+    body { background-color: #f8f9fa; }
+    .stat-card { background-color: #fff; border-radius: 0.75rem; box-shadow: 0 4px 20px rgba(0,0,0,0.05); border: none; padding: 1.5rem; transition: transform 0.2s ease, box-shadow 0.2s ease; }
+    .stat-card:hover { transform: translateY(-4px); box-shadow: 0 8px 30px rgba(0,0,0,0.1); }
+    .stat-icon { font-size: 2rem; width: 60px; height: 60px; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; }
+    .stat-value { font-size: 2.25rem; font-weight: 700; }
+    .stat-label { font-size: 0.9rem; color: #6c757d; font-weight: 500; }
+    .list-group-item-avatar img { width: 40px; height: 40px; object-fit: cover; }
+    .table-actions .btn { padding: 0.25rem 0.5rem; font-size: 0.8rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+    <div class="row justify-content-center">
+        <!-- Constrain the layout to a max of 11 columns on XL screens -->
+        <div class="col-xl-11">
+
+            <!-- === NEW Dedicated Header Bar === -->
+            <div class="d-flex justify-content-between align-items-center mb-4 pb-2 border-bottom">
+                <div>
+                    <h1 class="h2 fw-bold mb-0">LMS Mission Control</h1>
+                    <p class="text-muted mb-0">Manage, monitor, and analyze the entire learning platform.</p>
+                </div>
+                <div>
+                    <a href="{% url 'school-setup' %}" class="btn btn-outline-secondary"><i class="fas fa-cogs me-1"></i> Go to School Operations</a>
+                </div>
+            </div>
+
+            <!-- Top-Level Stats Row -->
+            <div class="row g-4 mb-4">
+                <div class="col-lg-6 col-xl-3">
+                    <div class="stat-card h-100">
+                        <div class="d-flex align-items-center">
+                            <div class="stat-icon bg-primary-subtle text-primary me-3"><i class="fas fa-book-open"></i></div>
+                            <div>
+                                <div class="stat-value">{{ total_courses|default:0 }}</div>
+                                <div class="stat-label">Total Courses</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-6 col-xl-3">
+                    <div class="stat-card h-100">
+                         <div class="d-flex align-items-center">
+                            <div class="stat-icon bg-success-subtle text-success me-3"><i class="fas fa-rocket"></i></div>
+                            <div>
+                                <div class="stat-value">{{ published_courses|default:0 }}</div>
+                                <div class="stat-label">Published Courses</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-6 col-xl-3">
+                    <div class="stat-card h-100">
+                         <div class="d-flex align-items-center">
+                            <div class="stat-icon bg-info-subtle text-info me-3"><i class="fas fa-users"></i></div>
+                            <div>
+                                <div class="stat-value">{{ total_enrollments|default:0 }}</div>
+                                <div class="stat-label">Active Enrollments</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-6 col-xl-3">
+                    <div class="stat-card h-100">
+                         <div class="d-flex align-items-center">
+                            <div class="stat-icon bg-warning-subtle text-warning me-3"><i class="fas fa-globe"></i></div>
+                            <div>
+                                <div class="stat-value">{{ online_academy_students|default:0 }}</div>
+                                <div class="stat-label">Online Academy Students</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- === Main Content: Full Course Management === -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-light">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0"><i class="fas fa-book-open me-2"></i>Course Management</h5>
+                        <div class="d-flex gap-2">
+                            <a href="{% url 'lsalms:course_create' %}" class="btn btn-primary btn-sm"><i class="fas fa-plus me-1"></i> Create Admin Course</a>
+                            <form method="get" class="d-flex">
+                                <input class="form-control form-control-sm me-2" type="search" name="q" placeholder="Search courses..." value="{{ request.GET.q }}">
+                                <button class="btn btn-sm btn-outline-secondary" type="submit">Search</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Course Title</th>
+                                    <th>Teacher</th>
+                                    <th class="text-center">Type</th>
+                                    <th class="text-center">Status</th>
+                                    <th class="text-center">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for course in all_courses %}
+                                    <tr>
+                                        <td>
+                                            <strong class="d-block">{{ course.get_course_title }}</strong>
+                                            <small class="text-muted">{{ course.updated_at|naturaltime }}</small>
+                                        </td>
+                                        <td>{{ course.teacher.get_full_name|default:"Admin" }}</td>
+                                        <td class="text-center"><span class="badge bg-info-subtle text-info-emphasis">{{ course.get_course_type_display }}</span></td>
+                                        <td class="text-center"><span class="badge bg-secondary">{{ course.get_status_display }}</span></td>
+                                        <td class="text-center table-actions">
+                                            <a href="{% url 'lsalms:course_manage' slug=course.slug %}" class="btn btn-sm btn-outline-secondary" title="Course Builder"><i class="fas fa-sitemap"></i></a>
+                                            <a href="{% url 'lsalms:course_edit' slug=course.slug %}" class="btn btn-sm btn-outline-secondary" title="Edit Settings"><i class="fas fa-pencil-alt"></i></a>
+                                            <button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteModal" data-url="{% url 'lsalms:course_delete' pk=course.pk %}" data-name="{{ course.get_course_title }}" title="Delete Course"><i class="fas fa-trash-alt"></i></button>
+                                        </td>
+                                    </tr>
+                                {% empty %}
+                                    <tr><td colspan="5" class="text-center py-4 text-muted">No courses found matching your criteria.</td></tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                {% if all_courses.has_other_pages %}
+                <div class="card-footer bg-light border-top-0">
+                    <nav aria-label="Course pagination"><ul class="pagination pagination-sm justify-content-center mb-0">
+                        {% if all_courses.has_previous %}<li class="page-item"><a class="page-link" href="?page={{ all_courses.previous_page_number }}">Previous</a></li>{% else %}<li class="page-item disabled"><span class="page-link">Previous</span></li>{% endif %}
+                        <li class="page-item active"><span class="page-link">{{ all_courses.number }} of {{ all_courses.paginator.num_pages }}</span></li>
+                        {% if all_courses.has_next %}<li class="page-item"><a class="page-link" href="?page={{ all_courses.next_page_number }}">Next</a></li>{% else %}<li class="page-item disabled"><span class="page-link">Next</span></li>{% endif %}
+                    </ul></nav>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Student Performance & Activity Row -->
+            <div class="row g-4">
+                <div class="col-lg-8">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-light fw-bold"><i class="fas fa-user-graduate me-2"></i>Student Performance (Based on Final Course Grades)</div>
+                        <div class="row g-0">
+                            <div class="col-md-6 border-end">
+                                <h6 class="text-center small text-uppercase text-muted p-2 bg-light-subtle">Top Students</h6>
+                                <div class="list-group list-group-flush">
+                                    {% for student in top_students %}<div class="list-group-item list-group-item-avatar d-flex align-items-center"><img src="{{ student.profile_image.url }}" class="rounded-circle me-3" alt=""><div class="flex-grow-1">{{ student.user.get_full_name }}</div><span class="badge bg-success rounded-pill">{{ student.average_lms_grade|floatformat:1 }}% Avg</span></div>{% empty %}<div class="list-group-item text-muted">No graded student progress yet.</div>{% endfor %}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <h6 class="text-center small text-uppercase text-muted p-2 bg-light-subtle">Low Engagement (At-Risk)</h6>
+                                <div class="list-group list-group-flush">
+                                    {% for student in at_risk_students %}<div class="list-group-item list-group-item-avatar d-flex align-items-center"><img src="{{ student.profile_image.url }}" class="rounded-circle me-3" alt=""><div class="flex-grow-1">{{ student.user.get_full_name }}</div><span class="badge bg-danger rounded-pill">0 Lessons</span></div>{% empty %}<div class="list-group-item text-muted">No at-risk students found.</div>{% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-lg-4">
+                     <div class="card shadow-sm">
+                        <div class="card-header bg-light fw-bold"><i class="fas fa-history me-2"></i>Recent LMS Activity</div>
+                         <div class="list-group list-group-flush small">
+                            {% for activity in recent_activities %}<div class="list-group-item"><strong>{{ activity.student.user.get_full_name }}</strong> {{ activity.get_activity_type_display|lower }} '{{ activity.related_object }}'<div class="text-muted">{{ activity.timestamp|naturaltime }}</div></div>{% empty %}<div class="list-group-item text-muted">No recent activity.</div>{% endfor %}
+                         </div>
+                    </div>
+                </div>
+            </div>
+
+        </div> <!-- End of col-xl-11 -->
+    </div> <!-- End of row justify-content-center -->
+</div> <!-- End of container -->
+
+<!-- Delete Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
+    <div class="modal-header"><h5 class="modal-title">Confirm Deletion</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
+    <div class="modal-body"><p>Are you sure you want to delete <strong id="deleteObjectName">this item</strong>? This action cannot be undone.</p></div>
+    <div class="modal-footer"><form id="deleteForm" method="post">{% csrf_token %}<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-danger">Yes, Delete</button></form></div>
+</div></div></div>
+{% endblock %}
+
+
+{% block extra_js %}
+<script>
+// JavaScript for the delete modal confirmation
+document.addEventListener('DOMContentLoaded', function() {
+    const deleteModal = document.getElementById('deleteModal');
+    if (deleteModal) {
+        deleteModal.addEventListener('show.bs.modal', function (event) {
+            const button = event.relatedTarget;
+            const url = button.getAttribute('data-url');
+            const name = button.getAttribute('data-name');
+            deleteModal.querySelector('#deleteObjectName').textContent = `the course "${name}"`;
+            deleteModal.querySelector('#deleteForm').setAttribute('action', url);
+        });
+    }
+});
+</script>
+{% endblock %}
