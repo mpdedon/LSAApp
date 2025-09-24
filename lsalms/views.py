@@ -112,7 +112,7 @@ class CourseManageView(LoginRequiredMixin, DetailView):
 
             # Re-fetch the enrollments to get the updated grade_report data.
             enrollments_with_grades = CourseEnrollment.objects.filter(
-                course=course, is_active=True
+                course=course
             ).select_related('student__user', 'grade_report')
 
             # Efficiently count completed lessons for these specific enrollments.

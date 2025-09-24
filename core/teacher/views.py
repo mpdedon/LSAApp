@@ -412,13 +412,13 @@ def attendance_log(request, class_id):
 
     context = {
         'class_instance': class_instance,
-        'students': students, # Pass students for iteration if needed
+        'students': students, 
         'current_term': current_term,
         'student_attendance_summary': student_attendance_summary,
         'weeks_for_nav': weeks_date_objects,
         'selected_week_index': selected_week_index,
         'max_week_index': max_week_index,
-        'week_days_for_log_display': school_week_days_for_log, # For displaying the days in the log
+        'week_days_for_log_display': school_week_days_for_log, 
     }
     return render(request, 'teacher/attendance_log.html', context)
 
@@ -983,7 +983,7 @@ def grade_assignment(request, submission_id):
             # Essay question - requires manual grading by teacher
             pass
     
-    submission.grade = (total_score / len(questions)) * 100  # Example grading logic
+    submission.grade = (total_score / len(questions)) * 100  
     submission.save()
 
     return redirect('teacher_dashboard')
@@ -1029,6 +1029,7 @@ def grade_essay_questions(request, assignment_id):
         'submissions': submissions,
     })
 
+
 @login_required
 def view_submitted_assignments(request):
     teacher = request.user.teacher
@@ -1045,10 +1046,12 @@ def view_submitted_assignments(request):
         'submissions_by_subject': submissions_by_subject,
     })
 
+
 @login_required
 def assignment_list(request):
     assignments = Assignment.objects.filter(teacher=request.user.teacher)
     return render(request, 'assignment/assignment_list.html', {'assignments': assignments})
+
 
 @login_required
 def update_assignment(request, assignment_id):
@@ -1062,6 +1065,7 @@ def update_assignment(request, assignment_id):
         form = AssignmentForm(instance=assignment)
     return render(request, 'assignment/update_assignment.html', {'form': form, 'assignment': assignment})
 
+
 @login_required
 def delete_assignment(request, assignment_id):
     assignment = get_object_or_404(Assignment, id=assignment_id)
@@ -1071,6 +1075,7 @@ def delete_assignment(request, assignment_id):
         return redirect('teacher_dashboard')
     
     return render(request, 'assignment/delete_assignment.html', {'assignment': assignment})
+
 
 @login_required
 def update_result(request, student_id, term_id):
