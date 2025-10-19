@@ -23,8 +23,10 @@ django-anymail==12.0
 django-ckeditor-5==0.2.18
 django-crispy-forms==2.3
 django-dotenv==1.4.2
+django-htmx==1.26.0
 django-js-asset==3.1.2
 django-ratelimit==4.1.0
+django-widget-tweaks==1.5.0
 flower==2.0.1
 fonttools==4.54.1
 google-ai-generativelanguage==0.6.15
