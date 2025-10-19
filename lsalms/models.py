@@ -187,6 +187,50 @@ class Lesson(models.Model):
     order = models.PositiveIntegerField(default=0)
     estimated_duration = models.PositiveIntegerField(default=5, help_text="Estimated time in minutes to complete.")
 
+    def get_next_lesson(self):
+        """Returns the next lesson in the course order."""
+        # Try to find the next lesson in the current module
+        next_in_module = Lesson.objects.filter(
+            module=self.module,
+            order__gt=self.order
+        ).order_by('order').first()
+
+        if next_in_module:
+            return next_in_module
+
+        # If not, find the first lesson of the next module in the course
+        next_module = Module.objects.filter(
+            course=self.module.course,
+            order__gt=self.module.order
+        ).order_by('order').first()
+
+        if next_module:
+            return next_module.lessons.order_by('order').first()
+
+        return None # This is the last lesson of the course
+
+    def get_previous_lesson(self):
+        """Returns the previous lesson in the course order."""
+        # Try to find the previous lesson in the current module
+        prev_in_module = Lesson.objects.filter(
+            module=self.module,
+            order__lt=self.order
+        ).order_by('-order').first()
+
+        if prev_in_module:
+            return prev_in_module
+
+        # If not, find the last lesson of the previous module
+        prev_module = Module.objects.filter(
+            course=self.module.course,
+            order__lt=self.module.order
+        ).order_by('-order').first()
+
+        if prev_module:
+            return prev_module.lessons.order_by('-order').first()
+
+        return None 
+
     class Meta:
         ordering = ['order']
 

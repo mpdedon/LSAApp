@@ -1,20 +1,67 @@
-<h3 class="widget-title"><i class="bi bi-journal-check me-2"></i>Manage Tasks</h3>
+<!-- In your teacher_dashboard.html -->
+<h3 class="widget-title"><i class="bi bi-journal-check me-2"></i>Manage Tasks for {{ active_term }}</h3>
+
 <ul class="nav nav-tabs nav-tabs-bordered" id="tasks-tabs" role="tablist">
     <li class="nav-item" role="presentation"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#assignments-content" type="button">Assignments</button></li>
     <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#assessments-content" type="button">Assessments (CA)</button></li>
     <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#exams-content" type="button">Exams</button></li>
 </ul>
+
 <div class="tab-content pt-3" id="tasks-tabs-content">
+    <!-- Assignments Tab -->
     <div class="tab-pane fade show active" id="assignments-content" role="tabpanel">
         <div class="d-flex justify-content-end mb-3"><a href="{% url 'create_assignment' %}" class="btn btn-sm btn-primary"><i class="bi bi-plus"></i> New Assignment</a></div>
-        {% include 'teacher/partials/_task_list.html' with tasks=all_assignments task_type='Assignment' view_url='assignment_detail' update_url='update_assignment' delete_url='delete_assignment' %}
+        {% include 'teacher/partials/_task_list.html' with tasks=all_current_assignments task_type='Assignment' view_url='assignment_detail' update_url='update_assignment' delete_url='delete_assignment' %}
+        
+        {# --- Toggle for Previous Assignments --- #}
+        {% if all_previous_assignments %}
+            <div class="mt-4 text-center">
+                <a class="text-muted small" data-bs-toggle="collapse" href="#previousAssignments" role="button" aria-expanded="false" aria-controls="previousAssignments">
+                    Show/Hide Tasks from Previous Terms <i class="bi bi-chevron-down"></i>
+                </a>
+            </div>
+            <div class="collapse mt-3" id="previousAssignments">
+                <h5 class="text-muted">Previous Terms</h5>
+                {% include 'teacher/partials/_task_list.html' with tasks=all_previous_assignments task_type='Assignment' view_url='assignment_detail' update_url='update_assignment' delete_url='delete_assignment' %}
+            </div>
+        {% endif %}
     </div>
+
+    <!-- Assessments Tab -->
     <div class="tab-pane fade" id="assessments-content" role="tabpanel">
         <div class="d-flex justify-content-end mb-3"><a href="{% url 'create_assessment' %}" class="btn btn-sm btn-primary"><i class="bi bi-plus"></i> New Assessment</a></div>
-        {% include 'teacher/partials/_task_list.html' with tasks=all_assessments task_type='Assessment' view_url='view_assessment' update_url='update_assessment' delete_url='admin_delete_assessment' %}
+        {% include 'teacher/partials/_task_list.html' with tasks=all_current_assessments task_type='Assessment' view_url='view_assessment' update_url='update_assessment' delete_url='admin_delete_assessment' %}
+
+        {# --- Toggle for Previous Assessments --- #}
+        {% if all_previous_assessments %}
+            <div class="mt-4 text-center">
+                <a class="text-muted small" data-bs-toggle="collapse" href="#previousAssessments" role="button" aria-expanded="false" aria-controls="previousAssessments">
+                    Show/Hide Tasks from Previous Terms <i class="bi bi-chevron-down"></i>
+                </a>
+            </div>
+            <div class="collapse mt-3" id="previousAssessments">
+                <h5 class="text-muted">Previous Terms</h5>
+                {% include 'teacher/partials/_task_list.html' with tasks=all_previous_assessments task_type='Assessment' view_url='view_assessment' update_url='update_assessment' delete_url='admin_delete_assessment' %}
+            </div>
+        {% endif %}
     </div>
+
+    <!-- Exams Tab -->
     <div class="tab-pane fade" id="exams-content" role="tabpanel">
         <div class="d-flex justify-content-end mb-3"><a href="{% url 'create_exam' %}" class="btn btn-sm btn-primary"><i class="bi bi-plus"></i> New Exam</a></div>
-        {% include 'teacher/partials/_task_list.html' with tasks=all_exams task_type='Exam' view_url='view_exam' update_url='update_exam' delete_url='delete_exam' %}
+        {% include 'teacher/partials/_task_list.html' with tasks=all_current_exams task_type='Exam' view_url='view_exam' update_url='update_exam' delete_url='delete_exam' %}
+
+        {# --- Toggle for Previous Exams --- #}
+        {% if all_previous_exams %}
+            <div class="mt-4 text-center">
+                <a class="text-muted small" data-bs-toggle="collapse" href="#previousExams" role="button" aria-expanded="false" aria-controls="previousExams">
+                    Show/Hide Tasks from Previous Terms <i class="bi bi-chevron-down"></i>
+                </a>
+            </div>
+            <div class="collapse mt-3" id="previousExams">
+                <h5 class="text-muted">Previous Terms</h5>
+                {% include 'teacher/partials/_task_list.html' with tasks=all_previous_exams task_type='Exam' view_url='view_exam' update_url='update_exam' delete_url='delete_exam' %}
+            </div>
+        {% endif %}
     </div>
 </div>

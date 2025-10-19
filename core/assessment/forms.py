@@ -27,15 +27,19 @@ class AssessmentForm(forms.ModelForm):
         model = Assessment
         fields = [
             'title', 'short_description', 'class_assigned',
-            'subject', 'term', 'due_date', 'duration', 'is_online'
+            'subject', 'term', 'due_date', 'duration',
+            'result_field_mapping', 'shuffle_questions'  
         ]
         widgets = {
             'title': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter the title of the assessment'}),
             'short_description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Provide a brief description'}),
             'class_assigned': forms.Select(attrs={'class': 'form-select'}),
             'subject': forms.Select(attrs={'class': 'form-select'}),
+            'duration': forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'e.g., 45 for 45 minutes'}),
             'term': forms.Select(attrs={'class': 'form-select'}),
-            'is_online': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'due_date': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
+            'result_field_mapping': forms.Select(attrs={'class': 'form-control'}),
+            'shuffle_questions': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
 
         def __init__(self, *args, **kwargs):
@@ -53,7 +57,22 @@ class AssessmentForm(forms.ModelForm):
 class OnlineQuestionForm(forms.ModelForm):
     class Meta:
         model = OnlineQuestion
-        fields = ['question_type', 'question_text', 'options', 'correct_answer']
+        fields = ['question_type', 'question_text', 'options', 'correct_answer', 'points']
+
+    def clean(self):
+        cleaned_data = super().clean()
+        question_type = cleaned_data.get('question_type')
+        points = cleaned_data.get('points')
+
+        if question_type in ['SCQ', 'MCQ']:
+            if not points:  # Catches None, 0, or empty
+                cleaned_data['points'] = 1
+
+        elif question_type == 'ES':
+            if not points or points <= 0:
+                self.add_error('points', 'A point value greater than zero is required for Essay questions.')
+        
+        return cleaned_data
 
     def clean_options(self):
         options = self.cleaned_data.get('options') # This should be a list if coming from view/JSONField
@@ -109,6 +128,7 @@ class OnlineQuestionForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
         initial_options = self.initial.get('options')
         # This logic is for when the form is initialized with existing instance data
         # for an edit form, ensuring stringified JSON for options is parsed to a list.

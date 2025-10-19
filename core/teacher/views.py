@@ -1031,21 +1031,33 @@ def grade_essay_questions(request, assignment_id):
 
 
 @login_required
-def view_submitted_assignments(request):
-    teacher = request.user.teacher
-    
-    # Group submissions by subject for assignments created by this teacher
-    submissions_by_subject = (
-        AssignmentSubmission.objects.filter(assignment__teacher=teacher)
-        .select_related('assignment', 'student__user')
-        .annotate(subject=F('assignment__subject'))
-        .order_by('subject', 'assignment__title', 'student__user__last_name')
-    )
-    
-    return render(request, 'teacher/view_submitted_assignments.html', {
-        'submissions_by_subject': submissions_by_subject,
-    })
+def assignment_submissions_list(request, assignment_id):
 
+    assignment = get_object_or_404(
+        Assignment.objects.select_related('class_assigned', 'teacher__user'), 
+        id=assignment_id
+    )
+
+    is_creator = assignment.teacher.user == request.user
+    is_form_teacher = False
+    if hasattr(request.user, 'teacher'):
+        form_teacher_of_class = assignment.class_assigned.form_teacher()
+        if form_teacher_of_class and form_teacher_of_class == request.user.teacher:
+            is_form_teacher = True
+
+    if not (request.user.is_superuser or is_creator or is_form_teacher):
+        messages.error(request, "You are not authorized to view submissions for this assignment.")
+        return redirect('teacher_dashboard')
+
+    submissions = AssignmentSubmission.objects.filter(assignment=assignment) \
+                                          .select_related('student__user') \
+                                          .order_by('student__user__last_name')
+
+    context = {
+        'assignment': assignment,
+        'submissions': submissions,
+    }
+    return render(request, 'assignment/assignment_submissions_list.html', context)
 
 @login_required
 def assignment_list(request):
@@ -1121,16 +1133,18 @@ def _process_newly_added_questions(request, assessment, question_name_prefix='ne
         q_text_key = f'{question_name_prefix}text_{question_number}'
         q_options_key = f'{question_name_prefix}options_{question_number}'
         q_correct_key = f'{question_name_prefix}correct_answer_{question_number}'
+        q_points_key = f'{question_name_prefix}points_{question_number}'
 
-        if q_type_key not in request.POST and q_text_key not in request.POST : 
+        if q_type_key not in request.POST and q_text_key not in request.POST : # Check if any primary field for this new question number exists
             break
 
         question_type = request.POST.get(q_type_key)
         question_text = request.POST.get(q_text_key, '').strip()
         options_str = request.POST.get(q_options_key, '')
         correct_answer_str = request.POST.get(q_correct_key, '').strip()
+        points_str = request.POST.get(q_points_key)
 
-        if not question_text and not question_type:
+        if not question_text and not question_type: # Skip if completely empty entry from JS
              question_number += 1
              continue
         if not question_text: # Error if type present but no text
@@ -1144,7 +1158,8 @@ def _process_newly_added_questions(request, assessment, question_name_prefix='ne
             'question_type': question_type,
             'question_text': question_text,
             'options': options_list,
-            'correct_answer': correct_answer_str if correct_answer_str else None
+            'correct_answer': correct_answer_str if correct_answer_str else None,
+            'points': points_str if points_str else None
         }
         
         question_form = OnlineQuestionForm(form_data)
@@ -1218,22 +1233,30 @@ def create_assessment(request):
         form.fields['subject'].queryset = assigned_subjects_qs
         return render(request, 'assessment/create_assessment.html', {'form': form})
 
+
 # --- Update Assessment View ---
 @login_required
 def update_assessment(request, assessment_id):
     assessment = get_object_or_404(Assessment, id=assessment_id)
     user = request.user
-    teacher_profile = Teacher.objects.filter(user=user).first()
+    
+    # Authorization check (can be simplified and made more robust)
+    is_creator = assessment.created_by == user
+    is_form_teacher = False
+    if hasattr(user, 'teacher'):
+        form_teacher_of_class = assessment.class_assigned.form_teacher()
+        if form_teacher_of_class and form_teacher_of_class == user.teacher:
+            is_form_teacher = True
 
-    # Authorization
-    if not (user.is_superuser or assessment.created_by == user):
+    if not (user.is_superuser or is_creator or is_form_teacher):
         messages.error(request, "You are not authorized to update this assessment.")
         return redirect('home')
 
-    if teacher_profile and not user.is_superuser :
-        assigned_classes_qs = teacher_profile.assigned_classes()
-        assigned_subjects_qs = teacher_profile.assigned_subjects()
-    else: # Superuser or non-teacher (though auth check above should handle non-teacher)
+    # Get available classes/subjects for the form dropdowns
+    if hasattr(user, 'teacher') and not user.is_superuser:
+        assigned_classes_qs = user.teacher.assigned_classes()
+        assigned_subjects_qs = user.teacher.assigned_subjects()
+    else: 
         assigned_classes_qs = Class.objects.all()
         assigned_subjects_qs = Subject.objects.all()
 
@@ -1244,28 +1267,25 @@ def update_assessment(request, assessment_id):
 
         if form.is_valid():
             updated_assessment = form.save(commit=False)
-            if user.is_superuser and not assessment.is_approved: 
-                 updated_assessment.is_approved = True
-                 updated_assessment.approved_by = user
             updated_assessment.updated_at = timezone.now()
             updated_assessment.save()
-            # form.save_m2m() # Only if AssessmentForm itself has M2M fields
 
             all_errors = []
 
-            # 1. Update Existing Questions
-            submitted_existing_ids = set()
+            # --- FIX 3: THE SMARTER EXISTING QUESTION PROCESSING LOOP ---
             for q_instance in assessment.questions.all():
                 q_id = q_instance.id
-                # Check if data for this existing question was submitted for update
-                # (Assumes edit form fields are named question_ID_text, etc.)
-                if f'question_{q_id}_text' in request.POST or f'question_{q_id}_type' in request.POST:
-                    submitted_existing_ids.add(q_id)
+                
+                # We only process an existing question if its text is submitted in the POST.
+                # This check prevents validation errors when only saving assessment details.
+                submitted_text = request.POST.get(f'question_{q_id}_text')
+                if submitted_text is not None:
                     data_for_existing = {
                         'question_type': request.POST.get(f'question_{q_id}_type'),
-                        'question_text': request.POST.get(f'question_{q_id}_text', '').strip(),
+                        'question_text': submitted_text.strip(),
                         'options': [opt.strip() for opt in request.POST.get(f'question_{q_id}_options', '').split(',') if opt.strip()],
-                        'correct_answer': request.POST.get(f'question_{q_id}_correct_answer', '').strip() or None
+                        'correct_answer': request.POST.get(f'question_{q_id}_correct_answer', '').strip() or None,
+                        'points': request.POST.get(f'question_{q_id}_points') # Pass points
                     }
                     q_form = OnlineQuestionForm(data_for_existing, instance=q_instance)
                     if q_form.is_valid():
@@ -1274,29 +1294,30 @@ def update_assessment(request, assessment_id):
                         for field, field_errors in q_form.errors.items():
                             all_errors.append(f"Existing Question ID {q_id} ({field.replace('_',' ').title()}): {', '.join(field_errors)}")
             
-            # 2. Remove Questions (if a mechanism exists to mark them for deletion)
-            deleted_ids_str = request.POST.get('deleted_question_ids', '') # e.g., "12,15,20"
+            # --- Logic for Deleted and New Questions (remains the same) ---
+            deleted_ids_str = request.POST.get('deleted_question_ids', '')
             if deleted_ids_str:
                 deleted_ids = [int(id_str) for id_str in deleted_ids_str.split(',') if id_str.isdigit()]
                 assessment.questions.remove(*deleted_ids) 
-                OnlineQuestion.objects.filter(id__in=deleted_ids, assessments=None).delete() # Optional: delete orphaned questions
+                OnlineQuestion.objects.filter(id__in=deleted_ids, assessments=None).delete()
 
-            # 3. Add Newly Added Questions (uses 'new_question_' prefix)
             new_question_errors = _process_newly_added_questions(request, assessment, question_name_prefix='new_question_')
             all_errors.extend(new_question_errors)
 
+            # --- Redirect or Re-render Logic (remains the same) ---
             if not all_errors:
                 messages.success(request, "Assessment updated successfully.")
                 return redirect('view_assessment', assessment_id=assessment.id)
             else:
-                messages.error(request, "Errors occurred. Please review.")
-        # If form is invalid or errors occurred, re-render with context
+                messages.error(request, "Errors occurred while processing questions. Please review.")
+        
+        # If form is invalid or question processing had errors, re-render the page
         current_questions = assessment.questions.all().order_by('id')
         return render(request, 'assessment/update_assessment.html', {
-            'form': form, # This form instance will have its own errors
+            'form': form, 
             'assessment': assessment,
             'questions': current_questions,
-            'processing_errors': all_errors if 'all_errors' in locals() and all_errors else [] 
+            'processing_errors': all_errors if 'all_errors' in locals() else [] 
         })
 
     else: # GET request
@@ -1309,6 +1330,7 @@ def update_assessment(request, assessment_id):
             'assessment': assessment,
             'questions': questions
         })
+    
 
 @login_required
 def teacher_assessment_list(request):
@@ -1316,9 +1338,12 @@ def teacher_assessment_list(request):
         teacher = get_object_or_404(Teacher, user=request.user)
     except Teacher.DoesNotExist:
         messages.error(request, "You do not have a teacher profile.")
-        return redirect('home') 
+        return redirect('home')
 
-
+    # Get the list of classes where this teacher is the FORM TEACHER
+    form_teacher_classes = teacher.current_classes().all()
+    
+    # --- Subqueries for annotation (these are efficient and well-written) ---
     total_submissions_subquery = AssessmentSubmission.objects.filter(
         assessment=OuterRef('pk')
     ).values('assessment').annotate(count=Count('pk')).values('count')
@@ -1328,30 +1353,22 @@ def teacher_assessment_list(request):
         is_graded=True
     ).values('assessment').annotate(count=Count('pk')).values('count')
 
-    class_student_count_subquery = Student.objects.filter(
-        current_class=OuterRef("class_assigned"),
-        status='active' # Optional: only count active students
-    ).values('current_class').annotate(count=Count('pk')).values('count')
-
-
-    # --- Main Query ---
-    assessments_by_teacher = Assessment.objects.filter(
-        created_by=teacher.user
-    ).select_related(
+    # This query now fetches assessments that meet EITHER condition:
+    # 1. The assessment was created by the logged-in teacher.
+    # 2. The assessment is assigned to a class where the teacher is the form teacher.
+    
+    assessments_for_teacher = Assessment.objects.filter(
+        Q(created_by=request.user) | Q(class_assigned__in=form_teacher_classes)
+    ).distinct().select_related( # Use distinct() to avoid duplicates if a teacher creates an assessment for their own form class
         'class_assigned', 'subject'
     ).annotate(
-        # Sum the 'points' field from the related OnlineQuestion model
         total_possible_score=Sum('questions__points'),
-
         submission_count=Subquery(total_submissions_subquery, output_field=IntegerField()),
-        submission_count_graded=Subquery(graded_submissions_subquery, output_field=IntegerField()),
-        total_students_in_class=Subquery(class_student_count_subquery, output_field=IntegerField())
-
+        submission_count_graded=Subquery(graded_submissions_subquery, output_field=IntegerField())
     ).order_by('-created_at')
 
-    # --- Query for Pending Submissions (this query is separate and fine as is) ---
-    pending_essay_submissions = AssessmentSubmission.objects.filter(
-        assessment__created_by=teacher.user,
+    pending_submissions_to_grade = AssessmentSubmission.objects.filter(
+        assessment__in=assessments_for_teacher, # Filter based on the assessments we just found
         requires_manual_review=True,
         is_graded=False
     ).select_related(
@@ -1359,25 +1376,45 @@ def teacher_assessment_list(request):
     ).order_by('submitted_at')
 
     context = {
-        'assessments': assessments_by_teacher,
-        'pending_essay_submissions': pending_essay_submissions,
-        'page_title': "My Assessments & Submissions",
+        'assessments': assessments_for_teacher,
+        'pending_submissions_to_grade': pending_submissions_to_grade,
+        'page_title': "Manage Assessments", 
     }
     return render(request, 'assessment/teacher_assessment_list.html', context)
 
+@login_required
+def assessment_submissions_list(request, assessment_id):
+    assessment = get_object_or_404(Assessment.objects.select_related('class_assigned__form_teacher__user'), id=assessment_id)
+
+    is_creator = assessment.created_by == request.user
+    is_form_teacher = hasattr(request.user, 'teacher') and assessment.class_assigned.form_teacher == request.user.teacher
+
+    if not (request.user.is_superuser or is_creator or is_form_teacher):
+        messages.error(request, "You are not authorized to view submissions for this assessment.")
+        return redirect('teacher_dashboard')
+
+    submissions = AssessmentSubmission.objects.filter(assessment=assessment) \
+                                          .select_related('student__user') \
+                                          .order_by('-submitted_at')
+    
+    context = { 'assessment': assessment, 'submissions': submissions}
+    return render(request, 'assessment/assessment_submissions_list.html', context)
+
 
 @login_required
-def view_assessment(request, assessment_id): 
+def view_assessment(request, assessment_id):
 
-    assessment = get_object_or_404(Assessment, id=assessment_id) 
-    questions = assessment.questions.all()
+    assessment = get_object_or_404(Assessment.objects.select_related('class_assigned', 'created_by'), id=assessment_id)
+    is_creator = assessment.created_by == request.user
+    is_form_teacher = False
+    if hasattr(request.user, 'teacher'):
+        form_teacher_of_class = assessment.class_assigned.form_teacher()
+        if form_teacher_of_class and form_teacher_of_class == request.user.teacher:
+            is_form_teacher = True
     
-    if not (request.user.is_superuser or assessment.created_by == request.user):
+    if not (request.user.is_superuser or is_creator or is_form_teacher):
         messages.error(request, "You are not authorized to view this assessment's details.")
-        return redirect('home') 
-
-    #for q_idx, q in enumerate(questions):
-    #    print(f"  Q{q_idx+1}: {q.question_text[:50]}... (Type: {q.question_type}, Options: {q.options})")
+        return redirect('teacher_dashboard')
 
     # Prepare questions with processed options for the template
     processed_questions_for_teacher_view = []
@@ -1677,9 +1714,12 @@ def teacher_exam_list(request):
         teacher = get_object_or_404(Teacher, user=request.user)
     except Teacher.DoesNotExist:
         messages.error(request, "You do not have a teacher profile.")
-        return redirect('home') 
+        return redirect('home')
 
-
+    # Get the list of classes where this teacher is the FORM TEACHER
+    form_teacher_classes = teacher.current_classes().all()
+    
+    # --- Subqueries for annotation (these are efficient and well-written) ---
     total_submissions_subquery = ExamSubmission.objects.filter(
         exam=OuterRef('pk')
     ).values('exam').annotate(count=Count('pk')).values('count')
@@ -1689,30 +1729,22 @@ def teacher_exam_list(request):
         is_graded=True
     ).values('exam').annotate(count=Count('pk')).values('count')
 
-    class_student_count_subquery = Student.objects.filter(
-        current_class=OuterRef("class_assigned"),
-        status='active' # Optional: only count active students
-    ).values('current_class').annotate(count=Count('pk')).values('count')
-
-
-    # --- Main Query ---
-    exams_by_teacher = Exam.objects.filter(
-        created_by=teacher.user
-    ).select_related(
+    # This query now fetches exams that meet EITHER condition:
+    # 1. The exam was created by the logged-in teacher.
+    # 2. The exam is assigned to a class where the teacher is the form teacher.
+    
+    exams_for_teacher = Exam.objects.filter(
+        Q(created_by=request.user) | Q(class_assigned__in=form_teacher_classes)
+    ).distinct().select_related( # Use distinct() to avoid duplicates if a teacher creates an exam for their own form class
         'class_assigned', 'subject'
     ).annotate(
-        # Sum the 'points' field from the related OnlineQuestion model
         total_possible_score=Sum('questions__points'),
-
         submission_count=Subquery(total_submissions_subquery, output_field=IntegerField()),
-        submission_count_graded=Subquery(graded_submissions_subquery, output_field=IntegerField()),
-        total_students_in_class=Subquery(class_student_count_subquery, output_field=IntegerField())
-
+        submission_count_graded=Subquery(graded_submissions_subquery, output_field=IntegerField())
     ).order_by('-created_at')
 
-    # --- Query for Pending Submissions (this query is separate and fine as is) ---
-    pending_essay_submissions = ExamSubmission.objects.filter(
-        exam__created_by=teacher.user,
+    pending_submissions_to_grade = ExamSubmission.objects.filter(
+        exam__in=exams_for_teacher, # Filter based on the exams we just found
         requires_manual_review=True,
         is_graded=False
     ).select_related(
@@ -1720,25 +1752,45 @@ def teacher_exam_list(request):
     ).order_by('submitted_at')
 
     context = {
-        'exams': exams_by_teacher,
-        'pending_essay_submissions': pending_essay_submissions,
-        'page_title': "My Exams & Submissions",
+        'exams': exams_for_teacher,
+        'pending_submissions_to_grade': pending_submissions_to_grade,
+        'page_title': "Manage Exams", 
     }
     return render(request, 'exam/teacher_exam_list.html', context)
 
 
 @login_required
-def view_exam(request, exam_id): 
+def exam_submissions_list(request, exam_id):
+    exam = get_object_or_404(Exam.objects.select_related('class_assigned__form_teacher__user'), id=exam_id)
 
-    exam = get_object_or_404(Exam, id=exam_id) 
-    questions = exam.questions.all()
+    is_creator = exam.created_by == request.user
+    is_form_teacher = hasattr(request.user, 'teacher') and exam.class_assigned.form_teacher == request.user.teacher
+
+    if not (request.user.is_superuser or is_creator or is_form_teacher):
+        messages.error(request, "You are not authorized to view submissions for this exam.")
+        return redirect('teacher_dashboard')
+
+    submissions = ExamSubmission.objects.filter(exam=exam) \
+                                          .select_related('student__user') \
+                                          .order_by('-submitted_at')
     
-    if not (request.user.is_superuser or exam.created_by == request.user):
-        messages.error(request, "You are not authorized to view this exam's details.")
-        return redirect('home') 
+    context = { 'exam': exam, 'submissions': submissions}
+    return render(request, 'exam/exam_submissions_list.html', context)
 
-    #for q_idx, q in enumerate(questions):
-    #    print(f"  Q{q_idx+1}: {q.question_text[:50]}... (Type: {q.question_type}, Options: {q.options})")
+
+@login_required
+def view_exam(request, exam_id):
+
+    exam = get_object_or_404(Exam.objects.select_related('class_assigned', 'created_by'), id=exam_id)
+    is_creator = exam.created_by == request.user
+    is_form_teacher = False
+    if hasattr(request.user, 'teacher'):
+        form_teacher_of_class = exam.class_assigned.form_teacher()
+        if form_teacher_of_class and form_teacher_of_class == request.user.teacher:
+            is_form_teacher = True
+    if not (request.user.is_superuser or is_creator or is_form_teacher):
+        messages.error(request, "You are not authorized to view this exam's details.")
+        return redirect('teacher_dashboard')
 
     # Prepare questions with processed options for the template
     processed_questions_for_teacher_view = []

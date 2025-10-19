@@ -1,20 +1,27 @@
-{% load humanize student_filters %}
+<!-- in student/student_dashboard.html -->
 
-{% if upcoming_quests %}
-    {% for task in upcoming_quests|slice:":10" %} {# Show top 5 upcoming quests #}
+{# --- ACTIVE QUESTS SECTION --- #}
+<h5 class="fw-bold">Your Active Quests</h5>
+{% if active_quests %}
+    {% for task in active_quests %}
         <div class="quest-card mb-3">
             <div class="card-body d-flex align-items-center p-3">
-                {% if task.type == 'assignment' %}<div class="quest-icon bg-info-subtle text-info"><i class="bi bi-journal-check"></i></div>
-                {% elif task.type == 'assessment' %}<div class="quest-icon bg-warning-subtle text-warning"><i class="bi bi-pencil-square"></i></div>
-                {% elif task.type == 'exam' %}<div class="quest-icon bg-success-subtle text-success"><i class="bi bi-file-earmark-check-fill"></i></div>
-                {% endif %}
+                <!-- ... Icon logic ... -->
                 <div class="flex-grow-1 mx-3">
                     <div class="quest-title">{{ task.obj.title }}</div>
                     <div class="text-muted small">{{ task.obj.subject.name }}</div>
                 </div>
                 <div class="text-end">
-                    <div class="quest-due text-danger">Due: {{ task.due_date|date:"D, d M" }}</div>
-                    <a href="{{ task.submit_url }}" class="btn btn-sm btn-primary mt-1" style="background-color: var(--dash-primary-color); border-color: var(--dash-primary-color);">Start Quest</a>
+                    <div class="quest-due text-danger">Due: {{ task.obj.due_date|date:"D, d M" }}</div>
+                    
+                    <!-- Button text changes for retakes -->
+                    <a href="{{ task.start_url }}" class="btn btn-sm btn-primary mt-1">
+                        {% if task.status == 'IN_PROGRESS' %}
+                            Continue Quest
+                        {% else %}
+                            Start Quest
+                        {% endif %}
+                    </a>
                 </div>
             </div>
         </div>
@@ -22,6 +29,71 @@
 {% else %}
     <div class="text-center p-4 text-muted">
         <i class="bi bi-trophy-fill fa-3x mb-3 text-success"></i>
-        <h5 class="fw-bold">Quest Log is Clear!</h5><p>No pending tasks.</p>
+        <h5 class="fw-bold">Quest Log is Clear!</h5><p>No active tasks.</p>
     </div>
+{% endif %}
+
+<hr class="my-4">
+
+{# --- PAST QUESTS ACCORD-ION --- #}
+{% if past_quests %}
+<div class="accordion" id="pastQuestsAccordion">
+    <div class="accordion-item">
+        <h2 class="accordion-header" id="headingPastQuests">
+            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapsePastQuests">
+                Quest History
+            </button>
+        </h2>
+        <div id="collapsePastQuests" class="accordion-collapse collapse" data-bs-parent="#pastQuestsAccordion">
+            <div class="accordion-body">
+                {% for task in past_quests %}
+                    <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                        <div>
+                            <div class="fw-bold">{{ task.obj.title }}</div>
+                            <div class="text-muted small">{{ task.obj.subject.name }} | {{ task.type|title }} | {{ task.obj.due_date|date:"D, d M" }} </div>
+                        </div>
+                        <div class="text-end">
+                            <!-- ================= START: THE DEFINITIVE, SYNTAX-CORRECT LOGIC ================= -->
+                            {% if task.status == "COMPLETED" %}
+                                
+                                {# Check for Assignments: Graded if 'grade' is not None #}
+                                {% if task.type == 'assignment' %}
+                                    {% if task.submission.grade is not None %}
+                                        <div class="d-flex align-items-center">
+                                            <div class="me-3 text-end"><div class="fw-bold text-success">{{ task.submission.grade|floatformat:1 }} / {{ task.obj.get_total_marks }}</div></div>
+                                            <a href="{% url 'view_assignment_result' task.submission.id %}" class="btn btn-sm btn-outline-primary"><i class="fas fa-eye"></i></a>
+                                        </div>
+                                    {% else %}
+                                        {# This case is rare for assignments but good to have #}
+                                        <span class="badge bg-warning text-dark">Pending Grade</span>
+                                    {% endif %}
+                                
+                                {# Check for Assessments/Exams: Graded if 'is_graded' is True #}
+                                {% else %}
+                                    {% if task.submission.is_graded %}
+                                        <div class="d-flex align-items-center">
+                                            <div class="me-3 text-end"><div class="fw-bold text-success">{{ task.submission.score|floatformat:1 }} / {{ task.obj.get_total_marks }}</div></div>
+                                            {% if task.type == 'assessment' %}<a href="{% url 'view_assessment_result' task.submission.id %}" class="btn btn-sm btn-outline-primary"><i class="fas fa-eye"></i></a>
+                                            {% elif task.type == 'exam' %}<a href="{% url 'view_exam_result' task.submission.id %}" class="btn btn-sm btn-outline-primary"><i class="fas fa-eye"></i></a>
+                                            {% endif %}
+                                        </div>
+                                    {% else %}
+                                        <span class="badge bg-warning text-dark">Pending Grade</span>
+                                    {% endif %}
+                                {% endif %}
+
+                            {% elif task.status == "OVERDUE" %}
+                                <span class="badge bg-danger">Overdue</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Archived</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% empty %}
+                    <p class="text-muted text-center">No past quests found.</p>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
 {% endif %}

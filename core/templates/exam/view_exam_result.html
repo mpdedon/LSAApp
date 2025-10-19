@@ -1,0 +1,60 @@
+<!-- ENHANCED FILE: templates/student/view_exam_results.html -->
+{% extends "base.html" %}
+
+{% block extra_head %}
+<style>
+    body { background-color: #f9f9f9; }
+    .results-card { border: none; border-radius: 12px; box-shadow: 0 8px 30px rgba(0,0,0,0.08); overflow: hidden; }
+    .results-header { background: linear-gradient(135deg, #d62828, #f77f00); color: white; padding: 2rem; } /* Changed gradient for exams */
+    .results-header h2 { font-weight: 700; }
+    .score-circle { width: 150px; height: 150px; border-radius: 50%; background-color: rgba(255,255,255,0.1); display: flex; flex-direction: column; align-items: center; justify-content: center; margin: 1.5rem auto; }
+    .score-circle .score { font-size: 2.5rem; font-weight: 700; line-height: 1; }
+    .score-circle .total { font-size: 1rem; opacity: 0.8; }
+    .question-block { border: 1px solid #e9ecef; border-radius: 8px; }
+    .question-block-header { display: flex; justify-content: space-between; align-items: center; background-color: #f8f9fa; padding: 0.75rem 1.25rem; border-bottom: 1px solid #e9ecef; }
+    .answer-section { padding: 1.25rem; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="container my-5">
+    <div class="results-card">
+        <!-- Header Section -->
+        <div class="results-header text-center">
+            <h2 class="display-5">{{ exam.title }}</h2>
+            <p class="lead mb-0">Results for {{ submission.student.user.get_full_name }}</p>
+        </div>
+
+        <div class="card-body p-4 p-md-5">
+            <!-- Score Summary -->
+            <div class="score-circle">
+                <div class="score">{{ submission.score|floatformat:1 }}</div>
+                <div class="total">out of {{ exam.get_total_marks }}</div>
+            </div>
+            <hr class="my-5">
+
+            <!-- Detailed Question Breakdown -->
+            <h3 class="text-center mb-4">Question Breakdown</h3>
+            {% for result in results_data %}
+                <div class="question-block mb-4">
+                    <div class="question-block-header">
+                        <h6 class="mb-0">Question {{ forloop.counter }}</h6>
+                        {% if result.is_correct %}<span class="badge bg-success-subtle text-success-emphasis rounded-pill"><i class="fas fa-check-circle me-1"></i> Correct</span>
+                        {% else %}<span class="badge bg-danger-subtle text-danger-emphasis rounded-pill"><i class="fas fa-times-circle me-1"></i> Incorrect</span>
+                        {% endif %}
+                    </div>
+                    <div class="answer-section">
+                        <p class="mb-3"><strong>{{ result.question_text|safe }}</strong></p>
+                        <div class="your-answer"><span class="text-muted">Your Answer:</span> <strong class="{% if result.is_correct %}text-success{% else %}text-danger{% endif %} ms-2">{{ result.student_answer|join:", "|default:"Not Answered" }}</strong></div>
+                        {% if not result.is_correct and result.correct_answer %}<div class="correct-answer mt-2"><span class="text-muted small">Correct Answer:</span> <strong class="text-success small ms-2">{{ result.correct_answer }}</strong></div>{% endif %}
+                    </div>
+                </div>
+            {% endfor %}
+
+            <div class="text-center mt-5">
+                <a href="{{ request.META.HTTP_REFERER|default:'/' }}" class="btn btn-secondary"><i class="fas fa-arrow-left me-1"></i> Back</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,18 @@
+<!-- lsalms/templates/partials/completion_section_v2.html -->
+{% if is_completed %}
+    <div class="illustration-container">
+        <img src="https://storage.googleapis.com/lsalms-media/undraw_road_to_knowledge.svg" alt="Course Progress">
+    </div>
+    <h2 class="text-success"><i class="bi bi-check-circle-fill"></i> Lesson Completed!</h2>
+    <p class="lead text-muted">You're one step closer to mastering this course.</p>
+{% else %}
+    <h3>Ready to complete this lesson?</h3>
+    <p class="text-muted">Click the button below to save your progress and move forward.</p>
+    <button class="btn btn-success btn-lg px-5 py-3"
+            hx-post="{% url 'lsalms:mark_lesson_complete' pk=lesson.id %}"
+            hx-target="#completion-section"
+            hx-swap="innerHTML">
+        <span class="htmx-indicator spinner-border spinner-border-sm me-2"></span>
+        Mark as Complete!
+    </button>
+{% endif %}

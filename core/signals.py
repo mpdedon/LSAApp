@@ -8,7 +8,7 @@ from core.models import StudentFeeRecord, Payment, FinancialRecord, Term, Studen
 from core.models import (
     Assessment, Exam, Assignment, 
     AssessmentSubmission, ExamSubmission, AssignmentSubmission,
-    Student, AcademicAlert
+    Student, AcademicAlert, SubjectResult
 )
 
 from django.core.mail import send_mail, EmailMultiAlternatives
@@ -443,3 +443,110 @@ def exam_submission_notifier(sender, instance, created, **kwargs):
 def assignment_submission_notifier(sender, instance, created, **kwargs):
     if created:
         _create_notifications_for_submission(instance, 'assignment', instance.assignment.title, instance.assignment.id, 'Assignment')
+
+# Helper function for linking Assignemnt, Assessment and Exam to SubjectResult
+def _update_subject_result(submission, related_item, item_type):
+    """
+    Helper function to update SubjectResult from a submission.
+    `related_item` is either an Assessment or Exam instance.
+    """
+    if submission.is_graded and related_item.result_field_mapping:
+        student = submission.student
+        
+        # 1. Get or create the main Result object for the student and term
+        result_sheet, _ = Result.objects.get_or_create(student=student, term=related_item.term)
+
+        # 2. Get or create the specific SubjectResult entry
+        subject_result, _ = SubjectResult.objects.get_or_create(
+            result=result_sheet,
+            subject=related_item.subject
+        )
+
+        # 3. Define max scores based on the target field
+        max_score_for_field = {
+            'continuous_assessment_1': Decimal('10.0'),
+            'continuous_assessment_2': Decimal('10.0'),
+            'continuous_assessment_3': Decimal('10.0'),
+            'assignment': Decimal('10.0'),
+            'oral_test': Decimal('20.0'),
+            'exam_score': Decimal('40.0'),
+        }.get(related_item.result_field_mapping, Decimal('0.0'))
+
+        if max_score_for_field == Decimal('0.0'):
+            return # Mapping is invalid or not found
+
+        # 4. Calculate the scaled score
+        total_possible_marks = related_item.get_total_marks
+        if total_possible_marks > 0 and submission.score is not None:
+            scaled_score = (Decimal(submission.score) / Decimal(total_possible_marks)) * max_score_for_field
+        else:
+            scaled_score = Decimal('0.0')
+
+        # 5. Update the SubjectResult field and save
+        setattr(subject_result, related_item.result_field_mapping, scaled_score)
+        subject_result.save()
+        
+        # Optional: Recalculate the overall term summary after updating a component
+        result_sheet.calculate_term_summary()
+
+@receiver(post_save, sender=AssignmentSubmission)
+def update_subject_result_from_assignment(sender, instance, **kwargs):
+    _update_subject_result(instance, instance.assignmenet, 'Assignment')
+
+
+def _update_subject_result_with_best_attempt(SubmissionModel, instance, related_item, item_type_str):
+    """
+    Generic helper that finds the highest scoring attempt and updates the SubjectResult.
+    """
+    if not (instance.is_graded and related_item.result_field_mapping):
+        return
+
+    # Find the highest scoring, completed submission for this student and item
+    best_submission = SubmissionModel.objects.filter(
+        **{item_type_str: related_item},
+        student=instance.student,
+        is_completed=True,
+        is_graded=True,
+        score__isnull=False
+    ).order_by('-score').first()
+
+    if not best_submission:
+        return
+
+    # Now proceed with the scaling logic, but use the score from the best_submission
+    # ... (The rest of the logic is the same as the _update_subject_result helper from before,
+    # just ensure you use `best_submission.score` for the calculation) ...
+    
+    result_sheet, _ = Result.objects.get_or_create(student=instance.student, term=related_item.term)
+    subject_result, _ = SubjectResult.objects.get_or_create(result=result_sheet, subject=related_item.subject)
+    
+    MAX_SCORES = {
+        'continuous_assessment_1': Decimal('10.0'), 'continuous_assessment_2': Decimal('10.0'),
+        'continuous_assessment_3': Decimal('10.0'), 'assignment': Decimal('10.0'),
+        'exam_score': Decimal('40.0'),
+    }
+    target_max_score = MAX_SCORES.get(related_item.result_field_mapping)
+    if not target_max_score: return
+
+    total_possible_marks = related_item.get_total_marks
+    scaled_score = Decimal('0.0')
+    if total_possible_marks > 0:
+        student_best_score = Decimal(best_submission.score)
+        scaled_score = (student_best_score / Decimal(total_possible_marks)) * target_max_score
+
+    setattr(subject_result, related_item.result_field_mapping, scaled_score)
+    subject_result.save()
+    result_sheet.calculate_term_summary()
+
+
+@receiver(post_save, sender=AssignmentSubmission)
+def update_subject_result_from_assignment(sender, instance, **kwargs):
+    _update_subject_result(instance, instance.assignmenet, 'Assignment')
+
+@receiver(post_save, sender=AssessmentSubmission)
+def update_assessment_result(sender, instance, **kwargs):
+    _update_subject_result_with_best_attempt(AssessmentSubmission, instance, instance.assessment, 'assessment')
+
+@receiver(post_save, sender=ExamSubmission)
+def update_exam_result(sender, instance, **kwargs):
+    _update_subject_result_with_best_attempt(ExamSubmission, instance, instance.exam, 'exam')

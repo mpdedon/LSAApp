@@ -13,12 +13,29 @@ class ExamForm(forms.ModelForm):
         required=False,
     )
 
+    due_date = forms.DateTimeField(
+        widget=forms.DateTimeInput(attrs={'type': 'datetime-local', 'class': 'form-control'}, format='%Y-%m-%dT%H:%M'),
+        input_formats=['%Y-%m-%dT%H:%M']
+    )
+    duration = forms.IntegerField(
+        widget=forms.NumberInput(attrs={'class': 'form-control', 'placeholder': 'e.g., 60'}),
+        min_value=1
+    )
+
     class Meta:
         model = Exam
-        fields = ['term', 'subject', 'title', 'short_description', 'class_assigned', 'due_date', 'duration', 'questions']
+        fields = ['term', 'subject', 'title', 'short_description', 'class_assigned', 
+                  'due_date', 'duration', 'questions', 'result_field_mapping', 'shuffle_questions']
         widgets = {
+            'title': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter the title of the exam'}),
+            'short_description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Provide a brief description'}),
+            'class_assigned': forms.Select(attrs={'class': 'form-select'}),
+            'subject': forms.Select(attrs={'class': 'form-select'}),
+            'term': forms.Select(attrs={'class': 'form-select'}),
             'due_date': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
             'duration': forms.NumberInput(attrs={'placeholder': 'Duration in minutes'}),
+            'shuffle_questions': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+
         }
 
         def __init__(self, *args, **kwargs):
@@ -35,8 +52,23 @@ class ExamForm(forms.ModelForm):
 class OnlineQuestionForm(forms.ModelForm):
     class Meta:
         model = OnlineQuestion
-        fields = ['question_type', 'question_text', 'options', 'correct_answer']
+        fields = ['question_type', 'question_text', 'options', 'correct_answer', 'points']
 
+    def clean(self):
+        cleaned_data = super().clean()
+        question_type = cleaned_data.get('question_type')
+        points = cleaned_data.get('points')
+
+        if question_type in ['SCQ', 'MCQ']:
+            if not points:  # Catches None, 0, or empty
+                cleaned_data['points'] = 1
+
+        elif question_type == 'ES':
+            if not points or points <= 0:
+                self.add_error('points', 'A point value greater than zero is required for Essay questions.')
+        
+        return cleaned_data
+    
     def clean_options(self):
         options = self.cleaned_data.get('options')
         question_type = self.cleaned_data.get('question_type')

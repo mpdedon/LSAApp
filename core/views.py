@@ -4,7 +4,7 @@ from django.contrib.auth.mixins import UserPassesTestMixin
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.urls import reverse, reverse_lazy
 from django.db import IntegrityError, transaction
-from django.db.models import Count, Sum, Q, F, Window, OuterRef, Subquery, IntegerField, Value, Prefetch
+from django.db.models import Count, Sum, Q, F, Window, OuterRef, Subquery, IntegerField, Value, Prefetch, Max
 from django.db.models.functions import Rank, Coalesce
 from django.contrib import messages
 from django.views.generic import ListView, CreateView, DetailView, UpdateView, DeleteView, TemplateView, FormView
@@ -1884,6 +1884,7 @@ def _process_newly_added_questions(request, assessment, question_name_prefix='ne
         q_text_key = f'{question_name_prefix}text_{question_number}'
         q_options_key = f'{question_name_prefix}options_{question_number}'
         q_correct_key = f'{question_name_prefix}correct_answer_{question_number}'
+        q_points_key = f'{question_name_prefix}points_{question_number}'
 
         if q_type_key not in request.POST and q_text_key not in request.POST : # Check if any primary field for this new question number exists
             break
@@ -1892,6 +1893,7 @@ def _process_newly_added_questions(request, assessment, question_name_prefix='ne
         question_text = request.POST.get(q_text_key, '').strip()
         options_str = request.POST.get(q_options_key, '')
         correct_answer_str = request.POST.get(q_correct_key, '').strip()
+        points_str = request.POST.get(q_points_key)
 
         if not question_text and not question_type: # Skip if completely empty entry from JS
              question_number += 1
@@ -1907,7 +1909,8 @@ def _process_newly_added_questions(request, assessment, question_name_prefix='ne
             'question_type': question_type,
             'question_text': question_text,
             'options': options_list,
-            'correct_answer': correct_answer_str if correct_answer_str else None
+            'correct_answer': correct_answer_str if correct_answer_str else None,
+            'points': points_str if points_str else None
         }
         
         question_form = OnlineQuestionForm(form_data)
@@ -1927,6 +1930,62 @@ def _process_newly_added_questions(request, assessment, question_name_prefix='ne
     if questions_successfully_added == 0 and f'{question_name_prefix}type_1' in request.POST:
         if not errors: errors.append("Attempted to add new questions, but none were valid or saved.")
     return errors
+
+
+@user_passes_test(lambda u: u.is_superuser or hasattr(u, 'teacher'))
+@login_required
+def grant_retake(request, item_type, item_id, student_id):
+    """
+    Grants a retake for a student on a specific Assessment or Exam.
+    This creates a new, blank submission record with an incremented attempt number.
+    """
+    student = get_object_or_404(Student, pk=student_id)
+    
+    # Determine which models to use based on the URL parameter
+    if item_type.lower() == 'assessment':
+        ItemModel = Assessment
+        SubmissionModel = AssessmentSubmission
+        redirect_url_name = 'assessment_submissions_list'
+        id_kwarg = 'assessment_id'
+    elif item_type.lower() == 'exam':
+        ItemModel = Exam
+        SubmissionModel = ExamSubmission
+        redirect_url_name = 'exam_submissions_list'
+        id_kwarg = 'exam_id'
+    else:
+        messages.error(request, "Invalid item type specified for retake.")
+        return redirect('school-setup')
+
+    item = get_object_or_404(ItemModel, id=item_id)
+    
+    # Authorization: Ensure teacher is assigned to the class (optional but recommended)
+    # ...
+
+    if request.method == 'POST':
+        # Find the highest existing attempt number for this student and item
+        max_attempt = SubmissionModel.objects.filter(
+            **{item_type.lower(): item}, student=student
+        ).aggregate(Max('attempt_number'))['attempt_number__max'] or 0
+        
+        new_attempt_number = max_attempt + 1
+
+        # Create the new, blank, incomplete submission record
+        SubmissionModel.objects.create(
+            **{item_type.lower(): item},
+            student=student,
+            attempt_number=new_attempt_number,
+        )
+
+        messages.success(request, f"Retake (Attempt #{new_attempt_number}) has been granted to {student.user.get_full_name()}.")
+        return redirect(redirect_url_name, **{id_kwarg: item.id})
+
+    # For the confirmation page (GET request)
+    context = {
+        'item': item,
+        'student': student,
+        'item_type': item_type,
+    }
+    return render(request, 'setup/grant_retake_confirm.html', context)
 
 # --- Create Assessment View ---
 @login_required
@@ -1987,16 +2046,23 @@ def create_assessment(request):
 def update_assessment(request, assessment_id):
     assessment = get_object_or_404(Assessment, id=assessment_id)
     user = request.user
-    teacher_profile = Teacher.objects.filter(user=user).first()
+    
+    # Authorization check (can be simplified and made more robust)
+    is_creator = assessment.created_by == user
+    is_form_teacher = False
+    if hasattr(user, 'teacher'):
+        form_teacher_of_class = assessment.class_assigned.form_teacher()
+        if form_teacher_of_class and form_teacher_of_class == user.teacher:
+            is_form_teacher = True
 
-    # Authorization
-    if not (user.is_superuser or assessment.created_by == user):
+    if not (user.is_superuser or is_creator or is_form_teacher):
         messages.error(request, "You are not authorized to update this assessment.")
         return redirect('home')
 
-    if teacher_profile and not user.is_superuser :
-        assigned_classes_qs = teacher_profile.assigned_classes()
-        assigned_subjects_qs = teacher_profile.assigned_subjects()
+    # Get available classes/subjects for the form dropdowns
+    if hasattr(user, 'teacher') and not user.is_superuser:
+        assigned_classes_qs = user.teacher.assigned_classes()
+        assigned_subjects_qs = user.teacher.assigned_subjects()
     else: 
         assigned_classes_qs = Class.objects.all()
         assigned_subjects_qs = Subject.objects.all()
@@ -2008,27 +2074,25 @@ def update_assessment(request, assessment_id):
 
         if form.is_valid():
             updated_assessment = form.save(commit=False)
-            if user.is_superuser and not assessment.is_approved: 
-                 updated_assessment.is_approved = True
-                 updated_assessment.approved_by = user
             updated_assessment.updated_at = timezone.now()
             updated_assessment.save()
 
             all_errors = []
 
-            # 1. Update Existing Questions
-            submitted_existing_ids = set()
+            # --- FIX 3: THE SMARTER EXISTING QUESTION PROCESSING LOOP ---
             for q_instance in assessment.questions.all():
                 q_id = q_instance.id
-                # Check if data for this existing question was submitted for update
-                # (Assumes edit form fields are named question_ID_text, etc.)
-                if f'question_{q_id}_text' in request.POST or f'question_{q_id}_type' in request.POST:
-                    submitted_existing_ids.add(q_id)
+                
+                # We only process an existing question if its text is submitted in the POST.
+                # This check prevents validation errors when only saving assessment details.
+                submitted_text = request.POST.get(f'question_{q_id}_text')
+                if submitted_text is not None:
                     data_for_existing = {
                         'question_type': request.POST.get(f'question_{q_id}_type'),
-                        'question_text': request.POST.get(f'question_{q_id}_text', '').strip(),
+                        'question_text': submitted_text.strip(),
                         'options': [opt.strip() for opt in request.POST.get(f'question_{q_id}_options', '').split(',') if opt.strip()],
-                        'correct_answer': request.POST.get(f'question_{q_id}_correct_answer', '').strip() or None
+                        'correct_answer': request.POST.get(f'question_{q_id}_correct_answer', '').strip() or None,
+                        'points': request.POST.get(f'question_{q_id}_points') # Pass points
                     }
                     q_form = OnlineQuestionForm(data_for_existing, instance=q_instance)
                     if q_form.is_valid():
@@ -2037,30 +2101,33 @@ def update_assessment(request, assessment_id):
                         for field, field_errors in q_form.errors.items():
                             all_errors.append(f"Existing Question ID {q_id} ({field.replace('_',' ').title()}): {', '.join(field_errors)}")
             
-            deleted_ids_str = request.POST.get('deleted_question_ids', '') # e.g., "12,15,20"
+            # --- Logic for Deleted and New Questions (remains the same) ---
+            deleted_ids_str = request.POST.get('deleted_question_ids', '')
             if deleted_ids_str:
                 deleted_ids = [int(id_str) for id_str in deleted_ids_str.split(',') if id_str.isdigit()]
                 assessment.questions.remove(*deleted_ids) 
-                OnlineQuestion.objects.filter(id__in=deleted_ids, assessments=None).delete() # Optional: delete orphaned questions
+                OnlineQuestion.objects.filter(id__in=deleted_ids, assessments=None).delete()
 
             new_question_errors = _process_newly_added_questions(request, assessment, question_name_prefix='new_question_')
             all_errors.extend(new_question_errors)
 
+            # --- Redirect or Re-render Logic (remains the same) ---
             if not all_errors:
                 messages.success(request, "Assessment updated successfully.")
                 return redirect('view_assessment', assessment_id=assessment.id)
             else:
-                messages.error(request, "Errors occurred. Please review.")
-        # If form is invalid or errors occurred, re-render with context
+                messages.error(request, "Errors occurred while processing questions. Please review.")
+        
+        # If form is invalid or question processing had errors, re-render the page
         current_questions = assessment.questions.all().order_by('id')
         return render(request, 'assessment/update_assessment.html', {
             'form': form, 
             'assessment': assessment,
             'questions': current_questions,
-            'processing_errors': all_errors if 'all_errors' in locals() and all_errors else [] 
+            'processing_errors': all_errors if 'all_errors' in locals() else [] 
         })
 
-    else: 
+    else: # GET request
         form = AssessmentForm(instance=assessment)
         form.fields['class_assigned'].queryset = assigned_classes_qs
         form.fields['subject'].queryset = assigned_subjects_qs
@@ -2152,22 +2219,27 @@ def admin_delete_assessment(request, assessment_id):
 # views.py
 @login_required
 def assessment_submissions_list(request, assessment_id):
-    assessment = get_object_or_404(Assessment, id=assessment_id)
+    assessment = get_object_or_404(Assessment.objects.select_related('class_assigned'), id=assessment_id)
 
     # Authorization: Superuser or creator of the assessment
     if not (request.user.is_superuser or assessment.created_by == request.user):
         messages.error(request, "You are not authorized to view submissions for this assessment.")
         return redirect('admin_assessment_list') # Or appropriate redirect
 
-    submissions = AssessmentSubmission.objects.filter(assessment=assessment)\
-                                          .select_related('student__user')\
-                                          .order_by('-submitted_at')
+    all_enrolled_students = Student.objects.filter(
+        current_class=assessment.class_assigned
+    ).select_related('user').order_by('user__last_name', 'user__first_name')
+
+    submissions = AssessmentSubmission.objects.filter(assessment=assessment)
+    submissions_map = {sub.student.pk: sub for sub in submissions}
     
     pending_manual_grade_count = submissions.filter(requires_manual_review=True, is_graded=False).count()
 
     context = {
         'assessment': assessment,
+        'all_enrolled_students': all_enrolled_students,
         'submissions': submissions,
+        'submissions_map': submissions_map,
         'pending_manual_grade_count': pending_manual_grade_count,
     }
     return render(request, 'assessment/assessment_submissions_list.html', context)
@@ -2489,21 +2561,27 @@ def admin_delete_exam(request, exam_id):
 # views.py
 @login_required
 def exam_submissions_list(request, exam_id):
-    exam = get_object_or_404(Exam, id=exam_id)
+    exam = get_object_or_404(Exam.objects.select_related('class_assigned'), id=exam_id)
 
+    # Authorization: Superuser or creator of the exam
     if not (request.user.is_superuser or exam.created_by == request.user):
         messages.error(request, "You are not authorized to view submissions for this exam.")
         return redirect('admin_exam_list') # Or appropriate redirect
 
-    submissions = ExamSubmission.objects.filter(exam=exam)\
-                                          .select_related('student__user')\
-                                          .order_by('-submitted_at')
+    all_enrolled_students = Student.objects.filter(
+        current_class=exam.class_assigned
+    ).select_related('user').order_by('user__last_name', 'user__first_name')
+
+    submissions = ExamSubmission.objects.filter(exam=exam)
+    submissions_map = {sub.student.pk: sub for sub in submissions}
     
     pending_manual_grade_count = submissions.filter(requires_manual_review=True, is_graded=False).count()
 
     context = {
         'exam': exam,
+        'all_enrolled_students': all_enrolled_students,
         'submissions': submissions,
+        'submissions_map': submissions_map,
         'pending_manual_grade_count': pending_manual_grade_count,
     }
     return render(request, 'exam/exam_submissions_list.html', context)

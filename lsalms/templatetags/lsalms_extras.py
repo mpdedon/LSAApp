@@ -1,5 +1,7 @@
 # lsalms/templatetags/lsalms_extras.py
 from django import template
+from django.utils.safestring import mark_safe
+import re
 from ..models import Lesson, Course
 
 register = template.Library()
@@ -24,3 +26,26 @@ def class_name(value):
         return value.Meta.model.__name__
     # Otherwise, get the class name from the object instance itself
     return value.__class__.__name__
+
+
+
+@register.filter(name='youtube_embed_url')
+def youtube_embed_url(value):
+    """
+    Converts a YouTube 'watch' URL to an 'embed' URL.
+    Example: https://www.youtube.com/watch?v=dQw4w9WgXcQ -> https://www.youtube.com/embed/dQw4w9WgXcQ
+    """
+    if "youtube.com/watch?v=" in value:
+        # Use regex to find the video ID for robustness
+        match = re.search(r"v=([^&]+)", value)
+        if match:
+            video_id = match.group(1)
+            return f"https://www.youtube.com/embed/{video_id}"
+    # If it's already an embed link or not a youtube link, return it as is.
+    return value
+
+
+@register.filter
+def in_set(value, arg):
+    """Checks if a value is present in a set."""
+    return value in arg

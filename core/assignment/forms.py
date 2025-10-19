@@ -10,13 +10,18 @@ class AssignmentForm(forms.ModelForm):
     )
     class Meta:
         model = Assignment
-        fields = ['title', 'description', 'class_assigned', 'subject', 'due_date']
+        fields = [
+            'term', 'teacher', 'title', 'description', 'subject', 
+            'class_assigned', 'due_date', 'duration', 'active',
+            'result_field_mapping', 'shuffle_questions'
+        ]
         widgets = {
             'title': forms.TextInput(attrs={'class': 'form-control'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 2}),
             'class_assigned': forms.Select(attrs={'class': 'form-control'}),
             'subject': forms.Select(attrs={'class': 'form-control'}),
-            'due_date': forms.DateInput(attrs={'class': 'form-control', 'type': 'date'}),
+            'due_date': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
+            'shuffle_questions': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
 
 

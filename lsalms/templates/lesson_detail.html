@@ -1,136 +1,201 @@
 {% extends 'base.html' %}
+{% load lsalms_extras %}
 
-{% block title %}Lesson: {{ lesson.title }}{% endblock %}
+{% block extra_css %}
+<style>
+    /* Duolingo/Khan Academy Inspired Theme */
+    :root {
+        --theme-bg: #f7f9fa;
+        --theme-primary: #58a700; /* Duolingo Green */
+        --theme-primary-hover: #69c800;
+        --theme-secondary: #1cb0f6; /* Duolingo Blue */
+        --theme-text: #4c4c4c;
+        --theme-border: #e5e5e5;
+    }
+    body { background-color: var(--theme-bg); color: var(--theme-text); }
+    .lesson-content-card {
+        background-color: white;
+        border: 1px solid var(--theme-border);
+        border-radius: 1rem;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+    .content-block-card {
+        background-color: #ffffff;
+        border: 1px solid var(--theme-border);
+        border-radius: .75rem;
+    }
+    .sidebar-card {
+        background-color: white;
+        border: 1px solid var(--theme-border);
+        border-radius: 1rem;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+    }
+    .btn-complete {
+        background-color: var(--theme-primary);
+        color: white;
+        border: none;
+        font-weight: bold;
+        padding: 1rem;
+        width: 100%;
+        transition: background-color 0.2s;
+    }
+    .btn-complete:hover {
+        background-color: var(--theme-primary-hover);
+        color: white;
+    }
+    .sidebar-nav-item.active {
+        background-color: #e9f7df; /* Light green highlight */
+        border-left: 4px solid var(--theme-primary);
+    }
+</style>
+{% endblock %}
+
+
+{% block title %}{{ lesson.title }} | {{ course.get_course_title }}{% endblock %}
 
 {% block content %}
-<div class="container my-5">
-    <div class="row justify-content-center">
-        <div class="col-lg-9">
-            <!-- Lesson Header -->
-            <div class="mb-4">
+<div class="container-fluid my-4">
+    <div class="row g-4">
+        <!-- ============================================= -->
+        <!-- =           MAIN CONTENT COLUMN             = -->
+        <!-- ============================================= -->
+        <div class="col-lg-8">
+            <div class="lesson-content-card p-4 p-md-5">
+                <!-- Header -->
                 <nav aria-label="breadcrumb">
                     <ol class="breadcrumb">
-                        <li class="breadcrumb-item"><a href="{% url 'student_dashboard' %}">Dashboard</a></li>
-                        <li class="breadcrumb-item"><a href="{% url 'lsalms:course_detail' slug=lesson.module.course.slug %}">{{ lesson.module.course.title }}</a></li>
+                        <li class="breadcrumb-item"><a href="{% url 'lsalms:course_detail' slug=course.slug %}">{{ course.get_course_title }}</a></li>
                         <li class="breadcrumb-item active" aria-current="page">{{ lesson.title }}</li>
                     </ol>
                 </nav>
-                <h1 class="fw-bold">{{ lesson.title }}</h1>
-            </div>
+                <h1 class="display-5 fw-bold mb-4">{{ lesson.title }}</h1>
 
-            <!-- Content Blocks -->
-            {% for block in lesson.content_blocks.all %}
-                <div class="card shadow-sm mb-4">
-                    <div class="card-header bg-light">
-                        <h5 class="mb-0">{{ block.title }}</h5>
+                <!-- Content Blocks Loop -->
+                {% for block in lesson.content_blocks.all %}
+                <div class="content-block-card mb-4">
+                    <div class="card-header bg-light fw-bold border-bottom-0">
+                        {{ block.title }}
                     </div>
                     <div class="card-body">
                         {% if block.content_type == 'TEXT' %}
-                            {{ block.rich_text|safe }}
+                            <div class="fs-5 lh-lg">{{ block.rich_text|safe }}</div>
                         {% elif block.content_type == 'VIDEO' and block.media_url %}
-                            <div class="ratio ratio-16x9">
-                                <iframe src="{{ block.media_url }}" title="{{ block.title }}" allowfullscreen></iframe>
+                            <div class="ratio ratio-16x9 rounded overflow-hidden">
+                                <iframe src="{{ block.media_url|youtube_embed_url }}" title="{{ block.title }}" allowfullscreen></iframe>
                             </div>
                         {% elif block.content_type == 'IMAGE' and block.media_file %}
                             <img src="{{ block.media_file.url }}" class="img-fluid rounded" alt="{{ block.title }}">
                         {% elif block.content_type == 'FILE' and block.media_file %}
-                            <a href="{{ block.media_file.url }}" class="btn btn-outline-primary" download>
-                                <i class="fas fa-download me-2"></i>Download: {{ block.title }}
-                            </a>
-                        {% elif block.content_type == 'ASSIGNMENT' and block.linked_assignment %}
-                            <div class="alert alert-info">
-                                <h4 class="alert-heading">Graded Assignment</h4>
-                                <p>This lesson includes a graded assignment: <strong>{{ block.linked_assignment.title }}</strong>.</p>
-                                <hr>
-                                <a href="#" class="btn btn-primary">Go to Assignment</a>
-                            </div>
+                        <a href="{{ block.media_file.url }}" class="btn btn-lg btn-outline-primary" download>
+                            <i class="bi bi-download me-2"></i>Download {{ block.title }}
+                        </a>
                         {% endif %}
                     </div>
                 </div>
-            {% endfor %}
-            
-            <!-- === ACTION BUTTONS & NAVIGATION (THE FIX) === -->
-            <div class="mt-5 p-4 bg-light rounded d-flex justify-content-between align-items-center">
-                <div>
-                    <h5 class="mb-1">Lesson Complete?</h5>
-                    <p class="mb-0 text-muted">Mark this lesson as complete to update your progress.</p>
-                </div>
-                <!-- 
-                    The button now has an ID for our script to find.
-                    We use data-* attributes to pass necessary info to the script.
-                -->
-                <button id="markCompleteBtn" 
-                        class="btn btn-success btn-lg" 
-                        data-lesson-id="{{ lesson.id }}"
-                        data-complete-url="{% url 'lsalms:mark_lesson_complete' lesson_id=lesson.id %}">
-                    <i class="fas fa-check-circle me-2"></i>Mark as Complete
-                </button>
-            </div>
+                {% endfor %}
 
-            <!-- Optional: Previous/Next Lesson Navigation -->
-            <div class="d-flex justify-content-between mt-4">
-                <a href="#" class="btn btn-outline-secondary">&laquo; Previous Lesson</a>
-                <a href="#" class="btn btn-outline-secondary">Next Lesson &raquo;</a>
+                <hr class="my-5">
+
+                <!-- BUG FIX: Re-added the Navigation Buttons -->
+                <div class="d-flex justify-content-between align-items-center">
+                    {% with prev_lesson=lesson.get_previous_lesson %}
+                        {% if prev_lesson %}
+                            <a href="{% url 'lsalms:lesson_detail' pk=prev_lesson.pk %}" class="btn btn-outline-secondary btn-lg">&laquo; {{ prev_lesson.title|truncatechars:20 }}</a>
+                        {% else %}<span></span>{% endif %}
+                    {% endwith %}
+                    {% with next_lesson=lesson.get_next_lesson %}
+                        {% if next_lesson %}
+                            <a href="{% url 'lsalms:lesson_detail' pk=next_lesson.pk %}" class="btn btn-primary btn-lg">{{ next_lesson.title|truncatechars:20 }} &raquo;</a>
+                        {% else %}
+                             <a href="{% url 'lsalms:course_detail' slug=course.slug %}" class="btn btn-complete">Finish Course!</a>
+                        {% endif %}
+                    {% endwith %}
+                </div>
+
+            </div>
+        </div>
+
+        <!-- ============================================= -->
+        <!-- =           SIDEBAR COLUMN                  = -->
+        <!-- ============================================= -->
+        <div class="col-lg-4">
+            <div class="sidebar-card sticky-top p-4" style="top: 1.5rem;">
+                <h4 class="fw-bold">{{ course.get_course_title }}</h4>
+                <hr>
+                
+                <!-- BUG FIX: Added the working Progress Bar -->
+                <label for="course-progress-bar" class="form-label">Your Progress</label>
+                <div class="progress mb-3" style="height: 1.5rem;">
+                    <div id="course-progress-bar" class="progress-bar fw-bold" role="progressbar" style="width: {{ progress_percent }}%;" aria-valuenow="{{ progress_percent }}">{{ progress_percent }}%</div>
+                </div>
+
+                <!-- BUG FIX: Added the "Mark as Complete" Button section -->
+                <div id="completion-section" class="d-grid gap-2 my-4">
+                     {% include 'partials/completion_section.html' %}
+                </div>
+
+                <h5 class="mt-4">Course Lessons</h5>
+                <!-- Curriculum Navigator -->
+                <div class="list-group">
+                {% for module in course_modules %}
+                    <div class="list-group-item list-group-item-light fw-bold">{{ module.title }}</div>
+                    {% for module_lesson in module.lessons.all %}
+                    <a href="{% url 'lsalms:lesson_detail' pk=module_lesson.pk %}"
+                       class="list-group-item list-group-item-action sidebar-nav-item d-flex align-items-center
+                              {% if module_lesson.id == lesson.id %}active{% endif %}">
+                        {% if module_lesson.id in completed_lesson_ids %}
+                            <i class="bi bi-check-circle-fill text-success me-3 fs-5"></i>
+                        {% else %}
+                            <i class="bi bi-circle me-3 fs-5"></i>
+                        {% endif %}
+                        <span class="flex-grow-1">{{ module_lesson.title }}</span>
+                    </a>
+                    {% endfor %}
+                {% endfor %}
+                </div>
             </div>
         </div>
     </div>
 </div>
 {% endblock %}
 
-
 {% block extra_js %}
+<!-- This celebratory modal is correctly styled and functional -->
+<div class="modal fade" id="lessonCompleteModal" tabindex="-1">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content text-center p-4 border-0 shadow-lg" style="border-radius: 1rem;">
+      <div class="modal-body">
+        <img src="https://storage.googleapis.com/lsalms-media/undraw_confirmation.svg" style="max-width: 250px;" alt="Lesson Complete!">
+        <h2 class="modal-title my-3" style="color: var(--theme-primary);">Lesson Complete!</h2>
+        <p class="lead">Great job! You've unlocked the next step in your learning journey.</p>
+        <button type="button" class="btn btn-lg btn-primary w-100" data-bs-dismiss="modal">Keep Learning</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    const markCompleteBtn = document.getElementById('markCompleteBtn');
-    
-    if (markCompleteBtn) {
-        markCompleteBtn.addEventListener('click', function() {
-            const lessonId = this.dataset.lessonId;
-            const url = this.dataset.completeUrl;
-            const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
-
-            // 1. Provide immediate user feedback
-            this.disabled = true;
-            this.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Saving...`;
-
-            // 2. Send the request to the backend
-            fetch(url, {
-                method: 'POST',
-                headers: {
-                    'X-CSRFToken': csrftoken,
-                    'Content-Type': 'application/json'
-                },
-                // body: JSON.stringify({ lesson_id: lessonId }) // Body is optional if ID is in URL
-            })
-            .then(response => {
-                if (!response.ok) {
-                    // Handle server errors
-                    return response.json().then(err => { throw new Error(err.message || 'Server error') });
-                }
-                return response.json();
-            })
-            .then(data => {
-                // 3. Handle a successful response
-                console.log(data.message);
-                this.classList.remove('btn-success');
-                this.classList.add('btn-outline-success');
-                this.innerHTML = `<i class="fas fa-check-circle me-2"></i>Completed!`;
-                // The button remains disabled to prevent re-submission
-            })
-            .catch(error => {
-                // 4. Handle any errors
-                console.error('Error marking lesson complete:', error);
-                alert(`An error occurred: ${error.message}`);
-                // Re-enable the button so the user can try again
-                this.disabled = false;
-                this.innerHTML = `<i class="fas fa-check-circle me-2"></i>Mark as Complete`;
-            });
-        });
+// This JS is robust and handles the events sent from our backend.
+document.body.addEventListener('htmx:afterSwap', function(evt) {
+    if (evt.detail.xhr.getResponseHeader('HX-Trigger')) {
+        const triggerData = JSON.parse(evt.detail.xhr.getResponseHeader('HX-Trigger'));
+        
+        if (triggerData.showCompletionModal) {
+            const completeModal = new bootstrap.Modal(document.getElementById('lessonCompleteModal'));
+            completeModal.show();
+            confetti({ particleCount: 200, spread: 100, origin: { y: 0.6 }, zIndex: 9999 });
+        }
+        
+        if (triggerData.updateProgress) {
+            const newPercentage = triggerData.updateProgress.newPercentage;
+            const progressBar = document.getElementById('course-progress-bar');
+            if (progressBar) {
+                progressBar.style.width = newPercentage + '%';
+                progressBar.setAttribute('aria-valuenow', newPercentage);
+                progressBar.innerText = newPercentage + '%';
+            }
+        }
     }
 });
 </script>
 {% endblock %}
-
-
-
-                    

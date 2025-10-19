@@ -38,17 +38,19 @@ from core.views import broadsheets, termly_broadsheet, approve_termly_broadsheet
 from core.views import sessional_broadsheets, admin_sessional_broadsheet, approve_sessional_broadsheet, archive_sessional_broadsheet
 from core.views import FeeAssignmentCreateView, FeeAssignmentListView, FeeAssignmentUpdateView, FeeAssignmentDetailView, FeeAssignmentDeleteView, StudentFeeRecordListView
 from core.views import PaymentCreateView, PaymentListView, PaymentUpdateView, PaymentDetailView, PaymentDeleteView, FinancialRecordListView
-from core.views import StudentClassEnrollmentView, StudentEnrollmentsView, message_inbox, message_thread, compose_message
+from core.views import StudentClassEnrollmentView, StudentEnrollmentsView, message_inbox, grant_retake, message_thread, compose_message
 from core.views import AssignSubjectView, AssignTeacherView, AssignClassSubjectView, ClassSubjectRolloverView, DeleteClassSubjectAssigmentView
 from core.views import TeacherAssignmentListView, TeacherAssignmentRolloverView, TeacherAssignmentUpdateView, TeacherAssignmentDetailView, TeacherAssignmentDeleteView
 from core.views import SubjectCreateView, SubjectListView, SubjectUpdateView, SubjectDetailView, SubjectDeleteView
 from core.views import PostCreateView, PostUpdateView, PostDeleteView, ManagePostListView
 from core.views import CategoryCreateView, CategoryUpdateView, ManageCategoryListView, TagCreateView, TagUpdateView, ManageTagListView
 from core.student.views import StudentListView, StudentCreateView, StudentUpdateView, StudentDetailView, StudentDeleteView, BulkUpdateStudentsView, export_students, student_reports
-from core.student.views import submit_assignment, submit_assessment, submit_exam
+from core.student.views import submit_assignment, start_assignment, take_assignment, autosubmit_beacon_assignment
+from core.student.views import submit_assessment, start_assessment, take_assessment, autosubmit_beacon_assessment
+from core.student.views import submit_exam, start_exam, take_exam, autosubmit_beacon_exam
 from core.teacher.views import TeacherListView, TeacherCreateView, TeacherUpdateView, TeacherDetailView, TeacherDeleteView, TeacherBulkActionView, export_teachers, teacher_reports
 from core.teacher.views import input_scores, broadsheet, sessional_broadsheet, mark_attendance, attendance_log, update_result, view_na_result, grade_essay_questions
-from core.teacher.views import create_assignment, add_question, grade_assignment, view_submitted_assignments, update_assignment, delete_assignment, assignment_detail, assignment_list
+from core.teacher.views import create_assignment, add_question, grade_assignment, assignment_submissions_list, update_assignment, delete_assignment, assignment_detail, assignment_list
 from core.teacher.views import create_assessment, teacher_assessment_list, view_assessment, update_assessment, delete_assessment, grade_essay_assessment
 from core.teacher.views import create_exam, teacher_exam_list, view_exam, update_exam, delete_exam, grade_essay_exam
 from core.guardian.views import GuardianListView, GuardianCreateView, GuardianUpdateView, GuardianDetailView, GuardianDeleteView, GuardianBulkActionView
@@ -90,7 +92,7 @@ urlpatterns = [
     
     # Blog URLS
     path('blog', PostListView.as_view(), name='post_list'),
-    path('post/<slug:slug>/', PostDetailView.as_view(), name='post_detail'), \
+    path('post/<slug:slug>/', PostDetailView.as_view(), name='post_detail'), 
     path('category/<slug:category_slug>/', PostListView.as_view(), name='category_post_list'), 
     path('tag/<slug:tag_slug>/', PostListView.as_view(), name='tag_post_list'),          
     path('author/<str:username>/', PostListView.as_view(), name='author_post_list'),    
@@ -201,19 +203,6 @@ urlpatterns = [
     path('teacher/broadsheet/<int:class_id>/<int:term_id>/', broadsheet, name='broadsheet'),
     path('teachers/export/', export_teachers, name='export_teachers'),
     path('teachers/reports/', teacher_reports, name='teacher_reports'),
-    path('assignments/create/', create_assignment, name='create_assignment'),
-    path('assignments/<int:assignment_id>/questions/add/', add_question, name='add_question'),
-    path('assignments/<int:assignment_id>/submit/', submit_assignment, name='submit_assignment'),
-    path('assignments/', assignment_list, name='assignment_list'),
-    path('assignments/<int:assignment_id>/', assignment_detail, name='assignment_detail'),
-    path('assignments/<int:assignment_id>/delete/', delete_assignment, name='delete_assignment'),
-    path('submissions/<int:submission_id>/grade/', grade_assignment, name='grade_assignment'),
-    path('submissions/<int:submission_id>/grade/', grade_essay_questions, name='grade_essay_questions'),
-    path('assignments/submitted/', view_submitted_assignments, name='view_submitted_assignments'),
-    path('assignments/<int:assignment_id>/edit/', update_assignment, name='update_assignment'),
-    path('assignments/<int:assignment_id>/delete/', delete_assignment, name='delete_assignment'),
-    path('assignment/<int:assignment_id>/result/', view_assignment_result, name='view_assignment_result'),
-
 
     # Guardian URLs
     path('guardians/', GuardianListView.as_view(), name='guardian_list'),
@@ -273,6 +262,23 @@ urlpatterns = [
     path('payments/delete/<int:pk>/', PaymentDeleteView.as_view(), name='delete_payment'),
     path('financial-records/', FinancialRecordListView.as_view(), name='financial_record_list'),
 
+    # Assignment URLs
+    path('assignments/create/', create_assignment, name='create_assignment'),
+    path('assignments/<int:assignment_id>/questions/add/', add_question, name='add_question'),
+    path('assignments/', assignment_list, name='assignment_list'),
+    path('assignments/<int:assignment_id>/', assignment_detail, name='assignment_detail'),
+    path('assignments/<int:assignment_id>/delete/', delete_assignment, name='delete_assignment'),
+    path('submissions/<int:submission_id>/grade/', grade_assignment, name='grade_assignment'),
+    path('submissions/<int:submission_id>/grade/', grade_essay_questions, name='grade_essay_questions'),
+    path('assignment/<int:assignment_id>/submissions/', assignment_submissions_list, name='assignment_submissions_list'),
+    path('assignments/<int:assignment_id>/edit/', update_assignment, name='update_assignment'),
+    path('assignments/<int:assignment_id>/delete/', delete_assignment, name='delete_assignment'),
+    path('assignment/<int:submission_id>/', view_assignment_result, name='view_assignment_result'),
+    path('assignment/<int:assignment_id>/start/', start_assignment, name='start_assignment'),
+    path('assignment/submission/<int:submission_id>/take/', take_assignment, name='take_assignment'),
+    path('assignment/submission/<int:submission_id>/submit/', submit_assignment, name='submit_assignment'),
+    path('assignment/submission/<int:submission_id>/autosubmit-beacon/', autosubmit_beacon_assignment, name='autosubmit_beacon'),
+
     # Assessment URLs
     path('assessments-create/', create_assessment, name='create_assessment'),
     path('assessment/approve/<int:assessment_id>/', approve_assessment, name='approve_assessment'),
@@ -283,10 +289,13 @@ urlpatterns = [
     path('assessment/update/<int:assessment_id>/', update_assessment, name='update_assessment'),
     path('admin-delete/<int:assessment_id>/', admin_delete_assessment, name='admin_delete_assessment'),
     path('assessment/delete/<int:assessment_id>/', delete_assessment, name='delete_assessment'),
-    path('submit-assessment/<int:assessment_id>/', submit_assessment, name='submit_assessment'),
+    path('assessment/<int:assessment_id>/start/', start_assessment, name='start_assessment'),
+    path('submission/<int:submission_id>/take/', take_assessment, name='take_assessment'), 
+    path('assessment/submission/<int:submission_id>/submit/', submit_assessment, name='submit_assessment'),
     path('assessment/<int:assessment_id>/submissions/', assessment_submissions_list, name='assessment_submissions_list'),
+    path('submission/<int:submission_id>/autosubmit-beacon/', autosubmit_beacon_assessment, name='autosubmit_beacon'),
     path('grade-essay-assessment/<int:submission_id>/', grade_essay_assessment, name='grade_essay_assessment'),
-    path('assessment/<int:assessment_id>/result/', view_assessment_result, name='view_assessment_result'),
+    path('assessment/<int:submission_id>/result/', view_assessment_result, name='view_assessment_result'),
 
     # Exam URLs
     path('exams-create/', create_exam, name='create_exam'),
@@ -298,10 +307,16 @@ urlpatterns = [
     path('exam/update/<int:exam_id>/', update_exam, name='update_exam'),
     path('admin-delete/<int:exam_id>/', admin_delete_exam, name='admin_delete_exam'),
     path('exam/delete/<int:exam_id>/', delete_exam, name='delete_exam'),
-    path('submit-exam/<int:exam_id>/', submit_exam, name='submit_exam'),
     path('exam/<int:exam_id>/submissions/', exam_submissions_list, name='exam_submissions_list'),
     path('grade-essay-exam/<int:submission_id>/', grade_essay_exam, name='grade_essay_exam'),
-    path('exam/<int:exam_id>/result/', view_exam_result, name='view_exam_result'),
+    path('exam/<int:submission_id>/result', view_exam_result, name='view_exam_result'),
+    path('exam/<int:exam_id>/start/', start_exam, name='start_exam'),
+    path('exam/submission/<int:submission_id>/take/', take_exam, name='take_exam'),
+    path('exam/submission/<int:submission_id>/submit/', submit_exam, name='submit_exam'),
+    path('exam/submission/<int:submission_id>/autosubmit-beacon/', autosubmit_beacon_exam, name='exam_autosubmit_beacon'),
+    
+    # --- Retake Admin/Teacher URL ---
+    path('retake/grant/<str:item_type>/<int:item_id>/<int:student_id>/', grant_retake, name='grant_retake'),
 
     path('lms/', include('lsalms.urls', namespace='lsalms')),
 ]

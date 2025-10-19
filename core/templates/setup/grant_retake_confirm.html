@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <div class="card">
+        <div class="card-header">
+            <h4>Confirm Retake</h4>
+        </div>
+        <div class="card-body">
+            <p>Are you sure you want to grant a retake for the following?</p>
+            <ul>
+                <li><strong>Student:</strong> {{ student.user.get_full_name }}</li>
+                <li><strong>{{ item_type|title }}:</strong> {{ item.title }}</li>
+            </ul>
+            <form method="post">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-warning">Grant Retake</button>
+                <a href="{{ request.META.HTTP_REFERER|default:'/' }}" class="btn btn-secondary">Cancel</a>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

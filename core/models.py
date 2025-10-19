@@ -664,20 +664,38 @@ class ClassSubjectAssignment(models.Model):
     
 
 class Assignment(models.Model):
+
+    RESULT_FIELD_CHOICES = [
+        ('', 'Do Not Link to Term Result'),
+        ('assignment', 'Assignment (Max 10)'),
+    ]
+    result_field_mapping = models.CharField(
+        max_length=50,
+        choices=RESULT_FIELD_CHOICES,
+        null=True,
+        blank=True,
+        help_text="If set, scores from this assessment will populate the selected field in the student's term result."
+    )
     term = models.ForeignKey('Term', on_delete=models.CASCADE, default=1)
     teacher = models.ForeignKey('Teacher', on_delete=models.CASCADE, default=1)
     title = models.CharField(max_length=255)
     description = models.CharField(max_length=500, null=True, blank=True)
     subject = models.ForeignKey('Subject', on_delete=models.CASCADE)
     class_assigned = models.ForeignKey('Class', related_name='assignments', on_delete=models.CASCADE)
+    duration = models.IntegerField(null=True, blank=True)
     due_date = models.DateTimeField(default=timezone.now)
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(default=timezone.now)
     active = models.BooleanField(default=True)  # To mark assignments as active/inactive
+    shuffle_questions = models.BooleanField(default=False)
+
 
     def has_expired(self):
         """Checks if the assignment is past its due date."""
         return timezone.now() > self.due_date
+    
+    def get_total_marks(self):
+        return self.questions.count()
     
     def __str__(self):
         return f"{self.title} = {self.subject} = {self.class_assigned} = {self.due_date}"
@@ -714,10 +732,13 @@ class AssignmentSubmission(models.Model):
     student = models.ForeignKey('Student', on_delete=models.CASCADE)
     assignment = models.ForeignKey(Assignment, related_name='submissions', on_delete=models.CASCADE)
     submitted_at = models.DateTimeField(default=timezone.now)
-    answers = models.JSONField()  # Store answers as JSON for simplicity
+    answers = models.JSONField(null=True, blank=True) 
     grade = models.FloatField(null=True, blank=True)  
     feedback = models.TextField(null=True, blank=True)  
     is_completed = models.BooleanField(default=False)
+    started_at = models.DateTimeField(null=True, blank=True)
+    force_submitted_at = models.DateTimeField(null=True, blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
 
     def calculate_grade(self):
         """
@@ -757,7 +778,7 @@ class OnlineQuestion(models.Model):
     question_text = models.TextField()
     options = models.JSONField(null=True, blank=True)  # For SCQ/MCQ, store choices as JSON
     correct_answer = models.CharField(max_length=255, null=True, blank=True)  # For SCQ/MCQ correct answer
-    points = models.PositiveIntegerField(default=1)
+    points = models.PositiveIntegerField(default=1, blank=True, null=True)
 
     def __str__(self):
         return self.question_text
@@ -799,6 +820,20 @@ class OnlineQuestion(models.Model):
         return False
     
 class Assessment(models.Model):
+
+    RESULT_FIELD_CHOICES = [
+        ('', 'Do Not Link to Term Result'),
+        ('continuous_assessment_1', 'Continuous Assessment 1 (Max 10)'),
+        ('continuous_assessment_2', 'Continuous Assessment 2 (Max 10)'),
+        ('continuous_assessment_3', 'Continuous Assessment 3 (Max 10)'),
+    ]
+    result_field_mapping = models.CharField(
+        max_length=50,
+        choices=RESULT_FIELD_CHOICES,
+        null=True,
+        blank=True,
+        help_text="If set, scores from this assessment will populate the selected field in the student's term result."
+    )
     term = models.ForeignKey('Term', on_delete=models.CASCADE, default=1)
     subject = models.ForeignKey('Subject', on_delete=models.CASCADE)
     title = models.CharField(max_length=255, null=True)
@@ -806,7 +841,6 @@ class Assessment(models.Model):
     score = models.IntegerField(default=0, null=True, blank=True)
     total_marks = models.PositiveIntegerField(null=True, blank=True, help_text="Total marks possible for this assessment.")
     class_assigned = models.ForeignKey('Class', on_delete=models.CASCADE, default=None)
-    is_online = models.BooleanField(default=True)
     due_date = models.DateTimeField(null=True, blank=True)
     duration = models.IntegerField(null=True, blank=True)
     questions = models.ManyToManyField('OnlineQuestion', related_name='assessments', blank=True)
@@ -815,14 +849,14 @@ class Assessment(models.Model):
     approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="approved_assessments")
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(default=timezone.now)
+    shuffle_questions = models.BooleanField(default=False)
 
     def __str__(self):
         return f"{self.title} - {self.subject.name}"
 
     @property
     def is_due(self):
-        """Check if the online assessment is due for submission."""
-        if self.is_online and self.due_date:
+        if self.due_date:
             return timezone.now() > self.due_date
         return False
 
@@ -830,19 +864,41 @@ class Assessment(models.Model):
     def get_total_marks(self):
         return self.questions.aggregate(total_marks=Sum('points'))['total_marks'] or 0
 
+
 class AssessmentSubmission(models.Model):
     assessment = models.ForeignKey('Assessment', on_delete=models.CASCADE, related_name='submissions_for_assessment')
     student = models.ForeignKey('Student', on_delete=models.CASCADE)
-    answers = models.JSONField()  # Stores the student's answers
+    answers = models.JSONField(null=True, blank=True) 
     score = models.IntegerField(null=True, blank=True)
     submitted_at = models.DateTimeField(default=timezone.now)
     is_graded = models.BooleanField(default=False)
     requires_manual_review = models.BooleanField(default=False)
+    started_at = models.DateTimeField(null=True, blank=True)
+    is_completed = models.BooleanField(default=False)
+    force_submitted_at = models.DateTimeField(null=True, blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    attempt_number = models.PositiveIntegerField(default=1, validators=[MaxValueValidator(3)], help_text="The attempt number for this submission.")
 
     def __str__(self):
         return f"{self.student.user.get_full_name()} - {self.assessment.title}"
+    
+    class Meta:
+        unique_together = ('student', 'assessment', 'attempt_number')
+        
 
 class Exam(models.Model):
+
+    RESULT_FIELD_CHOICES = [
+        ('', 'Do Not Link to Term Result'),
+        ('exam_score', 'Exam Score (Max 40)'),
+    ]
+    result_field_mapping = models.CharField(
+        max_length=50,
+        choices=RESULT_FIELD_CHOICES,
+        null=True,
+        blank=True,
+        help_text="Scores from this exam will populate the 'Exam Score' field in the student's term result."
+    )
     term = models.ForeignKey('Term', on_delete=models.CASCADE, default=1)
     subject = models.ForeignKey('Subject', on_delete=models.CASCADE)
     title = models.CharField(max_length=255, null=True)
@@ -850,7 +906,6 @@ class Exam(models.Model):
     score = models.IntegerField(default=0, null=True, blank=True)
     total_marks = models.PositiveIntegerField(null=True, blank=True, help_text="Total marks possible for this assessment.")
     class_assigned = models.ForeignKey('Class', on_delete=models.CASCADE, default=None)
-    is_online = models.BooleanField(default=True)
     due_date = models.DateTimeField(null=True, blank=True)
     duration = models.IntegerField(null=True, blank=True)
     questions = models.ManyToManyField('OnlineQuestion', related_name='exams', blank=True)
@@ -859,6 +914,8 @@ class Exam(models.Model):
     approved_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="approved_exams")
     created_at = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(default=timezone.now)
+    shuffle_questions = models.BooleanField(default=False)
+
 
     def __str__(self):
         return f"{self.title} - {self.subject.name}"
@@ -866,7 +923,7 @@ class Exam(models.Model):
     @property
     def is_due(self):
         """Check if the online exam is due for submission."""
-        if self.is_online and self.due_date:
+        if self.due_date:
             return timezone.now() > self.due_date
         return False
 
@@ -877,15 +934,24 @@ class Exam(models.Model):
 class ExamSubmission(models.Model):
     exam = models.ForeignKey('Exam', on_delete=models.CASCADE, related_name='submissions_for_exam')
     student = models.ForeignKey('Student', on_delete=models.CASCADE)
-    answers = models.JSONField()  
+    answers = models.JSONField(null=True, blank=True)  
     score = models.IntegerField(null=True, blank=True)
     submitted_at = models.DateTimeField(default=timezone.now)
     is_graded = models.BooleanField(default=False)
     requires_manual_review = models.BooleanField(default=False)
+    started_at = models.DateTimeField(null=True, blank=True)
+    is_completed = models.BooleanField(default=False)
+    force_submitted_at = models.DateTimeField(null=True, blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    attempt_number = models.PositiveIntegerField(default=1, validators=[MaxValueValidator(3)], help_text="The attempt number for this submission.")
+    
+    class Meta:
+        unique_together = ('student', 'exam', 'attempt_number')
 
     def __str__(self):
         return f"{self.student.user.get_full_name()} - {self.exam.title}"
-    
+
+
 class AcademicAlert(models.Model):
     ALERT_TYPE_CHOICES = [
         ('assignment_available', 'Assignment Available'),

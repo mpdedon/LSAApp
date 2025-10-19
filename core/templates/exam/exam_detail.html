@@ -1,44 +1,86 @@
 {% extends 'base.html' %}
-{% load static humanize %} {# No need for custom_string_filters if not used elsewhere #}
+{% load static humanize %}
 
 {% block title %}Details: {{ exam.title }}{% endblock %}
 
 {% block content %}
-<div class="container my-4 main-content-below-navbar">
+<div class="container my-4">
     <div class="card shadow-lg">
-        <div class="card-header bg-primary text-white">
+        <div class="card-header bg-danger text-white"> {# Changed color for Exams #}
             <div class="d-flex justify-content-between align-items-center">
-                <h2 class="mb-0 h4">{{ exam.title }}</h2>
+                <h2 class="mb-0 h4">Exam Details</h2>
                 <div>
-                    <a href="{% url 'update_exam' exam.id %}" class="btn btn-light btn-sm"><i class="fas fa-edit me-1"></i> Edit</a>
+                    <a href="{% url 'update_exam' exam.id %}" class="btn btn-light btn-sm"><i class="fas fa-edit me-1"></i> Edit Exam</a>
                     {% if user.is_superuser and not exam.is_approved %}
                         <button type="button" class="btn btn-success btn-sm ms-2" data-bs-toggle="modal" data-bs-target="#approveModal{{ exam.id }}"><i class="fas fa-check-circle me-1"></i> Approve</button>
                     {% endif %}
                 </div>
             </div>
         </div>
+
         <div class="card-body p-4">
-            <div class="row mb-3"><div class="col-md-6"><p class="mb-1"><strong>Subject:</strong> {{ exam.subject.name }}</p><p class="mb-0"><strong>Class:</strong> {{ exam.class_assigned.name }}</p></div><div class="col-md-6"><p class="mb-1"><strong>Due:</strong> {{ exam.due_date|date:"F d, Y, P"|default:"N/A" }}</p><p class="mb-0"><strong>Duration:</strong> {{ exam.duration|default:"N/A" }} min</p></div></div>
-            {% if exam.short_description %}<p class="text-muted mb-3">{{ exam.short_description|safe }}</p>{% endif %}
-            <p><strong>Status:</strong> <span class="badge {% if exam.is_approved %}bg-success{% else %}bg-warning text-dark{% endif %}">{% if exam.is_approved %}Approved{% else %}Pending Approval{% endif %}</span></p>
+            <h3 class="card-title border-bottom pb-2 mb-3">{{ exam.title }}</h3>
+            {% if exam.short_description %}
+                <p class="text-muted mb-4">{{ exam.short_description|safe }}</p>
+            {% endif %}
+
+            <!-- Reorganized Summary Section -->
+            <div class="row mb-4">
+                <div class="col-md-6">
+                    <h5 class="text-muted">Core Details</h5>
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item ps-0"><strong>Subject:</strong> {{ exam.subject.name }}</li>
+                        <li class="list-group-item ps-0"><strong>Class:</strong> {{ exam.class_assigned.name }}</li>
+                        <li class="list-group-item ps-0"><strong>Due Date:</strong> {{ exam.due_date|date:"F j, Y, P"|default:"Not set" }}</li>
+                        <li class="list-group-item ps-0"><strong>Duration:</strong> {{ exam.duration|default:"N/A" }} minutes</li>
+                    </ul>
+                </div>
+                <div class="col-md-6">
+                    <h5 class="text-muted">Configuration</h5>
+                    <ul class="list-group list-group-flush">
+                        <li class="list-group-item ps-0">
+                            <strong>Status:</strong> 
+                            <span class="badge {% if exam.is_approved %}bg-success{% else %}bg-warning text-dark{% endif %}">
+                                {% if exam.is_approved %}Approved{% else %}Pending Approval{% endif %}
+                            </span>
+                        </li>
+                        <li class="list-group-item ps-0">
+                            <strong>Links to Term Result:</strong> 
+                            {% if exam.result_field_mapping %}
+                                <span class="badge bg-primary">{{ exam.get_result_field_mapping_display }}</span>
+                            {% else %}
+                                <span class="badge bg-secondary">No</span>
+                            {% endif %}
+                        </li>
+                        <li class="list-group-item ps-0">
+                            <strong>Question Shuffling:</strong> 
+                            {% if exam.shuffle_questions %}
+                                <span class="badge bg-info text-dark">Enabled</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Disabled</span>
+                            {% endif %}
+                        </li>
+                         <li class="list-group-item ps-0"><strong>Total Points:</strong> <span class="badge bg-dark">{{ exam.get_total_marks }}</span></li>
+                    </ul>
+                </div>
+            </div>
 
             <hr class="my-4">
-            <h4 class="mb-3">Questions & Options Overview</h4>
 
+            <h4 class="mb-3">Questions & Options Overview</h4>
             {% if questions_processed %}
                 {% for q_data in questions_processed %}
-                    {% with question=q_data.instance %} {# Get the original question object #}
-                    <div class="card mb-3 question-review-card">
-                        <div class="card-header bg-light-subtle py-2">
-                            <strong class="question-number">Question {{ forloop.counter }}:</strong>
+                    {% with question=q_data.instance %}
+                    <div class="card mb-3 question-review-card-exam"> {# Unique class for exam styling #}
+                        <div class="card-header bg-light py-2">
+                            <strong>Question {{ forloop.counter }}</strong>
                             <span class="badge bg-secondary float-end">{{ question.get_question_type_display }}</span>
                         </div>
                         <div class="card-body">
-                            <p class="question-text mb-2">{{ question.question_text|safe }}</p>
+                            <p class="question-text mb-3">{{ question.question_text|safe }}</p>
 
                             {% if question.question_type == 'SCQ' or question.question_type == 'MCQ' %}
                                 {% if q_data.options_with_status %}
-                                    <p class="mb-1"><small class="text-muted">Options (Correct answer(s) highlighted):</small></p>
                                     <ul class="list-group list-group-flush options-display">
                                         {% for option_status in q_data.options_with_status %}
                                             <li class="list-group-item ps-2 {% if option_status.is_marked_correct %}list-group-item-success-teacher{% endif %}">
@@ -48,23 +90,11 @@
                                         {% endfor %}
                                     </ul>
                                 {% else %}
-                                    <p class="text-danger small"><em>Warning: No options configured for this SCQ/MCQ!</em></p>
+                                    <p class="text-danger small"><em>Warning: No options have been configured!</em></p>
                                 {% endif %}
-                                
-                                {% comment %} Display the stored correct_answer string for verification by teacher {% endcomment %}
-                                {% if question.correct_answer %}
-                                    <p class="mt-2 mb-0">
-                                        <small class="text-muted">
-                                            Designated Correct Answer(s) String:
-                                        </small> 
-                                        <strong class="text-success">{{ question.correct_answer }}</strong>
-                                    </p>
-                                {% endif %}
-
                             {% elif question.question_type == 'ES' %}
-                                <p class="text-muted small"><em>This is an essay question.</em></p>
                                 {% if question.correct_answer %}
-                                    <p class="mt-2 mb-1"><strong>Model Answer / Rubric:</strong></p>
+                                    <p class="mb-1"><small class="text-muted">Model Answer / Rubric:</small></p>
                                     <div class="p-2 rounded bg-light border small">{{ question.correct_answer|safe }}</div>
                                 {% else %}
                                      <p class="text-muted small"><em>No model answer provided.</em></p>
@@ -76,29 +106,47 @@
                 {% endfor %}
             {% else %}
                 <div class="alert alert-info text-center">
-                    No questions have been added to this {{ exam.title|lower }} yet. 
-                    <a href="{% url 'update_exam' exam.id %}">Add Questions</a>.
+                    No questions have been added yet. 
+                    <a href="{% url 'update_exam' exam.id %}">Click here to add questions</a>.
                 </div>
             {% endif %}
+        </div>
 
-            <div class="text-center mt-4 pt-3 border-top">
-                <a href="{{ request.META.HTTP_REFERER|default:'admin_dashboard' }}" class="btn btn-secondary"><i class="fas fa-arrow-left me-1"></i> Back</a>
-            </div>
+        <div class="card-footer text-center">
+            <a href="{{ request.META.HTTP_REFERER|default:'admin_dashboard' }}" class="btn btn-secondary"><i class="fas fa-arrow-left me-1"></i> Back to Previous Page</a>
         </div>
     </div>
 </div>
 
-{# Modal for Approve ... (keep as is) #}
+<!-- Approval Modal -->
 {% if user.is_superuser and not exam.is_approved %}
-<div class="modal fade" id="approveModal{{ exam.id }}" tabindex="-1" aria-labelledby="approveModalLabel{{ exam.id }}" aria-hidden="true"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"><div class="modal-header"><h5 class="modal-title" id="approveModalLabel{{ exam.id }}">Confirm Approval</h5><button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button></div><div class="modal-body">Are you sure you want to approve: <strong>{{ exam.title }}</strong>?</div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><form method="POST" action="{% url 'approve_exam' exam.id %}" style="display: inline;">{% csrf_token %}<button type="submit" class="btn btn-success">Yes, Approve</button></form></div></div></div></div>
+<div class="modal fade" id="approveModal{{ exam.id }}" tabindex="-1" aria-labelledby="approveModalLabel{{ exam.id }}" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="approveModalLabel{{ exam.id }}">Confirm Approval</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                Are you sure you want to approve the exam: <strong>{{ exam.title }}</strong>?
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form method="POST" action="{% url 'approve_exam' exam.id %}" style="display: inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-success">Yes, Approve</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
 {% endif %}
 
-<style> /* Move to main CSS file */
-    .question-review-card { border-left: 3px solid #6c757d; }
-    .question-number { color: #495057; }
-    .question-text { font-size: 1.1rem; margin-bottom: 0.75rem !important; }
-    .options-display .list-group-item { padding: .5rem .75rem; font-size: 0.95rem; border-bottom: 1px solid #eee !important; }
-    .options-display .list-group-item:last-child { border-bottom: 0 !important; }
-    .list-group-item-success-teacher { background-color: #e6f5e9 !important; font-weight: 500; }
+<style>
+    /* It's better to move these to a central CSS file */
+    .question-review-card-exam { border-left: 4px solid #dc3545; } /* Red border for exams */
+    .question-text { font-size: 1.1rem; }
+    .options-display .list-group-item { padding: .5rem .75rem; border-color: #f0f0f0; }
+    .list-group-item-success-teacher { background-color: #d1e7dd !important; font-weight: 500; }
 </style>
 {% endblock %}

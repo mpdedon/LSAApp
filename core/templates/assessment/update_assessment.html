@@ -6,7 +6,7 @@
 {% block content %}
 <div class="container my-4">
     <div class="card shadow-sm">
-        <div class="card-header bg-warning text-dark text-center"> {# Changed color for update #}
+        <div class="card-header bg-warning text-dark text-center">
             <h2>Update Assessment: {{ assessment.title }}</h2>
         </div>
         <div class="card-body p-4">
@@ -15,7 +15,6 @@
                     <h4 class="alert-heading">Errors Found!</h4>
                      <p>Please correct the errors below and try again.</p>
                      <hr>
-                     {% if form.non_field_errors %}<p class="mb-0">{{ form.non_field_errors }}</p>{% endif %}
                      {% for field in form %}{% if field.errors %}<p class="mb-0"><strong>{{ field.label }}:</strong> {{ field.errors|striptags }}</p>{% endif %}{% endfor %}
                      {% if processing_errors %}
                          <p class="mt-2 mb-0"><strong>Question Processing Errors:</strong></p>
@@ -26,7 +25,6 @@
 
             <form method="POST" novalidate>
                 {% csrf_token %}
-                {# Hidden input to track deleted existing questions (optional, requires JS to populate) #}
                 <input type="hidden" name="deleted_question_ids" id="deleted_question_ids_input" value="">
 
                 {# Render main assessment form fields #}
@@ -34,8 +32,16 @@
                 <div class="mb-3">{{ form.short_description|as_crispy_field }}</div>
                 <div class="row"><div class="col-md-6 mb-3">{{ form.class_assigned|as_crispy_field }}</div><div class="col-md-6 mb-3">{{ form.subject|as_crispy_field }}</div></div>
                 <div class="row"><div class="col-md-6 mb-3">{{ form.due_date|as_crispy_field }}</div><div class="col-md-6 mb-3">{{ form.duration|as_crispy_field }}</div></div>
-                <div class="mb-3 form-check">{{ form.is_online }} <label for="{{ form.is_online.id_for_label }}" class="form-check-label">Is Online?</label></div>
-
+                <div class="row mt-3"><div class="col-md-6 mb-3">{{ form.result_field_mapping|as_crispy_field }}</div>
+                <div class="col-md-6 mb-3 d-flex align-items-center pt-4">
+                        <div class="form-check">
+                            {{ form.shuffle_questions }}
+                            <label class="form-check-label" for="{{ form.shuffle_questions.id_for_label }}">
+                                Randomize question & option order for each student?
+                            </label>
+                        </div>
+                    </div>
+                </div>
                 <hr class="my-4">
                 <h4 class="mb-3">Manage Existing Questions</h4>
                 <div id="existing-questions-container">
@@ -43,31 +49,24 @@
                     <div class="card mb-3 shadow-sm existing-question-card" id="existing-question-card-{{ question.id }}">
                         <div class="card-body">
                             <div class="d-flex justify-content-between align-items-center mb-2">
-                                <h6 class="card-title mb-0">Question (ID: {{ question.id }})</h6>
+                                <h6 class="card-title mb-0">Existing Question (ID: {{ question.id }})</h6>
                                 <div>
-                                    <button type="button" class="btn btn-outline-primary btn-sm toggle-edit-existing-btn me-2" data-question-id="{{ question.id }}">
-                                        <i class="fas fa-edit"></i> Edit
-                                    </button>
-                                    <button type="button" class="btn btn-outline-danger btn-sm remove-existing-question-btn" data-question-id="{{ question.id }}">
-                                        <i class="fas fa-trash"></i> Remove
-                                    </button>
+                                    <button type="button" class="btn btn-outline-primary btn-sm toggle-edit-existing-btn me-2" data-question-id="{{ question.id }}"><i class="fas fa-edit"></i> Edit</button>
+                                    <button type="button" class="btn btn-outline-danger btn-sm remove-existing-question-btn" data-question-id="{{ question.id }}"><i class="fas fa-trash"></i> Remove</button>
                                 </div>
                             </div>
+                            
+                            <!-- VIEW MODE -->
                             <div class="question-view-mode">
-                                <p class="mb-1"><small class="text-muted">Type: {{ question.get_question_type_display }}</small></p>
+                                <p class="mb-1"><small class="text-muted">Type: {{ question.get_question_type_display }} | Points: {{ question.points }}</small></p>
                                 <p><strong>{{ question.question_text|safe }}</strong></p>
-                                {% if question.question_type == 'SCQ' or question.question_type == 'MCQ' %}
-                                    {% with opts=question.options_list %}{% if opts %}Options: {% for opt in opts %}<span class="badge bg-secondary me-1">{{opt}}</span>{% endfor %}{% endif %}{% endwith %}
-                                    <p class="mt-1"><small>Correct: {{ question.correct_answer }}</small></p>
-                                {% elif question.question_type == 'ES' and question.correct_answer %}
-                                    <p class="mt-1"><small>Model Answer: {{ question.correct_answer }}</small></p>
-                                {% endif %}
                             </div>
+                            
+                            <!-- EDIT MODE -->
                             <div class="question-edit-mode d-none mt-2">
-                                <input type="hidden" name="question_{{ question.id }}_id" value="{{ question.id }}"> {# To identify this block on backend #}
                                 <div class="row"><div class="col-md-12 mb-2">
                                     <label class="form-label form-label-sm">Type</label>
-                                    <select name="question_{{ question.id }}_type" class="form-select form-select-sm existing-question-type-select" data-question-id="{{ question.id }}">
+                                    <select name="question_{{ question.id }}_type" id="question_{{ question.id }}_type" class="form-select form-select-sm existing-question-type-select" data-question-id="{{ question.id }}">
                                         <option value="SCQ" {% if question.question_type == "SCQ" %}selected{% endif %}>Single Choice</option>
                                         <option value="MCQ" {% if question.question_type == "MCQ" %}selected{% endif %}>Multiple Choice</option>
                                         <option value="ES" {% if question.question_type == "ES" %}selected{% endif %}>Essay</option>
@@ -77,17 +76,17 @@
                                     <label class="form-label form-label-sm">Question Text</label>
                                     <textarea name="question_{{ question.id }}_text" class="form-control form-control-sm" rows="2">{{ question.question_text }}</textarea>
                                 </div>
-                                <div class="mb-2 existing-options-container" id="existing-options-container-{{ question.id }}">
+                                <div class="mb-2 options-container">
                                     <label class="form-label form-label-sm">Options (comma-separated)</label>
                                     <input type="text" name="question_{{ question.id }}_options" value="{{ question.options_list|join:', ' }}" class="form-control form-control-sm">
                                 </div>
-                                <div class="mb-2 existing-correct-answer-scq-mcq-container" id="existing-correct-answer-scq-mcq-container-{{ question.id }}">
+                                <div class="mb-2 correct-answer-scq-mcq-container">
                                     <label class="form-label form-label-sm">Correct Answer (SCQ/MCQ)</label>
                                     <input type="text" name="question_{{ question.id }}_correct_answer" value="{{ question.correct_answer|default:'' }}" class="form-control form-control-sm">
                                 </div>
-                                <div class="mb-2 d-none existing-essay-answer-container" id="existing-essay-answer-container-{{ question.id }}">
-                                    <label class="form-label form-label-sm">Model Answer (Essay)</label>
-                                    <textarea name="question_{{ question.id }}_correct_answer" class="form-control form-control-sm" rows="2">{{ question.correct_answer|default:'' }}</textarea>
+                                <div class="mb-2 points-container">
+                                    <label for="question_{{ question.id }}_points" class="form-label form-label-sm">Points (for Essay)</label>
+                                    <input type="number" name="question_{{ question.id }}_points" id="question_{{ question.id }}_points" class="form-control form-control-sm points-field" value="{{ question.points|default_if_none:'' }}" min="1">
                                 </div>
                             </div>
                         </div>
@@ -99,21 +98,15 @@
 
                 <hr class="my-4">
                 <h4 class="mb-3">Add New Questions</h4>
-                <div id="new-questions-container">
-                    <!-- Dynamically added new questions will appear here -->
-                </div>
+                <div id="new-questions-container"></div>
                 <div class="text-center my-3">
-                    <button type="button" id="add-new-question-btn" class="btn btn-outline-success">
-                        <i class="fas fa-plus-circle me-1"></i> Add New Question
-                    </button>
+                    <button type="button" id="add-new-question-btn" class="btn btn-outline-success"><i class="fas fa-plus-circle me-1"></i> Add New Question</button>
                 </div>
 
                 <hr class="my-4">
                 <div class="text-center">
-                    <button type="submit" class="btn btn-primary btn-lg">
-                        <i class="fas fa-save me-1"></i> Save Changes
-                    </button>
-                     <a href="{% url 'view_assessment' assessment.id %}" class="btn btn-secondary btn-lg">Cancel</a>
+                    <button type="submit" class="btn btn-primary btn-lg"><i class="fas fa-save me-1"></i> Save Changes</button>
+                    <a href="{% url 'view_assessment' assessment.id %}" class="btn btn-secondary btn-lg">Cancel</a>
                 </div>
             </form>
         </div>
@@ -122,18 +115,17 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    let newQuestionCounter = 0; // For new questions, use prefix 'new_question_'
+    let newQuestionCounter = 0;
     const deletedExistingQuestionIds = new Set();
 
     const createNewQuestionCardHTML = (qCount) => {
+        // Corrected name attributes to use 'new_question_' prefix
         return `
             <div class="card mb-3 shadow-sm new-question-card" id="new-question-card-${qCount}">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <h6 class="card-title mb-0">New Question ${qCount}</h6>
-                        <button type="button" class="btn btn-danger btn-sm remove-new-question-btn" data-question-id="${qCount}" aria-label="Remove New Question ${qCount}">
-                            <i class="fas fa-trash"></i>
-                        </button>
+                        <button type="button" class="btn btn-danger btn-sm remove-new-question-btn" data-question-id="${qCount}"><i class="fas fa-trash"></i></button>
                     </div>
                     <div class="row"><div class="col-md-12 mb-2">
                         <label for="new_question_type_${qCount}" class="form-label form-label-sm">Type</label>
@@ -141,22 +133,12 @@ document.addEventListener('DOMContentLoaded', function () {
                             <option value="SCQ" selected>Single Choice</option><option value="MCQ">Multiple Choice</option><option value="ES">Essay</option>
                         </select>
                     </div></div>
-                    <div class="mb-2">
-                        <label for="new_question_text_${qCount}" class="form-label form-label-sm">Question Text</label>
-                        <textarea name="new_question_text_${qCount}" id="new_question_text_${qCount}" class="form-control form-control-sm" rows="2" required></textarea>
-                    </div>
-                    <div class="mb-2 new-options-container" id="new-options-container-${qCount}">
-                    <label for="new_question_options_${qCount}" class="form-label form-label-sm">Options (comma-separated)</label>
-                    <input type="text" name="new_question_options_${qCount}" id="new_question_options_${qCount}" class="form-control form-control-sm">
-                    </div>
-                    <div class="mb-2 new-correct-answer-scq-mcq-container" id="new-correct-answer-scq-mcq-container-${qCount}">
-                        <label for="new_correct_answer_scq_mcq_input_${qCount}" class="form-label form-label-sm">Correct Answer (SCQ/MCQ)</label>
-                        <input type="text" name="new_question_correct_answer_${qCount}" id="new_correct_answer_scq_mcq_input_${qCount}" class="form-control form-control-sm correct-answer-field">
-                                                                                                                                    {# ^ Added common class #}
-                    </div>
-                    <div class="mb-2 d-none new-essay-answer-container" id="new-essay-answer-container-${qCount}">
-                        <label for="new_correct_answer_essay_textarea_${qCount}" class="form-label form-label-sm">Model Answer (Essay)</label>
-                        <textarea name="new_question_correct_answer_${qCount}" id="new_correct_answer_essay_textarea_${qCount}" class="form-control form-control-sm correct-answer-field" rows="2"></textarea>
+                    <div class="mb-2"><label for="new_question_text_${qCount}" class="form-label form-label-sm">Question Text</label><textarea name="new_question_text_${qCount}" class="form-control form-control-sm" rows="2" required></textarea></div>
+                    <div class="mb-2 options-container"><label for="new_question_options_${qCount}" class="form-label form-label-sm">Options (comma-separated)</label><input type="text" name="new_question_options_${qCount}" class="form-control form-control-sm"></div>
+                    <div class="mb-2 correct-answer-scq-mcq-container"><label for="new_question_correct_answer_${qCount}" class="form-label form-label-sm">Correct Answer (SCQ/MCQ)</label><input type="text" name="new_question_correct_answer_${qCount}" class="form-control form-control-sm"></div>
+                    <div class="mb-2 d-none points-container">
+                        <label for="new_question_points_${qCount}" class="form-label form-label-sm">Points (for Essay)</label>
+                        <input type="number" name="new_question_points_${qCount}" class="form-control form-control-sm points-field" min="1" disabled>
                     </div>
                 </div>
             </div>
@@ -164,43 +146,37 @@ document.addEventListener('DOMContentLoaded', function () {
     };
 
     const toggleFieldsVisibility = (qId, isExisting) => {
-        const prefix = isExisting ? 'existing-' : 'new-';
         const typeSelectId = isExisting ? `question_${qId}_type` : `new_question_type_${qId}`;
+        const cardId = isExisting ? `existing-question-card-${qId}` : `new-question-card-${qId}`;
         
         const typeSelect = document.getElementById(typeSelectId);
         if (!typeSelect) return;
         const selectedType = typeSelect.value;
 
-        const cardElementId = isExisting ? `existing-question-card-${qId}` : `new-question-card-${qId}`;
-        const cardElement = document.getElementById(cardElementId);
+        const cardElement = document.getElementById(cardId);
         if (!cardElement) return;
 
-        const optionsDiv = cardElement.querySelector(`.${prefix}options-container`); // More robust selector
-        const scqMcqAnswerContainerDiv = cardElement.querySelector(`.${prefix}correct-answer-scq-mcq-container`);
-        const essayAnswerContainerDiv = cardElement.querySelector(`.${prefix}essay-answer-container`);
+        // Use generic class selectors that work on both existing and new cards
+        const optionsDiv = cardElement.querySelector('.options-container');
+        const scqMcqAnswerDiv = cardElement.querySelector('.correct-answer-scq-mcq-container');
+        const pointsDiv = cardElement.querySelector('.points-container');
+        const pointsInput = cardElement.querySelector('.points-field');
+        
+        if (!optionsDiv || !scqMcqAnswerDiv || !pointsDiv || !pointsInput) {
+            console.error(`Could not find all required field containers for card ID: ${cardId}`);
+            return;
+        }
 
-        const scqMcqAnswerInput = scqMcqAnswerContainerDiv ? scqMcqAnswerContainerDiv.querySelector('input.correct-answer-field') : null;
-        const essayAnswerTextarea = essayAnswerContainerDiv ? essayAnswerContainerDiv.querySelector('textarea.correct-answer-field') : null;
-
-
-        if (optionsDiv && scqMcqAnswerContainerDiv && essayAnswerContainerDiv) {
-            if (selectedType === 'ES') {
-                optionsDiv.classList.add('d-none');
-                scqMcqAnswerContainerDiv.classList.add('d-none');
-                if (scqMcqAnswerInput) scqMcqAnswerInput.disabled = true;
-
-                essayAnswerContainerDiv.classList.remove('d-none');
-                if (essayAnswerTextarea) essayAnswerTextarea.disabled = false;
-            } else { // SCQ or MCQ
-                optionsDiv.classList.remove('d-none');
-                scqMcqAnswerContainerDiv.classList.remove('d-none');
-                if (scqMcqAnswerInput) scqMcqAnswerInput.disabled = false;
-
-                essayAnswerContainerDiv.classList.add('d-none');
-                if (essayAnswerTextarea) essayAnswerTextarea.disabled = true;
-            }
-        } else {
-            console.warn(`Could not find all required containers for question ID ${qId}, prefix ${prefix}`);
+        if (selectedType === 'ES') {
+            optionsDiv.classList.add('d-none');
+            scqMcqAnswerDiv.classList.add('d-none');
+            pointsDiv.classList.remove('d-none');
+            pointsInput.disabled = false;
+        } else { // SCQ or MCQ
+            optionsDiv.classList.remove('d-none');
+            scqMcqAnswerDiv.classList.remove('d-none');
+            pointsDiv.classList.add('d-none');
+            pointsInput.disabled = true;
         }
     };
 
@@ -208,7 +184,7 @@ document.addEventListener('DOMContentLoaded', function () {
     document.getElementById('add-new-question-btn').addEventListener('click', () => {
         newQuestionCounter++;
         document.getElementById('new-questions-container').insertAdjacentHTML('beforeend', createNewQuestionCardHTML(newQuestionCounter));
-        toggleFieldsVisibility(newQuestionCounter, false); // For new question
+        toggleFieldsVisibility(newQuestionCounter, false);
         const newTypeSelect = document.getElementById(`new_question_type_${newQuestionCounter}`);
         if (newTypeSelect) {
             newTypeSelect.addEventListener('change', () => toggleFieldsVisibility(newQuestionCounter, false));
@@ -217,45 +193,42 @@ document.addEventListener('DOMContentLoaded', function () {
 
     // Remove New Question Button (Event Delegation)
     document.getElementById('new-questions-container').addEventListener('click', function(event) {
-        let targetButton = event.target.closest('.remove-new-question-btn');
-        if (targetButton) {
-            const qId = targetButton.getAttribute('data-question-id');
-            document.getElementById(`new-question-card-${qId}`).remove();
+        let target = event.target.closest('.remove-new-question-btn');
+        if (target) {
+            document.getElementById(`new-question-card-${target.dataset.questionId}`).remove();
         }
     });
 
-    // Toggle Edit for Existing Questions (Event Delegation)
+    // Event Delegation for Existing Questions Container
     document.getElementById('existing-questions-container').addEventListener('click', function(event) {
-        let targetButton = event.target.closest('.toggle-edit-existing-btn');
-        if (targetButton) {
-            const qId = targetButton.getAttribute('data-question-id');
+        let editBtn = event.target.closest('.toggle-edit-existing-btn');
+        if (editBtn) {
+            const qId = editBtn.dataset.questionId;
             const card = document.getElementById(`existing-question-card-${qId}`);
             card.querySelector('.question-view-mode').classList.toggle('d-none');
             card.querySelector('.question-edit-mode').classList.toggle('d-none');
-            targetButton.innerHTML = card.querySelector('.question-view-mode').classList.contains('d-none') ? '<i class="fas fa-times"></i> Cancel Edit' : '<i class="fas fa-edit"></i> Edit';
-            if (!card.querySelector('.question-view-mode').classList.contains('d-none')) { // If cancelling edit
-                // Optionally reset form fields to original values if needed, though POST will handle current values
-            } else { // If starting edit
-                toggleFieldsVisibility(qId, true); // Ensure correct fields are shown in edit mode
+            const isEditing = card.querySelector('.question-view-mode').classList.contains('d-none');
+            editBtn.innerHTML = isEditing ? '<i class="fas fa-times"></i> Cancel' : '<i class="fas fa-edit"></i> Edit';
+            if (isEditing) {
+                toggleFieldsVisibility(qId, true);
             }
         }
 
-        // Remove Existing Question Button
-        let removeExistingButton = event.target.closest('.remove-existing-question-btn');
-        if (removeExistingButton) {
-            const qId = removeExistingButton.getAttribute('data-question-id');
-            const cardToRemove = document.getElementById(`existing-question-card-${qId}`);
-            if (cardToRemove && confirm('Are you sure you want to remove this existing question? This will be permanent upon saving changes.')) {
-                cardToRemove.remove();
+        let removeBtn = event.target.closest('.remove-existing-question-btn');
+        if (removeBtn) {
+            const qId = removeBtn.dataset.questionId;
+            const card = document.getElementById(`existing-question-card-${qId}`);
+            if (card && confirm('Are you sure you want to remove this question? This will be permanent upon saving.')) {
+                card.style.display = 'none'; // Hide it instead of removing, to avoid layout shifts
                 deletedExistingQuestionIds.add(qId);
                 document.getElementById('deleted_question_ids_input').value = Array.from(deletedExistingQuestionIds).join(',');
             }
         }
     });
     
-    // Initial toggle for all existing questions' type selects and add listeners
+    // Initializer for all existing questions on page load
     document.querySelectorAll('.existing-question-type-select').forEach(select => {
-        const qId = select.getAttribute('data-question-id');
+        const qId = select.dataset.questionId;
         toggleFieldsVisibility(qId, true);
         select.addEventListener('change', () => toggleFieldsVisibility(qId, true));
     });

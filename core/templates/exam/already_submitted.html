@@ -13,4 +13,28 @@
         </div>
     </div>
 </div>
+{% endblock %}{% extends "base.html" %}
+{% block content %}
+<div class="container mt-4">
+    <div class="card text-center">
+        <div class="card-header">
+            Submission Complete
+        </div>
+        <div class="card-body">
+            <h5 class="card-title">You have already completed the {{ exam.title|default:exam.title }}.</h5>
+            {% if latest_attempt %}
+                <p class="card-text">
+                    Your final score for Attempt #{{ latest_attempt.attempt_number }} was <strong>{{ latest_attempt.score }} / {{ exam.get_total_marks|default:exam.get_total_marks }}</strong>.
+                </p>
+                <p>If you need to retake this, please contact your teacher.</p>
+            {% endif %}
+            {% if request.user.student %}
+                <a href="{% url 'student_dashboard' %}" class="btn btn-primary">Back to Dashboard</a>
+            {% elif request.user.guardian %}
+                <a href="{% url 'guardian_dashboard' %}" class="btn btn-success">Back to Dashboard</a>
+            {% endif %}
+        </div>
+    </div>
+</div>
 {% endblock %}
+

@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load humanize %}
+{% load static humanize %}
 
 {% block title %}LMS Mission Control{% endblock %}
 
@@ -151,13 +151,42 @@
                             <div class="col-md-6 border-end">
                                 <h6 class="text-center small text-uppercase text-muted p-2 bg-light-subtle">Top Students</h6>
                                 <div class="list-group list-group-flush">
-                                    {% for student in top_students %}<div class="list-group-item list-group-item-avatar d-flex align-items-center"><img src="{{ student.profile_image.url }}" class="rounded-circle me-3" alt=""><div class="flex-grow-1">{{ student.user.get_full_name }}</div><span class="badge bg-success rounded-pill">{{ student.average_lms_grade|floatformat:1 }}% Avg</span></div>{% empty %}<div class="list-group-item text-muted">No graded student progress yet.</div>{% endfor %}
+                                    {% for student in top_students %}
+                                        <div class="list-group-item list-group-item-avatar d-flex align-items-center">
+                                            {% if student.profile_image %}
+                                                <img src="{{ student.profile_image.url }}" class="rounded-circle me-3" alt="{{ student.user.get_full_name }}'s profile picture" width="40" height="40">
+                                            {% else %}
+                                                <img src="{% static 'images/default_avatar.png' %}" class="rounded-circle me-3" alt="Default profile picture" width="40" height="40">
+                                            {% endif %}
+                                            <div class="flex-grow-1">
+                                                {{ student.user.get_full_name }}
+                                            </div>
+                                            <div>
+                                                <span class="badge bg-success rounded-pill">{{ student.average_lms_grade|floatformat:1 }}% Avg</span>
+                                            </div>
+
+                                        </div>
+                                    {% empty %}
+                                        <div class="list-group-item text-muted">No graded student progress yet.</div>
+                                    {% endfor %}
                                 </div>
                             </div>
                             <div class="col-md-6">
                                 <h6 class="text-center small text-uppercase text-muted p-2 bg-light-subtle">Low Engagement (At-Risk)</h6>
                                 <div class="list-group list-group-flush">
-                                    {% for student in at_risk_students %}<div class="list-group-item list-group-item-avatar d-flex align-items-center"><img src="{{ student.profile_image.url }}" class="rounded-circle me-3" alt=""><div class="flex-grow-1">{{ student.user.get_full_name }}</div><span class="badge bg-danger rounded-pill">0 Lessons</span></div>{% empty %}<div class="list-group-item text-muted">No at-risk students found.</div>{% endfor %}
+                                    {% for student in at_risk_students %}
+                                        <div class="list-group-item list-group-item-avatar d-flex align-items-center">
+                                            {% if student.profile_image %}
+                                                <img src="{{ student.profile_image.url }}" class="rounded-circle me-3" alt="{{ student.user.get_full_name }}'s profile picture">
+                                            {% else %}
+                                                <img src="{% static 'images/default_avatar.png' %}" class="rounded-circle me-3" alt="Default profile picture">
+                                            {% endif %}
+                                            <div class="flex-grow-1">{{ student.user.get_full_name }}</div>
+                                            <span class="badge bg-danger rounded-pill">0 Lessons</span>
+                                        </div>
+                                    {% empty %}
+                                        <div class="list-group-item text-muted">No at-risk students found.</div>
+                                    {% endfor %}                                
                                 </div>
                             </div>
                         </div>

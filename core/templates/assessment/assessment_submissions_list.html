@@ -1,124 +1,124 @@
 {% extends "base.html" %}
-{% load static humanize %}
+{% load assessment_filters humanize %}
 
 {% block title %}Submissions for: {{ assessment.title }}{% endblock %}
 
 {% block content %}
 <div class="container my-4 mb-5">
-    <!-- Header Section -->
-    <div class="p-4 mb-4 bg-light rounded-3 shadow-sm">
-        <div class="d-flex justify-content-between align-items-center">
-            <div>
-                <h2 class="display-6 fw-bold mb-1">{{ assessment.title }}</h2>
-                <p class="text-muted mb-0">
-                    Submissions for <strong>{{ assessment.class_assigned.name }}</strong> | <strong>{{ assessment.subject.name }}</strong>
-                </p>
+    <div class="card shadow-lg">
+        <!-- Main Card Header -->
+        <div class="card-header bg-primary text-white">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="h4 mb-0">Student Submission Status</h2>
+                    <p class="mb-0 small">{{ assessment.title }} ({{ assessment.class_assigned.name }})</p>
+                </div>
+                <a href="{{ request.META.HTTP_REFERER|default:'teacher_dashboard' }}" class="btn btn-light btn-sm">
+                    <i class="fas fa-arrow-left me-1"></i> Back
+                </a>
             </div>
-            <a href="{% url 'admin_assessment_list' %}" class="btn btn-outline-secondary btn-sm d-none d-md-block">
-                <i class="fas fa-arrow-left me-1"></i> Back to Assessments
-            </a>
         </div>
-    </div>
 
-    <!-- Stats and Info Row -->
-    <div class="row g-3 mb-4">
-        <div class="col-md-6 col-lg-3">
-            <div class="card h-100 text-center">
-                <div class="card-body">
-                    <div class="fs-5 text-muted">Total Score</div>
-                    <div class="display-5 fw-bold text-primary">{{ assessment.total_possible_score|default:0|floatformat|intcomma }}</div>
+        <div class="card-body p-4">
+
+            <div class="row g-3 mb-4">
+                <div class="col-md-6 col-lg-3">
+                    <div class="card h-100 text-center border-light shadow-sm">
+                        <div class="card-body">
+                            <div class="text-muted">Total Score</div>
+                            <div class="display-5 fw-bold text-primary">{{ assessment.get_total_marks|default:0 }}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-3">
+                    <div class="card h-100 text-center border-light shadow-sm">
+                        <div class="card-body">
+                            <div class="text-muted">Submissions</div>
+                            {# We count the number of items in our submissions map #}
+                            <div class="display-5 fw-bold">{{ submissions_map|length }} / {{ all_enrolled_students|length }}</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-3">
+                    <div class="card h-100 text-center bg-warning shadow-sm">
+                        <div class="card-body">
+                            <div class="text-dark">Pending Grade</div>
+                            {# We must calculate this from the submissions map #}
+                            <div class="display-5 fw-bold text-dark">
+                                {{ submissions_map.values|filter_pending_grade|length }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-6 col-lg-3">
+                    <div class="card h-100 text-center border-light shadow-sm">
+                         <div class="card-body">
+                            <div class="text-muted">Due Date</div>
+                            <div class="h5 fw-bold mt-2">{{ assessment.due_date|date:"d M, Y" }}</div>
+                            <div class="small text-muted">{{ assessment.due_date|date:"P" }}</div>
+                        </div>
+                    </div>
                 </div>
             </div>
-        </div>
-        <div class="col-md-6 col-lg-3">
-            <div class="card h-100 text-center">
-                <div class="card-body">
-                    <div class="fs-5 text-muted">Submissions</div>
-                    <div class="display-5 fw-bold">{{ submissions|length }}</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6 col-lg-3">
-            <div class="card h-100 text-center bg-warning">
-                <div class="card-body">
-                    <div class="fs-5 text-dark">Pending Grade</div>
-                    <div class="display-5 fw-bold text-dark">{{ pending_manual_grade_count|default:0 }}</div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6 col-lg-3">
-            <div class="card h-100 text-center">
-                 <div class="card-body">
-                    <div class="fs-5 text-muted">Due Date</div>
-                    <div class="h5 fw-bold mt-2">{{ assessment.due_date|date:"d M Y" }}</div>
-                    <div class="small text-muted">{{ assessment.due_date|date:"P" }}</div>
-                </div>
-            </div>
-        </div>
-    </div>
+            <!-- =================== END: CORRECTED STATS ROW =================== -->
 
 
-    <!-- Main Submissions Table Card -->
-    <div class="card shadow-sm">
-        <div class="card-header bg-white">
-            <h5 class="mb-0"><i class="fas fa-tasks me-2"></i>Student Submissions</h5>
-        </div>
-        <div class="card-body p-0">
-            {% if submissions %}
+            <!-- Main Submissions Table -->
             <div class="table-responsive">
-                <table class="table table-hover table-striped mb-0 align-middle">
+                <table class="table table-striped table-hover align-middle">
                     <thead class="table-light">
                         <tr>
-                            <th scope="col" class="ps-3">Student</th>
+                            <th scope="col">Student</th>
+                            <th scope="col">Status</th>
                             <th scope="col">Submitted At</th>
-                            <th scope="col" class="text-center">Score ({{ assessment.total_possible_score|default:0 }})</th>
-                            <th scope="col" class="text-center">Status</th>
+                            <th scope="col">Grade</th>
                             <th scope="col" class="text-center">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
-                        {% for sub in submissions %}
-                        <tr>
-                            <td class="ps-3 fw-medium">{{ sub.student.user.get_full_name|default:sub.student.user.username }}</td>
-                            <td>{{ sub.submitted_at|timesince }} ago <br><small class="text-muted">{{ sub.submitted_at|date:"d M Y, P" }}</small></td>
-                            <td class="text-center">
-                                {% if sub.is_graded %}
-                                    <span class="fw-bold fs-5">{{ sub.score|floatformat|default:"-" }}</span>
-                                {% else %}
-                                    <span class="text-muted small">Not Graded</span>
-                                {% endif %}
-                            </td>
-                            <td class="text-center">
-                                {% if sub.is_graded %}
-                                    <span class="badge bg-success rounded-pill"><i class="fas fa-check-circle me-1"></i>Graded</span>
-                                {% elif sub.requires_manual_review %}
-                                    <span class="badge bg-warning text-dark rounded-pill"><i class="fas fa-pen-alt me-1"></i>Needs Grading</span>
-                                {% else %}
-                                    <span class="badge bg-info rounded-pill"><i class="fas fa-hourglass-half me-1"></i>Submitted</span>
-                                {% endif %}
-                            </td>
-                            <td class="text-center">
-                                {% if sub.requires_manual_review and not sub.is_graded %}
-                                    <a href="{% url 'grade_essay_assessment' sub.id %}" class="btn btn-warning btn-sm">
-                                        <i class="fas fa-pen-alt me-1"></i> Grade Now
+                        {% for student in all_enrolled_students %}
+                            {% with submission=submissions_map|get_item:student.pk %}
+                            <tr>
+                                <td>{{ student.user.get_full_name }}</td>
+                                <td>
+                                    {% if submission %}
+                                        <span class="badge bg-success">Submitted</span>
+                                    {% else %}
+                                        <span class="badge bg-secondary">Not Submitted</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ submission.submitted_at|naturaltime|default:"---" }}</td>
+                                <td>
+                                    {% if submission.is_graded %}
+                                        <strong class="text-success">{{ submission.score|floatformat:1 }}</strong> / {{ assessment.get_total_marks|default:0 }}
+                                    {% elif submission %}
+                                        <span class="text-warning">Pending</span>
+                                    {% else %}
+                                        ---
+                                    {% endif %}
+                                </td>
+                                <td class="text-center">
+                                    {% if submission and submission.requires_manual_review and not submission.is_graded %}
+                                        <a href="{% url 'grade_essay_assessment' submission.id %}" class="btn btn-sm btn-warning">Grade Now</a>
+                                    {% endif %}
+                                    
+                                    <a href="{% url 'grant_retake' item_type='assessment' item_id=assessment.id student_id=student.pk %}" class="btn btn-sm btn-outline-secondary ms-1" title="Grant a retake for {{ student.user.get_full_name }}">
+                                        Grant Retake
                                     </a>
-                                {% else %}
-                                    <a href="{% url 'grade_essay_assessment' sub.id %}" class="btn btn-outline-primary btn-sm">
-                                        <i class="fas fa-search me-1"></i> View / Regrade
-                                    </a>
-                                {% endif %}
-                            </td>
-                        </tr>
+                                </td>
+                            </tr>
+                            {% endwith %}
+                        {% empty %}
+                            <tr>
+                                <td colspan="5" class="text-center text-muted py-4">
+                                    <i class="fas fa-users-slash fa-2x mb-2"></i>
+                                    <p class="mb-0">There are no students enrolled in this class.</p>
+                                </td>
+                            </tr>
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
-            {% else %}
-            <div class="text-center p-5 text-muted">
-                <i class="fas fa-folder-open fa-3x mb-3"></i>
-                <p class="mb-0">No submissions have been received for this assessment yet.</p>
-            </div>
-            {% endif %}
         </div>
     </div>
 </div>

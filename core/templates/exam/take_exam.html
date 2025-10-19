@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block content %}
+<style>
+    body.exam-mode { background-color: #f8f9fa; }
+    .no-select { -webkit-user-select: none; -ms-user-select: none; user-select: none; }
+    #timer { position: fixed; top: 10px; right: 20px; z-index: 1050; }
+</style>
+
+<div class="container mt-5 pt-5 no-select" oncontextmenu="return false;">
+    {% if end_time_iso %}
+    <div id="timer" class="alert alert-danger p-2 font-weight-bold shadow-sm">Loading...</div>
+    {% endif %}
+    
+    <div class="card">
+        <div class="card-header">
+            <h4>{{ exam.title }}</h4>
+            <p>Student: {{ student.user.get_full_name }}</p>
+        </div>
+        <div class="card-body">
+            <form id="exam-form" method="post" action="{% url 'submit_exam' submission.id %}">
+                {% csrf_token %}
+                {% for data in questions_data %}
+                    <div class="mb-4 p-3 border rounded">
+                        <p class="font-weight-bold">Question {{ forloop.counter }} ({{ data.question.points }} Point{{ data.question.points|pluralize }})</p>
+                        <div>{{ data.question.question_text|safe }}</div>
+                        <hr>
+                        {% if data.question.question_type == 'SCQ' %}
+                            {% for option in data.shuffled_options %}
+                                <div class="form-check"><input class="form-check-input" type="radio" name="answer_{{ data.question.id }}" value="{{ option }}" required> <label class="form-check-label">{{ option }}</label></div>
+                            {% endfor %}
+                        {% elif data.question.question_type == 'MCQ' %}
+                            {% for option in data.shuffled_options %}
+                                <div class="form-check"><input class="form-check-input" type="checkbox" name="answer_{{ data.question.id }}" value="{{ option }}"> <label class="form-check-label">{{ option }}</label></div>
+                            {% endfor %}
+                        {% elif data.question.question_type == 'ES' %}
+                            <textarea class="form-control" name="answer_{{ data.question.id }}" rows="5" required></textarea>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+                <button type="submit" class="btn btn-primary btn-lg">Submit Final Answers</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('exam-form');
+    const timerDisplay = document.getElementById('timer');
+    const endTimeIso = "{{ end_time_iso|default:'' }}";
+    let isSubmitting = false; // Flag to prevent double submission
+
+    // Function to handle the final submission
+    const submitForm = (isForced) => {
+        if (isSubmitting) return; // Prevent multiple submissions
+        isSubmitting = true;
+
+        if (isForced) {
+            console.log("Time expired or page closing. Submitting automatically.");
+            alert("Time has expired. Your answers will be submitted automatically.");
+        }
+        form.submit();
+    };
+    
+    // --- 1. TIMER COUNTDOWN ---
+    if (endTimeIso) {
+        const endTime = new Date(endTimeIso).getTime();
+        const timerInterval = setInterval(() => {
+            const distance = endTime - new Date().getTime();
+            if (distance < 0) {
+                clearInterval(timerInterval);
+                timerDisplay.innerHTML = "Time's Up!";
+                submitForm(true); // Force submit when timer ends
+            } else {
+                const h = Math.floor((distance % (1000*60*60*24))/(1000*60*60));
+                const m = Math.floor((distance % (1000*60*60))/(1000*60));
+                const s = Math.floor((distance % (1000*60))/1000);
+                timerDisplay.innerHTML = `Time Left: ${h}h ${m}m ${s}s`;
+            }
+        }, 1000);
+    } else if (timerDisplay) {
+        timerDisplay.style.display = 'none'; // No timer if duration is not set
+    }
+
+    // --- 2. FULL-SCREEN PROMPT ---
+    const requestFullScreen = () => {
+        const elem = document.documentElement;
+        if (elem.requestFullscreen) {
+            // Ask for fullscreen after a user interaction
+            elem.requestFullscreen().catch(err => {
+                console.warn(`Fullscreen mode could not be activated: ${err.message}`);
+            });
+        }
+    };
+    // Prompt the user to enter fullscreen on their first click anywhere
+    document.body.addEventListener('click', requestFullScreen, { once: true });
+
+
+    // --- 3. DISABLE COPY/PASTE & CONTEXT MENU ---
+    document.addEventListener('copy', (e) => e.preventDefault());
+    document.addEventListener('paste', (e) => e.preventDefault());
+    document.addEventListener('contextmenu', (e) => e.preventDefault());
+
+
+    // --- 4. AUTO-SUBMIT ON BROWSER/TAB CLOSE ---
+    window.addEventListener('beforeunload', function (e) {
+        if (!isSubmitting) {
+            // Use navigator.sendBeacon for a reliable background submission
+            if (navigator.sendBeacon) {
+                // IMPORTANT: The URL must match your urls.py for the beacon view
+                const beaconUrl = "{% url 'autosubmit_beacon' submission.id %}";
+                navigator.sendBeacon(beaconUrl, new FormData(form));
+            }
+        }
+    });
+
+    // Handle the regular form submission to set the flag
+    form.addEventListener('submit', () => {
+        isSubmitting = true;
+    });
+});
+</script>
+{% endblock %}

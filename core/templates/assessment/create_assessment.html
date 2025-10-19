@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load crispy_forms_tags %} {# Or your preferred form rendering method like add_class #}
+{% load crispy_forms_tags %} 
 
 {% block title %}Create New Assessment{% endblock %}
 
@@ -60,13 +60,25 @@
                     <div class="col-md-6 mb-3">
                          {{ form.due_date|as_crispy_field }}
                     </div>
-                    <div class="col-md-6 mb-3">
-                        {{ form.duration|as_crispy_field }}
+                    <div class="form-group">
+                        <label for="{{ form.duration.id_for_label }}">Duration (in minutes)</label>
+                        {{ form.duration }}
+                        <small class="form-text text-muted">{{ form.duration.help_text }}</small>
                     </div>
-                </div>
-                <div class="mb-3 form-check">
-                    {{ form.is_online }}
-                    <label for="{{ form.is_online.id_for_label }}" class="form-check-label">Is this an Online Assessment?</label>
+
+                    <div class="form-group">
+                        <label for="{{ form.result_field_mapping.id_for_label }}">Link to Term Result Sheet</label>
+                        {{ form.result_field_mapping }}
+                        <small class="form-text text-muted">{{ form.result_field_mapping.help_text }}</small>
+                    </div>
+
+                    <div class="form-check my-3">
+                        <label for="{{ form.shuffle_questions.id_for_label }}">Shuffle Questions</label>
+                        {{ form.shuffle_questions }}
+                        <label class="form-check-label" for="{{ form.shuffle_questions.id_for_label }}">
+                            {{ form.shuffle_questions.help_text }}
+                        </label>
+                    </div>
                 </div>
 
                 <hr class="my-4">
@@ -96,12 +108,12 @@ document.addEventListener('DOMContentLoaded', function () {
     let questionCount = 0; 
 
     const createQuestionCardHTML = (qCount) => {
-        // Consistent naming: question_type_X, question_text_X, etc.
+        // The name prefixes here ('question_') match your _process_newly_added_questions view function
         return `
             <div class="card mb-3 shadow-sm question-card-dynamic" id="question-card-${qCount}">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <h6 class="card-title mb-0">Question ${qCount}</h6>
+                        <h6 class="card-title mb-0">New Question ${qCount}</h6>
                         <button type="button" class="btn btn-danger btn-sm remove-question-btn" data-question-id="${qCount}" aria-label="Remove Question ${qCount}">
                             <i class="fas fa-trash"></i>
                         </button>
@@ -125,19 +137,21 @@ document.addEventListener('DOMContentLoaded', function () {
                         <input type="text" name="question_options_${qCount}" id="question_options_${qCount}" class="form-control form-control-sm" placeholder="e.g., Option A, Option B">
                     </div>
                     <div class="mb-2 correct-answer-scq-mcq-container" id="correct-answer-scq-mcq-container-${qCount}">
-                        <label for="question_correct_answer_input_${qCount}" class="form-label form-label-sm">Correct Answer (SCQ/MCQ)</label>
-                        <input type="text" name="question_correct_answer_${qCount}" id="question_correct_answer_input_${qCount}" class="form-control form-control-sm correct-answer-field" placeholder="One option for SCQ; comma-separated for MCQ">
+                        <label for="question_correct_answer_${qCount}" class="form-label form-label-sm">Correct Answer (SCQ/MCQ)</label>
+                        <input type="text" name="question_correct_answer_${qCount}" id="question_correct_answer_${qCount}" class="form-control form-control-sm" placeholder="One option for SCQ; comma-separated for MCQ">
                     </div>
-                    <div class="mb-2 d-none essay-answer-container" id="essay-answer-container-${qCount}">
-                        <label for="question_correct_answer_textarea_${qCount}" class="form-label form-label-sm">Model Answer (Essay, Optional)</label>
-                        <textarea name="question_correct_answer_${qCount}" id="question_correct_answer_textarea_${qCount}" class="form-control form-control-sm correct-answer-field" rows="2" placeholder="Model answer or rubric points"></textarea>
+                    
+                    <!-- STEP 1: ADD THE POINTS FIELD HTML (initially hidden) -->
+                    <div class="mb-2 d-none points-container" id="points-container-${qCount}">
+                        <label for="question_points_${qCount}" class="form-label form-label-sm">Points (for Essay)</label>
+                        <input type="number" name="question_points_${qCount}" id="question_points_${qCount}" class="form-control form-control-sm points-field" placeholder="e.g., 5" min="1" disabled>
                     </div>
                 </div>
             </div>
         `;
     };
 
-    const toggleQuestionFieldsVisibility = (qId) => { // Removed 'isExisting' as this template is only for new
+    const toggleQuestionFieldsVisibility = (qId) => {
         const typeSelect = document.getElementById(`question_type_${qId}`);
         if (!typeSelect) return;
         const selectedType = typeSelect.value;
@@ -145,38 +159,40 @@ document.addEventListener('DOMContentLoaded', function () {
         const cardElement = document.getElementById(`question-card-${qId}`);
         if (!cardElement) return;
 
-        const optionsDiv = cardElement.querySelector(`.options-container`); // Simpler selector within the card
-        const correctAnswerScqMcqDiv = cardElement.querySelector(`.correct-answer-scq-mcq-container`);
-        const essayAnswerDiv = cardElement.querySelector(`.essay-answer-container`);
+        const optionsDiv = cardElement.querySelector('.options-container');
+        const correctAnswerDiv = cardElement.querySelector('.correct-answer-scq-mcq-container');
+        
+        // STEP 2: GET THE NEW POINTS FIELD ELEMENTS
+        const pointsDiv = cardElement.querySelector('.points-container');
+        const pointsInput = cardElement.querySelector('.points-field');
+        
+        if (selectedType === 'ES') {
+            // Hide SCQ/MCQ fields
+            optionsDiv.classList.add('d-none');
+            correctAnswerDiv.classList.add('d-none');
+            
+            // Show and enable Essay fields
+            pointsDiv.classList.remove('d-none');
+            pointsInput.disabled = false;
 
-        const scqMcqAnswerInput = correctAnswerScqMcqDiv ? correctAnswerScqMcqDiv.querySelector('input.correct-answer-field') : null;
-        const essayAnswerTextarea = essayAnswerDiv ? essayAnswerDiv.querySelector('textarea.correct-answer-field') : null;
+        } else { // This handles SCQ or MCQ
+            // Show SCQ/MCQ fields
+            optionsDiv.classList.remove('d-none');
+            correctAnswerDiv.classList.remove('d-none');
 
-        if (optionsDiv && correctAnswerScqMcqDiv && essayAnswerDiv) { // Check if all divs are found
-            if (selectedType === 'ES') {
-                optionsDiv.classList.add('d-none');
-                correctAnswerScqMcqDiv.classList.add('d-none');
-                if (scqMcqAnswerInput) scqMcqAnswerInput.disabled = true;
-
-                essayAnswerDiv.classList.remove('d-none');
-                if (essayAnswerTextarea) essayAnswerTextarea.disabled = false;
-            } else { // SCQ or MCQ
-                optionsDiv.classList.remove('d-none');
-                correctAnswerScqMcqDiv.classList.remove('d-none');
-                if (scqMcqAnswerInput) scqMcqAnswerInput.disabled = false;
-
-                essayAnswerDiv.classList.add('d-none');
-                if (essayAnswerTextarea) essayAnswerTextarea.disabled = true;
-            }
+            // Hide and disable Essay fields
+            pointsDiv.classList.add('d-none');
+            pointsInput.disabled = true; // IMPORTANT: Disabled inputs are not sent with the form
         }
     };
 
     document.getElementById('add-question-btn').addEventListener('click', () => {
         questionCount++;
         const questionsContainer = document.getElementById('questions-container');
+        // Note: The prefix here is 'question_' to match your Python view function _process_newly_added_questions
         questionsContainer.insertAdjacentHTML('beforeend', createQuestionCardHTML(questionCount));
         
-        toggleQuestionFieldsVisibility(questionCount); // Initial toggle for the new card
+        toggleQuestionFieldsVisibility(questionCount);
         
         const newTypeSelect = document.getElementById(`question_type_${questionCount}`);
         if (newTypeSelect) {
@@ -192,15 +208,6 @@ document.addEventListener('DOMContentLoaded', function () {
             if (cardToRemove) {
                 cardToRemove.remove();
             }
-        }
-    });
-    
-    // If there are any questions re-rendered by Django form errors (though unlikely with this JS approach)
-    // this would try to initialize them. But typically, on error, this page would be fresh.
-    document.querySelectorAll('.question-type-select').forEach(select => {
-        const questionId = select.getAttribute('data-question-id');
-        if (questionId){ // Ensure data-question-id attribute exists
-             toggleQuestionFieldsVisibility(questionId);
         }
     });
 });

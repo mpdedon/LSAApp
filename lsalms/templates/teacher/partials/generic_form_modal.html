@@ -1,40 +1,71 @@
-{% load crispy_forms_tags %}
-{% load lsalms_extras %}
+<!-- teacher/partials/generic_form_modal.html -->
+{% comment %}
+    NOTICE: There is NO {% load widget_tweaks %} here.
+    All filters like |add_attr have been removed.
+{% endcomment %}
 
-<form method="post" action="{{ form_action_url }}">
-    <div class="modal-header">
-        <h5 class="modal-title">
-            {% if form.instance.pk %}
-                Edit {{ form.instance|class_name|default:form.Meta.model|class_name }}
-            {% else %}
-                Create New {{ form.Meta.model|class_name }}
-            {% endif %}
-        </h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-    </div>
+{{ form.media }}
+
+<form method="post" action="{{ form_action_url }}" novalidate
+    enctype="multipart/form-data"
+    x-data="{ selectedType: '{{ form.instance.content_type|default:'TEXT' }}' }">
+    {% csrf_token %}
+
     <div class="modal-body">
-        {% csrf_token %}
-        {{ form|crispy }}
-
-        <!-- === AI Co-pilot for ContentBlock Forms ONLY === -->
-        {% if form.Meta.model|class_name == 'ContentBlock' %}
-        <div id="ai-copilot-wrapper" class="mb-3 p-3 bg-light border rounded" style="display: none;">
-            <label for="ai-prompt-textarea" class="form-label fw-bold">✨ AI Co-pilot</label>
-            <p class="small text-muted">Let the AI draft the content for your rich text block.</p>
-            <textarea id="ai-prompt-textarea" class="form-control form-control-sm" rows="2" placeholder="e.g., Explain the water cycle simply"></textarea>
-            
-            <!-- This button's 'data-target' now uses a simple, predictable ID from the form -->
-            <button type="button" class="btn btn-sm btn-outline-primary mt-2 ai-assist-btn"
-                    data-target="{{ form.rich_text.auto_id }}" 
-                    data-prompt-source="ai-prompt-textarea"
-                    data-context="{{ form.title.auto_id }}">
-                Generate Content
-            </button>
+        <!-- Always visible fields -->
+        <div class="mb-3">
+            <label class="form-label">{{ form.title.label }}</label>
+            {{ form.title }}
         </div>
-        {% endif %}
+        <div class="mb-3">
+            <label class="form-label">{{ form.content_type.label }}</label>
+            {{ form.content_type }}
+        </div>
+        <div class="mb-3">
+            <label class="form-label">{{ form.order.label }}</label>
+            {{ form.order }}
+        </div>
+        <hr>
+
+        <!-- === DYNAMICALLY TOGGLED FIELDS === -->
+        <div class="mb-3" x-show="selectedType === 'TEXT'" x-transition.opacity>
+            <label class="form-label">{{ form.rich_text.label }}</label>
+            {{ form.rich_text }}
+        </div>
+
+        <div class="mb-3" x-show="selectedType === 'IMAGE' || selectedType === 'AUDIO' || selectedType === 'FILE'" x-transition.opacity>
+            <label class="form-label">{{ form.media_file.label }}</label>
+            {{ form.media_file }}
+        </div>
+
+        <div class="mb-3" x-show="selectedType === 'VIDEO' || selectedType === 'AUDIO'" x-transition.opacity>
+            <label class="form-label">{{ form.media_url.label }}</label>
+            {{ form.media_url }}
+        </div>
+
+        <div class="mb-3" x-show="selectedType === 'ASSIGNMENT'" x-transition.opacity>
+            <label class="form-label">{{ form.linked_assignment.label }}</label>
+            {{ form.linked_assignment }}
+        </div>
+
+        <div class="mb-3" x-show="selectedType === 'ASSESSMENT'" x-transition.opacity>
+            <label class="form-label">{{ form.linked_assessment.label }}</label>
+            {{ form.linked_assessment }}
+        </div>
+
+        <div class="mb-3" x-show="selectedType === 'EXAM'" x-transition.opacity>
+            <label class="form-label">{{ form.linked_exam.label }}</label>
+            {{ form.linked_exam }}
+        </div>
+
+        <div class="mb-3" x-show="selectedType === 'PRACTICE_QUIZ'" x-transition.opacity>
+            <label class="form-label">{{ form.linked_practice_quiz.label }}</label>
+            {{ form.linked_practice_quiz }}
+        </div>
     </div>
+
     <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
         <button type="submit" class="btn btn-primary">Save Changes</button>
     </div>
 </form>

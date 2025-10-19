@@ -1,12 +1,12 @@
 {% extends 'base.html' %}
-{% load crispy_forms_tags %} {# Or your preferred form rendering method like add_class #}
+{% load crispy_forms_tags %}
 
 {% block title %}Create New Exam{% endblock %}
 
 {% block content %}
 <div class="container my-4">
     <div class="card shadow-sm">
-        <div class="card-header bg-primary text-white text-center">
+        <div class="card-header bg-danger text-white text-center"> {# Changed color for Exams #}
             <h2>Create New Exam</h2>
         </div>
         <div class="card-body p-4">
@@ -15,21 +15,10 @@
                     <h4 class="alert-heading">Errors Found!</h4>
                     <p>Please correct the errors below and try again.</p>
                     <hr>
-                    {% if form.non_field_errors %}
-                        <p class="mb-0">{{ form.non_field_errors }}</p>
-                    {% endif %}
-                    {% for field in form %}
-                        {% if field.errors %}
-                            <p class="mb-0"><strong>{{ field.label }}:</strong> {{ field.errors|striptags }}</p>
-                        {% endif %}
-                    {% endfor %}
+                    {% for field in form %}{% if field.errors %}<p class="mb-0"><strong>{{ field.label }}:</strong> {{ field.errors|striptags }}</p>{% endif %}{% endfor %}
                     {% if question_errors %}
                         <p class="mt-2 mb-0"><strong>Question Errors:</strong></p>
-                        <ul>
-                            {% for error in question_errors %}
-                                <li>{{ error }}</li>
-                            {% endfor %}
-                        </ul>
+                        <ul>{% for error in question_errors %}<li>{{ error }}</li>{% endfor %}</ul>
                     {% endif %}
                 </div>
             {% endif %}
@@ -37,53 +26,32 @@
             <form method="POST" novalidate>
                 {% csrf_token %}
                 
-                <div class="row">
-                    <div class="col-md-8 mb-3">
-                        {{ form.title|as_crispy_field }}
-                    </div>
-                    <div class="col-md-4 mb-3">
-                        {{ form.term|as_crispy_field }}
-                    </div>
-                </div>
-                <div class="mb-3">
-                    {{ form.short_description|as_crispy_field }}
-                </div>
-                <div class="row">
+                <div class="row"><div class="col-md-8 mb-3">{{ form.title|as_crispy_field }}</div><div class="col-md-4 mb-3">{{ form.term|as_crispy_field }}</div></div>
+                <div class="mb-3">{{ form.short_description|as_crispy_field }}</div>
+                <div class="row"><div class="col-md-6 mb-3">{{ form.class_assigned|as_crispy_field }}</div><div class="col-md-6 mb-3">{{ form.subject|as_crispy_field }}</div></div>
+                <div class="row"><div class="col-md-6 mb-3">{{ form.due_date|as_crispy_field }}</div><div class="col-md-6 mb-3">{{ form.duration|as_crispy_field }}</div></div>
+                <div class="row mt-3">
                     <div class="col-md-6 mb-3">
-                        {{ form.class_assigned|as_crispy_field }}
+                        {{ form.result_field_mapping|as_crispy_field }}
                     </div>
-                    <div class="col-md-6 mb-3">
-                        {{ form.subject|as_crispy_field }}
-                    </div>
-                </div>
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                         {{ form.due_date|as_crispy_field }}
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        {{ form.duration|as_crispy_field }}
+                    <div class="col-md-6 mb-3 d-flex align-items-center pt-4">
+                        <div class="form-check">
+                            {{ form.shuffle_questions }}
+                            <label class="form-check-label" for="{{ form.shuffle_questions.id_for_label }}">
+                                Randomize question & option order for each student?
+                            </label>
+                        </div>
                     </div>
                 </div>
-                <div class="mb-3 form-check">
-                    {{ form.is_online }}
-                    <label for="{{ form.is_online.id_for_label }}" class="form-check-label">Is this an Online Exam?</label>
-                </div>
-
                 <hr class="my-4">
                 <h4 class="mb-3">Questions</h4>
-                <div id="questions-container">
-                    <!-- Dynamically added questions will appear here -->
-                </div>
+                <div id="questions-container"></div>
                 <div class="text-center my-3">
-                    <button type="button" id="add-question-btn" class="btn btn-outline-success">
-                        <i class="fas fa-plus-circle me-1"></i> Add Question
-                    </button>
+                    <button type="button" id="add-question-btn" class="btn btn-outline-success"><i class="fas fa-plus-circle me-1"></i> Add Question</button>
                 </div>
                 <hr class="my-4">
                 <div class="text-center">
-                    <button type="submit" class="btn btn-primary btn-lg">
-                        <i class="fas fa-save me-1"></i> Save Exam
-                    </button>
+                    <button type="submit" class="btn btn-danger btn-lg"><i class="fas fa-save me-1"></i> Save Exam</button>
                     <a href="{{ request.META.HTTP_REFERER|default:'home' }}" class="btn btn-secondary btn-lg">Cancel</a>
                 </div>
             </form>
@@ -96,111 +64,77 @@ document.addEventListener('DOMContentLoaded', function () {
     let questionCount = 0; 
 
     const createQuestionCardHTML = (qCount) => {
-        // Consistent naming: question_type_X, question_text_X, etc.
+        // Using the 'question_' prefix which the backend helper function expects
         return `
             <div class="card mb-3 shadow-sm question-card-dynamic" id="question-card-${qCount}">
                 <div class="card-body">
                     <div class="d-flex justify-content-between align-items-center mb-2">
-                        <h6 class="card-title mb-0">Question ${qCount}</h6>
-                        <button type="button" class="btn btn-danger btn-sm remove-question-btn" data-question-id="${qCount}" aria-label="Remove Question ${qCount}">
-                            <i class="fas fa-trash"></i>
-                        </button>
+                        <h6 class="card-title mb-0">New Question ${qCount}</h6>
+                        <button type="button" class="btn btn-danger btn-sm remove-question-btn" data-question-id="${qCount}"><i class="fas fa-trash"></i></button>
                     </div>
-                    <div class="row">
-                        <div class="col-md-12 mb-2">
-                            <label for="question_type_${qCount}" class="form-label form-label-sm">Type</label>
-                            <select name="question_type_${qCount}" id="question_type_${qCount}" class="form-select form-select-sm question-type-select" data-question-id="${qCount}">
-                                <option value="SCQ" selected>Single Choice (SCQ)</option>
-                                <option value="MCQ">Multiple Choice (MCQ)</option>
-                                <option value="ES">Essay (ES)</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="mb-2">
-                        <label for="question_text_${qCount}" class="form-label form-label-sm">Question Text</label>
-                        <textarea name="question_text_${qCount}" id="question_text_${qCount}" class="form-control form-control-sm" rows="2" required></textarea>
-                    </div>
-                    <div class="mb-2 options-container" id="options-container-${qCount}">
-                        <label for="question_options_${qCount}" class="form-label form-label-sm">Options (comma-separated)</label>
-                        <input type="text" name="question_options_${qCount}" id="question_options_${qCount}" class="form-control form-control-sm" placeholder="e.g., Option A, Option B">
-                    </div>
-                    <div class="mb-2 correct-answer-scq-mcq-container" id="correct-answer-scq-mcq-container-${qCount}">
-                        <label for="question_correct_answer_input_${qCount}" class="form-label form-label-sm">Correct Answer (SCQ/MCQ)</label>
-                        <input type="text" name="question_correct_answer_${qCount}" id="question_correct_answer_input_${qCount}" class="form-control form-control-sm correct-answer-field" placeholder="One option for SCQ; comma-separated for MCQ">
-                    </div>
-                    <div class="mb-2 d-none essay-answer-container" id="essay-answer-container-${qCount}">
-                        <label for="question_correct_answer_textarea_${qCount}" class="form-label form-label-sm">Model Answer (Essay, Optional)</label>
-                        <textarea name="question_correct_answer_${qCount}" id="question_correct_answer_textarea_${qCount}" class="form-control form-control-sm correct-answer-field" rows="2" placeholder="Model answer or rubric points"></textarea>
+                    <div class="row"><div class="col-md-12 mb-2">
+                        <label class="form-label form-label-sm">Type</label>
+                        <select name="question_type_${qCount}" class="form-select form-select-sm question-type-select" data-question-id="${qCount}">
+                            <option value="SCQ" selected>Single Choice</option><option value="MCQ">Multiple Choice</option><option value="ES">Essay</option>
+                        </select>
+                    </div></div>
+                    <div class="mb-2"><label class="form-label form-label-sm">Question Text</label><textarea name="question_text_${qCount}" class="form-control form-control-sm" rows="2" required></textarea></div>
+                    <div class="mb-2 options-container"><label class="form-label form-label-sm">Options (comma-separated)</label><input type="text" name="question_options_${qCount}" class="form-control form-control-sm"></div>
+                    <div class="mb-2 correct-answer-scq-mcq-container"><label class="form-label form-label-sm">Correct Answer (SCQ/MCQ)</label><input type="text" name="question_correct_answer_${qCount}" class="form-control form-control-sm"></div>
+                    <div class="mb-2 d-none points-container">
+                        <label class="form-label form-label-sm">Points (for Essay)</label>
+                        <input type="number" name="question_points_${qCount}" class="form-control form-control-sm points-field" min="1" disabled>
                     </div>
                 </div>
             </div>
         `;
     };
 
-    const toggleQuestionFieldsVisibility = (qId) => { // Removed 'isExisting' as this template is only for new
-        const typeSelect = document.getElementById(`question_type_${qId}`);
+    const toggleQuestionFieldsVisibility = (qId) => {
+        const typeSelect = document.querySelector(`.question-card-dynamic[id="question-card-${qId}"] .question-type-select`);
         if (!typeSelect) return;
         const selectedType = typeSelect.value;
 
         const cardElement = document.getElementById(`question-card-${qId}`);
         if (!cardElement) return;
 
-        const optionsDiv = cardElement.querySelector(`.options-container`); // Simpler selector within the card
-        const correctAnswerScqMcqDiv = cardElement.querySelector(`.correct-answer-scq-mcq-container`);
-        const essayAnswerDiv = cardElement.querySelector(`.essay-answer-container`);
+        const optionsDiv = cardElement.querySelector('.options-container');
+        const scqMcqAnswerDiv = cardElement.querySelector('.correct-answer-scq-mcq-container');
+        const pointsDiv = cardElement.querySelector('.points-container');
+        const pointsInput = cardElement.querySelector('.points-field');
+        
+        if (!optionsDiv || !scqMcqAnswerDiv || !pointsDiv || !pointsInput) {
+            console.error(`Could not find all required field containers for card ID: question-card-${qId}`);
+            return;
+        }
 
-        const scqMcqAnswerInput = correctAnswerScqMcqDiv ? correctAnswerScqMcqDiv.querySelector('input.correct-answer-field') : null;
-        const essayAnswerTextarea = essayAnswerDiv ? essayAnswerDiv.querySelector('textarea.correct-answer-field') : null;
-
-        if (optionsDiv && correctAnswerScqMcqDiv && essayAnswerDiv) { // Check if all divs are found
-            if (selectedType === 'ES') {
-                optionsDiv.classList.add('d-none');
-                correctAnswerScqMcqDiv.classList.add('d-none');
-                if (scqMcqAnswerInput) scqMcqAnswerInput.disabled = true;
-
-                essayAnswerDiv.classList.remove('d-none');
-                if (essayAnswerTextarea) essayAnswerTextarea.disabled = false;
-            } else { // SCQ or MCQ
-                optionsDiv.classList.remove('d-none');
-                correctAnswerScqMcqDiv.classList.remove('d-none');
-                if (scqMcqAnswerInput) scqMcqAnswerInput.disabled = false;
-
-                essayAnswerDiv.classList.add('d-none');
-                if (essayAnswerTextarea) essayAnswerTextarea.disabled = true;
-            }
+        if (selectedType === 'ES') {
+            optionsDiv.classList.add('d-none');
+            scqMcqAnswerDiv.classList.add('d-none');
+            pointsDiv.classList.remove('d-none');
+            pointsInput.disabled = false;
+        } else { // SCQ or MCQ
+            optionsDiv.classList.remove('d-none');
+            scqMcqAnswerDiv.classList.remove('d-none');
+            pointsDiv.classList.add('d-none');
+            pointsInput.disabled = true;
         }
     };
 
     document.getElementById('add-question-btn').addEventListener('click', () => {
         questionCount++;
-        const questionsContainer = document.getElementById('questions-container');
-        questionsContainer.insertAdjacentHTML('beforeend', createQuestionCardHTML(questionCount));
-        
-        toggleQuestionFieldsVisibility(questionCount); // Initial toggle for the new card
-        
-        const newTypeSelect = document.getElementById(`question_type_${questionCount}`);
+        document.getElementById('questions-container').insertAdjacentHTML('beforeend', createQuestionCardHTML(questionCount));
+        toggleQuestionFieldsVisibility(questionCount);
+        const newTypeSelect = document.querySelector(`#question-card-${questionCount} .question-type-select`);
         if (newTypeSelect) {
             newTypeSelect.addEventListener('change', () => toggleQuestionFieldsVisibility(questionCount));
         }
     });
 
     document.getElementById('questions-container').addEventListener('click', function(event) {
-        let targetButton = event.target.closest('.remove-question-btn');
-        if (targetButton) {
-            const qId = targetButton.getAttribute('data-question-id');
-            const cardToRemove = document.getElementById(`question-card-${qId}`);
-            if (cardToRemove) {
-                cardToRemove.remove();
-            }
-        }
-    });
-    
-    // If there are any questions re-rendered by Django form errors (though unlikely with this JS approach)
-    // this would try to initialize them. But typically, on error, this page would be fresh.
-    document.querySelectorAll('.question-type-select').forEach(select => {
-        const questionId = select.getAttribute('data-question-id');
-        if (questionId){ // Ensure data-question-id attribute exists
-             toggleQuestionFieldsVisibility(questionId);
+        let target = event.target.closest('.remove-question-btn');
+        if (target) {
+            document.getElementById(`question-card-${target.dataset.questionId}`).remove();
         }
     });
 });

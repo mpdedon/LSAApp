@@ -1,18 +1,24 @@
 # core.student.views
 
 import json
+import random
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required
 from django.contrib import messages
-from django.http import HttpResponse, Http404
+from django.http import HttpResponse, Http404, HttpResponseNotAllowed
 from django.views import View
 from django.core.paginator import Paginator
 from django.db.models import Q
+from datetime import timedelta
+from decimal import Decimal
+from django.utils import timezone
+from django.views.decorators.csrf import csrf_exempt
 from core.models import Student, Assignment, AssignmentSubmission, Teacher, CustomUser, Message
-from core.models import Assessment, AssessmentSubmission, Exam, ExamSubmission, AcademicAlert 
+from core.models import Assessment, AssessmentSubmission, Exam, ExamSubmission
 from .forms import StudentRegistrationForm, MessageForm, ReplyForm
 from core.assignment.forms import AssignmentSubmissionForm
+
 
 # Student Views
 
@@ -192,250 +198,448 @@ def student_reports(request):
     # Implement report generation logic here
     pass
 
-@login_required
-def submit_assignment(request, assignment_id):
-    # Get the assignment or return a 404 if not found
-    assignment = get_object_or_404(Assignment, id=assignment_id)
 
-    # Determine the logged-in user's type
+# Helper to get client IP
+def get_client_ip(request):
+    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+    return x_forwarded_for.split(',')[0] if x_forwarded_for else request.META.get('REMOTE_ADDR')
+
+# Helper to manage student/guardian logic to keep views DRY
+def get_student_for_item(request, item, item_type_verbose, submit_url_name, template_path):
+    """
+    Handles student/guardian logic. Returns a student object or a redirect response.
+    `item` can be an Assignment, Assessment, or Exam.
+    """
     if hasattr(request.user, 'guardian'):
         guardian = request.user.guardian
-
-        # Filter students by the guardian and the assignment's class
-        students = Student.objects.filter(
-            student_guardian=guardian,
-            current_class=assignment.class_assigned
-        )
-
+        students = Student.objects.filter(student_guardian=guardian, current_class=item.class_assigned)
         if not students.exists():
-            messages.error(request, "No students associated with this guardian are enrolled in the assignment's class.")
+            messages.error(request, "No students associated with this guardian are in this class.")
             return redirect('guardian_dashboard')
-
-        # Check if a specific student is selected
-        student_id = request.GET.get('student_id')
-        if student_id:
-            student = get_object_or_404(students, id=student_id)
-        elif students.count() == 1:
-            student = students.first()
-        else:
-            # Render a selection page if multiple students match
-            return render(request, 'assignment/select_student.html', {
-                'students': students,
-                'assignment': assignment,
-            })
-
-    else:
-        # Handle student users submitting their own assignment
-        student = get_object_or_404(
-            Student,
-            user=request.user,
-            current_class=assignment.class_assigned
-        )
-
-    # Handle form submission
-    if request.method == 'POST':
-        answers = {}
         
-        # Collect the answers for each question
-        for question in assignment.questions.all():
-            answer_key = f'answers[{question.id}]'
-            answer_value = request.POST.get(answer_key)
-
-            # If the answer exists for this question, store it
-            if answer_value:
-                # For MCQ/SCQ, answers will be stored as the selected option
-                answers[question.id] = answer_value
-            else:
-                # For essay questions, we might want to store the plain text response
-                if question.question_type == 'ES':
-                    essay_answer = request.POST.get(f'answers_essay[{question.id}]')
-                    if essay_answer:
-                        answers[question.id] = essay_answer
-
-        # If answers are valid, save the submission
-        if answers:
-            submission = AssignmentSubmission.objects.create(
-                student=student,
-                assignment=assignment,
-                answers=json.dumps(answers),  # Save answers as JSON
-                is_completed=True,
-            )
-            messages.success(request, "Your assignment has been successfully submitted!")
-            return redirect('guardian_dashboard' if hasattr(request.user, 'guardian') else 'student_dashboard')
-
-        messages.error(request, "Please answer all questions before submitting.")
-        return redirect('submit_assignment', assignment_id=assignment_id)
-            
-    else:
-        form = AssignmentSubmissionForm()
-
-    # Render the form for assignment submission
-    return render(request, 'assignment/submit_assignment.html', {
-        'assignment': assignment,
-        'form': form,
-        'student': student,
-    })
-
-@login_required
-def submit_assessment(request, assessment_id):
-    assessment = get_object_or_404(Assessment, id=assessment_id)
-    user = request.user
-
-    # Determine the logged-in user's type
-    if hasattr(request.user, 'guardian'):
-        guardian = request.user.guardian
-
-        # Filter students by the guardian and the assignment's class
-        students = Student.objects.filter(
-            student_guardian=guardian,
-            current_class=assessment.class_assigned
-        )
-
-        if not students.exists():
-            messages.error(request, "No students associated with this guardian are enrolled in the assignment's class.")
-            return redirect('guardian_dashboard')
-
-        # Check if a specific student is selected
         student_id = request.GET.get('student_id')
         if student_id:
-            student = get_object_or_404(students, id=student_id)
+            return get_object_or_404(students, pk=student_id)
         elif students.count() == 1:
-            student = students.first()
+            return students.first()
         else:
-            # Render a selection page if multiple students match
-            return render(request, 'assessment/select_student.html', {
-                'students': students,
-                'assessment': assessment,
+            return render(request, template_path, {
+                'students': students, 'item': item, 
+                'item_type_verbose': item_type_verbose, 'submit_url_name': submit_url_name
             })
-
     else:
-        # Handle student users submitting their own assignment
-        student = get_object_or_404(
-            Student,
-            user=request.user,
-            current_class=assessment.class_assigned
-        )
+        return get_object_or_404(Student, user=request.user, current_class=item.class_assigned)
 
-    # Prevent multiple submissions and overdue submissions
-    if assessment.is_due:
-        return render(request, 'assessment/assessment_due.html', {"assessment": assessment})
+
+@login_required
+def start_assignment(request, assignment_id):
+    """STEP 1: Entry point. Creates submission, starts timer, gets IP, and redirects."""
+    assignment = get_object_or_404(Assignment, id=assignment_id)
     
-    if AssessmentSubmission.objects.filter(assessment=assessment, student=student).exists():
-        return render(request, 'assessment/already_submitted.html')
+    response = get_student_for_item(request, assignment)
+    if not isinstance(response, Student):
+        return response 
+    student = response
 
-    # Handle POST submission
-    if request.method == "POST":
-        answers = {}
-        score = 0
-        requires_manual_review = False
+    if AssignmentSubmission.objects.filter(assignment=assignment, student=student, is_completed=True).exists():
+        return render(request, 'assignment/already_submitted.html', {"assignment": assignment, "student": student})
 
-        for question in assessment.questions.all():
-            answer = request.POST.get(f'answer_{question.id}')
-            answers[str(question.id)] = answer
+    submission, created = AssignmentSubmission.objects.get_or_create(
+        assignment=assignment, student=student,
+        defaults={'ip_address': get_client_ip(request)}
+    )
 
-            # Auto-grade SCQ/MCQ
-            if question.question_type in ['SCQ', 'MCQ']:
-                if question.correct_answer == answer:
-                    score += 1
-            elif question.question_type == 'ES':
-                requires_manual_review = True
+    if not submission.started_at and assignment.duration:
+        submission.started_at = timezone.now()
+        submission.save()
 
-        # Save the submission
+    return redirect('take_assignment', submission_id=submission.id)
+
+
+@login_required
+def take_assignment(request, submission_id):
+    """STEP 2: The main page where the student takes the assignment."""
+    submission = get_object_or_404(AssignmentSubmission.objects.select_related('assignment', 'student__user'), id=submission_id)
+    assignment = submission.assignment
+
+    if submission.is_completed:
+        messages.info(request, "This assignment has already been submitted.")
+        return redirect('student_dashboard')
+
+    end_time = None
+    if assignment.duration and submission.started_at:
+        end_time = submission.started_at + timedelta(minutes=assignment.duration)
+        if timezone.now() > end_time:
+            return render(request, 'assignment/assessment_due.html', {"assignment": assignment, "student": submission.student})
+
+    questions_list = list(assignment.questions.all())
+    if assignment.shuffle_questions:
+        random.shuffle(questions_list)
+
+    context = {
+        'submission': submission, 'assignment': assignment, 'questions': questions_list,
+        'student': submission.student, 'end_time_iso': end_time.isoformat() if end_time else None,
+    }
+    return render(request, 'assignment/take_assignment_form.html', context)
+
+
+def _process_and_save_assignment_submission(request, submission_id):
+    """Internal helper to process POST data for both regular and beacon submissions."""
+    submission = get_object_or_404(AssignmentSubmission, id=submission_id)
+    if submission.is_completed:
+        return submission, False
+
+    assignment = submission.assignment
+    answers = {}
+    auto_grade = 0
+    
+    for question in assignment.questions.all():
+        answer_key = f'answer_{question.id}'
+        answer_value = request.POST.get(answer_key)
+        answers[str(question.id)] = answer_value
+
+        if question.question_type in ['SCQ', 'MCQ']:
+            if str(answer_value).strip().lower() == str(question.correct_answer).strip().lower():
+                auto_grade += 1
+    
+    submission.answers = answers
+    submission.grade = Decimal(auto_grade) # Awaiting manual grading for essays
+    submission.is_completed = True
+    submission.submitted_at = timezone.now()
+    submission.save()
+    return submission, True
+
+
+@login_required
+def submit_assignment(request, submission_id):
+    """STEP 3: Handles the final, intentional submission from the student."""
+    if request.method != "POST":
+        return HttpResponseNotAllowed(['POST'])
+    
+    submission, was_processed = _process_and_save_assignment_submission(request, submission_id)
+    if was_processed:
+        messages.success(request, f"Assignment '{submission.assignment.title}' submitted successfully.")
+    else:
+        messages.warning(request, "Assignment was already submitted.")
+    
+    return redirect('guardian_dashboard' if hasattr(request.user, 'guardian') else 'student_dashboard')
+
+
+@csrf_exempt
+def autosubmit_beacon_assignment(request, submission_id):
+    """STEP 4: Handles background submissions from browser closure."""
+    if request.method != 'POST':
+        return HttpResponse(status=204)
+        
+    submission, was_processed = _process_and_save_assignment_submission(request, submission_id)
+    if was_processed:
+        submission.force_submitted_at = timezone.now()
+        submission.save()
+    return HttpResponse(status=204)
+
+
+@login_required
+def start_assessment(request, assessment_id):
+
+    assessment = get_object_or_404(Assessment, id=assessment_id, is_approved=True)
+
+    if assessment.is_due:
+        messages.error(request, f"The deadline for '{assessment.title}' has passed.")
+        return render(request, 'assessment/assessment_due.html', {"assessment": assessment})
+
+    # Get the student object
+    response = get_student_for_item(request, assessment, 'Assessment', 'start_assessment', 'assessment/select_student.html')
+    if not isinstance(response, Student): 
+        return response
+    student = response
+ 
+    # Get all previous attempts for this student and assessment
+    previous_attempts = AssessmentSubmission.objects.filter(
+        assessment=assessment,
+        student=student
+    ).order_by('-attempt_number')
+    
+    latest_attempt = previous_attempts.first()
+    attempt_count = previous_attempts.count()
+
+    # Find the next attempt number
+    next_attempt_number = (latest_attempt.attempt_number + 1) if latest_attempt else 1
+
+    # CHECK 1: Have they already used all their attempts?
+    if latest_attempt and latest_attempt.is_completed and attempt_count >= 3:
+        messages.error(request, "You have used all available attempts for this assessment.")
+        return render(request, 'assessment/already_submitted.html', {
+            "assessment": assessment, "student": student, "latest_attempt": latest_attempt
+        })
+
+    # CHECK 2: Look for a pre-existing record for the next attempt.
+    submission = AssessmentSubmission.objects.filter(
+        assessment=assessment,
+        student=student,
+        attempt_number=next_attempt_number
+    ).first()
+    
+    if not submission:
+        # Before creating, one final check: if the last attempt was NOT completed, they can't start a new one.
+        if latest_attempt and not latest_attempt.is_completed:
+             messages.warning(request, "You have an incomplete attempt. Please finish it or contact your teacher.")
+             # Redirect them back to their incomplete attempt
+             return redirect('take_assessment', submission_id=latest_attempt.id)
+
+        # All checks passed. Create the new attempt record.
         submission = AssessmentSubmission.objects.create(
             assessment=assessment,
             student=student,
-            answers=answers,
-            score=score if not requires_manual_review else None,
-            is_graded=not requires_manual_review,
-            requires_manual_review=requires_manual_review
+            attempt_number=next_attempt_number,
+            ip_address=get_client_ip(request)
         )
 
-    # Render the assessment form
-    return render(request, 'assessment/submit_assessment.html', {
-        'assessment': assessment,
-        'questions': assessment.questions.all()
-    })
+    # --- Timer and Redirect Logic (remains the same) ---
+    if not submission.started_at and assessment.duration:
+        submission.started_at = timezone.now()
+        submission.save()
+
+    return redirect('take_assessment', submission_id=submission.id)
+
 
 
 @login_required
-def submit_exam(request, exam_id):
-    exam = get_object_or_404(Exam, id=exam_id)
-    user = request.user
+def take_assessment(request, submission_id):
+    """STEP 2: The main page where the student takes the timed assessment."""
+    submission = get_object_or_404(AssessmentSubmission.objects.select_related('assessment', 'student__user'), id=submission_id)
+    assessment = submission.assessment
 
-    # Determine the logged-in user's type
-    if hasattr(request.user, 'guardian'):
-        guardian = request.user.guardian
+    if submission.is_completed:
+        messages.info(request, "This assessment has already been submitted.")
+        return redirect('student_dashboard')
 
-        # Filter students by the guardian and the assignment's class
-        students = Student.objects.filter(
-            student_guardian=guardian,
-            current_class=exam.class_assigned
-        )
+    end_time = None
+    if assessment.duration and submission.started_at:
+        end_time = submission.started_at + timedelta(minutes=assessment.duration)
+        if timezone.now() > end_time:
+            return render(request, 'assessment/assessment_due.html', {"assessment": assessment, "student": submission.student})
 
-        if not students.exists():
-            messages.error(request, "No students associated with this guardian are enrolled in the assignment's class.")
-            return redirect('guardian_dashboard')
-
-        # Check if a specific student is selected
-        student_id = request.GET.get('student_id')
-        if student_id:
-            student = get_object_or_404(students, id=student_id)
-        elif students.count() == 1:
-            student = students.first()
-        else:
-            # Render a selection page if multiple students match
-            return render(request, 'exam/select_student.html', {
-                'students': students,
-                'exam': exam,
-            })
-
-    else:
-        # Handle student users submitting their own assignment
-        student = get_object_or_404(
-            Student,
-            user=request.user,
-            current_class=exam.class_assigned
-        )
-
-    # Prevent multiple submissions and overdue submissions
-    if exam.is_due:
-        return render(request, 'exam/exam_due.html', {"exam": exam})
+    questions_list = list(assessment.questions.all())
+    if assessment.shuffle_questions:
+        random.shuffle(questions_list)
     
-    if ExamSubmission.objects.filter(exam=exam, student=student).exists():
-        return render(request, 'exam/already_submitted.html')
+    processed_questions = []
+    for q in questions_list:
+        options = q.options_list()
+        if assessment.shuffle_questions and q.question_type in ['SCQ', 'MCQ']:
+            random.shuffle(options)
+        processed_questions.append({'question': q, 'shuffled_options': options})
 
-    # Handle POST submission
-    if request.method == "POST":
-        answers = {}
-        score = 0
-        requires_manual_review = False
+    context = {
+        'submission': submission, 'assessment': assessment, 'questions_data': processed_questions,
+        'student': submission.student, 'end_time_iso': end_time.isoformat() if end_time else None,
+    }
+    return render(request, 'assessment/take_assessment.html', context)
 
-        for question in exam.questions.all():
-            answer = request.POST.get(f'answer_{question.id}')
-            answers[str(question.id)] = answer
 
-            # Auto-grade SCQ/MCQ
-            if question.question_type in ['SCQ', 'MCQ']:
-                if question.correct_answer == answer:
-                    score += 1
-            elif question.question_type == 'ES':
-                requires_manual_review = True
+def _process_and_save_assessment_submission(request, submission_id):
+    """Internal helper to process POST data for both regular and beacon submissions."""
+    submission = get_object_or_404(AssessmentSubmission, id=submission_id)
+    if submission.is_completed:
+        return submission, False
 
-        # Save the submission
+    assessment = submission.assessment
+    answers = {}
+    score = Decimal('0.0')
+    requires_manual_review = False
+
+    for question in assessment.questions.all():
+        answer_key = f'answer_{question.id}'
+        submitted_answer = None
+        if question.question_type == 'MCQ':
+            submitted_answer = request.POST.getlist(answer_key)
+        else:
+            submitted_answer = request.POST.get(answer_key)
+        
+        answers[str(question.id)] = submitted_answer
+
+        if question.question_type == 'ES':
+            requires_manual_review = True
+        elif question.is_option_correct(submitted_answer):
+            score += Decimal(question.points) # Use points from OnlineQuestion
+            
+    submission.answers = answers
+    submission.score = score
+    submission.requires_manual_review = requires_manual_review
+    submission.is_graded = not requires_manual_review
+    submission.is_completed = True
+    submission.submitted_at = timezone.now()
+    submission.save() # The signal will fire after this save
+    return submission, True
+
+
+@login_required
+def submit_assessment(request, submission_id):
+    """STEP 3: Handles the final, intentional submission."""
+    if request.method != "POST":
+        return HttpResponseNotAllowed(['POST'])
+    
+    submission, was_processed = _process_and_save_assessment_submission(request, submission_id)
+    if was_processed:
+        messages.success(request, f"Assessment '{submission.assessment.title}' submitted successfully.")
+    else:
+        messages.warning(request, "Assessment was already submitted.")
+    
+    return redirect('guardian_dashboard' if hasattr(request.user, 'guardian') else 'student_dashboard')
+
+
+@csrf_exempt
+def autosubmit_beacon_assessment(request, submission_id):
+    """STEP 4: Handles background submissions from browser closure."""
+    if request.method != 'POST':
+        return HttpResponse(status=204)
+        
+    submission, was_processed = _process_and_save_assessment_submission(request, submission_id)
+    if was_processed:
+        submission.force_submitted_at = timezone.now()
+        submission.save()
+    return HttpResponse(status=204)
+
+
+@login_required
+def start_exam(request, exam_id):
+
+    exam = get_object_or_404(Exam, id=exam_id, is_approved=True)
+
+    if exam.is_due:
+        messages.error(request, f"The deadline for '{exam.title}' has passed.")
+        return render(request, 'exam/exam_due.html', {"exam": exam})
+
+    response = get_student_for_item(request, exam, 'Exam', 'start_exam', 'exam/select_student.html')
+    if not isinstance(response, Student): 
+        return response
+    student = response
+
+    # --- 3-ATTEMPT RETAKE LOGIC ---
+    previous_attempts = ExamSubmission.objects.filter(exam=exam, student=student).order_by('-attempt_number')
+    latest_attempt = previous_attempts.first()
+    attempt_count = previous_attempts.count()
+    next_attempt_number = (latest_attempt.attempt_number + 1) if latest_attempt else 1
+
+    if latest_attempt and latest_attempt.is_completed and attempt_count >= 3:
+        messages.error(request, "You have used all available attempts for this exam.")
+        return render(request, 'exam/already_submitted.html', {"exam": exam, "student": student, "latest_attempt": latest_attempt})
+
+    submission = ExamSubmission.objects.filter(exam=exam, student=student, attempt_number=next_attempt_number).first()
+    
+    if not submission:
+        if latest_attempt and not latest_attempt.is_completed:
+             messages.warning(request, "You have an incomplete attempt. Please finish it or contact your teacher.")
+             return redirect('take_exam', submission_id=latest_attempt.id)
+
         submission = ExamSubmission.objects.create(
-            exam=exam,
-            student=student,
-            answers=answers,
-            score=score if not requires_manual_review else None,
-            is_graded=not requires_manual_review,
-            requires_manual_review=requires_manual_review
+            exam=exam, student=student, attempt_number=next_attempt_number, ip_address=get_client_ip(request)
         )
 
-    # Render the exam form
-    return render(request, 'exam/submit_exam.html', {
-        'exam': exam,
-        'questions': exam.questions.all()
-    })
+    # --- Timer and Redirect ---
+    if not submission.started_at and exam.duration:
+        submission.started_at = timezone.now()
+        submission.save()
+
+    return redirect('take_exam', submission_id=submission.id)
+
+
+@login_required
+def take_exam(request, submission_id):
+    """STEP 2: The main page where the student takes the timed exam."""
+    submission = get_object_or_404(ExamSubmission.objects.select_related('exam', 'student__user'), id=submission_id)
+    exam = submission.exam
+
+    if submission.is_completed:
+        messages.info(request, "This exam has already been submitted.")
+        return redirect('student_dashboard')
+
+    end_time = None
+    if exam.duration and submission.started_at:
+        end_time = submission.started_at + timedelta(minutes=exam.duration)
+        if timezone.now() > end_time:
+            return render(request, 'exam/exam_due.html', {"exam": exam, "student": submission.student})
+
+    questions_list = list(exam.questions.all())
+    if exam.shuffle_questions:
+        random.shuffle(questions_list)
+    
+    processed_questions = []
+    for q in questions_list:
+        options = q.options_list()
+        if exam.shuffle_questions and q.question_type in ['SCQ', 'MCQ']:
+            random.shuffle(options)
+        processed_questions.append({'question': q, 'shuffled_options': options})
+
+    context = {
+        'submission': submission, 'exam': exam, 'questions_data': processed_questions,
+        'student': submission.student, 'end_time_iso': end_time.isoformat() if end_time else None,
+    }
+    return render(request, 'exam/take_exam.html', context)
+
+
+def _process_and_save_exam_submission(request, submission_id):
+    """Internal helper to process POST data for both regular and beacon submissions."""
+    submission = get_object_or_404(ExamSubmission, id=submission_id)
+    if submission.is_completed:
+        return submission, False
+
+    exam = submission.exam
+    answers = {}
+    score = Decimal('0.0')
+    requires_manual_review = False
+
+    for question in exam.questions.all():
+        answer_key = f'answer_{question.id}'
+        submitted_answer = None
+        if question.question_type == 'MCQ':
+            submitted_answer = request.POST.getlist(answer_key)
+        else:
+            submitted_answer = request.POST.get(answer_key)
+        
+        answers[str(question.id)] = submitted_answer
+
+        if question.question_type == 'ES':
+            requires_manual_review = True
+        elif question.is_option_correct(submitted_answer):
+            score += Decimal(question.points) # Use points from OnlineQuestion
+            
+    submission.answers = answers
+    submission.score = score
+    submission.requires_manual_review = requires_manual_review
+    submission.is_graded = not requires_manual_review
+    submission.is_completed = True
+    submission.submitted_at = timezone.now()
+    submission.save() # The signal will fire after this save
+    return submission, True
+
+
+@login_required
+def submit_exam(request, submission_id):
+    """STEP 3: Handles the final, intentional submission."""
+    if request.method != "POST":
+        return HttpResponseNotAllowed(['POST'])
+    
+    submission, was_processed = _process_and_save_exam_submission(request, submission_id)
+    if was_processed:
+        messages.success(request, f"Exam '{submission.exam.title}' submitted successfully.")
+    else:
+        messages.warning(request, "Exam was already submitted.")
+    
+    return redirect('guardian_dashboard' if hasattr(request.user, 'guardian') else 'student_dashboard')
+
+
+@csrf_exempt
+def autosubmit_beacon_exam(request, submission_id):
+    """STEP 4: Handles background submissions from browser closure."""
+    if request.method != 'POST':
+        return HttpResponse(status=204)
+        
+    submission, was_processed = _process_and_save_exam_submission(request, submission_id)
+    if was_processed:
+        submission.force_submitted_at = timezone.now()
+        submission.save()
+    return HttpResponse(status=204)
 
 
 @login_required
@@ -611,3 +815,139 @@ def message_thread(request, thread_id):
     return render(request, 'messaging/message_thread.html', context)
 
 
+@login_required
+def view_assignment_result(request, submission_id):
+    submission = get_object_or_404(AssignmentSubmission.objects.select_related(
+        'assignment__subject', 'student__user'
+    ), id=submission_id)
+
+    # Authorization check
+    is_student = request.user == submission.student.user
+    is_guardian = hasattr(request.user, 'guardian') and submission.student in request.user.guardian.students.all()
+
+    if not (is_student or is_guardian):
+        messages.error(request, "You are not authorized to view these results.")
+        return redirect('home')
+
+    assignment = submission.assignment
+    questions = assignment.questions.all()
+    
+    # --- THE DEFENSIVE FIX: Handle incorrectly saved data ---
+    student_answers = submission.answers
+    if isinstance(student_answers, str):
+        try:
+            student_answers = json.loads(student_answers)
+        except json.JSONDecodeError:
+            student_answers = {} # Default to empty dict if the string is invalid
+
+    # Now, `student_answers` is guaranteed to be a dictionary
+    
+    # Prepare data for the template
+    results_data = []
+    for question in questions:
+        student_answer = student_answers.get(str(question.id), "Not Answered")
+        is_correct = (str(student_answer).strip().lower() == str(question.correct_answer).strip().lower())
+        
+        results_data.append({
+            'question_text': question.question_text,
+            'student_answer': student_answer,
+            'correct_answer': question.correct_answer,
+            'is_correct': is_correct,
+        })
+
+    context = {
+        'submission': submission,
+        'assignment': assignment,
+        'results_data': results_data, # Pass the processed data
+    }
+    return render(request, 'assignment/view_assignment_result.html', context)
+
+
+@login_required
+def view_assessment_result(request, submission_id):
+    """
+    This view correctly uses the unique submission_id to get a single object.
+    """
+    # --- THE FIX: Use get_object_or_404 with the unique submission_id ---
+    submission = get_object_or_404(AssessmentSubmission.objects.select_related(
+        'assessment__subject', 'student__user'
+    ), id=submission_id)
+
+    # Authorization check
+    is_student = request.user == submission.student.user
+    is_guardian = hasattr(request.user, 'guardian') and submission.student in request.user.guardian.students.all()
+
+    if not (is_student or is_guardian):
+        messages.error(request, "You are not authorized to view these results.")
+        return redirect('home')
+
+    assessment = submission.assessment
+    questions = assessment.questions.all()
+    
+    # Defensively handle the 'answers' field
+    student_answers = submission.answers
+    if isinstance(student_answers, str):
+        try: student_answers = json.loads(student_answers)
+        except json.JSONDecodeError: student_answers = {}
+
+    # Prepare data for the template (your logic here is good)
+    results_data = []
+    for question in questions:
+        student_answer = student_answers.get(str(question.id), "Not Answered")
+        is_correct = question.is_option_correct(student_answer)
+        results_data.append({ ... })
+
+    context = {
+        'submission': submission,
+        'assessment': assessment,
+        'results_data': results_data,
+    }
+    return render(request, 'assessment/view_assessment_result.html', context)
+
+
+@login_required
+def view_exam_result(request, submission_id):
+    # --- THE FIX: Look up the ExamSubmission by its ID ---
+    submission = get_object_or_404(ExamSubmission.objects.select_related(
+        'exam__subject', 'student__user'
+    ), id=submission_id)
+
+    # Authorization check
+    is_student = request.user == submission.student.user
+    is_guardian = hasattr(request.user, 'guardian') and submission.student in request.user.guardian.students.all()
+
+    if not (is_student or is_guardian):
+        messages.error(request, "You are not authorized to view these results.")
+        return redirect('home')
+
+    exam = submission.exam
+    questions = exam.questions.all()
+    
+    # Defensively handle the 'answers' field
+    student_answers = submission.answers
+    if isinstance(student_answers, str):
+        try: student_answers = json.loads(student_answers)
+        except json.JSONDecodeError: student_answers = {}
+
+    # Prepare data for the template
+    results_data = []
+    for question in questions:
+        student_answer = student_answers.get(str(question.id), "Not Answered")
+        # Use the robust is_option_correct method from the OnlineQuestion model
+        is_correct = question.is_option_correct(student_answer)
+        
+        results_data.append({
+            'question_text': question.question_text,
+            'student_answer': student_answer,
+            'correct_answer': question.correct_answer,
+            'is_correct': is_correct,
+            'options': question.options_list(), # Pass options for display
+            'question_type': question.question_type,
+        })
+
+    context = {
+        'submission': submission,
+        'exam': exam,
+        'results_data': results_data,
+    }
+    return render(request, 'exam/view_exam_result.html', context)

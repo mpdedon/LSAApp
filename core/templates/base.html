@@ -225,9 +225,25 @@
   <!-- Scripts -->
   <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
   {# <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/js/all.min.js" integrity="sha512-uKQ39gEGiyUJl4AI6L+ekBdGKpGw4xJ55+cprOpSoOTEUyL0T+sfC3t2IsA+WYTRRn4Tb9J7B8ayfAUHRTz8fQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script> #}
-
-  <!-- Custom JS -->
+  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.13.10/dist/cdn.min.js"></script>
+    <!-- Custom JS -->
   <script src="{% static 'js/script.js' %}"></script> 
+    {% csrf_token %}
+
+    <!-- ... your page content ... -->
+
+  <!-- Load HTMX -->
+  <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+  
+  <!-- === THE DEFINITIVE CSRF TOKEN FIX === -->
+  <script>
+      document.body.addEventListener('htmx:configRequest', (event) => {
+          event.detail.headers['X-CSRFToken'] = '{{ csrf_token }}';
+      })
+  </script>
+  
+  <!-- Load Confetti (we will use it) -->
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
   {% block extra_js %}{% endblock %} 
 

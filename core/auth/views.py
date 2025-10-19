@@ -240,47 +240,70 @@ def student_dashboard(request):
 
 
     # --- 2. PREPARE "QUESTS"  ---
-    upcoming_quests = []
-    # Fetch all submissions for this student at once
-    submitted_assignment_ids = set(AssignmentSubmission.objects.filter(student=student).values_list('assignment_id', flat=True))
-    submitted_assessment_ids = set(AssessmentSubmission.objects.filter(student=student).values_list('assessment_id', flat=True))
-    submitted_exam_ids = set(ExamSubmission.objects.filter(student=student).values_list('exam_id', flat=True))
+    active_quests = []
+    past_quests = []
 
-    # Get active tasks
-    assignments = Assignment.objects.filter(class_assigned=student.current_class, term=active_term, active=True).select_related('subject')
-    assessments = Assessment.objects.filter(class_assigned=student.current_class, term=active_term, is_approved=True).select_related('subject')
-    exams = Exam.objects.filter(class_assigned=student.current_class, term=active_term, is_approved=True).select_related('subject')
+    # --- Fetch ALL submissions for the student, including incomplete ones ---
+    all_assignments_subs = {s.assignment_id: s for s in AssignmentSubmission.objects.filter(student=student)}
+    all_assessments_subs = {s.assessment_id: s for s in AssessmentSubmission.objects.filter(student=student)}
+    all_exams_subs = {s.exam_id: s for s in ExamSubmission.objects.filter(student=student)}
 
-    # Helper function to safely reverse URLs
-    def safe_reverse(url_name, kwargs):
-        try:
-            return reverse(url_name, kwargs=kwargs)
-        except NoReverseMatch:
-            return "#" # Return a dead link as a fallback
+    # Fetch all tasks for the student's class
+    assignments = Assignment.objects.filter(class_assigned=student.current_class, active=True)
+    assessments = Assessment.objects.filter(class_assigned=student.current_class, is_approved=True)
+    exams = Exam.objects.filter(class_assigned=student.current_class, is_approved=True)
 
-    for task in assignments:
-        if task.id not in submitted_assignment_ids:
-            upcoming_quests.append({
-                'type': 'assignment', 'obj': task, 'due_date': task.due_date,
-                'submit_url': safe_reverse('submit_assignment', kwargs={'assignment_id': task.id})
-            })
+    def categorize_task(task, task_type, all_submissions_map):
+        submission = all_submissions_map.get(task.id)
+        
+        # --- NEW, PRIORITIZED LOGIC ---
+        status = ""
+        is_active = False
 
-    for task in assessments:
-        if task.id not in submitted_assessment_ids:
-            upcoming_quests.append({
-                'type': 'assessment', 'obj': task, 'due_date': task.due_date,
-                'submit_url': safe_reverse('submit_assessment', kwargs={'assessment_id': task.id})
-            })
+        # Priority 1: Check for completion. This overrides everything else.
+        if submission and submission.is_completed:
+            status = "COMPLETED"
+            is_active = False
+        
+        # Priority 2: If not completed, check if it's overdue. This is the next most important check.
+        elif task.due_date and task.due_date < now:
+            status = "OVERDUE"
+            is_active = False
 
-    for task in exams:
-        if task.id not in submitted_exam_ids:
-            upcoming_quests.append({
-                'type': 'exam', 'obj': task, 'due_date': task.due_date,
-                'submit_url': safe_reverse('submit_exam', kwargs={'exam_id': task.id})
-            })
+        # Priority 3: If not completed and not overdue, check for an in-progress attempt (a retake or abandoned task).
+        elif submission and not submission.is_completed:
+            status = "IN_PROGRESS" # This is a granted retake or an attempt they started and left.
+            is_active = True
 
-    context['upcoming_quests'] = sorted(upcoming_quests, key=lambda q: q['due_date'])
+        # Priority 4: If none of the above, it's a fresh, untouched, and active task.
+        else:
+            status = "ACTIVE"
+            is_active = True
 
+        quest = {
+            'type': task_type,
+            'obj': task,
+            'start_url': reverse(f'start_{task_type}', args=[task.id]),
+            'submission': submission,
+            'status': status,
+        }
+
+        if is_active:
+            active_quests.append(quest)
+        else:
+            past_quests.append(quest)
+
+    # Process all tasks using the new robust logic
+    for task in assignments: categorize_task(task, 'assignment', all_assignments_subs)
+    for task in assessments: categorize_task(task, 'assessment', all_assessments_subs)
+    for task in exams: categorize_task(task, 'exam', all_exams_subs)
+
+    # Sort the lists
+    active_quests.sort(key=lambda x: x['obj'].due_date)
+    past_quests.sort(key=lambda x: x['obj'].due_date, reverse=True) 
+
+    context['active_quests'] = active_quests
+    context['past_quests'] = past_quests
 
     # --- 3. FETCH OTHER DASHBOARD DATA ---
     context['subjects'] = Subject.objects.filter(class_assignments__class_assigned=student.current_class, class_assignments__term=active_term).distinct()
@@ -358,22 +381,70 @@ def teacher_dashboard(request):
     student_count = Student.objects.filter(current_class__in=teacher_assigned_classes_qs, status='active').count()
     subject_count = subjects_taught_qs.count()
     
+    form_teacher_classes = teacher.current_classes().all()
+
+    # --- Upcoming Tasks ---
+    upcoming_assignments_qs = Assignment.objects.filter(
+        Q(teacher=teacher) | Q(class_assigned__in=form_teacher_classes),
+        due_date__gte=now, active=True, term=active_term
+    ).distinct().select_related('subject', 'class_assigned')
+
+    upcoming_tasks_qs = Assessment.objects.filter(
+        Q(created_by=request.user) | Q(class_assigned__in=form_teacher_classes),
+        due_date__gte=now, is_approved=True, term=active_term
+    ).distinct().select_related('subject', 'class_assigned')
+
+    upcoming_exams_qs = Exam.objects.filter(
+        Q(created_by=request.user) | Q(class_assigned__in=form_teacher_classes),
+        due_date__gte=now, is_approved=True, term=active_term
+    ).distinct().select_related('subject', 'class_assigned')
+
+    # Combine and sort them
     upcoming_tasks = []
-    assignments = Assignment.objects.filter(teacher=teacher, due_date__gte=now, active=True, term=active_term).select_related('subject', 'class_assigned').order_by('due_date')[:3]
-    for item in assignments: upcoming_tasks.append({'type': 'Assignment', 'obj': item})
-    
-    assessments = Assessment.objects.filter(created_by=request.user, due_date__gte=now, is_approved=True, term=active_term).select_related('subject', 'class_assigned').order_by('due_date')[:3]
-    for item in assessments: upcoming_tasks.append({'type': 'Assessment', 'obj': item})
-
-    exams = Exam.objects.filter(created_by=request.user, due_date__gte=now, is_approved=True, term=active_term).select_related('subject', 'class_assigned').order_by('due_date')[:3]
-    for item in exams: upcoming_tasks.append({'type': 'Exam', 'obj': item})
-    
+    for item in upcoming_assignments_qs: upcoming_tasks.append({'type': 'Assignment', 'obj': item})
+    for item in upcoming_tasks_qs: upcoming_tasks.append({'type': 'Assessment', 'obj': item})
+    for item in upcoming_exams_qs: upcoming_tasks.append({'type': 'Exam', 'obj': item})
     upcoming_tasks.sort(key=lambda x: x['obj'].due_date)
+    uspcoming_tasks = upcoming_tasks[:5] 
 
-    pending_submissions = AssessmentSubmission.objects.filter(
-        assessment__created_by=request.user,
-        requires_manual_review=True, is_graded=False
-    ).select_related('student__user', 'assessment').order_by('submitted_at')[:5]
+    # --- Pending Submissions to Grade ---
+    pending_assessment_subs = AssessmentSubmission.objects.filter(
+        Q(assessment__created_by=request.user) | Q(assessment__class_assigned__in=form_teacher_classes),
+        requires_manual_review=True, 
+        is_graded=False
+    ).distinct().select_related('student__user', 'assessment')
+
+    pending_exam_subs = ExamSubmission.objects.filter(
+        Q(exam__created_by=request.user) | Q(exam__class_assigned__in=form_teacher_classes),
+        requires_manual_review=True, 
+        is_graded=False
+    ).distinct().select_related('student__user', 'exam')
+
+    # 4. Combine and prepare the unified list for the template
+    all_pending_submissions = []
+
+    for sub in pending_assessment_subs:
+        all_pending_submissions.append({
+            'type': 'Assessment',
+            'submission': sub,
+            'task': sub.assessment,
+            'student_name': sub.student.user.get_full_name(),
+            'submitted_at': sub.submitted_at,
+            'grade_url': 'grade_essay_assessment'
+        })
+        
+    for sub in pending_exam_subs:
+        all_pending_submissions.append({
+            'type': 'Exam',
+            'submission': sub,
+            'task': sub.exam,
+            'student_name': sub.student.user.get_full_name(),
+            'submitted_at': sub.submitted_at,
+            'grade_url': 'grade_essay_exam' 
+        })
+
+    # 5. Sort the final list by the submission date
+    all_pending_submissions.sort(key=lambda x: x['submitted_at'], reverse=True)
     
     notifications = Notification.objects.filter(
         Q(audience='teacher') | Q(audience='all'),
@@ -399,9 +470,45 @@ def teacher_dashboard(request):
             students_by_class_dict[student.current_class].append(student)
 
     # --- CONTEXT FOR: Manage Tasks Tab ---
-    all_assignments = Assignment.objects.filter(teacher=teacher).order_by('-created_at')
-    all_assessments = Assessment.objects.filter(created_by=request.user).order_by('-created_at')
-    all_exams = Exam.objects.filter(created_by=request.user).order_by('-created_at')
+    if not form_teacher_classes_qs.exists():
+        # Handle case where the teacher is not a form teacher of any class
+        all_current_assignments = Assignment.objects.none()
+        all_previous_assignments = Assignment.objects.none()
+        all_current_assessments = Assessment.objects.none()
+        all_previous_assessments = Assessment.objects.none()
+        all_current_exams = Exam.objects.none()
+        all_previous_exams = Exam.objects.none()
+    else:
+        # This retrieves ALL tasks for the form teacher's classes, regardless of creator.
+        
+        # 1. Get tasks for the CURRENT ACTIVE TERM
+        all_current_assignments = Assignment.objects.filter(
+            class_assigned__in=form_teacher_classes_qs,
+            term=active_term
+        ).select_related('class_assigned', 'subject').order_by('-due_date')
+
+        all_current_assessments = Assessment.objects.filter(
+            class_assigned__in=form_teacher_classes_qs,
+            term=active_term
+        ).select_related('class_assigned', 'subject').order_by('-due_date')
+
+        all_current_exams = Exam.objects.filter(
+            class_assigned__in=form_teacher_classes_qs,
+            term=active_term
+        ).select_related('class_assigned', 'subject').order_by('-due_date')
+
+        # 2. Get tasks from ALL PREVIOUS TERMS
+        all_previous_assignments = Assignment.objects.filter(
+            class_assigned__in=form_teacher_classes_qs
+        ).exclude(term=active_term).select_related('class_assigned', 'subject').order_by('-due_date')
+
+        all_previous_assessments = Assessment.objects.filter(
+            class_assigned__in=form_teacher_classes_qs
+        ).exclude(term=active_term).select_related('class_assigned', 'subject').order_by('-due_date')
+
+        all_previous_exams = Exam.objects.filter(
+            class_assigned__in=form_teacher_classes_qs
+        ).exclude(term=active_term).select_related('class_assigned', 'subject').order_by('-due_date')
     
     # --- CONTEXT FOR: Leaderboard & Broadsheet Tabs ---
     form_teacher_term_ids = TeacherAssignment.objects.filter(teacher=teacher).values_list('term_id', flat=True)
@@ -446,7 +553,7 @@ def teacher_dashboard(request):
         'student_count': student_count,
         'subject_count': subject_count,
         'upcoming_tasks': upcoming_tasks,
-        'pending_submissions': pending_submissions,
+        'pending_submissions': all_pending_submissions[:5],
         'notifications': notifications,
         'form_teacher_classes_count': form_teacher_classes_qs.count(),
 
@@ -459,9 +566,12 @@ def teacher_dashboard(request):
         'teacher_subjects': teacher.assigned_subjects(),
         
         # Manage Tasks Tab
-        'all_assignments': all_assignments,
-        'all_assessments': all_assessments,
-        'all_exams': all_exams,
+        'all_current_assignments': all_current_assignments,
+        'all_previous_assignments': all_previous_assignments,
+        'all_current_assessments': all_current_assessments,
+        'all_previous_assessments': all_previous_assessments,
+        'all_current_exams': all_current_exams,
+        'all_previous_exams': all_previous_exams,
         
         # Broadsheets Tab
         'all_sessions': all_sessions, 
@@ -496,106 +606,92 @@ def guardian_dashboard(request):
     active_term = Term.objects.filter(is_active=True).select_related('session').first()
     active_session = active_term.session if active_term else None
 
+    now = timezone.now()
+    students_data = defaultdict(dict)
+
     # --- Pre-fetch all data needed for all wards in bulk ---
 
     assignments_data = defaultdict(lambda: {'details': [], 'total': 0, 'completed': 0, 'pending': 0, 'completion_percentage': 0})
     assessments_data = defaultdict(lambda: {'details': [], 'total': 0, 'completed': 0, 'pending': 0, 'completion_percentage': 0})
     exams_data = defaultdict(lambda: {'details': [], 'total': 0, 'completed': 0, 'pending': 0, 'completion_percentage': 0})
-
+    
     if wards_qs.exists():
+        ward_pks = wards_qs.values_list('pk', flat=True)
         ward_class_ids = wards_qs.values_list('current_class_id', flat=True)
         
-        # --- Assignments ---
-        all_assignments = Assignment.objects.filter(class_assigned_id__in=ward_class_ids, active=True, term=active_term)
-        submitted_assignments = AssignmentSubmission.objects.filter(student__in=wards_qs, assignment__in=all_assignments).values('student_id', 'assignment_id', 'id')
-        
+        # 1. Fetch ALL submissions for ALL wards in bulk, getting the FULL objects
         submitted_assign_map = defaultdict(dict)
-        for sub in submitted_assignments:
-            submitted_assign_map[sub['student_id']][sub['assignment_id']] = {'id': sub['id']}
+        for sub in AssignmentSubmission.objects.filter(student_id__in=ward_pks):
+            submitted_assign_map[sub.student_id][sub.assignment_id] = sub
 
-        for student in wards_qs:
-            student_tasks = [a for a in all_assignments if a.class_assigned_id == student.current_class_id]
-            
-            details = []
-            for task in student_tasks:
-                submission_info = submitted_assign_map.get(student.pk, {}).get(task.id, {})
-                details.append({
-                    'obj': task,
-                    'submitted': task.id in submitted_assign_map.get(student.pk, {}),
-                    'submission_id': submission_info.get('id')
-                })
-            
-            completed_count = sum(1 for item in details if item['submitted'])
-            total_count = len(details)
-            assignments_data[student.pk] = {
-                'details': details,
-                'total': total_count,
-                'completed': completed_count,
-                'pending': total_count - completed_count,
-                'completion_percentage': (completed_count / total_count * 100) if total_count > 0 else 0
-            }
-
-        # --- Assessments (now mimics the Assignment pattern exactly) ---
-        all_assessments = Assessment.objects.filter(class_assigned_id__in=ward_class_ids, is_approved=True, term=active_term)
-        submitted_assessments = AssessmentSubmission.objects.filter(student__in=wards_qs, assessment__in=all_assessments).values('student_id', 'assessment_id', 'id', 'is_graded')
-        
         submitted_assess_map = defaultdict(dict)
-        for sub in submitted_assessments:
-            submitted_assess_map[sub['student_id']][sub['assessment_id']] = {'id': sub['id'], 'is_graded': sub['is_graded']}
-
-        for student in wards_qs:
-            student_tasks = [a for a in all_assessments if a.class_assigned_id == student.current_class_id]
+        for sub in AssessmentSubmission.objects.filter(student_id__in=ward_pks):
+            submitted_assess_map[sub.student_id][sub.assessment_id] = sub
             
-            details = []
-            for task in student_tasks:
-                submission_info = submitted_assess_map.get(student.pk, {}).get(task.id, {})
-                details.append({
-                    'obj': task,
-                    'submitted': task.id in submitted_assess_map.get(student.pk, {}),
-                    'submission_id': submission_info.get('id'),
-                    'is_graded': submission_info.get('is_graded', False)
-                })
-
-            completed_count = sum(1 for item in details if item['submitted'])
-            total_count = len(details)
-            assessments_data[student.pk] = {
-                'details': details,
-                'total': total_count,
-                'completed': completed_count,
-                'pending': total_count - completed_count,
-                'completion_percentage': (completed_count / total_count * 100) if total_count > 0 else 0
-            }
-
-        # --- Exams (now mimics the Assignment pattern exactly) ---
-        all_exams = Exam.objects.filter(class_assigned_id__in=ward_class_ids, is_approved=True, term=active_term)
-        submitted_exams = ExamSubmission.objects.filter(student__in=wards_qs, exam__in=all_exams).values('student_id', 'exam_id', 'id', 'is_graded')
-
         submitted_exam_map = defaultdict(dict)
-        for sub in submitted_exams:
-            submitted_exam_map[sub['student_id']][sub['exam_id']] = {'id': sub['id'], 'is_graded': sub['is_graded']}
-            
-        for student in wards_qs:
-            student_tasks = [e for e in all_exams if e.class_assigned_id == student.current_class_id]
+        for sub in ExamSubmission.objects.filter(student_id__in=ward_pks):
+            submitted_exam_map[sub.student_id][sub.exam_id] = sub
+        
+        # 2. Fetch all potentially relevant tasks
+        all_assignments = Assignment.objects.filter(class_assigned_id__in=ward_class_ids)
+        all_assessments = Assessment.objects.filter(class_assigned_id__in=ward_class_ids)
+        all_exams = Exam.objects.filter(class_assigned_id__in=ward_class_ids)
 
-            details = []
-            for task in student_tasks:
-                submission_info = submitted_exam_map.get(student.pk, {}).get(task.id, {})
-                details.append({
-                    'obj': task,
-                    'submitted': task.id in submitted_exam_map.get(student.pk, {}),
-                    'submission_id': submission_info.get('id'),
-                    'is_graded': submission_info.get('is_graded', False)
-                })
-            
-            completed_count = sum(1 for item in details if item['submitted'])
-            total_count = len(details)
-            exams_data[student.pk] = {
-                'details': details,
-                'total': total_count,
-                'completed': completed_count,
-                'pending': total_count - completed_count,
-                'completion_percentage': (completed_count / total_count * 100) if total_count > 0 else 0
-            }
+        # 3. Process data for each student
+        for student in wards_qs:
+            # This helper function contains the foolproof categorization logic
+            def categorize_tasks(tasks, submission_map, task_type):
+                active_list, past_list = [], []
+                for task in tasks:
+                    submission = submission_map.get(student.pk, {}).get(task.pk)
+                    
+                    # Determine the precise status
+                    status = ""
+                    is_active_task = False
+
+                    if submission and submission.is_completed:
+                        status = "COMPLETED"
+                    elif task.due_date and task.due_date < now:
+                        status = "OVERDUE"
+                    elif submission and not submission.is_completed:
+                        status = "IN_PROGRESS" # This is a granted retake
+                        is_active_task = True
+                    else:
+                        is_active_flag = getattr(task, 'active', getattr(task, 'is_approved', False))
+                        if is_active_flag:
+                             status = "ACTIVE"
+                             is_active_task = True
+
+                    item = {
+                        'type': task_type,
+                        'obj': task,
+                        'start_url': reverse(f'start_{task_type}', args=[task.id]),
+                        'submission': submission,
+                        'status': status,
+                    }
+                    
+                    if is_active_task:
+                        active_list.append(item)
+                    else:
+                        # Only show relevant past tasks
+                        if status in ["COMPLETED", "OVERDUE"]:
+                            past_list.append(item)
+                
+                active_list.sort(key=lambda x: x['obj'].due_date)
+                past_list.sort(key=lambda x: x['obj'].due_date, reverse=True)
+                return {'active': active_list, 'past': past_list}
+
+            # Process and store data for the current student
+            students_data[student.pk]['assignments'] = categorize_tasks(
+                [a for a in all_assignments if a.class_assigned_id == student.current_class_id], submitted_assign_map, 'assignment'
+            )
+            students_data[student.pk]['assessments'] = categorize_tasks(
+                [a for a in all_assessments if a.class_assigned_id == student.current_class_id], submitted_assess_map, 'assessment'
+            )
+            students_data[student.pk]['exams'] = categorize_tasks(
+                [e for e in all_exams if e.class_assigned_id == student.current_class_id], submitted_exam_map, 'exam'
+            )
+
     # 2. Financials
     financial_records = FinancialRecord.objects.filter(student_id__in=ward_pks, term=active_term)
     financial_data = {fr.student_id: fr for fr in financial_records}
@@ -703,6 +799,7 @@ def guardian_dashboard(request):
     context = {
         'guardian': guardian,
         'students': wards_qs,
+        'students_data': students_data,
         'active_session': active_session,
         'active_term': active_term,
 

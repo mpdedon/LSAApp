@@ -2,6 +2,8 @@
 
 from django.urls import path
 from . import views
+from django.conf import settings
+from django.conf.urls.static import static
 
 app_name = 'lsalms'
 
@@ -20,6 +22,7 @@ urlpatterns = [
     # URLs for adding components to the course builder (perfect for modals/HTMX)
     path('teacher/course/<int:course_id>/add-module/', views.ModuleCreateView.as_view(), name='module_create'),
     path('teacher/module/<int:module_id>/add-lesson/', views.LessonCreateView.as_view(), name='lesson_create'),
+    path('teacher/module/update-order/', views.update_module_order, name='update_module_order'),
     path('teacher/lesson/<int:lesson_id>/add-content/', views.ContentBlockCreateView.as_view(), name='content_block_create'),
 
     # UPDATE (Edit)
@@ -36,7 +39,7 @@ urlpatterns = [
     # === Student & Guardian Facing URLs ===
     path('course/<slug:slug>/', views.CourseDetailView.as_view(), name='course_detail'),
     path('lesson/<int:pk>/', views.LessonDetailView.as_view(), name='lesson_detail'),
-    path('lesson/<int:lesson_id>/complete/', views.mark_lesson_complete, name='mark_lesson_complete'),
+    path('lesson/<int:pk>/complete/', views.mark_lesson_complete, name='mark_lesson_complete'),
 
     # === API URL for AI Integration ===
     path('api/ai-assist/', views.ai_content_generator_view, name='api_ai_assist'),
@@ -49,3 +52,9 @@ urlpatterns = [
     path('academy/course/<slug:slug>/confirm/', views.CourseSubscriptionConfirmView.as_view(), name='course_subscription_confirm'),
 
 ]
+
+if settings.DEBUG:
+    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+
+
+

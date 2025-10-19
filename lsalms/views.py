@@ -1,5 +1,6 @@
 # lsalms/views.py
 
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.views.generic import DetailView, TemplateView, CreateView, UpdateView, ListView
 from django.urls import reverse, reverse_lazy
@@ -9,6 +10,7 @@ from django.views.decorators.http import require_POST
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.conf import settings
 from django.contrib import messages
+from django.http import HttpResponse
 from django.db import models
 from django.db.models import Max, Prefetch, Sum, Subquery, OuterRef, Count, Avg, Q
 from django.core.paginator import Paginator
@@ -80,9 +82,15 @@ class CourseUpdateView(LoginRequiredMixin, UpdateView):
         }
         context['total_weight'] = sum(act.weight for act in all_activities)
         return context
+    
+    def form_valid(self, form):
 
-    def get_success_url(self):
+        self.object = form.save(commit=False)
+        self.object.save()
         messages.success(self.request, "Course details updated successfully.")
+        return redirect(self.get_success_url())
+    
+    def get_success_url(self):
         return reverse('lsalms:course_edit', kwargs={'slug': self.object.slug})
     
 
@@ -336,15 +344,49 @@ class CourseDetailView(LoginRequiredMixin, DetailView): # Add Enrollment Mixins
         
         context['enrollment'] = enrollment
         context['progress_percent'] = progress_percent
-        context['next_lesson'] = course.get_next_uncompleted_lesson(student)
-        
+
+        next_lesson = course.get_next_uncompleted_lesson(student)
+        context['next_lesson'] = next_lesson
+        context['next_lesson_id'] = {next_lesson.id} if next_lesson else set() 
+        context['completed_lesson_ids'] = set(LessonProgress.objects.filter(
+            enrollment__student=student, lesson__module__course=course
+        ).values_list('lesson_id', flat=True))
+            
         return context
     
 
-class LessonDetailView(LoginRequiredMixin, DetailView): 
+class LessonDetailView(LoginRequiredMixin, DetailView):
     model = Lesson
     template_name = 'lesson_detail.html'
     context_object_name = 'lesson'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        student = self.request.user.student
+        lesson = self.get_object()
+        course = lesson.module.course
+        context['course'] = course
+
+        # Efficiently fetch the entire course structure for the sidebar
+        context['course_modules'] = Module.objects.filter(course=course).prefetch_related('lessons')
+
+        # Get a set of completed lesson IDs for easy lookup in the template
+        context['completed_lesson_ids'] = set(LessonProgress.objects.filter(
+            enrollment__student=student,
+            lesson__module__course=course
+        ).values_list('lesson_id', flat=True))
+
+        # Check completion status for the current lesson
+        context['is_completed'] = lesson.id in context['completed_lesson_ids']
+
+        # Calculate course progress
+        try:
+            enrollment = CourseEnrollment.objects.get(student=student, course=course)
+            context['progress_percent'] = enrollment.calculate_progress_percentage()
+        except CourseEnrollment.DoesNotExist:
+            context['progress_percent'] = 0
+
+        return context
 
 
 @login_required
@@ -384,41 +426,43 @@ def get_subjects_for_class_api(request):
         return JsonResponse({'error': str(e)}, status=500)
     
 @login_required
-@require_POST 
-def mark_lesson_complete(request, lesson_id):
-
+@require_POST
+def mark_lesson_complete(request, pk):
     try:
-        lesson = get_object_or_404(Lesson, pk=lesson_id)
+        lesson = get_object_or_404(Lesson, pk=pk)
         student = request.user.student
-        
         enrollment = get_object_or_404(CourseEnrollment, student=student, course=lesson.module.course)
-        
-        progress, created = LessonProgress.objects.get_or_create(enrollment=enrollment, lesson=lesson)
-        
-        if created:
-            # Only update spaced repetition if the lesson was just completed for the first time.
-            review_item, _ = SpacedRepetitionItem.objects.get_or_create(student=student, lesson=lesson)
-            # Simple algorithm: interval doubles each time, starting from 1 day.
-            if review_item.current_interval > 1:
-                review_item.current_interval = review_item.current_interval * 2
-            else:
-                review_item.current_interval = 2 # e.g., 1 -> 2 -> 4 -> 8
-            review_item.next_review_date = timezone.now().date() + timedelta(days=review_item.current_interval)
-            review_item.save()
 
-        # Log this important activity
-        StudentActivityLog.objects.create(
-            student=student,
-            activity_type=StudentActivityLog.ActivityType.LESSON_VIEWED, # Or create a new "LESSON_COMPLETED" type
-            related_object=lesson
-        )
-        
-        return JsonResponse({'status': 'success', 'message': 'Lesson marked as complete!'})
+        progress, created = LessonProgress.objects.get_or_create(enrollment=enrollment, lesson=lesson)
+
+        # We only want to run the "first-time completion" logic if the progress record was just created.
+        if created:
+            # When creating a new item, we MUST provide a next_review_date.
+            SpacedRepetitionItem.objects.update_or_create(
+                student=student,
+                lesson=lesson,
+                defaults={
+                    'current_interval': 1, # Start with a 1-day interval
+                    'next_review_date': timezone.now().date() + timedelta(days=1)
+                }
+            )
+            # Prepare the response to render the "Completed!" state
+            context = {'is_completed': True, 'lesson': lesson}
+            response = render(request, 'partials/completion_section_v2.html', context)
+
+            # Trigger the modal and confetti
+            triggers = {"showCompletionModal": True}
+            response['HX-Trigger'] = json.dumps(triggers)
+            return response
+        else:
+            # If they are clicking it again (already complete), just show the completed state quietly.
+            context = {'is_completed': True, 'lesson': lesson}
+            return render(request, 'partials/completion_section_v2.html', context)
 
     except Exception as e:
-        # Return an error response if something goes wrong
-        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
-
+        # Return a user-friendly error message that HTMX can display
+        return HttpResponse(f"<div class='alert alert-danger'>An unexpected error occurred: {e}</div>")
+    
 
 # === Admin Dashboard View ===
 class LMSAdminDashboardView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
@@ -499,6 +543,15 @@ def course_publish(request, pk):
     messages.success(request, f"Congratulations! Your course '{course.title}' is now published and visible to enrolled students.")
     return redirect('lsalms:course_manage', slug=course.slug)
 
+
+@login_required
+@require_POST
+def update_module_order(request):
+    module_ids = request.POST.getlist('module_order[]')
+    for index, module_id in enumerate(module_ids):
+        Module.objects.filter(id=module_id, course__teacher=request.user).update(order=index)
+    return HttpResponse(status=200) # Just return a success status
+
 # === AI Integration View ===
 
 @login_required
@@ -565,14 +618,13 @@ class OnlineAcademyHubView(ListView):
     model = Course
     template_name = 'academy/hub.html'
     context_object_name = 'courses'
-    paginate_by = 9 # Show 9 courses per page
+    paginate_by = 9 
 
     def get_queryset(self):
         # The queryset is simple: find all published, external courses.
         return Course.objects.filter(
-            status=Course.Status.PUBLISHED,
-            course_type=Course.CourseType.EXTERNAL
-        ).order_by('-created_at') # Show newest courses first
+            status=Course.Status.PUBLISHED
+        ).order_by('-created_at') 
 
 
 class AcademyCourseDetailView(DetailView):

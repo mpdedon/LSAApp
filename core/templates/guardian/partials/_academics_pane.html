@@ -1,61 +1,96 @@
-{% load static humanize message_filters %}
+<!-- DEFINITIVE FILE: guardian/partials/_academics_pane.html -->
+{% load message_filters %}
 
-<div class="accordion" id="academics-accordion-{{ student.pk }}">
+{% with student_tasks=students_data|get_item:student.pk %}
     
-    <!-- Assignments Accordion Item -->
-    <div class="accordion-item">
-        <h2 class="accordion-header" id="heading-assign-{{ student.pk }}">
-            <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-assign-{{ student.pk }}">
-                Assignments
-                {% with data=assignments_data|get_item:student.pk %}
-                    <span class="badge bg-secondary rounded-pill ms-2">{{ data.completed|default:0 }}/{{ data.total|default:0 }} Completed</span>
-                {% endwith %}
-            </button>
-        </h2>
-        <div id="collapse-assign-{{ student.pk }}" class="accordion-collapse collapse show" data-bs-parent="#academics-accordion-{{ student.pk }}">
-            <div class="accordion-body">
-                {% with student_assignments=assignments_data|get_item:student.pk %}
-                    {% include 'guardian/partials/_assignment_details.html' with assignments=student_assignments student=student %}
-                {% endwith %}
+    {# --- ACTIVE TASKS SECTION --- #}
+    {% with combined_active_tasks=student_tasks.assignments.active|add:student_tasks.assessments.active|add:student_tasks.exams.active %}
+    <h5 class="fw-bold mb-3">Active Tasks ({{ combined_active_tasks|length }})</h5>
+    <div class="list-group list-group-flush">
+        {% for task in combined_active_tasks %}
+        <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+            <div class="d-flex align-items-center">
+                {% if task.type == 'assignment' %}<div class="quest-icon-sm bg-info-subtle text-info me-3"><i class="bi bi-journal-check"></i></div>
+                {% elif task.type == 'assessment' %}<div class="quest-icon-sm bg-warning-subtle text-warning me-3"><i class="bi bi-pencil-square"></i></div>
+                {% elif task.type == 'exam' %}<div class="quest-icon-sm bg-danger-subtle text-danger me-3"><i class="bi bi-file-earmark-check-fill"></i></div>
+                {% endif %}
+                <div>
+                    <strong>{{ task.obj.title }}</strong>
+                    <div class="small text-muted">{{ task.obj.subject.name }} | Due: {{ task.obj.due_date|date:"D, d M Y" }}</div>
+                </div>
+            </div>
+            <div>
+                <a href="{{ task.start_url }}?student_id={{ student.pk }}" class="btn btn-sm btn-primary">
+                    {% if task.status == 'IN_PROGRESS' %}Continue{% else %}Start{% endif %}
+                </a>
+            </div>
+        </div>
+        {% empty %}
+        <div class="list-group-item text-muted text-center py-4"><p class="mb-0">No active tasks found.</p></div>
+        {% endfor %}
+    </div>
+    {% endwith %}
+
+    <hr class="my-4">
+
+    {# --- TASK HISTORY SECTION --- #}
+    {% with combined_past_tasks=student_tasks.assignments.past|add:student_tasks.assessments.past|add:student_tasks.exams.past %}
+    {% if combined_past_tasks %}
+    <div class="accordion" id="task-history-accordion-{{ student.pk }}">
+        <div class="accordion-item">
+            <h2 class="accordion-header"><button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-history-{{ student.pk }}">Task History</button></h2>
+            <div id="collapse-history-{{ student.pk }}" class="accordion-collapse collapse" data-bs-parent="#task-history-accordion-{{ student.pk }}">
+                <div class="accordion-body p-0">
+                    <div class="list-group list-group-flush">
+                        {% for task in combined_past_tasks %}
+                        <div class="list-group-item d-flex justify-content-between align-items-center px-0">
+                            <div>
+                                <strong>{{ task.obj.title }}</strong>
+                                <div class="small text-muted">{{ task.obj.subject.name }} | {{ task.type|title }}</div>
+                            </div>
+                            <div class="text-end">
+                                <!-- ================= START: THE DEFINITIVE, SYNTAX-CORRECT LOGIC ================= -->
+                                {% if task.status == "COMPLETED" %}
+                                    
+                                    {# Check for Assignments: They are graded if they have a 'grade' #}
+                                    {% if task.type == 'assignment' %}
+                                        {% if task.submission.grade is not None %}
+                                            <div class="d-flex align-items-center">
+                                                <div class="me-3 text-end"><div class="fw-bold text-success">{{ task.submission.grade|floatformat:1 }} / {{ task.obj.get_total_marks }}</div></div>
+                                                <a href="{% url 'view_assignment_result' task.submission.id %}" class="btn btn-sm btn-outline-primary"><i class="fas fa-eye"></i></a>
+                                            </div>
+                                        {% else %}
+                                            <span class="badge bg-warning text-dark">Pending Grade</span>
+                                        {% endif %}
+                                    
+                                    {# Check for Assessments/Exams: They are graded if 'is_graded' is True #}
+                                    {% else %}
+                                        {% if task.submission.is_graded %}
+                                            <div class="d-flex align-items-center">
+                                                <div class="me-3 text-end"><div class="fw-bold text-success">{{ task.submission.score|floatformat:1 }} / {{ task.obj.get_total_marks }}</div></div>
+                                                {% if task.type == 'assessment' %}<a href="{% url 'view_assessment_result' task.submission.id %}" class="btn btn-sm btn-outline-primary"><i class="fas fa-eye"></i></a>
+                                                {% elif task.type == 'exam' %}<a href="{% url 'view_exam_result' task.submission.id %}" class="btn btn-sm btn-outline-primary"><i class="fas fa-eye"></i></a>
+                                                {% endif %}
+                                            </div>
+                                        {% else %}
+                                            <span class="badge bg-warning text-dark">Pending Grade</span>
+                                        {% endif %}
+                                    {% endif %}
+
+                                {% elif task.status == "OVERDUE" %}
+                                    <span class="badge bg-danger">Overdue</span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Archived</span>
+                                {% endif %}
+                                <!-- ================== END: THE DEFINITIVE, SYNTAX-CORRECT LOGIC ================== -->
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
             </div>
         </div>
     </div>
-    
-    <!-- Assessments Accordion Item -->
-    <div class="accordion-item">
-        <h2 class="accordion-header" id="heading-assess-{{ student.pk }}">
-            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-assess-{{ student.pk }}">
-                Assessments (Continuous Assessment)
-                {% with data=assessments_data|get_item:student.pk %}
-                    <span class="badge bg-secondary rounded-pill ms-2">{{ data.completed|default:0 }}/{{ data.total|default:0 }} Completed</span>
-                {% endwith %}
-            </button>
-        </h2>
-        <div id="collapse-assess-{{ student.pk }}" class="accordion-collapse collapse" data-bs-parent="#academics-accordion-{{ student.pk }}">
-            <div class="accordion-body">
-                {% with student_tasks=assessments_data|get_item:student.pk %}
-                    {% include 'guardian/partials/_assessment_exam_details.html' with tasks_data=student_tasks student=student type='assessment' %}
-                {% endwith %}
-            </div>
-        </div>
-    </div>
-    
-    <!-- Exams Accordion Item -->
-    <div class="accordion-item">
-        <h2 class="accordion-header" id="heading-exam-{{ student.pk }}">
-            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-exam-{{ student.pk }}">
-                Exams
-                {% with data=exams_data|get_item:student.pk %}
-                    <span class="badge bg-secondary rounded-pill ms-2">{{ data.completed|default:0 }}/{{ data.total|default:0 }} Completed</span>
-                {% endwith %}
-            </button>
-        </h2>
-        <div id="collapse-exam-{{ student.pk }}" class="accordion-collapse collapse" data-bs-parent="#academics-accordion-{{ student.pk }}">
-            <div class="accordion-body">
-                {% with student_tasks=exams_data|get_item:student.pk %}
-                     {% include 'guardian/partials/_assessment_exam_details.html' with tasks_data=student_tasks student=student type='exam' %}
-                {% endwith %}
-            </div>
-        </div>
-    </div>
-</div>
+    {% endif %}
+    {% endwith %}
+{% endwith %}

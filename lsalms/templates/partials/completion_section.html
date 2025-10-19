@@ -1,0 +1,14 @@
+<!-- lsalms/templates/partials/completion_section.html -->
+{% if is_completed %}
+    <button class="btn btn-lg btn-outline-success" disabled>
+        <i class="bi bi-check-circle-fill me-2"></i>Completed!
+    </button>
+{% else %}
+    <button class="btn btn-lg btn-complete"
+            hx-post="{% url 'lsalms:mark_lesson_complete' pk=lesson.id %}"
+            hx-target="#completion-section"
+            hx-swap="innerHTML">
+        <span class="htmx-indicator spinner-border spinner-border-sm me-2"></span>
+        Mark as Complete
+    </button>
+{% endif %}

@@ -1,15 +1,20 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="container mt-3">
-    <div class="card shadow-lg border-info">
-        <div class="card-body text-center">
-            <h2 class="text-info">Assessment Already Submitted</h2>
-            <p class="lead">You have already submitted this assessment. Further submissions are not allowed.</p>
-            {% if request.user.student %}
-                <a href="{% url 'student_dashboard' %}" class="btn btn-primary">Back to Dashboard</a>
-            {% elif request.user.guardian %}
-                <a href="{% url 'guardian_dashboard' %}" class="btn btn-success">Back to Dashboard</a>
+<div class="container mt-4">
+    <div class="card text-center">
+        <div class="card-header">Submission Complete</div>
+        <div class="card-body">
+            <h5 class="card-title">You have used all available attempts for the assessment:</h5>
+            <p><strong>{{ assessment.title }}</strong></p>
+            {% if latest_attempt %}
+                <p class="card-text">Your score for your last attempt was <strong>{{ latest_attempt.score }}</strong>.</p>
             {% endif %}
+            <p>If you need to retake this, please contact your teacher.</p>
+                {% if request.user.student %}
+                    <a href="{% url 'student_dashboard' %}" class="btn btn-primary">Back to Dashboard</a>
+                {% elif request.user.guardian %}
+                    <a href="{% url 'guardian_dashboard' %}" class="btn btn-success">Back to Dashboard</a>
+                {% endif %}
         </div>
     </div>
 </div>

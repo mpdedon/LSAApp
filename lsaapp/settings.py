@@ -45,6 +45,8 @@ INSTALLED_APPS = [
     'crispy_bootstrap5',
     'django.contrib.humanize',
     'django_ckeditor_5',
+    'widget_tweaks',
+    'django_htmx',
     'reportlab',
     'anymail',
 ]
@@ -64,6 +66,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'django_htmx.middleware.HtmxMiddleware',
 ]
 
 ROOT_URLCONF = 'lsaapp.urls'
