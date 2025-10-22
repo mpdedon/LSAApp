@@ -2,64 +2,37 @@
 {% load crispy_forms_tags %}
 {% load lsalms_extras %}
 
-{% block title %}AI Course Builder: {{ course.get_course_title }}{% endblock %}
+{% block title %}Course Builder: {{ course.get_course_title }}{% endblock %}
 
 {% block extra_head %}
 <style>
     /* === Top-Notch Builder Styles === */
-    .builder-header {
-        background-color: #fff;
-        padding: 1.5rem 2rem;
-        border-radius: 0.75rem;
-        box-shadow: 0 4px 25px rgba(0,0,0,0.07);
-        margin-bottom: 2rem;
-    }
-    .builder-nav .nav-link {
-        font-weight: 500;
-        color: #6c757d;
-        padding: 0.75rem 1.5rem;
-        border-bottom: 3px solid transparent;
-    }
-    .builder-nav .nav-link.active {
-        color: var(--bs-primary);
-        border-bottom-color: var(--bs-primary);
-        background-color: transparent;
-    }
-    .module-accordion .accordion-item {
-        border: 1px solid #dee2e6;
-        border-radius: 0.5rem !important; /* Override Bootstrap's default */
-        overflow: hidden;
-    }
-    .module-accordion .accordion-button {
-        font-weight: 600;
-        font-size: 1.1rem;
-        background-color: #f8f9fa;
-    }
-    .module-accordion .accordion-button:not(.collapsed) {
-        color: var(--bs-primary);
-        box-shadow: inset 0 -1px 0 rgba(0,0,0,.125);
-    }
-    .lesson-item {
-        padding: 1rem 0;
-        border-bottom: 1px solid #e9ecef;
-    }
+    .builder-header { background-color: #fff; padding: 1.5rem 2rem; border-radius: 0.75rem; box-shadow: 0 4px 25px rgba(0,0,0,0.07); margin-bottom: 2rem; }
+    .builder-nav .nav-link { font-weight: 500; color: #6c757d; padding: 0.75rem 1.5rem; border-bottom: 3px solid transparent; }
+    .builder-nav .nav-link.active { color: var(--bs-primary); border-bottom-color: var(--bs-primary); background-color: transparent; }
+    .module-accordion .accordion-item { border: 1px solid #dee2e6; border-radius: 0.5rem !important; overflow: hidden; }
+    .module-accordion .accordion-button { font-weight: 600; font-size: 1.1rem; background-color: #f8f9fa; }
+    .module-accordion .accordion-button:not(.collapsed) { color: var(--bs-primary); box-shadow: inset 0 -1px 0 rgba(0,0,0,.125); }
+    .lesson-item { padding: 1rem; border-bottom: 1px solid #e9ecef; }
     .lesson-item:last-child { border-bottom: none; }
-    .content-block-list {
-        list-style-type: none;
-        padding-left: 2.5rem;
-        margin-top: 1rem;
-    }
+    .content-block-list { list-style-type: none; padding-left: 2.5rem; margin-top: 1rem; }
     .action-btn { background: none; border: none; padding: 0.25rem 0.5rem; color: #6c757d; }
-    .ai-suggestion-box { background-color: #eef2ff; border: 1px dashed #b0c4ff; padding: 1.5rem; }
+    
+    /* --- Styles for Drag & Drop --- */
+    .drag-handle { cursor: grab; opacity: 0.5; transition: opacity 0.2s; }
+    .drag-handle:hover { opacity: 1; }
+    .sortable-ghost { opacity: 0.4; background: #c8ebfb; } /* Visual feedback for drop location */
+    .sortable-chosen { cursor: grabbing; }
 </style>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
-
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<script src="https://cdn.ckeditor.com/ckeditor5/40.0.0/classic/ckeditor.js"></script>
 {% endblock %}
 
 
 {% block content %}
 <div class="container-fluid my-4">
-    {{ content_form.media }}
     <!-- === Dedicated Header Section === -->
     <div class="builder-header">
         <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
@@ -81,7 +54,7 @@
     </div>
 
     <!-- === Main Tab Navigation === -->
-    <ul class="nav nav-pills mb-4" id="builderTab" role="tablist">
+    <ul class="nav nav-pills builder-nav mb-4" id="builderTab" role="tablist">
         <li class="nav-item" role="presentation">
             <button class="nav-link active" id="curriculum-tab" data-bs-toggle="tab" data-bs-target="#curriculum-panel" type="button" role="tab">
                 <i class="fas fa-sitemap me-2"></i>Curriculum
@@ -96,81 +69,38 @@
 
     <!-- Tab Content -->
     <div class="tab-content" id="builderTabContent">
-        <!-- === Curriculum & Stats Panel (REBUILT) === -->
+        <!-- === Curriculum Panel === -->
         <div class="tab-pane fade show active" id="curriculum-panel" role="tabpanel">
             <div class="row g-4">
-                <!-- Left Column: Curriculum Structure -->
-                <!-- Left Column: Curriculum Structure -->
-                <div class="col-lg-8">
-                    {% for module in course.modules.all %}
-                        <div class="accordion module-accordion mb-3" id="accordionModule{{ module.pk }}">
-                            <div class="accordion-item">
-                                <h2 class="accordion-header" id="headingModule{{ module.pk }}">
-                                    <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseModule{{ module.pk }}">
-                                        {{ module.title }}
-                                    </button>
-                                </h2>
-                                <div id="collapseModule{{ module.pk }}" class="accordion-collapse collapse show">
-                                    <div class="accordion-body">
-                                        <div class="d-flex justify-content-end mb-3">
-                                            <button class="btn btn-sm btn-outline-secondary me-2" data-bs-toggle="modal" data-bs-target="#editModal" data-url="{% url 'lsalms:module_edit' pk=module.pk %}" title="Edit Module"><i class="fas fa-pencil-alt me-1"></i> Edit Module</button>
-                                            <button class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteModal" data-url="{% url 'lsalms:module_delete' pk=module.pk %}" data-name="{{ module.title }}" title="Delete Module"><i class="fas fa-trash-alt me-1"></i> Delete Module</button>
-                                        </div>
-                                        
-                                        {% for lesson in module.lessons.all %}
-                                            <div class="lesson-item">
-                                                <div class="d-flex justify-content-between align-items-center">
-                                                    <h6 class="fw-bold mb-0"><i class="fas fa-file-alt fa-fw text-muted me-2"></i>{{ lesson.title }}</h6>
-                                                    <div>
-                                                        <button class="btn btn-sm btn-primary" data-bs-toggle="modal" data-bs-target="#editModal" data-url="{% url 'lsalms:content_block_create' lesson_id=lesson.id %}">Add Content</button>
-                                                        <button class="action-btn ms-2" data-bs-toggle="modal" data-bs-target="#editModal" data-url="{% url 'lsalms:lesson_edit' pk=lesson.pk %}" title="Edit Lesson"><i class="fas fa-pencil-alt"></i></button>
-                                                        <button class="action-btn action-btn-delete" data-bs-toggle="modal" data-bs-target="#deleteModal" data-url="{% url 'lsalms:lesson_delete' pk=lesson.pk %}" data-name="{{ lesson.title }}" title="Delete Lesson"><i class="fas fa-trash-alt"></i></button>
-                                                    </div>
-                                                </div>
-                                                <ul class="content-block-list">
-                                                    {% for block in lesson.content_blocks.all %}
-                                                        <li class="content-block-item d-flex justify-content-between align-items-center">
-                                                            <span><i class="fas fa-puzzle-piece fa-fw text-muted me-2"></i>{{ block.title }}</span>
-                                                            <div>
-                                                                <button class="action-btn" data-bs-toggle="modal" data-bs-target="#editModal" data-url="{% url 'lsalms:content_block_edit' pk=block.pk %}" title="Edit Content"><i class="fas fa-pencil-alt"></i></button>
-                                                                <button class="action-btn action-btn-delete" data-bs-toggle="modal" data-bs-target="#deleteModal" data-url="{% url 'lsalms:content_block_delete' pk=block.pk %}" data-name="{{ block.title }}" title="Delete Content"><i class="fas fa-trash-alt"></i></button>
-                                                            </div>
-                                                        </li>
-                                                    {% endfor %}
-                                                </ul>
-                                            </div>
-                                        {% endfor %}
-                                        
-                                        <div class="mt-3">
-                                            <button class="btn btn-outline-secondary btn-sm" data-bs-toggle="modal" data-bs-target="#editModal" data-url="{% url 'lsalms:lesson_create' module_id=module.id %}"><i class="fas fa-plus me-1"></i> Add Lesson</button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    {% empty %}
+                <!-- Left Column: The Interactive Curriculum -->
+                <div class="col-lg-8" id="curriculum-container">
+                    
+                    <!-- This is the main container for draggable modules -->
+                    <div id="modules-list" data-reorder-url="{% url 'lsalms:api_update_module_order' course_id=course.pk %}">
+                        {% for module in course.modules.all %}
+                            {% include 'teacher/partials/_module_item.html' with module=module %}
+                        {% endfor %}
+                    </div>
+
+                    {% if not course.modules.all %}
                         <div class="text-center p-5 bg-light rounded ai-suggestion-box">
                             <h5 class="fw-bold">Let's build your course!</h5>
-                            <p class="text-muted">Need a starting point? Our AI can suggest a course outline for you.</p>
-                            
+                            <p class="text-muted">This course has no modules yet. Add your first one below, or use AI to get started.</p>
                             {% if AI_IS_CONFIGURED %}
-                                <button type="button" class="btn btn-primary ai-assist-btn" data-target="initial-module-suggestions" data-prompt-source="static" data-prompt="Based on the course title and its learning objectives, suggest 4-5 relevant module titles. Return them as a simple, unnumbered list, one per line." data-context="Course Title: '{{ course.title }}'. Learning Objectives: '{{ course.learning_objectives }}'"><i class="fas fa-magic me-2"></i> Suggest Course Outline</button>
+                                <button type="button" class="btn btn-primary ai-assist-btn" data-target="initial-module-suggestions" ...>...</button>
                                 <div id="initial-module-suggestions" class="mt-3 text-start"></div>
-                            {% else %}
-                                <div class="alert alert-warning small mt-3">
-                                    <strong>AI Assistant is not configured.</strong> A `GEMINI_API_KEY` is missing from the application's environment settings. This feature is currently disabled.
-                                </div>
                             {% endif %}
                         </div>
-                    {% endfor %}
+                    {% endif %}
+
                     <div class="mt-4 d-flex justify-content-center">
-                        <button type="button" class="btn btn-primary btn-lg" data-bs-toggle="modal" data-bs-target="#editModal" data-url="{% url 'lsalms:module_create' course_id=course.pk %}">
+                        <button type="button" class="btn btn-primary btn-lg modal-btn" data-bs-toggle="modal" data-bs-target="#simpleModal" data-url="{% url 'lsalms:module_create' course_id=course.pk %}">
                             <i class="fas fa-plus me-1"></i> Add New Module
                         </button>
                     </div>
                 </div>
                 
-                <!-- Right Column: Stats (RESTORED) -->
+                <!-- ... Your Right Column for Stats ... -->
                 <div class="col-lg-4">
                     <div class="card shadow-sm position-sticky" style="top: 80px;">
                          <div class="card-header bg-light"><h5 class="mb-0">Course at a Glance</h5></div>
@@ -187,7 +117,7 @@
             </div>
         </div>
 
-        <!-- Student Progress Panel -->
+        <!-- ... Your Student Progress Panel ... -->
         <div class="tab-pane fade" id="progress-panel" role="tabpanel">
             <div class="card shadow-sm">
                 <div class="card-header bg-light">
@@ -240,112 +170,186 @@
     </div>
 </div>
 
-<!-- === MODALS (Generic and Reusable) === -->
-<div class="modal fade" id="editModal" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content"></div></div></div>
+<!-- === MODALS === -->
+<!-- Simple modal for Module & Lesson forms -->
+<div class="modal fade" id="simpleModal" tabindex="-1"><div class="modal-dialog modal-dialog-centered"><div class="modal-content"></div></div></div>
+<!-- Large modal for complex ContentBlock forms -->
+<div class="modal fade" id="formModal" tabindex="-1"><div class="modal-dialog modal-lg"><div class="modal-content"></div></div></div>
+<!-- Delete confirmation modal -->
 <div class="modal fade" id="deleteModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content">
     <div class="modal-header"><h5 class="modal-title">Confirm Deletion</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div>
     <div class="modal-body"><p>Are you sure you want to delete <strong id="deleteObjectName">this item</strong>? This action cannot be undone.</p></div>
-    <div class="modal-footer"><form id="deleteForm" method="post">{% csrf_token %}<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-danger">Yes, Delete</button></form></div>
+    <div class="modal-footer"><form id="deleteForm" method="post">{% csrf_token %}<button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="submit" class="btn btn-danger">Delete</button></form></div>
 </div></div></div>
 {% endblock %}
 
 
 {% block extra_js %}
 <script>
-  const moduleList = document.getElementById('module-list');
-  const sortable = new Sortable(moduleList, {
-    animation: 150,
-    handle: '.card-header', // Optional: makes only the header draggable
-    onEnd: function (evt) {
-      const orderedIds = Array.from(moduleList.children).map(child => child.dataset.id);
-
-      // Use fetch API to send the new order to the backend
-      const formData = new FormData();
-      orderedIds.forEach(id => formData.append('module_order[]', id));
-
-      fetch("{% url 'lsalms:update_module_order' %}", {
-        method: 'POST',
-        headers: {
-          'X-CSRFToken': '{{ csrf_token }}', // Django CSRF protection
-        },
-        body: formData
-      });
-    }
-  });
-</script>
-<script>
 document.addEventListener('DOMContentLoaded', function() {
-    // This variable is correctly passed from the Django view.
-    // It will be either `true` or `false` in the final rendered HTML.
+
+    // --- 1. SETUP & CONFIGURATION ---
+    const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+    const curriculumContainer = document.getElementById('curriculum-container');
+    
+    // Get Modal elements and create Bootstrap instances
+    const simpleModalEl = document.getElementById('simpleModal');
+    const simpleModal = new bootstrap.Modal(simpleModalEl);
+    const formModalEl = document.getElementById('formModal');
+    const formModal = new bootstrap.Modal(formModalEl);
+    const deleteModalEl = document.getElementById('deleteModal');
+    const deleteModal = new bootstrap.Modal(deleteModalEl);
+    
+    // A flag passed from the Django view to check if AI is enabled
     const AI_IS_CONFIGURED = {{ AI_IS_CONFIGURED|yesno:"true,false" }};
 
-    // --- Generic Modal Loaders for Edit & Create forms ---
-    const editModal = document.getElementById('editModal');
-    if (editModal) {
-        editModal.addEventListener('show.bs.modal', function (event) {
-            const button = event.relatedTarget;
-            const url = button.getAttribute('data-url');
-            const modalContent = editModal.querySelector('.modal-content');
-            if(url) {
-                fetch(url)
-                    .then(response => response.text())
-                    .then(html => {
-                        modalContent.innerHTML = html;
-                        // After loading the form, re-initialize the dynamic fields
-                        initializeDynamicFormFields(modalContent);
-                    });
-            }
-        });
-    }
 
-    // --- Generic Modal Loader for DELETE confirmation ---
-    const deleteModal = document.getElementById('deleteModal');
-    if (deleteModal) {
-        // ... (this part is correct and remains the same)
-    }
-
-    // === NEW CENTRALIZED FUNCTION FOR DYNAMIC MODAL CONTENT ===
-    function initializeDynamicFormFields(modalContent) {
-        // This function is called every time a new form is loaded into a modal.
+    // --- 2. CORE DYNAMIC SCRIPT INITIALIZATION ENGINE ---
+    /**
+     * This function is the heart of the dynamic builder. It's called every time
+     * new HTML is loaded into a modal.
+     */
+    function reinitializeModalScripts(modalContent) {
+        // A. Initialize Alpine.js for dynamic fields in the ContentBlock form
+        if (window.Alpine) {
+            modalContent.querySelectorAll('[x-data]').forEach(el => {
+                if (!el._x_is_initialized) { // Prevent re-initializing the same element
+                    window.Alpine.initializeComponent(el);
+                }
+            });
+        }
         
-        // --- Logic for the Dynamic ContentBlock Form ---
-        const contentTypeSelect = modalContent.querySelector('[id$="-content_type"]'); // Finds the select regardless of prefix
-        if (contentTypeSelect) {
-            const aiCopilotWrapper = modalContent.querySelector('#ai-copilot-wrapper');
-            const fieldTypeMap = {
-                'rich_text': ['TEXT'],
-                'media_url': ['VIDEO'],
-                'media_file': ['IMAGE', 'AUDIO', 'FILE'],
-                'linked_practice_quiz': ['PRACTICE_QUIZ'],
-                'linked_assignment': ['ASSIGNMENT'],
-                'linked_assessment': ['ASSESSMENT'],
-                'linked_exam': ['EXAM']
-            };
-
-            function toggleContentFields() {
-                const selectedType = contentTypeSelect.value;
-                for (const fieldName in fieldTypeMap) {
-                    const fieldElement = modalContent.querySelector(`[id$="-${fieldName}"]`);
-                    if (fieldElement) {
-                        const parentWrapper = fieldElement.closest('div.mb-3');
-                        if (parentWrapper) {
-                            parentWrapper.style.display = fieldTypeMap[fieldName].includes(selectedType) ? 'block' : 'none';
-                        }
-                    }
-                }
-                // --- THE AI VISIBILITY FIX ---
-                // We check the global config flag AND the selected content type.
-                if (aiCopilotWrapper) {
-                    aiCopilotWrapper.style.display = (selectedType === 'TEXT' && AI_IS_CONFIGURED) ? 'block' : 'none';
-                }
+        // B. Initialize CKEditor for any rich text textareas
+        const ckeditorTextarea = modalContent.querySelector('textarea.ckeditor-textarea');
+        if (ckeditorTextarea && typeof ClassicEditor !== 'undefined') {
+            // If an editor instance already exists (e.g., on a re-rendered form with errors), destroy it first.
+            if (ckeditorTextarea.ckeditorInstance) {
+                ckeditorTextarea.ckeditorInstance.destroy().catch(() => {});
             }
-            contentTypeSelect.addEventListener('change', toggleContentFields);
-            toggleContentFields(); // Run once to set initial state
+            // Create the editor
+            ClassicEditor
+                .create(ckeditorTextarea)
+                .then(editor => {
+                    // Store the instance on the element itself so we can get its data on submit
+                    ckeditorTextarea.ckeditorInstance = editor;
+                })
+                .catch(error => console.error('Error initializing CKEditor:', error));
         }
     }
 
+
+    // --- 3. DRAG-AND-DROP REORDERING ENGINE (SortableJS) ---
+    function sendReorderRequest(url, listElement, idKey) {
+        const orderedIds = Array.from(listElement.children).map(child => child.dataset.id).filter(id => id);
+        if (orderedIds.length === 0) return;
+        const formData = new FormData();
+        orderedIds.forEach(id => formData.append(`${idKey}[]`, id));
+        fetch(url, { method: 'POST', headers: { 'X-CSRFToken': csrftoken }, body: formData });
+    }
+
+    function initializeSortable(selector, idKey) {
+        document.querySelectorAll(selector).forEach(list => {
+            if (list.sortableInstance) list.sortableInstance.destroy();
+            list.sortableInstance = new Sortable(list, {
+                animation: 150, handle: '.drag-handle',
+                ghostClass: 'sortable-ghost', chosenClass: 'sortable-chosen',
+                onEnd: () => sendReorderRequest(list.dataset.reorderUrl, list, idKey)
+            });
+        });
+    }
+
+    function initializeAllSortables() {
+        initializeSortable('#modules-list', 'module_order');
+        initializeSortable('.lessons-list', 'lesson_order');
+        initializeSortable('.content-blocks-list', 'block_order');
+    }
+    initializeAllSortables(); // Run once on initial page load
+
+
+    // --- 4. AJAX INTERACTIONS ENGINE (MODALS FOR CREATE, EDIT, DELETE) ---
+    document.body.addEventListener('click', function(event) {
+        const modalBtn = event.target.closest('.modal-btn');
+        const deleteBtn = event.target.closest('.delete-btn');
+
+        // -- Handle opening Create/Edit Modals --
+        if (modalBtn) {
+            event.preventDefault();
+            const modalEl = document.querySelector(modalBtn.dataset.bsTarget);
+            const modalInstance = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+            const modalContent = modalEl.querySelector('.modal-content');
+            
+            fetch(modalBtn.dataset.url)
+                .then(response => response.text())
+                .then(html => {
+                    modalContent.innerHTML = html;
+                    modalInstance.show();
+                    
+                    // Use the 'shown.bs.modal' event to guarantee the DOM is ready
+                    modalEl.addEventListener('shown.bs.modal', () => {
+                        reinitializeModalScripts(modalContent);
+                    }, { once: true });
+                });
+        }
+        
+        // -- Handle opening Delete Confirmation Modals --
+        if (deleteBtn) {
+            event.preventDefault();
+            document.getElementById('deleteObjectName').textContent = `"${deleteBtn.dataset.name}"`;
+            const deleteForm = document.getElementById('deleteForm');
+            deleteForm.action = deleteBtn.dataset.url;
+            deleteForm.dataset.itemToRemove = `#${deleteBtn.closest('[data-id]').id}`; // Find the closest parent with a data-id
+            deleteModal.show();
+        }
+    });
+
+    // -- Handle submission of Create/Edit Forms --
+    document.body.addEventListener('submit', function(event) {
+        const form = event.target.closest('.ajax-form');
+        if (form) {
+            event.preventDefault();
+            const submitBtn = form.querySelector('button[type="submit"]');
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Saving...`;
+
+            // IMPORTANT: If CKEditor exists, update the textarea before submitting
+            const ckeditorTextarea = form.querySelector('textarea.ckeditor-textarea');
+            if (ckeditorTextarea && ckeditorTextarea.ckeditorInstance) {
+                ckeditorTextarea.value = ckeditorTextarea.ckeditorInstance.getData();
+            }
+
+            fetch(form.action, { method: 'POST', body: new FormData(form) })
+                .then(response => {
+                    // Your Django views redirect on success. This is the simplest way to check.
+                    if (response.redirected) {
+                        window.location.href = response.url; // Success! Just reload the page.
+                    } else {
+                        // Form has validation errors. Re-render the form inside the modal.
+                        return response.text().then(html => { throw new Error(html); });
+                    }
+                })
+                .catch(errorHtml => {
+                    const modalContent = form.closest('.modal-content');
+                    if (modalContent) {
+                        modalContent.innerHTML = errorHtml;
+                        // IMPORTANT: Re-initialize scripts on the re-rendered form WITH ERRORS
+                        reinitializeModalScripts(modalContent);
+                    }
+                });
+        }
+    });
+
+    // -- Handle submission of the Delete Form --
+    document.getElementById('deleteForm').addEventListener('submit', function(event) {
+        event.preventDefault();
+        fetch(this.action, { method: 'POST', headers: { 'X-CSRFToken': csrftoken }})
+            .then(response => {
+                if (response.redirected) {
+                    window.location.href = response.url; // Success! Reload the page to see the change.
+                }
+            });
+    });
+
     // --- AI Assist Button Logic using EVENT DELEGATION ---
-    // This is more robust because it listens on a parent element.
     if (AI_IS_CONFIGURED) {
         document.body.addEventListener('click', function(event) {
             // Check if the clicked element is our AI button
@@ -402,6 +406,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         });
     }
+
 });
 </script>
 {% endblock %}

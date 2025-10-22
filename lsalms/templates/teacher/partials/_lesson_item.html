@@ -1,0 +1,15 @@
+<div class="lesson-item py-2" data-id="{{ lesson.pk }}" id="lesson-item-{{ lesson.pk }}">
+    <div class="d-flex justify-content-between align-items-center">
+        <div class="fw-bold"><i class="fas fa-grip-vertical me-2 text-muted drag-handle"></i>{{ lesson.title }}</div>
+        <div>
+            <button class="btn btn-sm btn-outline-primary modal-btn" data-bs-toggle="modal" data-bs-target="#formModal" data-url="{% url 'lsalms:content_block_create' lesson_id=lesson.id %}"><i class="fas fa-plus"></i> Content</button>
+            <button class="action-btn modal-btn" data-bs-toggle="modal" data-bs-target="#simpleModal" data-url="{% url 'lsalms:lesson_edit' pk=lesson.pk %}"><i class="fas fa-pencil-alt"></i></button>
+            <button class="action-btn delete-btn" data-url="{% url 'lsalms:lesson_delete' pk=lesson.pk %}" data-name="{{ lesson.title }}"><i class="fas fa-trash-alt"></i></button>
+        </div>
+    </div>
+    <ul class="content-block-list mt-2 content-blocks-list" data-reorder-url="{% url 'lsalms:api_update_content_block_order' lesson_id=lesson.pk %}">
+        {% for block in lesson.content_blocks.all %}
+            {% include 'teacher/partials/_content_block_item.html' with block=block %}
+        {% endfor %}
+    </ul>
+</div>

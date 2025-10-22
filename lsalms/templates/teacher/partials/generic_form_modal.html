@@ -1,71 +1,57 @@
-<!-- teacher/partials/generic_form_modal.html -->
-{% comment %}
-    NOTICE: There is NO {% load widget_tweaks %} here.
-    All filters like |add_attr have been removed.
-{% endcomment %}
+<!-- DEFINITIVE FILE: lsalms/templates/lsalms/partials/generic_form_modal.html -->
+{% load crispy_forms_tags lsalms_extras %}
 
+{# This is essential for loading CKEditor's required JavaScript #}
 {{ form.media }}
 
-<form method="post" action="{{ form_action_url }}" novalidate
-    enctype="multipart/form-data"
-    x-data="{ selectedType: '{{ form.instance.content_type|default:'TEXT' }}' }">
+{# This form is a self-contained Alpine.js component #}
+<form class="ajax-form" method="post" action="{{ form_action_url }}" enctype="multipart/form-data" 
+      x-data="{ selectedType: '{{ form.instance.content_type|default:'TEXT' }}' }">
+    
     {% csrf_token %}
-
-    <div class="modal-body">
-        <!-- Always visible fields -->
-        <div class="mb-3">
-            <label class="form-label">{{ form.title.label }}</label>
-            {{ form.title }}
-        </div>
-        <div class="mb-3">
-            <label class="form-label">{{ form.content_type.label }}</label>
-            {{ form.content_type }}
-        </div>
-        <div class="mb-3">
-            <label class="form-label">{{ form.order.label }}</label>
-            {{ form.order }}
-        </div>
-        <hr>
-
-        <!-- === DYNAMICALLY TOGGLED FIELDS === -->
-        <div class="mb-3" x-show="selectedType === 'TEXT'" x-transition.opacity>
-            <label class="form-label">{{ form.rich_text.label }}</label>
-            {{ form.rich_text }}
-        </div>
-
-        <div class="mb-3" x-show="selectedType === 'IMAGE' || selectedType === 'AUDIO' || selectedType === 'FILE'" x-transition.opacity>
-            <label class="form-label">{{ form.media_file.label }}</label>
-            {{ form.media_file }}
-        </div>
-
-        <div class="mb-3" x-show="selectedType === 'VIDEO' || selectedType === 'AUDIO'" x-transition.opacity>
-            <label class="form-label">{{ form.media_url.label }}</label>
-            {{ form.media_url }}
-        </div>
-
-        <div class="mb-3" x-show="selectedType === 'ASSIGNMENT'" x-transition.opacity>
-            <label class="form-label">{{ form.linked_assignment.label }}</label>
-            {{ form.linked_assignment }}
-        </div>
-
-        <div class="mb-3" x-show="selectedType === 'ASSESSMENT'" x-transition.opacity>
-            <label class="form-label">{{ form.linked_assessment.label }}</label>
-            {{ form.linked_assessment }}
-        </div>
-
-        <div class="mb-3" x-show="selectedType === 'EXAM'" x-transition.opacity>
-            <label class="form-label">{{ form.linked_exam.label }}</label>
-            {{ form.linked_exam }}
-        </div>
-
-        <div class="mb-3" x-show="selectedType === 'PRACTICE_QUIZ'" x-transition.opacity>
-            <label class="form-label">{{ form.linked_practice_quiz.label }}</label>
-            {{ form.linked_practice_quiz }}
-        </div>
+    <div class="modal-header">
+        <h5 class="modal-title">{{ modal_title }}</h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
     </div>
+    <div class="modal-body">
+        
+        {# --- Logic for Simple Module/Lesson Forms --- #}
+        {% if form.instance|model_name == 'module' or form.instance|model_name == 'lesson' %}
+            {{ form|crispy }}
 
+        {# --- Logic for the Complex ContentBlock Form --- #}
+        {% elif form.instance|model_name == 'contentblock' %}
+            
+            {{ form.title|as_crispy_field }}
+            
+            <!-- This select now correctly updates the Alpine 'selectedType' variable -->
+            <div class="mb-3">
+                <label for="{{ form.content_type.id_for_label }}" class="form-label requiredField">{{ form.content_type.label }}</label>
+                <select name="{{ form.content_type.name }}" class="form-select" id="{{ form.content_type.id_for_label }}" @change="selectedType = $event.target.value">
+                    {% for value, text in form.fields.content_type.choices %}
+                        <option value="{{ value }}" {% if form.instance.content_type == value %}selected{% endif %}>{{ text }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <hr>
+
+            <!-- These divs will now correctly show/hide based on the dropdown selection -->
+            <div x-show="selectedType === 'TEXT'" x-transition.opacity>{{ form.rich_text|as_crispy_field }}</div>
+            <div x-show="selectedType === 'IMAGE' || selectedType === 'AUDIO' || selectedType === 'FILE'" x-transition.opacity>{{ form.media_file|as_crispy_field }}</div>
+            <div x-show="selectedType === 'VIDEO'" x-transition.opacity>{{ form.media_url|as_crispy_field }}</div>
+            <div x-show="selectedType === 'PRACTICE_QUIZ'" x-transition.opacity>{{ form.linked_practice_quiz|as_crispy_field }}</div>
+            <div x-show="selectedType === 'ASSIGNMENT'" x-transition.opacity>{{ form.linked_assignment|as_crispy_field }}</div>
+            <div x-show="selectedType === 'ASSESSMENT'" x-transition.opacity>{{ form.linked_assessment|as_crispy_field }}</div>
+            <div x-show="selectedType === 'EXAM'" x-transition.opacity>{{ form.linked_exam|as_crispy_field }}</div>
+        
+        {% else %}
+            <!-- Fallback for any other form types -->
+            {{ form|crispy }}
+        {% endif %}
+    </div>
     <div class="modal-footer">
-        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
         <button type="submit" class="btn btn-primary">Save Changes</button>
     </div>
 </form>

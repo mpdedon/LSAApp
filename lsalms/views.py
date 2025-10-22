@@ -7,11 +7,13 @@ from django.urls import reverse, reverse_lazy
 from django.shortcuts import get_object_or_404, redirect
 from django.http import JsonResponse, HttpResponseForbidden
 from django.views.decorators.http import require_POST
+from django.views.decorators.csrf import csrf_exempt 
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.conf import settings
 from django.contrib import messages
-from django.http import HttpResponse
-from django.db import models
+from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse
+from django.template.loader import render_to_string
+from django.db import models, transaction
 from django.db.models import Max, Prefetch, Sum, Subquery, OuterRef, Count, Avg, Q
 from django.core.paginator import Paginator
 from .models import Course, Lesson, Module, ContentBlock, CourseEnrollment, LessonProgress, StudentActivityLog
@@ -93,67 +95,7 @@ class CourseUpdateView(LoginRequiredMixin, UpdateView):
     def get_success_url(self):
         return reverse('lsalms:course_edit', kwargs={'slug': self.object.slug})
     
-
-class CourseManageView(LoginRequiredMixin, DetailView): 
-    model = Course
-    template_name = 'teacher/course_manage.html'
-    context_object_name = 'course'
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        course = self.get_object()
-        
-        graded_activities = course.graded_activities.all().select_related('content_type')
-        total_weight = graded_activities.aggregate(total=Sum('weight'))['total'] or 0
-
-        enrollments = CourseEnrollment.objects.filter(
-            course=course
-        ).select_related('student__user', 'grade_report')
-
-        total_lessons_in_course = Lesson.objects.filter(module__course=course).count()
-
-        # 3. Only proceed if there are actual enrollments.
-        if enrollments.exists():
-            # Trigger grade calculations for all enrolled students.
-            for enrollment in enrollments:
-                update_course_grade_for_student(course=course, student=enrollment.student)
-
-            # Re-fetch the enrollments to get the updated grade_report data.
-            enrollments_with_grades = CourseEnrollment.objects.filter(
-                course=course
-            ).select_related('student__user', 'grade_report')
-
-            # Efficiently count completed lessons for these specific enrollments.
-            completed_lessons_subquery = LessonProgress.objects.filter(
-                enrollment=OuterRef('pk')
-            ).values('enrollment').annotate(c=Count('id')).values('c')
-            
-            enrollments_with_progress = enrollments_with_grades.annotate(
-                completed_lessons_count=Subquery(completed_lessons_subquery, output_field=models.IntegerField())
-            )
-
-            # Attach the final percentage.
-            for enrollment in enrollments_with_progress:
-                completed_count = enrollment.completed_lessons_count or 0
-                if total_lessons_in_course > 0:
-                    enrollment.progress_percentage = int((completed_count / total_lessons_in_course) * 100)
-                else:
-                    enrollment.progress_percentage = 0
-            
-            context['student_progress_data'] = enrollments_with_progress
-        else:
-            context['student_progress_data'] = []
-        
-        context['total_lessons_in_course'] = total_lessons_in_course
-        context['graded_activities'] = graded_activities
-        context['total_weight'] = total_weight
-        context['module_form'] = ModuleForm(prefix='new_module')
-        context['lesson_form'] = LessonForm(prefix='new_lesson')
-        context['content_form'] = ContentBlockForm(prefix='new_content')
-        context['AI_IS_CONFIGURED'] = bool(settings.GEMINI_API_KEY)
-        
-        return context
-
+    
 
 class ModuleCreateView(LoginRequiredMixin, CreateView):
     model = Module
@@ -268,7 +210,68 @@ class ContentBlockUpdateView(LoginRequiredMixin, OwnerRequiredMixin, UpdateView)
 
 
 # === "Creator Hub" FBVs for DELETING ===
-    
+
+@login_required
+def course_builder_view(request, course_slug):
+    # Fetch the course and prefetch all related items in an efficient way
+    course = get_object_or_404(Course.objects.prefetch_related('modules__lessons__content_blocks'), slug=course_slug)
+
+    # Authorization Check: Ensure the user is the teacher of the course or a superuser
+    if not (request.user.is_superuser or course.teacher == request.user):
+        messages.error(request, "You are not authorized to edit this course.")
+        return redirect('lsalms:academy_hub')
+
+    context = {
+        'course': course,
+    }
+    return render(request, 'lsalms/builder/course_builder.html', context)
+
+
+@require_POST
+def update_module_order(request, course_id):
+    """
+    Receives a list of module IDs in their new order and updates them.
+    """
+    module_ids = request.POST.getlist('module_order[]')
+    try:
+        with transaction.atomic(): # Ensures all updates succeed or none do
+            for index, module_id in enumerate(module_ids):
+                Module.objects.filter(id=module_id, course_id=course_id).update(order=index)
+        return JsonResponse({'status': 'success', 'message': 'Module order updated.'})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+
+
+@require_POST
+def update_lesson_order(request, module_id):
+    """
+    Receives a list of lesson IDs in their new order and updates them.
+    """
+    lesson_ids = request.POST.getlist('lesson_order[]')
+    try:
+        with transaction.atomic():
+            for index, lesson_id in enumerate(lesson_ids):
+                Lesson.objects.filter(id=lesson_id, module_id=module_id).update(order=index)
+        return JsonResponse({'status': 'success', 'message': 'Lesson order updated.'})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+
+
+@require_POST
+def update_content_block_order(request, lesson_id):
+    """
+    Receives a list of content block IDs in their new order and updates them.
+    """
+    block_ids = request.POST.getlist('block_order[]')
+    try:
+        with transaction.atomic():
+            for index, block_id in enumerate(block_ids):
+                ContentBlock.objects.filter(id=block_id, lesson_id=lesson_id).update(order=index)
+        return JsonResponse({'status': 'success', 'message': 'Content order updated.'})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+
+
 @login_required
 @require_POST 
 @user_passes_test(lambda u: u.is_superuser) 

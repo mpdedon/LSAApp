@@ -49,7 +49,6 @@
                                 <div class="small text-muted">{{ task.obj.subject.name }} | {{ task.type|title }}</div>
                             </div>
                             <div class="text-end">
-                                <!-- ================= START: THE DEFINITIVE, SYNTAX-CORRECT LOGIC ================= -->
                                 {% if task.status == "COMPLETED" %}
                                     
                                     {# Check for Assignments: They are graded if they have a 'grade' #}
@@ -82,7 +81,6 @@
                                 {% else %}
                                     <span class="badge bg-secondary">Archived</span>
                                 {% endif %}
-                                <!-- ================== END: THE DEFINITIVE, SYNTAX-CORRECT LOGIC ================== -->
                             </div>
                         </div>
                         {% endfor %}
