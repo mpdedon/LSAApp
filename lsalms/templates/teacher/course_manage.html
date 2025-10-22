@@ -26,7 +26,6 @@
 </style>
 <script src="https://cdn.jsdelivr.net/npm/sortablejs@latest/Sortable.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
-<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 <script src="https://cdn.ckeditor.com/ckeditor5/40.0.0/classic/ckeditor.js"></script>
 {% endblock %}
 
@@ -191,49 +190,36 @@ document.addEventListener('DOMContentLoaded', function() {
     // --- 1. SETUP & CONFIGURATION ---
     const csrftoken = document.querySelector('[name=csrfmiddlewaretoken]').value;
     const curriculumContainer = document.getElementById('curriculum-container');
-    
-    // Get Modal elements and create Bootstrap instances
-    const simpleModalEl = document.getElementById('simpleModal');
-    const simpleModal = new bootstrap.Modal(simpleModalEl);
-    const formModalEl = document.getElementById('formModal');
-    const formModal = new bootstrap.Modal(formModalEl);
-    const deleteModalEl = document.getElementById('deleteModal');
-    const deleteModal = new bootstrap.Modal(deleteModalEl);
-    
-    // A flag passed from the Django view to check if AI is enabled
+    const deleteModal = new bootstrap.Modal(document.getElementById('deleteModal'));
     const AI_IS_CONFIGURED = {{ AI_IS_CONFIGURED|yesno:"true,false" }};
 
 
     // --- 2. CORE DYNAMIC SCRIPT INITIALIZATION ENGINE ---
     /**
-     * This function is the heart of the dynamic builder. It's called every time
-     * new HTML is loaded into a modal.
+     * This function is called every time new HTML is loaded into a modal.
      */
     function reinitializeModalScripts(modalContent) {
-        // A. Initialize Alpine.js for dynamic fields in the ContentBlock form
-        if (window.Alpine) {
-            modalContent.querySelectorAll('[x-data]').forEach(el => {
-                if (!el._x_is_initialized) { // Prevent re-initializing the same element
-                    window.Alpine.initializeComponent(el);
-                }
-            });
-        }
         
+        // ================= START: THE ALPINE.JS v3 FIX =================
+        // In Alpine v3, you don't need to manually initialize components.
+        // The `defer` attribute on the script tag handles the initial load.
+        // For dynamically added content, Alpine automatically discovers it.
+        // We can simply dispatch a custom event if needed, but often it's not.
+        // This function's main job is now just to handle CKEditor.
+        // =================  END: THE ALPINE.JS v3 FIX  =================
+
         // B. Initialize CKEditor for any rich text textareas
         const ckeditorTextarea = modalContent.querySelector('textarea.ckeditor-textarea');
         if (ckeditorTextarea && typeof ClassicEditor !== 'undefined') {
-            // If an editor instance already exists (e.g., on a re-rendered form with errors), destroy it first.
             if (ckeditorTextarea.ckeditorInstance) {
                 ckeditorTextarea.ckeditorInstance.destroy().catch(() => {});
             }
-            // Create the editor
             ClassicEditor
                 .create(ckeditorTextarea)
                 .then(editor => {
-                    // Store the instance on the element itself so we can get its data on submit
                     ckeditorTextarea.ckeditorInstance = editor;
                 })
-                .catch(error => console.error('Error initializing CKEditor:', error));
+                .catch(error => console.error('CKEditor Init Error:', error));
         }
     }
 
@@ -263,7 +249,7 @@ document.addEventListener('DOMContentLoaded', function() {
         initializeSortable('.lessons-list', 'lesson_order');
         initializeSortable('.content-blocks-list', 'block_order');
     }
-    initializeAllSortables(); // Run once on initial page load
+    initializeAllSortables();
 
 
     // --- 4. AJAX INTERACTIONS ENGINE (MODALS FOR CREATE, EDIT, DELETE) ---
@@ -283,68 +269,107 @@ document.addEventListener('DOMContentLoaded', function() {
                 .then(html => {
                     modalContent.innerHTML = html;
                     modalInstance.show();
-                    
-                    // Use the 'shown.bs.modal' event to guarantee the DOM is ready
                     modalEl.addEventListener('shown.bs.modal', () => {
                         reinitializeModalScripts(modalContent);
                     }, { once: true });
                 });
         }
         
-        // -- Handle opening Delete Confirmation Modals --
+        // -- Handle opening Delete Modals --
         if (deleteBtn) {
             event.preventDefault();
             document.getElementById('deleteObjectName').textContent = `"${deleteBtn.dataset.name}"`;
             const deleteForm = document.getElementById('deleteForm');
             deleteForm.action = deleteBtn.dataset.url;
-            deleteForm.dataset.itemToRemove = `#${deleteBtn.closest('[data-id]').id}`; // Find the closest parent with a data-id
+            deleteForm.dataset.itemToRemove = `#${deleteBtn.closest('[data-id]').id}`;
             deleteModal.show();
         }
     });
 
-    // -- Handle submission of Create/Edit Forms --
-    document.body.addEventListener('submit', function(event) {
-        const form = event.target.closest('.ajax-form');
-        if (form) {
-            event.preventDefault();
-            const submitBtn = form.querySelector('button[type="submit"]');
-            submitBtn.disabled = true;
-            submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Saving...`;
-
-            // IMPORTANT: If CKEditor exists, update the textarea before submitting
-            const ckeditorTextarea = form.querySelector('textarea.ckeditor-textarea');
-            if (ckeditorTextarea && ckeditorTextarea.ckeditorInstance) {
-                ckeditorTextarea.value = ckeditorTextarea.ckeditorInstance.getData();
-            }
-
-            fetch(form.action, { method: 'POST', body: new FormData(form) })
-                .then(response => {
-                    // Your Django views redirect on success. This is the simplest way to check.
-                    if (response.redirected) {
-                        window.location.href = response.url; // Success! Just reload the page.
-                    } else {
-                        // Form has validation errors. Re-render the form inside the modal.
-                        return response.text().then(html => { throw new Error(html); });
-                    }
-                })
-                .catch(errorHtml => {
-                    const modalContent = form.closest('.modal-content');
-                    if (modalContent) {
-                        modalContent.innerHTML = errorHtml;
-                        // IMPORTANT: Re-initialize scripts on the re-rendered form WITH ERRORS
-                        reinitializeModalScripts(modalContent);
-                    }
-                });
-        }
+    // --- 4. AJAX INTERACTIONS ENGINE (with enhanced logging) ---
+    document.body.addEventListener('click', function(event) {
+        // ... (Your 'modalBtn' and 'deleteBtn' click listeners are correct) ...
     });
 
-    // -- Handle submission of the Delete Form --
+    // -- Definitive Handler for Create/Edit Form Submission --
+    document.body.addEventListener('submit', function(event) {
+        const form = event.target.closest('.ajax-form');
+        if (!form) return;
+        
+        event.preventDefault(); // Always prevent the default browser submission
+        
+        console.log("AJAX form submission initiated."); // DEBUG: Confirm the handler is running
+
+        const submitBtn = form.querySelector('button[type="submit"]');
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm"></span> Saving...`;
+
+        // IMPORTANT: Manually update the textarea from CKEditor
+        const ckeditorTextarea = form.querySelector('textarea.ckeditor-textarea');
+        if (ckeditorTextarea && ckeditorTextarea.ckeditorInstance) {
+            console.log("Syncing data from CKEditor instance."); // DEBUG
+            ckeditorTextarea.value = ckeditorTextarea.ckeditorInstance.getData();
+        }
+
+        const formData = new FormData(form);
+        console.log("Submitting form data to:", form.action); // DEBUG
+
+        fetch(form.action, {
+            method: 'POST',
+            body: formData,
+            // We need the CSRF token for POST requests
+            headers: { 'X-CSRFToken': csrftoken, 'Accept': 'application/json, text/html' }
+        })
+        .then(response => {
+            console.log("Received response from server with status:", response.status); // DEBUG
+            // Your Django views redirect on success. This is the primary success check.
+            if (response.redirected) {
+                console.log("Response was a redirect. Reloading page."); // DEBUG
+                window.location.href = response.url;
+                return; // Stop processing
+            }
+            
+            // If it's not a redirect, it's either an error or a JSON success message (from our API views)
+            if (response.ok) {
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    return response.json().then(data => {
+                        console.log("Received successful JSON response:", data); // DEBUG
+                        // This handles success from our simple API views (like reordering)
+                        // In this case, we might just reload for simplicity
+                        window.location.reload();
+                    });
+                }
+            }
+
+            // If we reach here, it's a validation error (response.ok is false, or not a redirect)
+            console.log("Response is not a redirect or OK. Assuming validation error."); // DEBUG
+            // We expect the body of the response to be the re-rendered form HTML with errors
+            return response.text().then(html => {
+                // Throwing an error here sends it to the .catch() block
+                throw new Error(html);
+            });
+        })
+        .catch(error => {
+            // This .catch() block handles both network errors and the thrown validation error
+            console.log("Caught an error during form submission. Re-rendering modal with error HTML."); // DEBUG
+            const modalContent = form.closest('.modal-content');
+            if (modalContent) {
+                modalContent.innerHTML = error.message; // The error message IS the HTML
+                reinitializeModalScripts(modalContent); // IMPORTANT: Re-init JS on the new form content
+            }
+        });
+    });
+    
+    // -- Definitive Handler for the Delete Form --
     document.getElementById('deleteForm').addEventListener('submit', function(event) {
         event.preventDefault();
         fetch(this.action, { method: 'POST', headers: { 'X-CSRFToken': csrftoken }})
             .then(response => {
                 if (response.redirected) {
-                    window.location.href = response.url; // Success! Reload the page to see the change.
+                    window.location.href = response.url;
+                } else {
+                    alert('Error: Could not delete the item.');
                 }
             });
     });

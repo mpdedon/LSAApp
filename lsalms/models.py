@@ -174,7 +174,7 @@ class Module(models.Model):
     course = models.ForeignKey(Course, on_delete=models.CASCADE, related_name='modules')
     title = models.CharField(max_length=255)
     description = models.TextField(blank=True, help_text="A brief overview of this module's goals.")
-    order = models.PositiveIntegerField(default=0)
+    order = models.PositiveIntegerField(default=0, blank=True)
 
     class Meta:
         ordering = ['order']
@@ -188,7 +188,7 @@ class Lesson(models.Model):
     """ An individual learning unit (e.g., a lecture, reading, or activity). """
     module = models.ForeignKey(Module, on_delete=models.CASCADE, related_name='lessons')
     title = models.CharField(max_length=255)
-    order = models.PositiveIntegerField(default=0)
+    order = models.PositiveIntegerField(default=0, blank=True)
     estimated_duration = models.PositiveIntegerField(default=5, help_text="Estimated time in minutes to complete.")
 
     def get_next_lesson(self):
@@ -261,7 +261,7 @@ class ContentBlock(models.Model):
     lesson = models.ForeignKey(Lesson, on_delete=models.CASCADE, related_name='content_blocks')
     title = models.CharField(max_length=255, help_text="e.g., 'Video: Introduction to Photosynthesis'")
     content_type = models.CharField(max_length=15, choices=ContentType.choices)
-    order = models.PositiveIntegerField(default=0)
+    order = models.PositiveIntegerField(default=0, blank=True)
 
     # --- Content Payloads ---
     rich_text = models.TextField(blank=True, help_text="For TEXT content type.")

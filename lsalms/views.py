@@ -276,7 +276,7 @@ class ModuleCreateView(LoginRequiredMixin, CreateView):
         context = super().get_context_data(**kwargs)
         context['form_action_url'] = reverse('lsalms:module_create', kwargs={'course_id': self.kwargs['course_id']})
         return context
-
+    
     def form_valid(self, form):
         course = get_object_or_404(Course, pk=self.kwargs['course_id'], teacher=self.request.user)
         form.instance.course = course
@@ -321,13 +321,26 @@ class ContentBlockCreateView(LoginRequiredMixin, CreateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['form_action_url'] = reverse('lsalms:content_block_create', kwargs={'lesson_id': self.kwargs['lesson_id']})
+        context['modal_title'] = 'Add New Content'
         return context
+    
+    def form_invalid(self, form):
 
+        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        print("CONTENT BLOCK FORM IS INVALID. ERRORS:")
+        print(form.errors.as_json())
+        print("---------------------------------------------")
+        print("DATA RECEIVED:")
+        print(self.request.POST)
+        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+        
+        return super().form_invalid(form)
+    
     def form_valid(self, form):
         lesson = get_object_or_404(Lesson, pk=self.kwargs['lesson_id'], module__course__teacher=self.request.user)
         form.instance.lesson = lesson
-        last_content_order = ContentBlock.objects.filter(lesson=lesson).aggregate(max_order=Max('order'))['max_order']
-        form.instance.order = 1 if last_content_order is None else last_content_order + 1
+        max_order = ContentBlock.objects.filter(lesson=lesson).aggregate(Max('order'))['order__max']
+        form.instance.order = (max_order or 0) + 1 if max_order is not None else 0
         messages.success(self.request, "Content Block created successfully.")
         return super().form_valid(form)
     

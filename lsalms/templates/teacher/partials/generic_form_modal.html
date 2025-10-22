@@ -1,40 +1,25 @@
-<!-- DEFINITIVE FILE: lsalms/templates/lsalms/partials/generic_form_modal.html -->
 {% load crispy_forms_tags lsalms_extras %}
 
-{# This is essential for loading CKEditor's required JavaScript #}
 {{ form.media }}
 
-{# This form is a self-contained Alpine.js component #}
-<form class="ajax-form" method="post" action="{{ form_action_url }}" enctype="multipart/form-data" 
-      x-data="{ selectedType: '{{ form.instance.content_type|default:'TEXT' }}' }">
-    
-    {% csrf_token %}
-    <div class="modal-header">
-        <h5 class="modal-title">{{ modal_title }}</h5>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-    </div>
-    <div class="modal-body">
-        
-        {# --- Logic for Simple Module/Lesson Forms --- #}
-        {% if form.instance|model_name == 'module' or form.instance|model_name == 'lesson' %}
-            {{ form|crispy }}
-
-        {# --- Logic for the Complex ContentBlock Form --- #}
-        {% elif form.instance|model_name == 'contentblock' %}
+<!-- We attach the Alpine component to a wrapper div, NOT the form, for stability -->
+<div x-data="{ selectedType: '{{ form.instance.content_type|default:'TEXT' }}' }">
+    <form class="ajax-form" method="post" action="{{ form_action_url }}" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="modal-header">...</div>
+        <div class="modal-body">
             
-            {{ form.title|as_crispy_field }}
-            
-            <!-- This select now correctly updates the Alpine 'selectedType' variable -->
-            <div class="mb-3">
-                <label for="{{ form.content_type.id_for_label }}" class="form-label requiredField">{{ form.content_type.label }}</label>
-                <select name="{{ form.content_type.name }}" class="form-select" id="{{ form.content_type.id_for_label }}" @change="selectedType = $event.target.value">
-                    {% for value, text in form.fields.content_type.choices %}
-                        <option value="{{ value }}" {% if form.instance.content_type == value %}selected{% endif %}>{{ text }}</option>
-                    {% endfor %}
-                </select>
-            </div>
-
-            <hr>
+            {% if form.instance|model_name == 'contentblock' %}
+                {{ form.title|as_crispy_field }}
+                <div class="mb-3">
+                    <label class="form-label requiredField">{{ form.content_type.label }}</label>
+                    <select name="{{ form.content_type.name }}" class="form-select" @change="selectedType = $event.target.value">
+                        {% for value, text in form.fields.content_type.choices %}
+                            <option value="{{ value }}" {% if form.instance.content_type == value %}selected{% endif %}>{{ text }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <hr>
 
             <!-- These divs will now correctly show/hide based on the dropdown selection -->
             <div x-show="selectedType === 'TEXT'" x-transition.opacity>{{ form.rich_text|as_crispy_field }}</div>

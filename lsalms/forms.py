@@ -83,7 +83,7 @@ class ContentBlockForm(forms.ModelForm):
         # Map content types to the fields they should display
         self.fields['content_type'].widget.attrs.update({
             '@change': 'selectedType = $event.target.value',
-            'class': 'form-select' # Also a good place to add CSS classes
+            'class': 'form-select' 
         })
 
         for field_name, field in self.fields.items():
