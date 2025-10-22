@@ -49,3 +49,8 @@ def youtube_embed_url(value):
 def in_set(value, arg):
     """Checks if a value is present in a set."""
     return value in arg
+
+
+@register.filter
+def model_name(instance):
+    return instance.__class__.__name__.lower()

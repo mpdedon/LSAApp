@@ -95,14 +95,14 @@ class BulkUpdateStudentsView(View):
         if action == "promote":
             for student in students:
                 if student.current_class and student.current_class.next_class:
-                    student.current_class = student.current_class.next_class
+                    student.current_class = student.current_class.next_class()
                     student.save()
             messages.success(request, "Selected students have been promoted.")
         
         elif action == "demote":
             for student in students:
                 if student.current_class and student.current_class.previous_class:
-                    student.current_class = student.current_class.previous_class
+                    student.current_class = student.current_class.previous_class()
                     student.save()
             messages.success(request, "Selected students have been demoted.")
 

@@ -14,7 +14,7 @@ from django.utils.text import slugify
 
 # --- Import core application models ---
 try:
-    from core.models import Student, Class, Term, Subject, Assignment, Assessment, Exam
+    from core.models import Student, Class, Term, Subject, Assignment, Assessment, Exam, OnlineQuestion
 except ImportError:
     # Fallback for initial migrations or design phase
     Student = settings.AUTH_USER_MODEL 
@@ -78,6 +78,10 @@ class Course(models.Model):
     is_subscription_based = models.BooleanField(
         default=False,
         help_text="For EXTERNAL courses: requires a paid subscription."
+    )
+    image = models.ImageField(
+        upload_to='courses/thumbnails/', null=True, blank=True,                 
+        help_text="Upload a course thumbnail image. Recommended size: 800x600."
     )
     # --- Timestamps & Managers ---
     created_at = models.DateTimeField(auto_now_add=True)
@@ -177,7 +181,7 @@ class Module(models.Model):
         unique_together = [['course', 'title']]
 
     def __str__(self):
-        return f"{self.course.title} | {self.title}"
+        return f"{self.course.title} - Module {self.order}: {self.title}"
 
 
 class Lesson(models.Model):

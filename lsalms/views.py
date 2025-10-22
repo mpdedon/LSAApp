@@ -7,11 +7,13 @@ from django.urls import reverse, reverse_lazy
 from django.shortcuts import get_object_or_404, redirect
 from django.http import JsonResponse, HttpResponseForbidden
 from django.views.decorators.http import require_POST
+from django.views.decorators.csrf import csrf_exempt 
 from django.contrib.auth.decorators import login_required, user_passes_test
 from django.conf import settings
 from django.contrib import messages
-from django.http import HttpResponse
-from django.db import models
+from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse
+from django.template.loader import render_to_string
+from django.db import models, transaction
 from django.db.models import Max, Prefetch, Sum, Subquery, OuterRef, Count, Avg, Q
 from django.core.paginator import Paginator
 from .models import Course, Lesson, Module, ContentBlock, CourseEnrollment, LessonProgress, StudentActivityLog
@@ -94,15 +96,31 @@ class CourseUpdateView(LoginRequiredMixin, UpdateView):
         return reverse('lsalms:course_edit', kwargs={'slug': self.object.slug})
     
 
-class CourseManageView(LoginRequiredMixin, DetailView): 
-    model = Course
-    template_name = 'teacher/course_manage.html'
-    context_object_name = 'course'
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        course = self.get_object()
+class CourseManageView(LoginRequiredMixin, DetailView):
+    """
+    Handles both the initial page load (GET) and all AJAX actions (POST)
+    for the course builder.
+    """
+    def dispatch(self, request, *args, **kwargs):
+        """ Get the course object once for all methods. """
+        self.course = get_object_or_404(
+            Course.objects.prefetch_related('modules__lessons__content_blocks'),
+            slug=self.kwargs.get('slug')
+        )
+        # --- Authorization Check ---
+        if not (request.user.is_superuser or self.course.teacher == request.user):
+            messages.error(request, "You are not authorized to manage this course.")
+            return redirect('lsalms:academy_hub')
         
+        return super().dispatch(request, *args, **kwargs)
+    
+    def get(self, request, *args, **kwargs):
+        """ Handles the initial page load. """
+        course = get_object_or_404(
+            Course.objects.prefetch_related('modules__lessons__content_blocks'),
+            slug=self.kwargs.get('slug')
+        )
+      
         graded_activities = course.graded_activities.all().select_related('content_type')
         total_weight = graded_activities.aggregate(total=Sum('weight'))['total'] or 0
 
@@ -139,21 +157,115 @@ class CourseManageView(LoginRequiredMixin, DetailView):
                     enrollment.progress_percentage = int((completed_count / total_lessons_in_course) * 100)
                 else:
                     enrollment.progress_percentage = 0
-            
-            context['student_progress_data'] = enrollments_with_progress
-        else:
-            context['student_progress_data'] = []
         
-        context['total_lessons_in_course'] = total_lessons_in_course
-        context['graded_activities'] = graded_activities
-        context['total_weight'] = total_weight
-        context['module_form'] = ModuleForm(prefix='new_module')
-        context['lesson_form'] = LessonForm(prefix='new_lesson')
-        context['content_form'] = ContentBlockForm(prefix='new_content')
-        context['AI_IS_CONFIGURED'] = bool(settings.GEMINI_API_KEY)
-        
-        return context
+        context = {
+            'course': course,
+            'graded_activities': graded_activities,
+            'total_weight': total_weight,
+            'student_progress_data': enrollments_with_progress,
+            'AI_IS_CONFIGURED': bool(settings.GEMINI_API_KEY),
+        }
+        return render(request, 'teacher/course_manage.html', context)
 
+    def post(self, request, *args, **kwargs):
+        """
+        Acts as a router for all AJAX POST requests. The 'action' parameter
+        determines which private method to call.
+        """
+        action = request.POST.get('action')
+        handler = getattr(self, f'_handle_{action}', self._handle_invalid_action)
+        return handler(request)
+
+    # --- ACTION HANDLERS ---
+    def _handle_invalid_action(self, request):
+        return JsonResponse({'status': 'error', 'message': 'Invalid action specified.'}, status=400)
+
+    def _render_form(self, request, form, url, modal_title):
+        """ Helper to render a form inside a modal structure. """
+        context = {'form': form, 'form_action_url': url, 'modal_title': modal_title}
+        return render(request, 'lsalms/partials/generic_form_modal.html', context)
+
+    def _handle_get_form(self, request):
+        """ Generic handler for fetching create/edit form HTML. """
+        form_type = request.GET.get('form_type')
+        pk = request.GET.get('pk')
+        
+        if form_type == 'module':
+            instance = get_object_or_404(Module, pk=pk, course=self.course) if pk else None
+            form = ModuleForm(instance=instance)
+            url = reverse('lsalms:course_manage', kwargs={'slug': self.course.slug})
+            modal_title = 'Edit Module' if instance else 'Create New Module'
+            
+        elif form_type == 'lesson':
+            instance = get_object_or_404(Lesson, pk=pk, module__course=self.course) if pk else None
+            form = LessonForm(instance=instance)
+            url = reverse('lsalms:course_manage', kwargs={'slug': self.course.slug})
+            modal_title = 'Edit Lesson' if instance else 'Create New Lesson'
+            
+        elif form_type == 'content_block':
+            instance = get_object_or_404(ContentBlock, pk=pk, lesson__module__course=self.course) if pk else None
+            form = ContentBlockForm(instance=instance)
+            url = reverse('lsalms:course_manage', kwargs={'slug': self.course.slug})
+            modal_title = 'Edit Content' if instance else 'Add New Content'
+        
+        else:
+            return HttpResponseBadRequest("Invalid form type.")
+            
+        return self._render_form(request, form, url, modal_title)
+        
+    def _handle_save_form(self, request):
+        """ Generic handler for saving create/edit forms. """
+        form_type = request.POST.get('form_type')
+        pk = request.POST.get('pk')
+
+        if form_type == 'module':
+            instance = get_object_or_404(Module, pk=pk, course=self.course) if pk else None
+            form = ModuleForm(request.POST, instance=instance)
+            if form.is_valid():
+                obj = form.save(commit=False)
+                if not instance: obj.course = self.course
+                obj.save()
+                html = render_to_string('lsalms/partials/_module_item.html', {'module': obj})
+                return JsonResponse({'status': 'success', 'html': html, 'is_new': not instance})
+            
+        if form_type == 'lesson':
+            instance = get_object_or_404(Lesson, pk=pk, course=self.course) if pk else None
+            form = LessonForm(request.POST, instance=instance)
+            if form.is_valid():
+                obj = form.save(commit=False)
+                if not instance: obj.module = self.module
+                obj.save()
+                html = render_to_string('lsalms/partials/_lesson_item.html', {'module': obj})
+                return JsonResponse({'status': 'successmod', 'html': html, 'is_new': not instance})
+            
+        if form_type == 'content_block':
+            instance = get_object_or_404(ContentBlock, pk=pk, course=self.course) if pk else None
+            form = ContentBlockForm(request.POST, instance=instance)
+            if form.is_valid():
+                obj = form.save(commit=False)
+                if not instance: obj.lesson = self.lesson
+                obj.save()
+                html = render_to_string('lsalms/partials/_content_block_item.html', {'module': obj})
+                return JsonResponse({'status': 'success', 'html': html, 'is_new': not instance})
+              
+        return JsonResponse({'status': 'error', 'errors': form.errors})
+
+    def _handle_delete_item(self, request):
+        """ Generic handler for deleting items. """
+        item_type = request.POST.get('item_type')
+        pk = request.POST.get('pk')
+
+        if item_type == 'module':
+            Module.objects.filter(pk=pk, course=self.course).delete()
+        elif item_type == 'lesson':
+            Lesson.objects.filter(pk=pk, module__course=self.course).delete()
+        elif item_type == 'content_block':
+            ContentBlock.objects.filter(pk=pk, lesson__module__course=self.course).delete()
+        else:
+            return HttpResponseBadRequest("Invalid item type.")
+
+        return JsonResponse({'status': 'success'})
+    
 
 class ModuleCreateView(LoginRequiredMixin, CreateView):
     model = Module
@@ -268,7 +380,68 @@ class ContentBlockUpdateView(LoginRequiredMixin, OwnerRequiredMixin, UpdateView)
 
 
 # === "Creator Hub" FBVs for DELETING ===
-    
+
+@login_required
+def course_builder_view(request, course_slug):
+    # Fetch the course and prefetch all related items in an efficient way
+    course = get_object_or_404(Course.objects.prefetch_related('modules__lessons__content_blocks'), slug=course_slug)
+
+    # Authorization Check: Ensure the user is the teacher of the course or a superuser
+    if not (request.user.is_superuser or course.teacher == request.user):
+        messages.error(request, "You are not authorized to edit this course.")
+        return redirect('lsalms:academy_hub')
+
+    context = {
+        'course': course,
+    }
+    return render(request, 'lsalms/builder/course_builder.html', context)
+
+
+@require_POST
+def update_module_order(request, course_id):
+    """
+    Receives a list of module IDs in their new order and updates them.
+    """
+    module_ids = request.POST.getlist('module_order[]')
+    try:
+        with transaction.atomic(): # Ensures all updates succeed or none do
+            for index, module_id in enumerate(module_ids):
+                Module.objects.filter(id=module_id, course_id=course_id).update(order=index)
+        return JsonResponse({'status': 'success', 'message': 'Module order updated.'})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+
+
+@require_POST
+def update_lesson_order(request, module_id):
+    """
+    Receives a list of lesson IDs in their new order and updates them.
+    """
+    lesson_ids = request.POST.getlist('lesson_order[]')
+    try:
+        with transaction.atomic():
+            for index, lesson_id in enumerate(lesson_ids):
+                Lesson.objects.filter(id=lesson_id, module_id=module_id).update(order=index)
+        return JsonResponse({'status': 'success', 'message': 'Lesson order updated.'})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+
+
+@require_POST
+def update_content_block_order(request, lesson_id):
+    """
+    Receives a list of content block IDs in their new order and updates them.
+    """
+    block_ids = request.POST.getlist('block_order[]')
+    try:
+        with transaction.atomic():
+            for index, block_id in enumerate(block_ids):
+                ContentBlock.objects.filter(id=block_id, lesson_id=lesson_id).update(order=index)
+        return JsonResponse({'status': 'success', 'message': 'Content order updated.'})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+
+
 @login_required
 @require_POST 
 @user_passes_test(lambda u: u.is_superuser) 

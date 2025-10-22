@@ -17,6 +17,7 @@ urlpatterns = [
     path('teacher/course/<slug:slug>/manage/', views.CourseManageView.as_view(), name='course_manage'),
     path('teacher/course/<int:pk>/publish/', views.course_publish, name='course_publish'),
     path('teacher/course/<int:course_id>/update-weights/', views.update_weights_view, name='update_weights'),
+    path('builder/<slug:course_slug>/', views.course_builder_view, name='course_builder'),
 
     
     # URLs for adding components to the course builder (perfect for modals/HTMX)
@@ -24,6 +25,10 @@ urlpatterns = [
     path('teacher/module/<int:module_id>/add-lesson/', views.LessonCreateView.as_view(), name='lesson_create'),
     path('teacher/module/update-order/', views.update_module_order, name='update_module_order'),
     path('teacher/lesson/<int:lesson_id>/add-content/', views.ContentBlockCreateView.as_view(), name='content_block_create'),
+    path('api/reorder/modules/<int:course_id>/', views.update_module_order, name='api_update_module_order'),
+    path('api/reorder/lessons/<int:module_id>/', views.update_lesson_order, name='api_update_lesson_order'),
+    path('api/reorder/content-blocks/<int:lesson_id>/', views.update_content_block_order, name='api_update_content_block_order'),
+
 
     # UPDATE (Edit)
     path('teacher/module/<int:pk>/edit/', views.ModuleUpdateView.as_view(), name='module_edit'),

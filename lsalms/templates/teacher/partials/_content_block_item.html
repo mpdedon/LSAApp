@@ -1,0 +1,7 @@
+<li class="content-block-item d-flex justify-content-between align-items-center" data-id="{{ block.pk }}" id="content-block-item-{{ block.pk }}">
+    <span><i class="fas fa-grip-vertical me-2 text-muted drag-handle"></i>{{ block.title }} <small class="text-muted">({{ block.get_content_type_display }})</small></span>
+    <div>
+        <button class="action-btn modal-btn" data-bs-toggle="modal" data-bs-target="#formModal" data-url="{% url 'lsalms:content_block_edit' pk=block.pk %}"><i class="fas fa-pencil-alt"></i></button>
+        <button class="action-btn delete-btn" data-url="{% url 'lsalms:content_block_delete' pk=block.pk %}" data-name="{{ block.title }}"><i class="fas fa-trash-alt"></i></button>
+    </div>
+</li>

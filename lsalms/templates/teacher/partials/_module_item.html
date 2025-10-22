@@ -1,0 +1,31 @@
+{% load lsalms_extras %}
+
+<div class="module-item mb-3" data-id="{{ module.pk }}" id="module-item-{{ module.pk }}">
+    <div class="accordion module-accordion">
+        <div class="accordion-item">
+            <h2 class="accordion-header">
+                <button class="accordion-button" type="button" data-bs-toggle="collapse" data-bs-target="#collapseModule{{ module.pk }}">
+                    <i class="fas fa-grip-vertical me-3 text-muted drag-handle"></i> {{ module.title }}
+                </button>
+            </h2>
+            <div id="collapseModule{{ module.pk }}" class="accordion-collapse collapse show">
+                <div class="accordion-body">
+                    <div class="d-flex justify-content-end mb-3">
+                        <button class="btn btn-sm btn-outline-secondary me-2 modal-btn" data-bs-toggle="modal" data-bs-target="#simpleModal" data-url="{% url 'lsalms:module_edit' pk=module.pk %}"><i class="fas fa-pencil-alt"></i></button>
+                        <button class="btn btn-sm btn-outline-danger delete-btn" data-url="{% url 'lsalms:module_delete' pk=module.pk %}" data-name="{{ module.title }}"><i class="fas fa-trash-alt"></i></button>
+                    </div>
+                    
+                    <div class="lessons-list ps-3" data-reorder-url="{% url 'lsalms:api_update_lesson_order' module_id=module.pk %}">
+                        {% for lesson in module.lessons.all %}
+                            {% include 'teacher/partials/_lesson_item.html' with lesson=lesson %}
+                        {% endfor %}
+                    </div>
+                    
+                    <div class="mt-3 border-top pt-3">
+                        <button class="btn btn-outline-success btn-sm modal-btn" data-bs-toggle="modal" data-bs-target="#simpleModal" data-url="{% url 'lsalms:lesson_create' module_id=module.id %}"><i class="fas fa-plus me-1"></i> Add Lesson</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

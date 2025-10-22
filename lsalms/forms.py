@@ -14,7 +14,7 @@ class CourseForm(forms.ModelForm):
         fields = [
             'title', 'status', 
             'course_type', 'linked_class', 'term', 'subject', 'is_subscription_based',
-            'learning_objectives', 'prerequisites'
+            'learning_objectives', 'prerequisites', 'image'
         ]
         widgets = {
             'learning_objectives': forms.Textarea(attrs={'rows': 4}),
@@ -89,3 +89,6 @@ class ContentBlockForm(forms.ModelForm):
         for field_name, field in self.fields.items():
             if 'class' not in field.widget.attrs:
                 field.widget.attrs.update({'class': 'form-control'}) 
+
+        if 'rich_text' in self.fields:
+            self.fields['rich_text'].widget.attrs.update({'class': 'ckeditor-textarea'})
