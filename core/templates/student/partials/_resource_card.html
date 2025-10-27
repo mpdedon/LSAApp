@@ -1,0 +1,58 @@
+<!-- DEFINITIVE FILE: templates/student/partials/_resource_card.html -->
+<div class="col">
+    <a href="{{ resource.url }}" target="_blank" rel="noopener noreferrer" class="card h-100 resource-card text-decoration-none text-dark">
+        <div class="card-body d-flex flex-column text-center p-4">
+            <!-- Large, centered icon -->
+            <div class="resource-icon mb-3 mx-auto">
+                    <img src="https://www.google.com/s2/favicons?domain={{ resource.url|slice:'8:' }}&sz=64" class="resource-favicon me-3" alt="Logo">
+            </div>
+            
+            <!-- Title and Description -->
+            <h5 class="card-title fw-bold mb-2">{{ resource.name }}</h5>
+            <p class="card-text small text-muted flex-grow-1">{{ resource.description }}</p>
+
+            <!-- "Explore" link that appears at the bottom -->
+            <div class="mt-auto">
+                <span class="fw-bold small resource-link stretched-link">
+                    Visit Site <i class="bi bi-arrow-right"></i>
+                </span>
+            </div>
+        </div>
+    </a>
+</div>
+
+<style>
+    /* It's better to move these to a central CSS file */
+    .resource-card {
+        border: 1px solid #e9ecef;
+        border-radius: 12px;
+        transition: transform 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
+        background-color: #fff;
+    }
+    .resource-card:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 10px 30px rgba(0,0,0,0.09);
+        border-color: var(--bs-primary);
+    }
+    .resource-icon {
+        font-size: 2rem;
+        width: 64px;
+        height: 64px;
+        border-radius: 16px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background-color: var(--bs-primary-bg-subtle);
+        color: var(--bs-primary);
+    }
+    .resource-link {
+        color: var(--bs-secondary);
+        transition: color 0.2s ease;
+    }
+    .resource-card:hover .resource-link {
+        color: var(--bs-primary);
+    }
+</style>
+
+
+

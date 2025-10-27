@@ -95,7 +95,7 @@
                                                     {% if student.profile_image %}
                                                         <img src="{{ student.profile_image.url }}" class="rounded-circle mx-2" style="width: 40px; height: 40px; object-fit: cover;" alt="{{ student.user.get_full_name }}">
                                                     {% else %}
-                                                        <img src="{% static 'core/images/default.jpg' %}" class="rounded-circle mx-2" style="width: 40px; height: 40px; object-fit: cover;" alt="Default Profile">
+                                                        <img src="{% static 'core\static\images\default.jpg' %}" class="rounded-circle mx-2" style="width: 40px; height: 40px; object-fit: cover;" alt="Default Profile">
                                                     {% endif %}
                                                     <span class="flex-grow-1 fw-medium">{{ student.user.get_full_name }}</span>
                                                     <span class="badge bg-primary rounded-pill">{{ student.term_submission_count }} tasks submitted</span>

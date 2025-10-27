@@ -130,6 +130,7 @@ class CourseManageView(LoginRequiredMixin, DetailView):
 
         total_lessons_in_course = Lesson.objects.filter(module__course=course).count()
 
+        enrollments_with_progress = []
         # 3. Only proceed if there are actual enrollments.
         if enrollments.exists():
             # Trigger grade calculations for all enrolled students.
@@ -326,13 +327,8 @@ class ContentBlockCreateView(LoginRequiredMixin, CreateView):
     
     def form_invalid(self, form):
 
-        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
-        print("CONTENT BLOCK FORM IS INVALID. ERRORS:")
         print(form.errors.as_json())
-        print("---------------------------------------------")
-        print("DATA RECEIVED:")
         print(self.request.POST)
-        print("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
         
         return super().form_invalid(form)
     

@@ -343,12 +343,151 @@ def student_dashboard(request):
     context['unread_message_count'] = unread_message_count
 
     # Fetch all active enrollments for the student
-    enrollments = CourseEnrollment.objects.filter(student=student).select_related('course', 'grade_report')
-    active_enrollments = [e for e in enrollments if e.is_active and e.course.status == 'PUBLISHED']
+    all_enrollments = CourseEnrollment.objects.filter(student=student).select_related('course', 'grade_report').order_by('-course__term__start_date', 'course__subject__name')
+    
+    current_internal_enrollments = []
+    previous_internal_enrollments = []
+    
+    # Separate INTERNAL courses into "Current Term" and "Previous"
+    for enrollment in all_enrollments:
+        if enrollment.course.course_type == 'INTERNAL':
+            if enrollment.course.term == active_term and enrollment.course.linked_class == student.current_class:
+                current_internal_enrollments.append(enrollment)
+            else:
+                previous_internal_enrollments.append(enrollment)
 
-    # Separate them by type for the template
-    context['lms_internal_enrollments'] = [e for e in active_enrollments if e.course.course_type == 'INTERNAL']
-    context['lms_external_enrollments'] = [e for e in active_enrollments if e.course.course_type == 'EXTERNAL']
+    # External courses are always considered "current" if their subscription is active
+    context['lms_external_enrollments'] = [e for e in all_enrollments if e.course.course_type == 'EXTERNAL' and e.is_active()]
+    context['lms_current_internal_enrollments'] = current_internal_enrollments
+    context['lms_previous_internal_enrollments'] = previous_internal_enrollments
+    
+    context['primary_multidisciplinary'] = [
+        {'name': 'Khan Academy Kids', 'url': 'https://learn.khanacademy.org/khan-academy-kids/', 'description': 'Animated lessons in early literacy, math, and social-emotional learning for ages 2-8.'},
+        {'name': 'PBS Kids', 'url': 'https://pbskids.org/', 'description': 'The safest destination for educational games and videos featuring beloved characters.'},
+        {'name': 'BrainPOP Jr. (K-3)', 'url': 'https://jr.brainpop.com/', 'description': 'Explains topics in science, math, and social studies through short, funny, animated movies.'},
+        {'name': 'Starfall', 'url': 'https://www.starfall.com/', 'description': 'A legendary platform with a powerful, phonics-based approach to reading.'},
+        {'name': 'E-Learning for Kids', 'url': 'https://www.e-learningforkids.org/', 'description': 'Free global platform offering animated lessons and games for children across multiple subjects.'},
+        {'name': 'Funbrain', 'url': 'https://www.funbrain.com/', 'description': 'Mix of interactive math games, reading puzzles, and literacy games in a kid-safe environment.'},
+    ]
+    context['primary_maths'] = [
+        {'name': 'Prodigy Math Game', 'url': 'https://www.prodigygame.com/', 'description': 'Fantasy role-playing game where success depends on correctly answering curriculum-aligned math questions.'},
+        {'name': 'Zearn', 'url': 'https://www.zearn.org/', 'description': 'Blends video "Math Chats" with interactive digital lessons that feel like a private tutor.'},
+        {'name': 'SplashLearn', 'url': 'https://www.splashlearn.com/', 'description': 'A visually rich, game-based platform with a comprehensive K-5 curriculum.'},
+        {'name': 'Math Playground', 'url': 'https://www.mathplayground.com/', 'description': 'Logic puzzles, visual math activities, and a large collection of math games.'},
+        {'name': 'Bedtime Math', 'url': 'http://bedtimemath.org/', 'description': 'Uses quirky story problems to build number sense outside of formal lessons.'},
+        {'name': 'PhET Simulations', 'url': 'https://phet.colorado.edu/', 'description': 'Game-like simulations to visually explore complex math and science concepts.'},
+        {'name': 'Topmarks – Maths', 'url': 'https://www.topmarks.co.uk/maths-games', 'description': 'Many interactive games categorized by grade and math skill.'},
+        {'name': 'Coolmath4Kids', 'url': 'https://www.coolmath4kids.com/', 'description': 'Fun math games and puzzles oriented for primary students.'},
+    ]
+    context['primary_english'] = [
+        {'name': 'Teach Your Monster to Read', 'url': 'https://www.teachyourmonstertoread.com/', 'description': 'An award-winning, phonics-based adventure game that is transformative for early readers.'},
+        {'name': 'Epic!', 'url': 'https://www.getepic.com/', 'description': 'The "Netflix for kids\' books." An enormous digital library that fosters a love of reading.'},
+        {'name': 'Vooks', 'url': 'https://www.vooks.com/', 'description': 'A streaming service entirely dedicated to animated storybooks for visual learners.'},
+        {'name': 'Storyline Online', 'url': 'https://www.storylineonline.net/', 'description': 'A free literacy program where celebrated actors read children\'s books aloud with animations.'},
+        {'name': 'ReadTheory', 'url': 'https://readtheory.org/', 'description': 'Adaptive reading comprehension practice with immediate feedback.'},
+        {'name': 'Storyberries', 'url': 'https://www.storyberries.com/', 'description': 'Free illustrated stories, many with read-aloud features, for kids.'},
+        {'name': 'TypingClub', 'url': 'https://www.typingclub.com/', 'description': 'The best platform for learning touch-typing through a series of fun games and interactive lessons.'},
+    ]
+    context['primary_science'] = [
+        {'name': 'Mystery Science', 'url': 'https://mysteryscience.com/', 'description': 'Short animated video lessons and hands-on "mysteries" that guide discovery.'},
+        {'name': 'National Geographic Kids', 'url': 'https://kids.nationalgeographic.com/', 'description': 'Rich visuals, photos, and interactive facts about animals, earth, and science.'},
+        {'name': 'NASA Kids’ Club', 'url': 'https://www.nasa.gov/kidsclub/index.html', 'description': 'Space-themed games, animations, and interactive content directly from NASA.'},
+        {'name': 'Wonderopolis', 'url': 'https://www.wonderopolis.org/', 'description': 'Presents engaging "Wonders of the Day" that spark curiosity in a visual format.'},
+        {'name': 'Science Kids', 'url': 'https://www.sciencekids.co.nz/', 'description': 'Experiments, games, and quizzes in biology, physics, and earth science.'},
+    ]
+    context['primary_arts'] = [
+        {'name': 'Art for Kids Hub', 'url': 'https://www.artforkidshub.com/', 'description': 'Step-by-step drawing video tutorials with a fun, child-friendly presentation.'},
+        {'name': 'Tate Kids', 'url': 'https://www.tate.org.uk/kids', 'description': 'Interactive art games, quizzes, and videos about art and famous artists.'},
+        {'name': 'Google Arts & Culture', 'url': 'https://artsandculture.google.com/', 'description': 'Virtual tours of museums and interactive artwork exploration for all ages.'},
+        {'name': 'Crayola Education', 'url': 'https://www.crayola.com/education/', 'description': 'Crafts, coloring pages, and creative lesson ideas with downloadable templates.'},
+        {'name': 'Storyboard That', 'url': 'https://www.storyboardthat.com/', 'description': 'A powerful tool for creating comic-style storyboards and visual stories.'},
+    ]
+    context['primary_geography'] = [
+        {'name': 'Seterra Geography', 'url': 'https://www.geoguessr.com/seterra', 'description': 'An incredibly addictive and effective series of map quiz games.'},
+        {'name': 'Sheppard Software – Geography', 'url': 'https://www.sheppardsoftware.com/', 'description': 'Map puzzles, geography quizzes, country games, and interactive maps.'},
+        {'name': 'DK Find Out!', 'url': 'https://www.dkfindout.com/uk/', 'description': 'Visual encyclopedic content, animations, and quizzes in geography and history.'},
+        {'name': 'BBC Bitesize (Primary)', 'url': 'https://www.bbc.co.uk/bitesize/primary', 'description': 'Animated explainer lessons and quizzes for younger learners in the UK curriculum.'},
+        {'name': 'Ducksters', 'url': 'https://www.ducksters.com/', 'description': 'Clean, simple facts, timelines, and map games for history and geography.'},
+    ]
+    context['primary_values'] = [
+        {'name': 'Sesame Street in Communities', 'url': 'https://sesamestreetincommunities.org/', 'description': 'Videos, games, and activities built around empathy, emotional health, and family topics.'},
+        {'name': 'Stop, Breathe & Think Kids', 'url': 'https://www.stopbreathethink.com/kids/', 'description': 'Short mindfulness exercises and emotional check-ins suitable for children.'},
+        {'name': 'Mind Yeti', 'url': 'https://www.mindyeti.com/', 'description': 'Guided mindfulness sessions (audio) for kids that help with calm and focus.'},
+        {'name': 'Second Step', 'url': 'https://www.secondstep.org/', 'description': 'Curriculum and resources for social-emotional learning (some free materials).'},
+    ]
+
+    # --- SECONDARY RESOURCES ---
+    context['secondary_multidisciplinary'] = [
+        {'name': 'Khan Academy', 'url': 'https://www.khanacademy.org/', 'description': 'The undisputed champion of free education, covering all major subjects with a mastery system.'},
+        {'name': 'Crash Course (YouTube)', 'url': 'https://www.youtube.com/user/crashcourse', 'description': 'Fast-paced, brilliantly animated video series on history, science, literature, and more.'},
+        {'name': 'Ted-Ed', 'url': 'https://ed.ted.com/', 'description': 'A massive library of incredible animated videos explaining complex questions, with full lessons.'},
+        {'name': 'CK-12', 'url': 'https://www.ck12.org/', 'description': 'Free interactive textbook-style modules, simulations, and concept videos.'},
+        {'name': 'BrainPOP', 'url': 'https://www.brainpop.com/', 'description': 'Uses witty animated movies to break down complex topics for a teenage audience.'},
+        {'name': 'OpenStax', 'url': 'https://openstax.org/', 'description': 'Free, high-quality, peer-reviewed textbooks for college and AP-level courses.'},
+    ]
+    context['secondary_stem'] = [
+        {'name': 'Brilliant.org', 'url': 'https://brilliant.org/', 'description': 'Teaches math and science through interactive, gamified problem-solving.'},
+        {'name': '3Blue1Brown (YouTube)', 'url': 'https://www.youtube.com/c/3blue1brown', 'description': 'Stunning animations that provide deep, visual intuition for complex math topics.'},
+        {'name': 'Desmos', 'url': 'https://www.desmos.com/', 'description': 'A beautiful, interactive graphing calculator that allows students to play with functions.'},
+        {'name': 'GeoGebra', 'url': 'https://www.geogebra.org/', 'description': 'Interactive geometry, algebra, and calculus tools with visual simulations.'},
+        {'name': 'Art of Problem Solving', 'url': 'https://artofproblemsolving.com/', 'description': 'The premier community and resource for high-performing math students.'},
+        {'name': 'Mark Rober (YouTube)', 'url': 'https://www.youtube.com/c/MarkRober', 'description': 'A former NASA engineer making science and engineering fun through real-world projects.'},
+        {'name': 'Wolfram Alpha', 'url': 'https://www.wolframalpha.com/', 'description': 'A computational knowledge engine that can solve equations and answer questions.'},
+        {'name': 'ChemCollective', 'url': 'http://chemcollective.org/', 'description': 'Virtual labs and scenario-based chemistry exercises.'},
+        {'name': 'BioInteractive', 'url': 'https://www.biointeractive.org/', 'description': 'Multimedia biology lessons and interactive modules from HHMI.'},
+    ]
+    context['secondary_english'] = [
+        {'name': 'Purdue OWL', 'url': 'https://owl.purdue.edu/', 'description': 'The definitive free resource for writing, grammar, citation, and style guides.'},
+        {'name': 'SparkNotes', 'url': 'https://www.sparknotes.com/', 'description': 'Literature summaries, chapter-by-chapter analyses, and study guides.'},
+        {'name': 'Goodreads', 'url': 'https://www.goodreads.com/', 'description': 'Transforms reading into a social, trackable hobby with challenges and community reviews.'},
+        {'name': 'Heimler\'s History (YouTube)', 'url': 'https://www.youtube.com/c/HeimlersHistory', 'description': 'A phenomenon among AP History students for his fast-paced and effective teaching style.'},
+    ]
+    context['secondary_languages'] = [
+        {'name': 'Duolingo', 'url': 'https://www.duolingo.com/', 'description': 'The undisputed leader in gamified language learning with a habit-forming system.'},
+        {'name': 'Memrise', 'url': 'https://www.memrise.com/', 'description': 'Vocabulary learning with spaced repetition, mnemonics, and video clips.'},
+        {'name': 'LanguageTransfer', 'url': 'https://www.languagetransfer.org/', 'description': 'An audio-based, free method for learning the thinking process behind several languages.'},
+        {'name': 'Clozemaster', 'url': 'https://www.clozemaster.com/', 'description': 'Gamified contextual vocabulary practice for intermediate and advanced learners.'},
+        {'name': 'Busuu', 'url': 'https://www.busuu.com/', 'description': 'Language courses with community feedback on speaking and writing exercises.'},
+    ]
+    context['secondary_ict'] = [
+        {'name': 'CS50 (by Harvard)', 'url': 'https://www.edx.org/course/introduction-computer-science-harvardx-cs50x', 'description': 'Widely considered the best introductory computer science course in the world.'},
+        {'name': 'freeCodeCamp', 'url': 'https://www.freecodecamp.org/', 'description': 'A proven, project-based curriculum that takes students from zero to job-ready for free.'},
+        {'name': 'Code.org', 'url': 'https://code.org/', 'description': 'The most accessible entry point into computer science, with "Hour of Code" and block-based lessons.'},
+        {'name': 'Scratch', 'url': 'https://scratch.mit.edu/', 'description': 'A visual programming language from MIT that lets you create your own games and animations.'},
+        {'name': 'GitHub Learning Lab', 'url': 'https://lab.github.com/', 'description': 'Interactive modules to learn Git, repositories, and modern coding workflows.'},
+        {'name': 'Replit', 'url': 'https://replit.com/', 'description': 'An online coding environment for many languages with multiplayer collaboration.'},
+        {'name': 'Canva', 'url': 'https://www.canva.com/', 'description': 'An intuitive graphic design tool to create presentations, videos, and graphics.'},
+    ]
+    context['secondary_vocational'] = [
+        {'name': 'Instructables', 'url': 'https://www.instructables.com/', 'description': 'Step-by-step project guides for DIY, crafts, electronics, and practical skills.'},
+        {'name': 'Alison', 'url': 'https://alison.com/', 'description': 'A huge library of free vocational and certificate courses in practical subjects.'},
+    ]
+    context['secondary_leadership'] = [
+        {'name': 'TED', 'url': 'https://www.ted.com/', 'description': 'Inspiring talks and ideas on leadership, innovation, and personal growth.'},
+        {'name': 'Facing History & Ourselves', 'url': 'https://www.facinghistory.org/', 'description': 'Media and resources around history, civic education, and ethics.'},
+        {'name': 'Common Sense Education', 'url': 'https://www.commonsense.org/education/', 'description': 'Lessons in digital ethics, citizenship, media literacy, and communication.'},
+        {'name': 'News Literacy Project', 'url': 'https://newslit.org/', 'description': 'Develops critical thinking skills to separate fact from fiction in media.'},
+        {'name': 'Character.org', 'url': 'https://www.character.org/', 'description': 'Frameworks and resources for character development in schools and communities.'},
+    ]
+
+    # --- SHARED RESOURCES (All Levels) ---
+    context['islamic_studies'] = [
+        {'name': 'Quran.com', 'url': 'https://quran.com/', 'description': 'The best-in-class online Quran. Clean, ad-free, with translations and recitation.'},
+        {'name': 'Yaqeen Institute', 'url': 'https://www.yaqeeninstitute.org/', 'description': 'High-quality, engaging, and well-researched videos on complex Islamic concepts.'},
+        {'name': 'Tarteel AI', 'url': 'https://www.tarteel.ai/', 'description': 'Uses AI to listen to your Quran recitation, correct mistakes, and track progress.'},
+        {'name': 'Sunnah.com', 'url': 'https://sunnah.com/', 'description': 'An indispensable, clean, and searchable database of Hadith collections.'},
+        {'name': 'Quranic', 'url': 'https://quranic.io/', 'description': 'The "Duolingo for Quranic Arabic." A fun, gamified way to learn Quranic vocabulary.'},
+        {'name': 'Kalamullah', 'url': 'https://kalamullah.com/', 'description': 'A vast free library of classical Islamic texts (Tafsir, Fiqh, Seerah) in English.'},
+        {'name': 'Alim.org', 'url': 'https://www.alim.org/', 'description': 'A knowledge-base of Qur’an, tafsir, hadith, and translations.'},
+    ]
+    context['educational_games'] = [
+        {'name': 'Minecraft (Creative)', 'url': 'https://www.minecraft.net/', 'description': 'The ultimate "digital LEGOs" for fostering creativity, planning, and problem-solving.'},
+        {'name': 'Kerbal Space Program', 'url': 'https://www.kerbalspaceprogram.com/', 'description': 'The most entertaining game about rocket science and orbital mechanics.'},
+        {'name': 'Coolmath Games', 'url': 'https://www.coolmathgames.com/', 'description': 'A carefully curated portal of logic, reasoning, and puzzle games with a reputation for safety.'},
+        {'name': 'Chess.com / ChessKid', 'url': 'https://www.chess.com/', 'description': 'The definitive platform for learning and playing chess to develop strategic thinking.'},
+        {'name': 'Quizizz', 'url': 'https://quizizz.com/', 'description': 'Students play quiz games individually or in groups, competing in fun quizzes.'},
+        {'name': 'Kahoot!', 'url': 'https://kahoot.com/', 'description': 'A popular game-quiz platform for classrooms and interactive lessons.'},
+    ]
 
     return render(request, 'student/student_dashboard.html', context)
 
