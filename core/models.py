@@ -280,7 +280,7 @@ class Student(models.Model):
  
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, primary_key=True, related_name='student')    
     LSA_number = models.CharField(max_length=20, unique=True, null=True)
-    profile_image = models.ImageField(upload_to='profile_images/', default='core/static/images/default.jpg', null=True, blank=True)
+    profile_image = models.ImageField(upload_to='profile_images/', default='images/default.jpg', null=True, blank=True)
     date_of_birth = models.DateField()
     gender = models.CharField(max_length=1, choices=GENDER_CHOICES)
     student_guardian = models.ForeignKey('Guardian', on_delete=models.SET_NULL, null=True, related_name='students')
@@ -390,7 +390,7 @@ class Guardian(models.Model):
 
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, primary_key=True, related_name='guardian')
     gender = models.CharField(max_length=1, choices=GENDER_CHOICES, default='M')
-    profile_image = models.ImageField(upload_to='profile_images/', default='core/static/images/default.jpg', null=True, blank=True)
+    profile_image = models.ImageField(upload_to='profile_images/', default='images/default.jpg', null=True, blank=True)
     contact = models.CharField(max_length=15, null=True)
     address = models.TextField()
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='active')
@@ -417,7 +417,7 @@ class Teacher(models.Model):
 
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, primary_key=True, related_name='teacher')
     employee_id = models.CharField(max_length=20, unique=True, null=True)
-    profile_image = models.ImageField(upload_to='profile_images/', default='core/static/images/default.jpg', null=True, blank=True)
+    profile_image = models.ImageField(upload_to='profile_images/', default='images/default.jpg', null=True, blank=True)
     date_of_birth = models.DateField()
     gender = models.CharField(max_length=1, choices=GENDER_CHOICES, default='M')
     contact = models.CharField(max_length=15, null=True)
