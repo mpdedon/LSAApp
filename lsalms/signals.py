@@ -1,10 +1,11 @@
 # lsalms/signals.py
 
-from django.db.models.signals import post_save, post_delete
+from django.db.models.signals import post_save, post_delete, pre_save
 from django.dispatch import receiver
 from django.contrib.contenttypes.models import ContentType
+from django.db import transaction
 from .models import Course, CourseEnrollment, ContentBlock, GradedActivity
-from core.models import Student, Assignment, Assessment, Exam
+from core.models import Student, Assignment, Assessment, Exam, Term
 
 
 @receiver(post_save, sender=Course)
@@ -34,41 +35,93 @@ def auto_enroll_students_on_publish(sender, instance, created, **kwargs):
             print(f"  + Auto-enrolled '{student.user.username}' via signal.")
 
 
-@receiver(post_save, sender=Student)
-def auto_enroll_student_on_class_change(sender, instance, created, **kwargs):
+@receiver(pre_save, sender=Student) # <-- Changed to pre_save
+def auto_enroll_student_on_promotion(sender, instance, **kwargs):
     """
-    Signal 2: When a Student is saved, check if their 'current_class' has
-    changed. If so, enroll them in all published courses for their NEW class.
+    Signal: Before a Student is saved, check if their 'current_class' is changing.
+    If so, enroll them in all published, internal courses for their NEW class in the active term.
+    This also handles newly created students.
     """
-    # If this is a new student, they will be enrolled by the sync command or later actions.
-    if created:
+    # If the student is new (doesn't have a pk yet), we'll handle them on post_save.
+    if not instance.pk:
+        # For new students, we let post_save handle it.
+        # This function will only handle updates to existing students.
         return
-    
+
     try:
-        # Get the student's state BEFORE this save
+        # Get the student's state as it currently exists in the database
         old_instance = Student.objects.get(pk=instance.pk)
-        # If the class hasn't changed, do nothing.
-        if old_instance.current_class == instance.current_class:
-            return
     except Student.DoesNotExist:
-        return 
+        return # Should not happen on an update
 
+    # --- THE KEY LOGIC ---
+    # Compare the old class from the database with the new class about to be saved.
+    old_class = old_instance.current_class
     new_class = instance.current_class
+
+    # If the class has not changed, or if they are being removed from a class, do nothing.
+    if old_class == new_class or not new_class:
+        return
+
+    # A promotion has been detected!
+    print(f"PRE_SAVE SIGNAL: Detected class change for {instance} from '{old_class}' to '{new_class}'.")
+    
+    # We must defer the enrollment logic to post_save, because the student's new
+    # class is not yet committed to the database. We can attach the old class
+    # to the instance to pass it along.
+    instance._old_class_for_signal = old_class
+
+
+@receiver(post_save, sender=Student)
+def perform_auto_enrollment(sender, instance, created, **kwargs):
+    """
+    This runs AFTER the student is saved. It performs the actual enrollment
+    based on the change detected by the pre_save signal or if the student is new.
+    """
+    student = instance
+    new_class = student.current_class
+    
+    # Determine if we should run:
+    # 1. Is it a newly created student with a class?
+    # 2. Or is it an updated student where a class change was detected in pre_save?
+    old_class_from_presave = getattr(student, '_old_class_for_signal', None)
+    
+    if not (created or old_class_from_presave):
+        return # Not a new student and not a class change, so do nothing.
+
     if not new_class:
-        return # Do nothing if they are unassigned from a class
+        return # Not assigned to a class, nothing to enroll in.
 
-    print(f"SIGNAL TRIGGERED: Student '{instance.user.username}' moved to new class '{new_class}'. Checking enrollments.")
+    print(f"POST_SAVE SIGNAL: Enrolling '{student}' into courses for new class '{new_class}'.")
 
-    courses_for_new_class = Course.objects.filter(
+    active_term = Term.objects.filter(is_active=True).first()
+    if not active_term:
+        print(f"  - FAILED: No active term found.")
+        return
+
+    courses_to_enroll_in = Course.objects.filter(
+        course_type=Course.CourseType.INTERNAL,
         linked_class=new_class,
-        status=Course.Status.PUBLISHED,
-        course_type=Course.CourseType.INTERNAL
+        term=active_term,
+        status=Course.Status.PUBLISHED
     )
 
-    for course in courses_for_new_class:
-        _, created = CourseEnrollment.objects.get_or_create(student=instance, course=course)
-        if created:
-            print(f"  + Auto-enrolled '{instance.user.username}' in '{course.get_course_title()}' due to class change.")
+    if not courses_to_enroll_in.exists():
+        print(f"  - INFO: No published internal courses found for class '{new_class}' in term '{active_term}'.")
+        return
+
+    created_count = 0
+    with transaction.atomic():
+        for course in courses_to_enroll_in:
+            _, created_enrollment = CourseEnrollment.objects.get_or_create(
+                student=student,
+                course=course
+            )
+            if created_enrollment:
+                created_count += 1
+
+    if created_count > 0:
+        print(f"  - SUCCESS: Created {created_count} new enrollments for {student}.")
 
 
 @receiver(post_save, sender=ContentBlock)
@@ -130,3 +183,4 @@ def delete_graded_activity_on_unlink(sender, instance, **kwargs):
             content_type=activity_type,
             object_id=activity_id
         ).delete()
+
