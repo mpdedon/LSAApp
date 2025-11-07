@@ -7,7 +7,7 @@
 <div class="container mt-4 mb-5">
     <div class="d-flex justify-content-between align-items-center mb-3">
         <h2 class="mb-0">Fee Assignments</h2>
-        <a href="{% url 'create_fee_assignment' %}" class="btn btn-primary"> {# Ensure URL name matches #}
+        <a href="{% url 'create_fee_assignment' %}" class="btn btn-primary">
             <i class="fas fa-plus me-1"></i> Add New Fee Assignment
         </a>
     </div>
@@ -21,89 +21,90 @@
         {% endfor %}
     {% endif %}
 
-    <div class="table-responsive mt-3">
-        <table class="table table-bordered table-hover align-middle">
-            <thead class="table-light">
-                <tr>
-                    <th style="width: 5%;">S/N</th>
-                    <th style="width: 20%;">Class</th>
-                    <th style="width: 25%;">Term</th>
-                    <th style="width: 15%;" class="text-end">Amount</th>
-                    <th style="width: 35%;" class="text-center">Actions</th> {# Adjusted width #}
-                </tr>
-            </thead>
-            <tbody>
-                {# Use 'assignments' or 'page_obj.object_list' based on view #}
-                {% with object_list=page_obj.object_list|default:assignments %}
-                {% for assignment in object_list %}
-                    <tr>
-                        <td>{{ forloop.counter }}</td>
-                        <td>{{ assignment.class_instance.name }}</td> {# Access name #}
-                        <td>{{ assignment.term }}</td> {# Uses __str__ #}
-                        <td class="text-end">₦{{ assignment.amount|floatformat:2|intcomma }}</td>
-                        <td class="text-center">
-                            <div class="btn-group btn-group-sm" role="group"> {# Group buttons #}
+    {% with object_list=page_obj.object_list|default:assignments %}
+    {% regroup object_list by term as term_groups %}
 
-                                {# LINK TO STUDENT FEE RECORDS FOR THIS ASSIGNMENT #}
-                                <a href="{% url 'student_fee_record_list' %}?term_id={{ assignment.term.id }}&class_id={{ assignment.class_instance.id }}"
-                                   class="btn btn-info"
-                                   title="Manage Student Discounts/Waivers for {{ assignment.class_instance.name }} - {{ assignment.term.name }}">
-                                    <i class="fas fa-users-cog"></i> Manage Students
-                                </a>
-                                {# ---------------------------------------------- #}
+    <div class="accordion mt-3" id="feeAssignmentAccordion">
+        {% for group in term_groups %}
+        <div class="accordion-item">
+            <h2 class="accordion-header" id="heading-{{ forloop.counter }}">
+                <button class="accordion-button {% if not forloop.first %}collapsed{% endif %}" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-{{ forloop.counter }}" aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}" aria-controls="collapse-{{ forloop.counter }}">
+                    {{ group.grouper.name }} | {{ group.grouper.session }} <small class="text-muted ms-2">({{ group.list|length }} assignment{% if group.list|length != 1 %}s{% endif %})</small>
+                </button>
+            </h2>
+            <div id="collapse-{{ forloop.counter }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}" aria-labelledby="heading-{{ forloop.counter }}" data-bs-parent="#feeAssignmentAccordion">
+                <div class="accordion-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-bordered table-hover mb-0 align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th style="width: 5%;">S/N</th>
+                                    <th style="width: 40%;">Class</th>
+                                    <th style="width: 25%;" class="text-end">Amount</th>
+                                    <th style="width: 30%;" class="text-center">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for assignment in group.list %}
+                                <tr>
+                                    <td>{{ forloop.parentloop.counter }}.{{ forloop.counter }}</td>
+                                    <td>{{ assignment.class_instance.name }}</td>
+                                    <td class="text-end">₦{{ assignment.amount|floatformat:2|intcomma }}</td>
+                                    <td class="text-center">
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <a href="{% url 'student_fee_record_list' %}?term_id={{ assignment.term.id }}&class_id={{ assignment.class_instance.id }}" class="btn btn-info" title="Manage Student Discounts/Waivers for {{ assignment.class_instance.name }} - {{ assignment.term.name }}">
+                                                <i class="fas fa-users-cog"></i> Manage Students
+                                            </a>
+                                            <a href="{% url 'update_fee_assignment' assignment.pk %}" class="btn btn-warning" title="Edit Assignment">
+                                                <i class="fas fa-edit"></i> Edit
+                                            </a>
+                                            <a href="#" class="btn btn-danger" title="Delete Assignment" data-bs-toggle="modal" data-bs-target="#deleteModal-{{ assignment.pk }}">
+                                                <i class="fas fa-trash-alt"></i> Delete
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
 
-                                {# Optional: View Assignment Detail #}
-                                {# <a href="{% url 'fee_assignment_detail' assignment.pk %}" class="btn btn-secondary" title="View Details"><i class="fas fa-eye"></i></a> #}
+                                <!-- Delete Confirmation Modal for this assignment -->
+                                <div class="modal fade" id="deleteModal-{{ assignment.pk }}" tabindex="-1" aria-labelledby="deleteModalLabel-{{ assignment.pk }}" aria-hidden="true">
+                                  <div class="modal-dialog">
+                                    <div class="modal-content">
+                                      <div class="modal-header">
+                                        <h5 class="modal-title" id="deleteModalLabel-{{ assignment.pk }}">Confirm Deletion</h5>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                      </div>
+                                      <div class="modal-body">
+                                        Are you sure you want to delete the fee assignment for <strong>{{ assignment.class_instance.name }} - {{ assignment.term.name }}</strong>?
+                                        <br><small class="text-danger">This action cannot be undone.</small>
+                                      </div>
+                                      <div class="modal-footer">
+                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                                        <form action="{% url 'delete_fee_assignment' assignment.pk %}" method="POST" class="d-inline">
+                                            {% csrf_token %}
+                                            <button type="submit" class="btn btn-danger">Confirm Delete</button>
+                                        </form>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                                <!-- End Modal -->
 
-                                {# Edit Assignment (Amount/Class/Term) #}
-                                <a href="{% url 'update_fee_assignment' assignment.pk %}" class="btn btn-warning" title="Edit Assignment"> {# Ensure URL name matches #}
-                                    <i class="fas fa-edit"></i> Edit
-                                </a>
-
-                                {# Delete Assignment #}
-                                <a href="#" class="btn btn-danger" title="Delete Assignment"
-                                   data-bs-toggle="modal" data-bs-target="#deleteModal-{{ assignment.pk }}"> {# Use Modal for safety #}
-                                    <i class="fas fa-trash-alt"></i> Delete
-                                </a>
-
-                            </div>
-                        </td>
-                    </tr>
-                     <!-- Delete Confirmation Modal for this assignment -->
-                    <div class="modal fade" id="deleteModal-{{ assignment.pk }}" tabindex="-1" aria-labelledby="deleteModalLabel-{{ assignment.pk }}" aria-hidden="true">
-                      <div class="modal-dialog">
-                        <div class="modal-content">
-                          <div class="modal-header">
-                            <h5 class="modal-title" id="deleteModalLabel-{{ assignment.pk }}">Confirm Deletion</h5>
-                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                          </div>
-                          <div class="modal-body">
-                            Are you sure you want to delete the fee assignment for <strong>{{ assignment.class_instance.name }} - {{ assignment.term.name }}</strong>?
-                            <br><small class="text-danger">This action cannot be undone.</small>
-                          </div>
-                          <div class="modal-footer">
-                            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                            <form action="{% url 'delete_fee_assignment' assignment.pk %}" method="POST" class="d-inline"> {# Ensure URL name matches #}
-                                {% csrf_token %}
-                                <button type="submit" class="btn btn-danger">Confirm Delete</button>
-                            </form>
-                          </div>
-                        </div>
-                      </div>
+                                {% empty %}
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted py-3">No assignments for this term.</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
                     </div>
-                    <!-- End Modal -->
-
-                {% empty %}
-                    <tr>
-                        <td colspan="5" class="text-center text-muted py-3">No fee assignments found.</td>
-                    </tr>
-                {% endfor %}
-                {% endwith %}
-            </tbody>
-        </table>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
     </div>
 
-    <!-- Pagination Controls (Keep as before) -->
+    {% endwith %}
+
     {% if page_obj and page_obj.paginator.num_pages > 1 %}
     <nav aria-label="Page navigation" class="mt-4">
         <ul class="pagination justify-content-center pagination-sm">
@@ -112,5 +113,5 @@
     </nav>
     {% endif %}
 
-</div> {# End container #}
+</div>
 {% endblock %}

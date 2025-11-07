@@ -1632,28 +1632,82 @@ class PaymentListView(AdminRequiredMixin, ListView):
     model = Payment
     template_name = 'payment/payment_list.html'
     context_object_name = 'payments'
-    ordering = ['-payment_date', '-pk'] # Order by date then pk
-    paginate_by = 50 # Add pagination
+    ordering = ['-payment_date', '-pk']
+    paginate_by = 50
 
     def get_queryset(self):
-        # Prefetch related financial record and student details for efficiency
-        return super().get_queryset().select_related(
+        qs = super().get_queryset().select_related(
             'financial_record__student__user',
             'financial_record__term__session'
-        )
+        ).order_by('-payment_date', '-pk')
+        session_id = self.request.GET.get('session_id')
+        term_id = self.request.GET.get('term_id')
+        if term_id:
+            try:
+                qs = qs.filter(financial_record__term_id=int(term_id))
+            except (ValueError, Term.DoesNotExist):
+                pass
+        elif session_id:
+            try:
+                qs = qs.filter(financial_record__term__session_id=int(session_id))
+            except ValueError:
+                pass
+        return qs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        active_term = Term.objects.filter(is_active=True).first() # Get current term for summary
-        # Recalculate totals based on ALL records for overall summary
-        all_records = FinancialRecord.objects.all()
-        context['total_fee'] = all_records.aggregate(total=Sum('total_fee'))['total'] or Decimal('0.00')
-        context['total_discount'] = all_records.aggregate(total=Sum('total_discount'))['total'] or Decimal('0.00')
-        # Total paid sum from financial records is more reliable than summing all payments directly
-        context['total_paid'] = all_records.aggregate(total=Sum('total_paid'))['total'] or Decimal('0.00')
-        context['total_outstanding_balance'] = all_records.aggregate(total=Sum('outstanding_balance'))['total'] or Decimal('0.00')
-        context['active_term'] = active_term # Pass active term if needed for display/filtering
-        
+        request = self.request
+        session_id = request.GET.get('session_id')
+        term_id = request.GET.get('term_id')
+
+        # dropdown lists
+        context['sessions'] = Session.objects.all().order_by('-start_date')
+        context['terms'] = Term.objects.select_related('session').order_by('-start_date')
+
+        # base totals (apply same filters as queryset)
+        totals_qs = FinancialRecord.objects.all()
+        if term_id:
+            try:
+                totals_qs = totals_qs.filter(term_id=int(term_id))
+            except ValueError:
+                pass
+        elif session_id:
+            try:
+                totals_qs = totals_qs.filter(term__session_id=int(session_id))
+            except ValueError:
+                pass
+
+        context['total_fee'] = totals_qs.aggregate(total=Sum('total_fee'))['total'] or Decimal('0.00')
+        context['total_discount'] = totals_qs.aggregate(total=Sum('total_discount'))['total'] or Decimal('0.00')
+        context['total_paid'] = totals_qs.aggregate(total=Sum('total_paid'))['total'] or Decimal('0.00')
+        context['total_outstanding_balance'] = totals_qs.aggregate(total=Sum('outstanding_balance'))['total'] or Decimal('0.00')
+
+        # summary by class
+        summary_qs = totals_qs.values('student__current_class__name').annotate(
+            expected=Sum('total_fee'),
+            paid=Sum('total_paid'),
+            discounts=Sum('total_discount'),
+            outstanding=Sum('outstanding_balance')
+        ).order_by('student__current_class__name')
+
+        summary_list = []
+        for row in summary_qs:
+            summary_list.append({
+                'class_name': row.get('student__current_class__name') or 'Unassigned',
+                'expected': row.get('expected') or Decimal('0.00'),
+                'paid': row.get('paid') or Decimal('0.00'),
+                'discounts': row.get('discounts') or Decimal('0.00'),
+                'outstanding': row.get('outstanding') or Decimal('0.00'),
+            })
+        context['summary_by_class'] = summary_list
+
+        # pass selected ids for templates
+        context['selected_session_id'] = int(session_id) if session_id else None
+        context['selected_term_id'] = int(term_id) if term_id else None
+
+        # keep active_term if needed by template
+        context['active_term'] = Term.objects.filter(is_active=True).first()
+
         return context
 
 class PaymentCreateView(AdminRequiredMixin, CreateView):
@@ -1767,26 +1821,80 @@ class FinancialRecordListView(AdminRequiredMixin, ListView):
 
     def get_queryset(self):
         # Preload related fields for optimization
-        return FinancialRecord.objects.select_related(
+        qs = FinancialRecord.objects.select_related(
             'student__user',
             'term__session'
-        ).order_by('-term__start_date', 'student__user__last_name') # Order by term then name
+        ).order_by('-term__start_date', 'student__user__last_name')
+        # Apply filters if provided
+        session_id = self.request.GET.get('session_id')
+        term_id = self.request.GET.get('term_id')
+        if term_id:
+            try:
+                qs = qs.filter(term_id=int(term_id))
+            except (ValueError, Term.DoesNotExist):
+                pass
+        elif session_id:
+            try:
+                qs = qs.filter(term__session_id=int(session_id))
+            except ValueError:
+                pass
+        return qs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        # Use the paginated queryset for calculations if needed, or all records for global totals
-        all_records = FinancialRecord.objects.all() # For global totals
 
-        # Calculate summary statistics using the reliable values from FinancialRecord
-        context['total_fee'] = all_records.aggregate(total=Sum('total_fee'))['total'] or Decimal('0.00')
-        context['total_discount'] = all_records.aggregate(total=Sum('total_discount'))['total'] or Decimal('0.00')
-        context['total_paid'] = all_records.aggregate(total=Sum('total_paid'))['total'] or Decimal('0.00')
-        context['total_outstanding_balance'] = all_records.aggregate(total=Sum('outstanding_balance'))['total'] or Decimal('0.00')
+        # filter inputs
+        request = self.request
+        session_id = request.GET.get('session_id')
+        term_id = request.GET.get('term_id')
 
-        # Add active term/session if needed for filtering/display
-        active_term = Term.objects.filter(is_active=True).first()
-        context['active_term'] = active_term
-        context['active_session'] = active_term.session if active_term else None
+        # lists for dropdowns
+        context['sessions'] = Session.objects.all().order_by('-start_date')
+        context['terms'] = Term.objects.select_related('session').order_by('-start_date')
+
+        # base queryset for totals (apply same filters used for list)
+        totals_qs = FinancialRecord.objects.all()
+        if term_id:
+            try:
+                totals_qs = totals_qs.filter(term_id=int(term_id))
+            except ValueError:
+                pass
+        elif session_id:
+            try:
+                totals_qs = totals_qs.filter(term__session_id=int(session_id))
+            except ValueError:
+                pass
+
+        from decimal import Decimal
+        from django.db.models import Sum
+
+        context['total_fee'] = totals_qs.aggregate(total=Sum('total_fee'))['total'] or Decimal('0.00')
+        context['total_discount'] = totals_qs.aggregate(total=Sum('total_discount'))['total'] or Decimal('0.00')
+        context['total_paid'] = totals_qs.aggregate(total=Sum('total_paid'))['total'] or Decimal('0.00')
+        context['total_outstanding_balance'] = totals_qs.aggregate(total=Sum('outstanding_balance'))['total'] or Decimal('0.00')
+
+        # Summary by class: annotate sums grouped by student's current_class
+        summary_qs = totals_qs.values('student__current_class__name').annotate(
+            expected=Sum('total_fee'),
+            paid=Sum('total_paid'),
+            discounts=Sum('total_discount'),
+            outstanding=Sum('outstanding_balance')
+        ).order_by('student__current_class__name')
+
+        summary_list = []
+        for row in summary_qs:
+            summary_list.append({
+                'class_name': row.get('student__current_class__name') or 'Unassigned',
+                'expected': row.get('expected') or Decimal('0.00'),
+                'paid': row.get('paid') or Decimal('0.00'),
+                'discounts': row.get('discounts') or Decimal('0.00'),
+                'outstanding': row.get('outstanding') or Decimal('0.00'),
+            })
+        context['summary_by_class'] = summary_list
+
+        # pass selected ids for templates
+        context['selected_session_id'] = int(session_id) if session_id else None
+        context['selected_term_id'] = int(term_id) if term_id else None
 
         return context
 
