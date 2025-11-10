@@ -1753,6 +1753,8 @@ class PaymentCreateView(AdminRequiredMixin, CreateView):
             # Save the payment instance - this will trigger the post_save signal
             # The signal handler will update the financial_record
             payment.save()
+            # Ensure self.object is set so get_success_url can format properly
+            self.object = payment
             messages.success(self.request, 'Payment recorded successfully.')
             return redirect(self.get_success_url())
         except ValidationError as e:
@@ -1763,6 +1765,8 @@ class PaymentCreateView(AdminRequiredMixin, CreateView):
             # Catch other unexpected errors during save
             messages.error(self.request, f"An unexpected error occurred: {e}")
             return self.form_invalid(form)
+
+    # Use the default form_invalid from CreateView so the form is re-rendered
 
 class PaymentUpdateView(AdminRequiredMixin, UpdateView):
     model = Payment

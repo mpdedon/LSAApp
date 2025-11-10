@@ -38,6 +38,27 @@ class PaymentForm(forms.ModelForm):
             # OR maybe show all non-archived if that's desired:
             # queryset = FinancialRecord.objects.filter(archived=False).select_related(...)
 
+        # If the form is bound and the POST includes a financial_record value that
+        # would otherwise be excluded by the active-term filter, include it so
+        # ModelChoiceField validation doesn't reject a legitimate submitted id.
+        bound_value = None
+        # `data` can be passed either positionally or via kwargs depending on Django internals
+        data = kwargs.get('data') if 'data' in kwargs else (args[0] if args else None)
+        if data and hasattr(data, 'get'):
+            bound_value = data.get('financial_record')
+        elif isinstance(data, dict):
+            bound_value = data.get('financial_record')
+
+        if bound_value:
+            try:
+                # Accept integer-like strings too
+                fr_pk = int(bound_value)
+                extra_qs = FinancialRecord.objects.filter(pk=fr_pk)
+                queryset = (queryset | extra_qs).distinct()
+            except Exception:
+                # Ignore parse errors and leave queryset as-is
+                pass
+
         self.fields['financial_record'].queryset = queryset
 
         # Customize dropdown text - make it robust
