@@ -1,52 +1,88 @@
 {% extends 'base.html' %}
-{% load custom_filters %}
+{% load custom_filters %} 
+
 {% block content %}
-<div class="container mt-5">
-    <h1 class="text-center mb-4">Broadsheet for {{ class.name }} : {{ term.name }} ({{ session.name }})</h1> {# Added session name #}
+<div class="container-fluid my-4"> {# Use container-fluid for better use of screen width #}
+    <div class="card shadow-sm">
+        <div class="card-header bg-light">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h2 class="h4 mb-0">Academic Broadsheet</h2>
+                    <p class="text-muted mb-0">{{ class.name }} &mdash; {{ term.name }} ({{ session.name }})</p>
+                </div>
+                <div>
+                    <a href="{% url 'teacher_dashboard' %}" class="btn btn-outline-secondary btn-sm"><i class="fas fa-arrow-left me-1"></i> Back</a>
+                    <button onclick="window.print();" class="btn btn-primary btn-sm"><i class="fas fa-print me-1"></i> Print</button>
+                </div>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+              <table class="table table-striped table-bordered table-hover mb-0">
+                <thead class="table-light text-center">
+                    <tr class="align-middle">
+                        <th>Rank</th>
+                        <th class="text-start">Student Name</th>
+                        {% for subject in subjects %}
+                          <th>{{ subject.name }}</th>
+                        {% endfor %}
+                        <th>Total</th>
+                        <th>Average</th>
+                        <th>GPA</th>
+                        <th>Grade</th>
+                    </tr>
+                </thead>
+                <tbody class="text-center">
+                  {% for data in results_data %}
+                  <tr class="align-middle">
+                      <td class="fw-bold">{{ data.rank }}</td>
+                      <td class="text-start">{{ data.student.user.get_full_name }}</td>
 
-    <div class="mb-3 text-end">
-        <a href="{% url 'teacher_dashboard' %}" class="btn btn-secondary">Back to Dashboard</a>
+                      {% for subject in subjects %}
+                        {% with subject_result=data.subject_results|get_item:subject.id %}
+                          <td>
+                              {# Display the total score for the subject if it exists, otherwise a dash #}
+                              {{ subject_result.total_score|default:"-" }}
+                          </td>
+                        {% endwith %}
+                      {% endfor %}
+
+                      <td class="fw-bold">{{ data.total_score }}</td>
+                      <td>{{ data.average_score }}</td>
+                      <td>{{ data.gpa }}</td>
+                      <td class="fw-bold">{{ data.grade }}</td>
+                  </tr>
+                  {% empty %}
+                  <tr>
+                      {# colspan should be the number of subjects + the 6 extra columns #}
+                      <td colspan="{{ subjects|length|add:6 }}" class="text-center text-muted p-5">
+                          <p class="mb-0">No student results have been recorded for this class and term yet.</p>
+                      </td>
+                  </tr>
+                  {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </div>
     </div>
-
-    <div class="table-responsive">
-      <table class="table table-striped table-bordered"> {# Added table-bordered for clarity #}
-        <thead>
-            <tr>
-                <th>S/N</th> {# Added Serial Number #}
-                <th>Student</th>
-                {% for subject in subjects %}
-                  <th class="text-center">{{ subject.name }}</th> {# Centered header #}
-                {% endfor %}
-                <th class="text-center">Total Score</th> {# Centered header #}
-                <th class="text-center">GPA</th> {# Centered header #}
-                <th class="text-center">Grade</th> {# Centered header #}
-            </tr>
-        </thead>
-        <tbody>
-          {% for data in results_data %}
-          <tr>
-              <td>{{ forloop.counter }}</td> {# Display serial number #}
-              <td>{{ data.student.user.get_full_name }}</td>
-
-              {% for subject in subjects %}
-              {% with data.subject_results|dict_key:subject.id as subject_result %}
-                  <td class="text-center"> {# Centered score #}
-                      {{ subject_result.total_score|default_if_none:"-" }}
-                  </td>
-              {% endwith %}
-              {% endfor %}
-
-              <td class="text-center">{{ data.total_score }}</td> {# Centered total #}
-              <td class="text-center">{{ data.gpa }}</td> {# Centered GPA #}
-              <td class="text-center">{{ data.grade }}</td> {# USE THE NEW KEY #}
-          </tr>
-          {% empty %}
-          <tr>
-              <td colspan="{{ subjects|length|add:4 }}" class="text-center">No student results found for this class, term, and session.</td> {# Improved empty message #}
-          </tr>
-          {% endfor %}
-      </tbody>
-    </table>
-  </div>
 </div>
+
+<style>
+    /* Optional: For better printing */
+    @media print {
+        body * {
+            visibility: hidden;
+        }
+        .table-responsive, .table-responsive * {
+            visibility: visible;
+        }
+        .table-responsive {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+        }
+        .btn { display: none; }
+    }
+</style>
 {% endblock %}
