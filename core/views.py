@@ -2,6 +2,7 @@ import json
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.mixins import UserPassesTestMixin
 from django.contrib.auth.decorators import login_required, user_passes_test
+from django.views.decorators.http import require_POST
 from django.urls import reverse, reverse_lazy
 from django.db import IntegrityError, transaction
 from django.db.models import Count, Sum, Q, F, Window, OuterRef, Subquery, IntegerField, Value, Prefetch, Max
@@ -477,6 +478,34 @@ def StudentEnrollmentsView(request, student_id):
     student = get_object_or_404(Student, pk=student_id)
     enrollments = student.enrollments.all()
     return render(request, 'setup/view_enrollments.html', {'student': student, 'enrollments': enrollments})
+
+
+@require_POST # This is crucial for safety. Only allows form submissions.
+@login_required
+@user_passes_test(lambda u: u.is_superuser or u.is_staff) # Protect this action
+def unenroll_student(request, student_id, class_id):
+    """
+    Sets a student's 'current_class' to None.
+    This effectively "un-enrolls" them from their current class.
+    """
+    student = get_object_or_404(Student, pk=student_id)
+    class_obj = get_object_or_404(Class, pk=class_id)
+
+    # Check that the student is actually in the class we think they are in
+    if student.current_class == class_obj:
+        # Update the history before changing the class
+        student.update_history('Unenrolled', from_class=class_obj, to_class=None)
+        
+        # Set the current_class to None. This does not delete the student.
+        student.current_class = None
+        student.save()
+        messages.success(request, f"Successfully unenrolled {student.user.get_full_name()} from {class_obj.name}.")
+    else:
+        messages.warning(request, f"{student.user.get_full_name()} was not enrolled in {class_obj.name}.")
+
+    # Redirect back to the class detail page
+    # Make sure your class detail URL is named 'class_detail'
+    return redirect('class_detail', pk=class_id)
 
 # View for assigning teachers to classes
 

@@ -31,7 +31,7 @@ from core.views import AdminDashboardView, PromoteStudentView, programs, about, 
 from core.views import CreateNotificationView, NotificationListView
 from core.views import SessionListView, SessionDetailView, SessionCreateView, SessionUpdateView, SessionDeleteView
 from core.views import TermListView, TermDetailView, TermCreateView, TermUpdateView, TermDeleteView, activate_term_view
-from core.views import promote_student, repeat_student, demote_student, mark_dormant_student, mark_left_student, mark_active
+from core.views import promote_student, repeat_student, demote_student, mark_dormant_student, mark_left_student, mark_active, unenroll_student
 from core.views import create_assessment, admin_assessment_list, approve_assessment, pending_assessments, view_assessment, admin_delete_assessment, assessment_submissions_list, class_subjects
 from core.views import create_exam, admin_exam_list, approve_exam, pending_exams, view_exam, admin_delete_exam, exam_submissions_list
 from core.views import broadsheets, termly_broadsheet, approve_termly_broadsheet, archive_termly_broadsheet, admin_leaderboard_view
@@ -142,6 +142,7 @@ urlpatterns = [
 
     # Enrollment URLs
     path('setup/enrol_student/', StudentClassEnrollmentView, name='enrol_student'),
+    path('student/<int:student_id>/unenroll/<int:class_id>/', unenroll_student, name='unenroll_student'),
     path('student/<int:student_id>/enrollments/', StudentEnrollmentsView, name='view_enrollments'),
     path('setup/promote_students', PromoteStudentView.as_view(), name='promote_students'),
 
