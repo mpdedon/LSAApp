@@ -494,6 +494,8 @@ def input_scores(request, class_id, subject_id, term_id):
         all_forms_valid = True
         forms_to_save = []
 
+        affected_results = set()  # To track which Result objects need GPA recalculation    
+
         for student in students:
             subject_result = subject_results.get(student.user.id)
             if not subject_result:
@@ -504,14 +506,27 @@ def input_scores(request, class_id, subject_id, term_id):
 
             if form.is_valid():
                 forms_to_save.append(form) 
+                affected_results.add(subject_result.result)
             else:
                 all_forms_valid = False
 
         if all_forms_valid:
-            for form in forms_to_save:
-                form.save()
-            messages.success(request, f"{subject.name} scores for {class_obj.name} submitted successfully.")
-            return redirect('broadsheet', class_id=class_id, term_id=term_id)
+            try:
+                # Use a transaction to ensure all saves succeed or none do
+                with transaction.atomic():
+                    for form in forms_to_save:
+                        form.save()
+
+                    # After all scores are saved, recalculate the summary for each affected student.
+                    for result_obj in affected_results:
+                        result_obj.calculate_term_summary()
+                
+                messages.success(request, f"{subject.name} scores for {class_obj.name} updated successfully.")
+                return redirect('broadsheet', class_id=class_id, term_id=term_id)
+
+            except Exception as e:
+                # Catch potential database errors during the transaction
+                messages.error(request, f"An error occurred while saving scores: {e}")
         else:
             messages.error(request, "Please correct the errors below.")
 
