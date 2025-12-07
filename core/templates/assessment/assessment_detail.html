@@ -10,7 +10,9 @@
             <div class="d-flex justify-content-between align-items-center">
                 <h2 class="mb-0 h4">Assessment Details</h2>
                 <div>
-                    <a href="{% url 'update_assessment' assessment.id %}" class="btn btn-light btn-sm"><i class="fas fa-edit me-1"></i> Edit Assessment</a>
+                    {% if can_edit %}
+                        <a href="{% url 'update_assessment' assessment.id %}" class="btn btn-light btn-sm"><i class="fas fa-edit me-1"></i> Edit Assessment</a>
+                    {% endif %}
                     {% if user.is_superuser and not assessment.is_approved %}
                         <button type="button" class="btn btn-success btn-sm ms-2" data-bs-toggle="modal" data-bs-target="#approveModal{{ assessment.id }}"><i class="fas fa-check-circle me-1"></i> Approve</button>
                     {% endif %}

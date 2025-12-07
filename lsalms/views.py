@@ -14,6 +14,7 @@ from django.contrib import messages
 from django.http import HttpResponse, HttpResponseBadRequest, JsonResponse
 from django.template.loader import render_to_string
 from django.db import models, transaction
+import json
 from django.db.models import Max, Prefetch, Sum, Subquery, OuterRef, Count, Avg, Q
 from django.core.paginator import Paginator
 from .models import Course, Lesson, Module, ContentBlock, CourseEnrollment, LessonProgress, StudentActivityLog
@@ -61,6 +62,7 @@ class CourseCreateView(LoginRequiredMixin, CreateView):
         form.instance.teacher = self.request.user
         messages.success(self.request, "Course created successfully. You can now build its curriculum.")
         return super().form_valid(form)
+
 
 
 class CourseUpdateView(LoginRequiredMixin, UpdateView): 

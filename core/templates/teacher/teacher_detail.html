@@ -9,7 +9,7 @@
             {% if teacher.profile_image %}
                 <img src="{{ teacher.profile_image.url }}" class="card-img-top" alt="{{ teacher.user.get_full_name }}" style="max-height: 300px; object-fit: cover;">
             {% else %}
-                <img src="{% static 'images\default.jpg' %}" class="card-img-top" alt="Default Profile Image" style="max-height: 300px; object-fit: cover;">
+                <img src="{% static 'images/default.jpg' %}" class="card-img-top" alt="Default Profile Image" style="max-height: 300px; object-fit: cover;">
             {% endif %}
             <br>
             <h3>{{ teacher.user.first_name }} {{ teacher.user.last_name }}</h3>

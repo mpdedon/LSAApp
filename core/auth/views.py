@@ -351,14 +351,30 @@ def student_dashboard(request):
     # Separate INTERNAL courses into "Current Term" and "Previous"
     for enrollment in all_enrollments:
         if enrollment.course.course_type == 'INTERNAL':
-            if enrollment.course.term == active_term and enrollment.course.linked_class == student.current_class:
+            # Only include INTERNAL enrollments for the current term/class and only if the course is published
+            try:
+                course_status = enrollment.course.status
+            except Exception:
+                course_status = None
+
+            if (
+                enrollment.course.term == active_term
+                and enrollment.course.linked_class == student.current_class
+                and course_status == 'PUBLISHED'
+            ):
                 current_internal_enrollments.append(enrollment)
             else:
-                previous_internal_enrollments.append(enrollment)
+                # Only include INTERNAL courses in the "previous" list if they are published
+                # Draft or unpublished internal courses should not be shown to students.
+                if course_status == 'PUBLISHED':
+                    previous_internal_enrollments.append(enrollment)
 
     # External courses are always considered "current" if their subscription is active
     context['lms_external_enrollments'] = [e for e in all_enrollments if e.course.course_type == 'EXTERNAL' and e.is_active()]
+    # Keep the newer, explicit name for templates while also providing the legacy key
     context['lms_current_internal_enrollments'] = current_internal_enrollments
+    # Legacy alias expected by older tests/templates
+    context['lms_internal_enrollments'] = list(current_internal_enrollments)
     context['lms_previous_internal_enrollments'] = previous_internal_enrollments
     
     context['primary_multidisciplinary'] = [
@@ -831,9 +847,60 @@ def guardian_dashboard(request):
                 [e for e in all_exams if e.class_assigned_id == student.current_class_id], submitted_exam_map, 'exam'
             )
 
+        # Mirror per-student structures into the top-level maps expected by templates/tests
+        for sid, pdata in students_data.items():
+            # Helper to convert internal student_data entries into the top-level shape expected by templates/tests
+            def make_summary(entry):
+                active = entry.get('active', []) if isinstance(entry, dict) else []
+                past = entry.get('past', []) if isinstance(entry, dict) else []
+                combined = active + past
+                details = []
+                completed = 0
+                for it in combined:
+                    submission = it.get('submission')
+                    is_submitted = bool(submission and getattr(submission, 'is_completed', False))
+                    if is_submitted: completed += 1
+                    details.append({'obj': it.get('obj'), 'submitted': is_submitted, 'status': it.get('status')})
+
+                total = len(details)
+                pending = total - completed
+                completion_percentage = int((completed / total) * 100) if total > 0 else 0
+                return {'details': details, 'total': total, 'completed': completed, 'pending': pending, 'completion_percentage': completion_percentage}
+
+            assignments_data[sid] = make_summary(pdata.get('assignments', {}))
+            assessments_data[sid] = make_summary(pdata.get('assessments', {}))
+            exams_data[sid] = make_summary(pdata.get('exams', {}))
+
     # 2. Financials
     financial_records = FinancialRecord.objects.filter(student_id__in=ward_pks, term=active_term)
     financial_data = {fr.student_id: fr for fr in financial_records}
+    
+    # 2b. Attendance per-student for active term
+    attendance_data = {}
+    if active_term and ward_pks:
+        attendance_agg = Attendance.objects.filter(student_id__in=ward_pks, term=active_term).values('student_id').annotate(
+            total_days=Count('id'), present_days=Count('id', filter=Q(is_present=True))
+        )
+        for item in attendance_agg:
+            student_id = item['student_id']
+            total = item.get('total_days', 0) or 0
+            present = item.get('present_days', 0) or 0
+            absent = total - present
+            attendance_data_key = None
+            try:
+                # Use the user's id as the key to match templates which use student.user.id
+                user_id = Student.objects.get(pk=student_id).user.id
+                attendance_data_key = user_id
+            except Student.DoesNotExist:
+                attendance_data_key = student_id
+
+            attendance_data[attendance_data_key] = {
+                'total_days': total,
+                'present_days': present,
+                'absent_days': absent,
+                'attendance_percentage': round((present / total * 100), 1) if total > 0 else 0
+            }
+    # Ensure attendance_data is available in template using the same keying as other maps (student.user.id)
     
     # 3. Results (Termly, Sessional, Archived)
     result_data = {res.student_id: res for res in Result.objects.filter(student_id__in=ward_pks, term=active_term, is_published=True)}
@@ -961,6 +1028,7 @@ def guardian_dashboard(request):
         'guardian_teachers': guardian_teachers,
 
         'lms_student_data': lms_student_data,
+        'attendance_data': attendance_data,
 
     }
     return render(request, 'guardian/guardian_dashboard.html', context)

@@ -10,6 +10,7 @@ from django.contrib.auth.mixins import UserPassesTestMixin
 from django.core.paginator import Paginator
 from django.utils import timezone
 from django.db import models
+from django.db import transaction
 from django.db.models import Q, Count, F, Sum, Subquery, OuterRef, IntegerField
 from django.http import HttpResponseForbidden, Http404
 from datetime import date
@@ -28,6 +29,54 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+    # Helper: robust permission check for creator/editor (handles created_by being either a User or Teacher)
+def _user_can_edit_created_object(user, obj):
+    """Return True when user should be allowed to edit/delete an object they created.
+    Handles common shapes: obj.created_by may be a User, a Teacher, or a related object.
+    Also allows form-teachers for class-scoped objects.
+    """
+    if not user or not obj:
+        return False
+    # superusers always allowed
+    if getattr(user, 'is_superuser', False):
+        return True
+
+    # direct equality check (created_by was stored as request.user)
+    created_by = getattr(obj, 'created_by', None)
+    try:
+        if created_by == user:
+            return True
+    except Exception:
+        pass
+
+    # created_by might be a Teacher instance (or similar) with .user
+    if created_by is not None and hasattr(created_by, 'user'):
+        try:
+            if created_by.user == user:
+                return True
+        except Exception:
+            pass
+
+    # created_by might be a User stored on a related teacher-like object
+    # check if the requesting user has a teacher profile and matches created_by
+    if hasattr(user, 'teacher') and created_by is not None:
+        try:
+            if created_by == user.teacher:
+                return True
+        except Exception:
+            pass
+
+    # If object has a class_assigned, allow the class form teacher to edit
+    class_obj = getattr(obj, 'class_assigned', None)
+    if class_obj is not None and hasattr(user, 'teacher'):
+        try:
+            form_teacher = class_obj.form_teacher() if hasattr(class_obj, 'form_teacher') else None
+            if form_teacher and form_teacher == user.teacher:
+                return True
+        except Exception:
+            pass
+
+    return False
 # Teacher Views
 
 class AdminRequiredMixin(UserPassesTestMixin):
@@ -429,7 +478,7 @@ def input_scores(request, class_id, subject_id, term_id):
     subject = get_object_or_404(Subject, id=subject_id)
     term = get_object_or_404(Term, id=term_id)
     # Ensure we only get students currently enrolled in THIS class
-    students = Student.objects.filter(current_class=class_obj).order_by('user__last_name', 'user__first_name').distinct()
+    students = Student.objects.filter(current_class=class_obj, status='active').order_by('user__last_name', 'user__first_name').distinct()
 
     # Prepare instances and forms
     subject_results = {}
@@ -484,71 +533,83 @@ def input_scores(request, class_id, subject_id, term_id):
 @login_required
 def broadsheet(request, class_id, term_id):
     class_obj = get_object_or_404(Class, id=class_id)
-    # Ensure active session logic is robust if needed elsewhere too
-    try:
-        session = Session.objects.get(is_active=True)
-    except Session.DoesNotExist:
-        messages.error(request, "No active session found.")
-        return redirect('teacher_dashboard') 
-    except Session.MultipleObjectsReturned:
-        messages.error(request, "Multiple active sessions found. Please resolve.")
-        return redirect('teacher_dashboard')
-
     term = get_object_or_404(Term, id=term_id)
-    # Get students enrolled in the class for this specific term/session if possible
-    students = Student.objects.filter(current_class=class_obj).order_by('user__last_name', 'user__first_name') 
+    session = term.session
 
-    # Get subjects assigned to this class in this term/session
+    students = Student.objects.filter(current_class=class_obj, status='active').select_related('user').order_by('user__last_name', 'user__first_name')
+
     subjects = Subject.objects.filter(
         class_assignments__class_assigned=class_obj,
-        class_assignments__session=session,
         class_assignments__term=term
     ).distinct().order_by('name')
 
     results_data = []
 
     for student in students:
-        # Get the main Result object for this student/term
         result = Result.objects.filter(student=student, term=term).first()
+        
+        # --- Defensive Initialization for ALL variables ---
         student_subject_results = {}
         total_score_sum = Decimal('0.0')
-        gpa_points_sum = Decimal('0.0')
-        subject_count = 0
+        average_score = Decimal('0.0')
+        student_gpa = Decimal('0.0')
+        overall_grade = 'F'
+        total_weighted_points = Decimal('0.0')
+        total_weights = Decimal('0.0')
+        graded_subject_count = 0
 
         if result:
-            # Get all SubjectResult entries for this Result (student/term)
-            # Filter only for subjects relevant to *this* broadsheet view
-            subject_results_qs = result.subject_results.filter(subject__in=subjects)
+            # Filter for graded subjects relevant to this broadsheet
+            graded_subject_results = result.subject_results.filter(
+                subject__in=subjects
+            ).select_related('subject').exclude(
+                continuous_assessment_1__isnull=True,
+                continuous_assessment_2__isnull=True,
+                continuous_assessment_3__isnull=True,
+                assignment__isnull=True,
+                oral_test__isnull=True,
+                exam_score__isnull=True,
+            )
 
-            for sr in subject_results_qs:
-                 # Check if any score has been entered to consider it 'active'
-                 if (sr.continuous_assessment_1 is not None or
-                     sr.continuous_assessment_2 is not None or
-                     sr.continuous_assessment_3 is not None or
-                     sr.assignment is not None or
-                     sr.oral_test is not None or
-                     sr.exam_score is not None):
+            graded_subject_count = graded_subject_results.count()
 
-                     student_subject_results[sr.subject.id] = sr
-                     total_score_sum += sr.total_score()
-                     gpa_points_sum += Decimal(sr.calculate_grade_point()) 
-                     subject_count += 1
+            if graded_subject_count > 0:
+                for sr in graded_subject_results:
+                    student_subject_results[sr.subject.id] = sr
+                    total_score_sum += sr.total_score()
+                    
+                    # --- WEIGHTED GPA CALCULATION ---
+                    weight = Decimal(getattr(sr.subject, 'subject_weight', 1))
+                    total_weighted_points += sr.calculate_grade_point() * weight
+                    total_weights += weight
 
-        # Calculate overall GPA for the student based *only* on subjects shown on this broadsheet
-        # Here we calculate GPA based on the subjects included in `student_subject_results`.
-        student_gpa = (gpa_points_sum / subject_count) if subject_count > 0 else Decimal('0.0')
-        grade = sr.calculate_grade()
+                # Calculate averages only if there were graded subjects
+                average_score = total_score_sum / graded_subject_count
+                student_gpa = total_weighted_points / total_weights if total_weights > 0 else Decimal('0.0')
 
+                # Calculate the overall grade based on the correct average score
+                if average_score >= 80: overall_grade = 'A'
+                elif average_score >= 65: overall_grade = 'B'
+                elif average_score >= 50: overall_grade = 'C'
+                elif average_score >= 45: overall_grade = 'D'
+                elif average_score >= 40: overall_grade = 'E'
+                else: overall_grade = 'F'
+        
         results_data.append({
             'student': student,
             'subject_results': student_subject_results, 
             'gpa': student_gpa.quantize(Decimal('0.01')), 
-            'total_score': total_score_sum.quantize(Decimal('0.1')), 
-            'grade': grade,
+            'total_score': total_score_sum.quantize(Decimal('0.1')),
+            'average_score': average_score.quantize(Decimal('0.1')),
+            'grade': overall_grade,
         })
 
-    # Sort students: Primary by Total Score (desc), Secondary by GPA (desc)
+    # Sort students based on total score, then GPA
     results_data.sort(key=lambda x: (-x['total_score'], -x['gpa']))
+
+    # Assign rank AFTER sorting is complete
+    for i, data in enumerate(results_data):
+        data['rank'] = i + 1
 
     context = {
         'class': class_obj,
@@ -588,7 +649,7 @@ def sessional_broadsheet(request, class_id, session_id):
         class_assignments__term__in=terms_in_session
     ).distinct().order_by('name')
 
-    students_in_class = Student.objects.filter(current_class=class_obj).select_related('user').order_by('user__last_name', 'user__first_name')
+    students_in_class = Student.objects.filter(current_class=class_obj, status='active').select_related('user').order_by('user__last_name', 'user__first_name')
 
     # --- Data Processing: Build a nested structure for the template ---
     broadsheet_data = []
@@ -1124,7 +1185,13 @@ def view_na_result(request, student_id, term_id):
 
 # --- Helper: Process NEW Questions (for Create and Update) ---
 def _process_newly_added_questions(request, assessment, question_name_prefix='new_question_'):
+    """Process newly added questions from the POST payload.
+    Returns a tuple: (posted_questions_data, errors)
+    - posted_questions_data: list of dicts {index, question_type, question_text, options, correct_answer, points}
+    - errors: list of error strings
+    """
     errors = []
+    posted_questions = []
     question_number = 1
     questions_successfully_added = 0
 
@@ -1135,7 +1202,7 @@ def _process_newly_added_questions(request, assessment, question_name_prefix='ne
         q_correct_key = f'{question_name_prefix}correct_answer_{question_number}'
         q_points_key = f'{question_name_prefix}points_{question_number}'
 
-        if q_type_key not in request.POST and q_text_key not in request.POST : # Check if any primary field for this new question number exists
+        if q_type_key not in request.POST and q_text_key not in request.POST:
             break
 
         question_type = request.POST.get(q_type_key)
@@ -1144,16 +1211,26 @@ def _process_newly_added_questions(request, assessment, question_name_prefix='ne
         correct_answer_str = request.POST.get(q_correct_key, '').strip()
         points_str = request.POST.get(q_points_key)
 
-        if not question_text and not question_type: # Skip if completely empty entry from JS
-             question_number += 1
-             continue
-        if not question_text: # Error if type present but no text
-            if question_type: errors.append(f"Error in New Question {question_number}: Text is empty.")
+        # Collect posted representation for hydration even if invalid
+        options_list = [opt.strip() for opt in options_str.split(',') if opt.strip()]
+        posted_questions.append({
+            'index': question_number,
+            'question_type': question_type,
+            'question_text': question_text,
+            'options': options_list,
+            'correct_answer': correct_answer_str if correct_answer_str else None,
+            'points': points_str if points_str else None,
+        })
+
+        if not question_text and not question_type:
+            question_number += 1
+            continue
+        if not question_text:
+            if question_type:
+                errors.append(f"Error in New Question {question_number}: Text is empty.")
             question_number += 1
             continue
 
-        options_list = [opt.strip() for opt in options_str.split(',') if opt.strip()]
-        
         form_data = {
             'question_type': question_type,
             'question_text': question_text,
@@ -1161,24 +1238,31 @@ def _process_newly_added_questions(request, assessment, question_name_prefix='ne
             'correct_answer': correct_answer_str if correct_answer_str else None,
             'points': points_str if points_str else None
         }
-        
+
         question_form = OnlineQuestionForm(form_data)
         if question_form.is_valid():
             try:
                 new_question = question_form.save()
-                assessment.questions.add(new_question)
+                # Only add to assessment/exam if provided assessment has been saved
+                try:
+                    assessment.questions.add(new_question)
+                except Exception:
+                    # If assessment isn't persisted (transactional rollback scenario), just keep posted data
+                    pass
                 questions_successfully_added += 1
             except Exception as e:
                 errors.append(f"Error saving new question {question_number}: {str(e)}")
         else:
             for field, field_errors in question_form.errors.items():
                 errors.append(f"New Question {question_number} ({field.replace('_',' ').title()}): {', '.join(field_errors)}")
-        
+
         question_number += 1
-    
+
     if questions_successfully_added == 0 and f'{question_name_prefix}type_1' in request.POST:
-        if not errors: errors.append("Attempted to add new questions, but none were valid or saved.")
-    return errors
+        if not errors:
+            errors.append("Attempted to add new questions, but none were valid or saved.")
+
+    return posted_questions, errors
 
 # --- Create Assessment View ---
 @login_required
@@ -1202,19 +1286,26 @@ def create_assessment(request):
         form.fields['subject'].queryset = assigned_subjects_qs
 
         if form.is_valid():
-            assessment = form.save(commit=False)
-            assessment.created_by = user
-            if user.is_superuser: # Superusers can auto-approve
-                assessment.is_approved = True
-            assessment.save() 
+            posted_questions = []
+            question_processing_errors = []
+            try:
+                with transaction.atomic():
+                    assessment = form.save(commit=False)
+                    assessment.created_by = user
+                    if user.is_superuser: # Superusers can auto-approve
+                        assessment.is_approved = True
+                    assessment.save()
 
-            question_processing_errors = _process_newly_added_questions(request, assessment, question_name_prefix='question_')
-            
-            if not question_processing_errors:
+                    posted_questions, question_processing_errors = _process_newly_added_questions(request, assessment, question_name_prefix='question_')
+                    if question_processing_errors:
+                        # Force a rollback
+                        raise ValueError('Question processing errors')
+
+                # If we get here, transaction committed and no question errors
                 messages.success(request, f"Assessment '{assessment.title}' created successfully.")
                 return redirect('school-setup' if user.is_superuser else 'teacher_dashboard')
-            else:
-                assessment.delete() # Rollback assessment creation if questions had critical errors
+            except Exception:
+                # Render the form with posted question data and errors (no half-saved objects due to atomic rollback)
                 form_with_initial_data = AssessmentForm(request.POST) # Re-bind to show original data
                 form_with_initial_data.fields['class_assigned'].queryset = assigned_classes_qs
                 form_with_initial_data.fields['subject'].queryset = assigned_subjects_qs
@@ -1222,6 +1313,7 @@ def create_assessment(request):
                 return render(request, 'assessment/create_assessment.html', {
                     'form': form_with_initial_data,
                     'question_errors': question_processing_errors,
+                    'posted_questions_json': json.dumps(posted_questions),
                 })
         else: # AssessmentForm is invalid
             form.fields['class_assigned'].queryset = assigned_classes_qs # Re-set for template
@@ -1240,15 +1332,8 @@ def update_assessment(request, assessment_id):
     assessment = get_object_or_404(Assessment, id=assessment_id)
     user = request.user
     
-    # Authorization check (can be simplified and made more robust)
-    is_creator = assessment.created_by == user
-    is_form_teacher = False
-    if hasattr(user, 'teacher'):
-        form_teacher_of_class = assessment.class_assigned.form_teacher()
-        if form_teacher_of_class and form_teacher_of_class == user.teacher:
-            is_form_teacher = True
-
-    if not (user.is_superuser or is_creator or is_form_teacher):
+    # Authorization: allow superuser, creators, or class form teacher
+    if not _user_can_edit_created_object(user, assessment):
         messages.error(request, "You are not authorized to update this assessment.")
         return redirect('home')
 
@@ -1301,7 +1386,7 @@ def update_assessment(request, assessment_id):
                 assessment.questions.remove(*deleted_ids) 
                 OnlineQuestion.objects.filter(id__in=deleted_ids, assessments=None).delete()
 
-            new_question_errors = _process_newly_added_questions(request, assessment, question_name_prefix='new_question_')
+            posted_new_questions, new_question_errors = _process_newly_added_questions(request, assessment, question_name_prefix='new_question_')
             all_errors.extend(new_question_errors)
 
             # --- Redirect or Re-render Logic (remains the same) ---
@@ -1313,12 +1398,18 @@ def update_assessment(request, assessment_id):
         
         # If form is invalid or question processing had errors, re-render the page
         current_questions = assessment.questions.all().order_by('id')
-        return render(request, 'assessment/update_assessment.html', {
-            'form': form, 
+        context = {
+            'form': form,
             'assessment': assessment,
             'questions': current_questions,
-            'processing_errors': all_errors if 'all_errors' in locals() else [] 
-        })
+            'processing_errors': all_errors if 'all_errors' in locals() else [],
+            'can_edit': _user_can_edit_created_object(user, assessment),
+        }
+        # If there were posted new questions, include them for client-side hydration
+        if 'posted_new_questions' in locals() and posted_new_questions:
+            context['posted_questions_json'] = json.dumps(posted_new_questions)
+
+        return render(request, 'assessment/update_assessment.html', context)
 
     else: # GET request
         form = AssessmentForm(instance=assessment)
@@ -1328,7 +1419,8 @@ def update_assessment(request, assessment_id):
         return render(request, 'assessment/update_assessment.html', {
             'form': form,
             'assessment': assessment,
-            'questions': questions
+            'questions': questions,
+            'can_edit': _user_can_edit_created_object(user, assessment),
         })
     
 
@@ -1405,14 +1497,8 @@ def assessment_submissions_list(request, assessment_id):
 def view_assessment(request, assessment_id):
 
     assessment = get_object_or_404(Assessment.objects.select_related('class_assigned', 'created_by'), id=assessment_id)
-    is_creator = assessment.created_by == request.user
-    is_form_teacher = False
-    if hasattr(request.user, 'teacher'):
-        form_teacher_of_class = assessment.class_assigned.form_teacher()
-        if form_teacher_of_class and form_teacher_of_class == request.user.teacher:
-            is_form_teacher = True
-    
-    if not (request.user.is_superuser or is_creator or is_form_teacher):
+    # Authorization: allow superuser, creators, or class form teacher
+    if not _user_can_edit_created_object(request.user, assessment):
         messages.error(request, "You are not authorized to view this assessment's details.")
         return redirect('teacher_dashboard')
 
@@ -1437,8 +1523,10 @@ def view_assessment(request, assessment_id):
     context = {
         'assessment': assessment, 
         'questions_processed': processed_questions_for_teacher_view,
+        'can_edit': _user_can_edit_created_object(request.user, assessment),
     }
     return render(request, 'assessment/assessment_detail.html', context)
+
 
 
 @login_required
@@ -1446,8 +1534,8 @@ def delete_assessment(request, assessment_id):
     assessment = get_object_or_404(Assessment, id=assessment_id)
     teacher = get_object_or_404(Teacher, user=request.user)
 
-    # Ensure the logged-in user is the creator or an admin
-    if assessment.created_by != teacher.user and not request.user.is_superuser:
+    # Ensure the logged-in user is the creator, form-teacher, or an admin
+    if not _user_can_edit_created_object(request.user, assessment):
         return HttpResponseForbidden("You do not have permission to delete this assessment.")
 
     if request.method == 'POST':
@@ -1456,6 +1544,7 @@ def delete_assessment(request, assessment_id):
 
     return render(request, 'assessment/delete_assessment.html', {
         'assessment': assessment,
+        'can_edit': _user_can_edit_created_object(request.user, assessment),
     })
 
 
@@ -1585,19 +1674,23 @@ def create_exam(request):
         form.fields['subject'].queryset = assigned_subjects_qs
 
         if form.is_valid():
-            exam = form.save(commit=False)
-            exam.created_by = user
-            if user.is_superuser: # Superusers can auto-approve
-                exam.is_approved = True
-            exam.save() 
+            posted_questions = []
+            question_processing_errors = []
+            try:
+                with transaction.atomic():
+                    exam = form.save(commit=False)
+                    exam.created_by = user
+                    if user.is_superuser: # Superusers can auto-approve
+                        exam.is_approved = True
+                    exam.save()
 
-            question_processing_errors = _process_newly_added_questions(request, exam, question_name_prefix='question_')
-            
-            if not question_processing_errors:
+                    posted_questions, question_processing_errors = _process_newly_added_questions(request, exam, question_name_prefix='question_')
+                    if question_processing_errors:
+                        raise ValueError('Question processing errors')
+
                 messages.success(request, f"Exam '{exam.title}' created successfully.")
                 return redirect('school-setup' if user.is_superuser else 'teacher_dashboard')
-            else:
-                exam.delete() # Rollback exam creation if questions had critical errors
+            except Exception:
                 form_with_initial_data = ExamForm(request.POST) # Re-bind to show original data
                 form_with_initial_data.fields['class_assigned'].queryset = assigned_classes_qs
                 form_with_initial_data.fields['subject'].queryset = assigned_subjects_qs
@@ -1605,6 +1698,7 @@ def create_exam(request):
                 return render(request, 'exam/create_exam.html', {
                     'form': form_with_initial_data,
                     'question_errors': question_processing_errors,
+                    'posted_questions_json': json.dumps(posted_questions),
                 })
         else: # ExamForm is invalid
             form.fields['class_assigned'].queryset = assigned_classes_qs # Re-set for template
@@ -1623,8 +1717,8 @@ def update_exam(request, exam_id):
     user = request.user
     teacher_profile = Teacher.objects.filter(user=user).first()
 
-    # Authorization
-    if not (user.is_superuser or exam.created_by == user):
+    # Authorization: allow superuser, creators, or class form teacher
+    if not _user_can_edit_created_object(user, exam):
         messages.error(request, "You are not authorized to update this exam.")
         return redirect('home')
 
@@ -1680,7 +1774,7 @@ def update_exam(request, exam_id):
                 OnlineQuestion.objects.filter(id__in=deleted_ids, exams=None).delete() # Optional: delete orphaned questions
 
             # 3. Add Newly Added Questions (uses 'new_question_' prefix)
-            new_question_errors = _process_newly_added_questions(request, exam, question_name_prefix='new_question_')
+            posted_new_questions, new_question_errors = _process_newly_added_questions(request, exam, question_name_prefix='new_question_')
             all_errors.extend(new_question_errors)
 
             if not all_errors:
@@ -1690,12 +1784,16 @@ def update_exam(request, exam_id):
                 messages.error(request, "Errors occurred. Please review.")
         # If form is invalid or errors occurred, re-render with context
         current_questions = exam.questions.all().order_by('id')
-        return render(request, 'exam/update_exam.html', {
+        context = {
             'form': form, # This form instance will have its own errors
             'exam': exam,
             'questions': current_questions,
-            'processing_errors': all_errors if 'all_errors' in locals() and all_errors else [] 
-        })
+            'processing_errors': all_errors if 'all_errors' in locals() and all_errors else [],
+            'can_edit': _user_can_edit_created_object(user, exam),
+        }
+        if 'posted_new_questions' in locals() and posted_new_questions:
+            context['posted_questions_json'] = json.dumps(posted_new_questions)
+        return render(request, 'exam/update_exam.html', context)
 
     else: # GET request
         form = ExamForm(instance=exam)
@@ -1705,7 +1803,8 @@ def update_exam(request, exam_id):
         return render(request, 'exam/update_exam.html', {
             'form': form,
             'exam': exam,
-            'questions': questions
+            'questions': questions,
+            'can_edit': _user_can_edit_created_object(user, exam),
         })
 
 @login_required
@@ -1782,13 +1881,8 @@ def exam_submissions_list(request, exam_id):
 def view_exam(request, exam_id):
 
     exam = get_object_or_404(Exam.objects.select_related('class_assigned', 'created_by'), id=exam_id)
-    is_creator = exam.created_by == request.user
-    is_form_teacher = False
-    if hasattr(request.user, 'teacher'):
-        form_teacher_of_class = exam.class_assigned.form_teacher()
-        if form_teacher_of_class and form_teacher_of_class == request.user.teacher:
-            is_form_teacher = True
-    if not (request.user.is_superuser or is_creator or is_form_teacher):
+    # Authorization: allow superuser, creators, or class form teacher
+    if not _user_can_edit_created_object(request.user, exam):
         messages.error(request, "You are not authorized to view this exam's details.")
         return redirect('teacher_dashboard')
 
@@ -1813,6 +1907,7 @@ def view_exam(request, exam_id):
     context = {
         'exam': exam, 
         'questions_processed': processed_questions_for_teacher_view,
+        'can_edit': _user_can_edit_created_object(request.user, exam),
     }
     return render(request, 'exam/exam_detail.html', context)
 
@@ -1822,8 +1917,8 @@ def delete_exam(request, exam_id):
     exam = get_object_or_404(Exam, id=exam_id)
     teacher = get_object_or_404(Teacher, user=request.user)
 
-    # Ensure the logged-in user is the creator or an admin
-    if exam.created_by != teacher.user and not request.user.is_superuser:
+    # Ensure the logged-in user is the creator, form-teacher, or an admin
+    if not _user_can_edit_created_object(request.user, exam):
         return HttpResponseForbidden("You do not have permission to delete this exam.")
 
     if request.method == 'POST':
@@ -1832,6 +1927,7 @@ def delete_exam(request, exam_id):
 
     return render(request, 'exam/delete_exam.html', {
         'exam': exam,
+        'can_edit': _user_can_edit_created_object(request.user, exam),
     })
 
 

@@ -1,17 +1,20 @@
 from django.test import TestCase
 from django.contrib.auth import get_user_model
+from django.test import TestCase
+from django.contrib.auth import get_user_model
 from django.utils import timezone
 from django.core.exceptions import ValidationError
 from decimal import Decimal
 from datetime import date, timedelta
 
 # Import ALL your relevant models
-from models import (
+from core.models import (
     Student, Guardian, Class, Session, Term, FeeAssignment,
     StudentFeeRecord, Payment, FinancialRecord
 )
 
 CustomUser = get_user_model()
+
 
 class FinancialModelTests(TestCase):
 

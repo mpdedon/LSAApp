@@ -144,7 +144,7 @@
                             {% if student.profile_image %}
                                 <img src="{{ student.profile_image.url }}" class="rounded-circle me-3" alt="{{ student.user.get_full_name }}" style="width: 60px; height: 60px; object-fit: cover;">
                             {% else %}
-                                <img src="{% static 'core\static\images\default.jpg' %}" class="rounded-circle me-3" alt="Default Profile Image" style="width: 60px; height: 60px; object-fit: cover;">
+                                <img src="{% static 'images/default.jpg' %}" class="rounded-circle me-3" alt="Default Profile Image" style="width: 60px; height: 60px; object-fit: cover;">
                             {% endif %}
                             <div>
                                 <h4 class="mb-0">{{ student.user.get_full_name }}</h4>

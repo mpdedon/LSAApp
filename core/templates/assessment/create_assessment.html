@@ -70,6 +70,7 @@
                         <label for="{{ form.result_field_mapping.id_for_label }}">Link to Term Result Sheet</label>
                         {{ form.result_field_mapping }}
                         <small class="form-text text-muted">{{ form.result_field_mapping.help_text }}</small>
+                        <small class="form-text text-muted mt-1">Selecting a result field will map this assessment's total score into that term result. The score is scaled to the target field's maximum (for example, continuous assessments are scaled to Max 10; exams are typically scaled to Max 40). Choose "None" to leave this assessment unmapped.</small>
                     </div>
 
                     <div class="form-check my-3">
@@ -141,10 +142,11 @@ document.addEventListener('DOMContentLoaded', function () {
                         <input type="text" name="question_correct_answer_${qCount}" id="question_correct_answer_${qCount}" class="form-control form-control-sm" placeholder="One option for SCQ; comma-separated for MCQ">
                     </div>
                     
-                    <!-- STEP 1: ADD THE POINTS FIELD HTML (initially hidden) -->
+                    <!-- Points field: visible input for UX + hidden field for submission -->
                     <div class="mb-2 d-none points-container" id="points-container-${qCount}">
-                        <label for="question_points_${qCount}" class="form-label form-label-sm">Points (for Essay)</label>
-                        <input type="number" name="question_points_${qCount}" id="question_points_${qCount}" class="form-control form-control-sm points-field" placeholder="e.g., 5" min="1" disabled>
+                        <label for="question_points_vis_${qCount}" class="form-label form-label-sm">Points (for Essay)</label>
+                        <input type="number" name="question_points_vis_${qCount}" id="question_points_vis_${qCount}" class="form-control form-control-sm points-field" placeholder="e.g., 5" min="1">
+                        <input type="hidden" name="question_points_${qCount}" id="question_points_${qCount}_hidden" value="">
                     </div>
                 </div>
             </div>
@@ -210,6 +212,35 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }
     });
+
+    // Hydration: if server provided posted_questions_json, rebuild the question cards
+    {% if posted_questions_json %}
+    try {
+        const posted = JSON.parse(`{{ posted_questions_json|escapejs }}`);
+        if (Array.isArray(posted)) {
+            posted.forEach(pq => {
+                document.getElementById('add-question-btn').click();
+                const idx = pq.index;
+                const typeEl = document.getElementById(`question_type_${idx}`);
+                const textEl = document.getElementById(`question_text_${idx}`);
+                const optionsEl = document.getElementById(`question_options_${idx}`);
+                const correctEl = document.getElementById(`question_correct_answer_${idx}`);
+                const visPoints = document.getElementById(`question_points_vis_${idx}`);
+                const hiddenPoints = document.getElementById(`question_points_${idx}_hidden`);
+
+                if (typeEl && pq.question_type) typeEl.value = pq.question_type;
+                if (textEl && pq.question_text) textEl.value = pq.question_text;
+                if (optionsEl && pq.options) optionsEl.value = pq.options.join(', ');
+                if (correctEl && pq.correct_answer) correctEl.value = pq.correct_answer;
+                if (visPoints && hiddenPoints) { visPoints.value = pq.points || ''; hiddenPoints.value = pq.points || ''; }
+
+                if (typeEl) { typeEl.dispatchEvent(new Event('change')); }
+            });
+        }
+    } catch (e) {
+        console.error('Failed to hydrate posted questions:', e);
+    }
+    {% endif %}
 });
 </script>
 {% endblock %}

@@ -70,8 +70,9 @@ class LMSCoreWorkflowTests(TestCase):
         
         # Check 2: Were we redirected to the Course Builder page?
         self.assertRedirects(response, reverse('lsalms:course_manage', kwargs={'slug': new_course.slug}))
-        
-        print("✅ PASSED: test_teacher_can_create_internal_course")
+
+        # Test passed (no unicode in printed output to avoid cp1252 encoding issues on Windows)
+        print("PASSED: test_teacher_can_create_internal_course")
 
     def test_course_publish_signal_triggers_auto_enrollment(self):
         """
@@ -99,7 +100,8 @@ class LMSCoreWorkflowTests(TestCase):
         self.assertTrue(CourseEnrollment.objects.filter(student=self.student, course=course).exists())
         self.assertEqual(CourseEnrollment.objects.count(), 1)
         
-        print("✅ PASSED: test_course_publish_signal_triggers_auto_enrollment")
+        # Avoid emoji to prevent Windows cp1252 encoding errors during test runs
+        print("PASSED: test_course_publish_signal_triggers_auto_enrollment")
 
     def test_student_can_see_enrolled_course_on_dashboard(self):
         """
@@ -131,8 +133,8 @@ class LMSCoreWorkflowTests(TestCase):
         
         # Check 3: The course title should be rendered in the final HTML.
         self.assertContains(response, course.get_course_title())
-        
-        print("✅ PASSED: test_student_can_see_enrolled_course_on_dashboard")
+
+        print("PASSED: test_student_can_see_enrolled_course_on_dashboard")
 
     def test_student_cannot_see_draft_course(self):
         """
@@ -160,39 +162,52 @@ class LMSCoreWorkflowTests(TestCase):
         # The context list should be empty because our view filters out non-published courses.
         self.assertEqual(len(response.context['lms_internal_enrollments']), 0)
         
-        print("✅ PASSED: test_student_cannot_see_draft_course")
+        print("PASSED: test_student_cannot_see_draft_course")
 
     def test_progress_calculation_and_completion(self):
         """
         Tests the lesson completion and progress calculation logic.
         """
         # 1. Setup: Create a course with 2 lessons
-        course = Course.objects.create(teacher=self.teacher_user, status='PUBLISHED', course_type='INTERNAL', linked_class=self.school_class, term=self.term, subject=self.subject)
-        enrollment = CourseEnrollment.objects.create(student=self.student, course=course)
+        course = Course.objects.create(
+            teacher=self.teacher_user,
+            status='PUBLISHED',
+            course_type='INTERNAL',
+            linked_class=self.school_class,
+            term=self.term,
+            subject=self.subject
+        )
+
+        # Use get_or_create here because the post_save signal for Course may already have auto-enrolled
+        # when the course was created as PUBLISHED. Using get_or_create avoids IntegrityError on duplicate.
+        enrollment, _ = CourseEnrollment.objects.get_or_create(student=self.student, course=course)
+
         module = Module.objects.create(course=course, title="Test Module")
         lesson1 = Lesson.objects.create(module=module, title="Lesson 1", order=1)
         lesson2 = Lesson.objects.create(module=module, title="Lesson 2", order=2)
-        
+
         enrollment = CourseEnrollment.objects.get(student=self.student, course=course)
         # Sanity check that the enrollment exists.
         self.assertIsNotNone(enrollment)
+
         # 2. Log in as student, go to the course detail page
         self.client.login(username='teststudent', password='password')
         course_detail_url = reverse('lsalms:course_detail', kwargs={'slug': course.slug})
         response = self.client.get(course_detail_url)
-        
+
         # Check 1: Initial progress should be 0%
         self.assertEqual(response.context['progress_percent'], 0)
         self.assertEqual(response.context['next_lesson'], lesson1)
-        
+
         # 3. Simulate completing the first lesson
-        complete_lesson1_url = reverse('lsalms:mark_lesson_complete', kwargs={'lesson_id': lesson1.id})
+    # URL pattern uses 'pk' for lesson id (lsalms.urls -> path('lesson/<int:pk>/complete/') )
+        complete_lesson1_url = reverse('lsalms:mark_lesson_complete', kwargs={'pk': lesson1.id})
         self.client.post(complete_lesson1_url)
-        
+
         # Check 2: Progress should now be 50%
         self.assertEqual(LessonProgress.objects.count(), 1)
         response_after_completion = self.client.get(course_detail_url)
         self.assertEqual(response_after_completion.context['progress_percent'], 50)
         self.assertEqual(response_after_completion.context['next_lesson'], lesson2)
-        
-        print("✅ PASSED: test_progress_calculation_and_completion")
+
+        print("PASSED: test_progress_calculation_and_completion")

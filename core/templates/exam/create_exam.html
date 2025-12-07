@@ -33,6 +33,7 @@
                 <div class="row mt-3">
                     <div class="col-md-6 mb-3">
                         {{ form.result_field_mapping|as_crispy_field }}
+                        <small class="form-text text-muted mt-1">Selecting a result field will map this exam's total score into that term result. The score is scaled to the target field's maximum (for example, continuous assessments → Max 10; exams → Max 40). Choose "None" to leave this exam unmapped.</small>
                     </div>
                     <div class="col-md-6 mb-3 d-flex align-items-center pt-4">
                         <div class="form-check">
@@ -83,7 +84,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     <div class="mb-2 correct-answer-scq-mcq-container"><label class="form-label form-label-sm">Correct Answer (SCQ/MCQ)</label><input type="text" name="question_correct_answer_${qCount}" class="form-control form-control-sm"></div>
                     <div class="mb-2 d-none points-container">
                         <label class="form-label form-label-sm">Points (for Essay)</label>
-                        <input type="number" name="question_points_${qCount}" class="form-control form-control-sm points-field" min="1" disabled>
+                        <input type="number" name="question_points_vis_${qCount}" class="form-control form-control-sm points-field" min="1">
+                        <input type="hidden" name="question_points_${qCount}" id="question_points_${qCount}_hidden" value="">
                     </div>
                 </div>
             </div>
@@ -129,6 +131,12 @@ document.addEventListener('DOMContentLoaded', function () {
         if (newTypeSelect) {
             newTypeSelect.addEventListener('change', () => toggleQuestionFieldsVisibility(questionCount));
         }
+        // Sync visible points input to hidden field so value is submitted reliably
+        const visPoints = document.querySelector(`#question-card-${questionCount} input[name="question_points_vis_${questionCount}"]`);
+        const hiddenPoints = document.getElementById(`question_points_${questionCount}_hidden`);
+        if (visPoints && hiddenPoints) {
+            visPoints.addEventListener('input', () => { hiddenPoints.value = visPoints.value; });
+        }
     });
 
     document.getElementById('questions-container').addEventListener('click', function(event) {
@@ -137,6 +145,35 @@ document.addEventListener('DOMContentLoaded', function () {
             document.getElementById(`question-card-${target.dataset.questionId}`).remove();
         }
     });
+
+    // Hydration: re-create posted questions if provided by server
+    {% if posted_questions_json %}
+    try {
+        const posted = JSON.parse(`{{ posted_questions_json|escapejs }}`);
+        if (Array.isArray(posted)) {
+            posted.forEach(pq => {
+                document.getElementById('add-question-btn').click();
+                const idx = pq.index;
+                const typeEl = document.querySelector(`#question-card-${idx} .question-type-select`);
+                const textEl = document.querySelector(`#question-card-${idx} textarea[name="question_text_${idx}"]`);
+                const optionsEl = document.querySelector(`#question-card-${idx} input[name="question_options_${idx}"]`);
+                const correctEl = document.querySelector(`#question-card-${idx} input[name="question_correct_answer_${idx}"]`);
+                const visPoints = document.querySelector(`#question-card-${idx} input[name="question_points_vis_${idx}"]`);
+                const hiddenPoints = document.getElementById(`question_points_${idx}_hidden`);
+
+                if (typeEl && pq.question_type) typeEl.value = pq.question_type;
+                if (textEl && pq.question_text) textEl.value = pq.question_text;
+                if (optionsEl && pq.options) optionsEl.value = pq.options.join(', ');
+                if (correctEl && pq.correct_answer) correctEl.value = pq.correct_answer;
+                if (visPoints && hiddenPoints) { visPoints.value = pq.points || ''; hiddenPoints.value = pq.points || ''; }
+
+                if (typeEl) { typeEl.dispatchEvent(new Event('change')); }
+            });
+        }
+    } catch (e) {
+        console.error('Failed to hydrate posted questions (exam):', e);
+    }
+    {% endif %}
 });
 </script>
 {% endblock %}

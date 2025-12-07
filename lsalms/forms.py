@@ -31,6 +31,17 @@ class CourseForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        # Make status optional in the form so create flows that omit it (e.g., tests
+        # or quick teacher posts) will default to Course.Status.DRAFT at the model level
+        # without causing a validation error.
+        if 'status' in self.fields:
+            try:
+                from .models import Course as _Course
+                self.fields['status'].required = False
+                self.fields['status'].initial = _Course.Status.DRAFT
+            except Exception:
+                # If import fails during migrations, ignore and leave as-is.
+                pass
         # Add CSS classes to fields to allow JavaScript to easily target them for show/hide logic
         self.fields['linked_class'].widget.attrs['class'] = 'form-select internal-field'
         self.fields['term'].widget.attrs['class'] = 'form-select internal-field'
