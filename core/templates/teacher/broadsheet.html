@@ -41,9 +41,10 @@
                     <!-- Loop through the official subject list for the header -->
                     {% for subject in subjects %}
                         <td class="text-center">
-                            {# Look up this student's score for this specific subject #}
-                            {% with score=data.subject_scores|get_item:subject.id %}
-                                {{ score|default:"-" }}
+                            {% with data.subject_results|dict_key:subject.id as subject_result %}
+                                <td class="text-center">
+                                    {{ subject_result.total_score|default_if_none:"-" }}
+                                </td>
                             {% endwith %}
                         </td>
                     {% endfor %}
