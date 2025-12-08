@@ -32,27 +32,25 @@
                         <th>Grade</th>
                     </tr>
                 </thead>
-                <tbody>
-                {% for data in results_data %}
-                <tr>
-                    <td>{{ data.rank }}</td> {# Use the rank calculated in the view #}
-                    <td class="text-start">{{ data.student.user.get_full_name }}</td>
+                <tbody class="text-center">
+                  {% for data in results_data %}
+                  <tr class="align-middle">
+                      <td class="fw-bold">{{ data.rank }}</td>
+                      <td class="text-start">{{ data.student.user.get_full_name }}</td>
 
-                    <!-- Loop through the official subject list for the header -->
-                    {% for subject in subjects %}
-                        <td class="text-center">
-                            {% with data.subject_results|dict_key:subject.id as subject_result %}
-                                <td class="text-center">
-                                    {{ subject_result.total_score|default_if_none:"-" }}
-                                </td>
-                            {% endwith %}
-                        </td>
-                    {% endfor %}
+                      {% for subject in subjects %}
+                        {% with subject_result=data.subject_results|get_item:subject.id %}
+                          <td>
+                              {# Display the total score for the subject if it exists, otherwise a dash #}
+                              {{ subject_result.total_score|default:"-" }}
+                          </td>
+                        {% endwith %}
+                      {% endfor %}
 
-                    <td class="text-center fw-bold">{{ data.total_score }}</td>
-                    <td class="text-center">{{ data.average_score }}</td>
-                    <td class="text-center">{{ data.gpa }}</td>
-                    <td class="text-center fw-bold">{{ data.grade }}</td>
+                      <td class="fw-bold">{{ data.total_score }}</td>
+                      <td>{{ data.average_score }}</td>
+                      <td>{{ data.gpa }}</td>
+                      <td class="fw-bold">{{ data.grade }}</td>
                   </tr>
                   {% empty %}
                   <tr>
