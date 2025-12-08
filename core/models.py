@@ -35,6 +35,10 @@ class Session(models.Model):
              Session.objects.filter(is_active=True).update(is_active=False) # Deactivate all others
         super().save(*args, **kwargs)
 
+    def get_next_session(self):
+        """Finds the next session based on start date."""
+        return Session.objects.filter(start_date__gt=self.start_date).order_by('start_date').first()
+
     def __str__(self):
         return self.name or f"Session {self.pk}"
     
