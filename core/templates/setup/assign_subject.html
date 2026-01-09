@@ -1,47 +1,45 @@
-{% extends 'base.html' %}
+{% extends 'base_admin_sidebar.html' %}
+{% load crispy_forms_tags %}
+
 {% block content %}
-<div class="container my-5 d-flex justify-content-center">
-    <div class="card shadow-sm" style="max-width: 700px; width: 100%;">
-        <div class="card-header bg-info text-white">
-            <h4 class="text-center mb-2">Assign Teacher to Subject</h4>
-        </div>
-        <div class="card-body">
-            <form method="POST" enctype="multipart/form-data">
-                {% csrf_token %}
-                
-                <!-- Class and Subject Selection -->
-                <div class="mb-3">
-                    <label for="class_assigned" class="form-label">Class Assigned</label>
-                    {{ subject_assignment_form.class_assigned }}
-                </div>
-                <div class="mb-3">
-                    <label for="subject" class="form-label">Subject</label>
-                    {{ subject_assignment_form.subject }}
+<div class="container-fluid px-4 py-3">
+    <div class="row justify-content-center">
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm">
+                <!-- Header with Purple gradient -->
+                <div class="card-header text-white py-3" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                    <h5 class="mb-0 fw-bold">
+                        <i class="bi bi-journal-plus me-2"></i>Assign Teacher to Subject
+                    </h5>
                 </div>
 
-                <!-- Teacher and Session Details -->
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <label for="teacher" class="form-label">Teacher</label>
-                        {{ subject_assignment_form.teacher }}
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <label for="session" class="form-label">Session</label>
-                        {{ subject_assignment_form.session }}
-                    </div>
-                </div>
+                <div class="card-body p-4">
+                    <form method="POST" enctype="multipart/form-data">
+                        {% csrf_token %}
+                        
+                        {% if subject_assignment_form.non_field_errors %}
+                            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                                {% for error in subject_assignment_form.non_field_errors %}
+                                    <p class="mb-0">{{ error }}</p>
+                                {% endfor %}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endif %}
 
-                <!-- Term Selection -->
-                <div class="mb-3">
-                    <label for="term" class="form-label">Term</label>
-                    {{ subject_assignment_form.term }}
+                        {{ subject_assignment_form|crispy }}
+
+                        <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
+                            <a href="{% url 'subject_assignment_list' %}" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left me-1"></i>Cancel
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-circle me-1"></i>Assign Subject
+                            </button>
+                        </div>
+                    </form>
                 </div>
-                
-                <!-- Submit Button -->
-                <div class="text-center">
-                    <button type="submit" class="btn btn-success">Assign Subject</button>
-                </div>
-            </form>
+            </div>
         </div>
     </div>
 </div>

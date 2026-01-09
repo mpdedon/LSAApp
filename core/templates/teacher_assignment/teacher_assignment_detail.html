@@ -1,61 +1,111 @@
-{% extends 'base.html' %}
+{% extends 'base_admin_sidebar.html' %}
 {% load static %}
 
 {% block title %}Teacher Assignment Details{% endblock %}
 
 {% block content %}
-<div class="container my-4">
-    <div class="card shadow-sm">
-        <div class="card-header bg-light d-flex justify-content-between align-items-center flex-wrap">
-            <h4 class="card-title mb-0 h5"><i class="fas fa-user-tag me-2"></i>Assignment Details</h4>
-            <a href="{% url 'teacher_assignment_list' %}" class="btn btn-outline-secondary btn-sm mt-2 mt-md-0">
-                <i class="fas fa-list me-1"></i> Back to List
-            </a>
+<div class="container-fluid px-4 py-3">
+    <!-- Header with Teal gradient -->
+    <div class="card border-0 shadow-sm mb-4" style="background: linear-gradient(135deg, #14b8a6 0%, #0891b2 100%);">
+        <div class="card-body py-3">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h4 class="text-white mb-1"><i class="bi bi-person-badge me-2"></i>Teacher Assignment Details</h4>
+                    <p class="text-white-50 mb-0 small">{{ teacher_assignment.teacher.user.get_full_name }} - {{ teacher_assignment.class_assigned.name }}</p>
+                </div>
+                <div class="d-flex gap-2">
+                    <a href="{% url 'teacher_assignment_update' teacher_assignment.pk %}" class="btn btn-light btn-sm">
+                        <i class="bi bi-pencil me-1"></i>Edit
+                    </a>
+                    <a href="{% url 'teacher_assignment_list' %}" class="btn btn-outline-light btn-sm">
+                        <i class="bi bi-arrow-left me-1"></i>Back
+                    </a>
+                </div>
+            </div>
         </div>
-        <div class="card-body">
-            <dl class="row">
-                <dt class="col-sm-3">Teacher:</dt>
-                <dd class="col-sm-9">
-                    {% if teacher_assignment.teacher.user %}
-                        {{ teacher_assignment.teacher.user.get_full_name }}
-                    {% else %}
-                        {{ teacher_assignment.teacher }} {# Fallback #}
-                    {% endif %}
-                </dd>
+    </div>
 
-                <dt class="col-sm-3">Class Assigned:</dt>
-                <dd class="col-sm-9">{{ teacher_assignment.class_assigned.name }}</dd>
+    <!-- Main Content -->
+    <div class="row g-4">
+        <!-- Left Column - Assignment Information -->
+        <div class="col-lg-8">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-light border-0 py-3">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-info-circle me-2"></i>Assignment Information</h6>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-12">
+                            <div class="p-3 bg-light rounded">
+                                <small class="text-muted d-block mb-1">TEACHER</small>
+                                <h5 class="mb-0">
+                                    {% if teacher_assignment.teacher.user %}
+                                        {{ teacher_assignment.teacher.user.get_full_name }}
+                                    {% else %}
+                                        {{ teacher_assignment.teacher }}
+                                    {% endif %}
+                                </h5>
+                            </div>
+                        </div>
 
-                <dt class="col-sm-3">Session:</dt>
-                <dd class="col-sm-9">{{ teacher_assignment.session }}</dd>
+                        <div class="col-md-6">
+                            <div class="p-3 bg-light rounded">
+                                <small class="text-muted d-block mb-1">CLASS ASSIGNED</small>
+                                <h5 class="mb-0">{{ teacher_assignment.class_assigned.name }}</h5>
+                                <small class="text-muted">{{ teacher_assignment.class_assigned.school_level }}</small>
+                            </div>
+                        </div>
 
-                <dt class="col-sm-3">Term:</dt>
-                <dd class="col-sm-9">{{ teacher_assignment.term.name }}</dd>
+                        <div class="col-md-6">
+                            <div class="p-3 bg-light rounded">
+                                <small class="text-muted d-block mb-1">FORM TEACHER</small>
+                                {% if teacher_assignment.is_form_teacher %}
+                                    <span class="badge bg-success fs-6"><i class="bi bi-check-circle me-1"></i>Yes</span>
+                                {% else %}
+                                    <span class="badge bg-secondary fs-6">No</span>
+                                {% endif %}
+                            </div>
+                        </div>
 
-                <dt class="col-sm-3">Is Form Teacher:</dt>
-                <dd class="col-sm-9">
-                    {% if teacher_assignment.is_form_teacher %}
-                        <span class="badge bg-success"><i class="fas fa-check me-1"></i>Yes</span>
-                    {% else %}
-                        <span class="badge bg-secondary">No</span>
-                    {% endif %}
-                </dd>
+                        <div class="col-md-6">
+                            <div class="p-3 bg-light rounded">
+                                <small class="text-muted d-block mb-1">SESSION</small>
+                                <span class="badge bg-info fs-6">{{ teacher_assignment.session }}</span>
+                            </div>
+                        </div>
 
-                {# Add other relevant fields from TeacherAssignment if needed #}
-
-            </dl>
+                        <div class="col-md-6">
+                            <div class="p-3 bg-light rounded">
+                                <small class="text-muted d-block mb-1">TERM</small>
+                                <span class="badge bg-primary fs-6">{{ teacher_assignment.term.name }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="card-footer bg-light text-end">
-             {# Edit Button #}
-             <a href="{% url 'teacher_assignment_update' teacher_assignment.pk %}"
-                class="btn btn-warning btn-sm me-2" title="Edit Assignment">
-                 <i class="fas fa-edit me-1"></i> Edit
-             </a>
-             {# Delete Button #}
-             <a href="{% url 'teacher_assignment_delete' teacher_assignment.pk %}"
-                class="btn btn-danger btn-sm" title="Delete Assignment">
-                 <i class="fas fa-trash-alt me-1"></i> Delete
-             </a>
+
+        <!-- Right Column - Quick Actions -->
+        <div class="col-lg-4">
+            <div class="card border-0 shadow-sm">
+                <div class="card-header bg-light border-0 py-3">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-gear me-2"></i>Actions</h6>
+                </div>
+                <div class="card-body">
+                    <div class="d-grid gap-2">
+                        <a href="{% url 'teacher_assignment_update' teacher_assignment.pk %}" class="btn btn-outline-info">
+                            <i class="bi bi-pencil me-1"></i>Edit Assignment
+                        </a>
+                        <a href="{% url 'teacher_assignment_delete' teacher_assignment.pk %}" class="btn btn-outline-danger">
+                            <i class="bi bi-trash me-1"></i>Delete Assignment
+                        </a>
+                        <hr>
+                        <a href="{% url 'teacher_assignment_list' %}" class="btn btn-outline-secondary">
+                            <i class="bi bi-list me-1"></i>View All Assignments
+                        </a>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>

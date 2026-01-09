@@ -1,141 +1,572 @@
-<!-- teacher_form.html -->
-
-{% extends 'base.html' %}
+{% extends 'base_admin_sidebar.html' %}
+{% load static %}
 
 {% block content %}
-<script>
-  function previewImage(input) {
-      var file = input.files[0];
-      var reader = new FileReader();
+<style>
+    /* Teacher Form Wizard - Green Theme */
+    .wizard-container {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 2rem 0;
+    }
+    
+    .wizard-card {
+        background: white;
+        border-radius: 16px;
+        box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+        overflow: hidden;
+    }
+    
+    .wizard-header {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: white;
+        padding: 2rem 3rem;
+        text-align: center;
+    }
+    
+    .wizard-header h2 {
+        margin: 0;
+        font-size: 1.75rem;
+        font-weight: 700;
+    }
+    
+    .wizard-header p {
+        margin: 0.5rem 0 0;
+        opacity: 0.9;
+    }
+    
+    /* Progress Steps */
+    .progress-bar-container {
+        padding: 2rem 3rem 1rem;
+        background: #f9fafb;
+    }
+    
+    .progress-steps {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        position: relative;
+    }
+    
+    .progress-steps::before {
+        content: '';
+        position: absolute;
+        top: 20px;
+        left: 0;
+        right: 0;
+        height: 3px;
+        background: #e5e7eb;
+        z-index: 0;
+    }
+    
+    .progress-step {
+        flex: 1;
+        text-align: center;
+        position: relative;
+        z-index: 1;
+    }
+    
+    .progress-step-circle {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: white;
+        border: 3px solid #e5e7eb;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0 auto 0.5rem;
+        font-weight: bold;
+        transition: all 0.3s ease;
+    }
+    
+    .progress-step.active .progress-step-circle {
+        border-color: #10b981;
+        background: #10b981;
+        color: white;
+        transform: scale(1.1);
+    }
+    
+    .progress-step.completed .progress-step-circle {
+        border-color: #059669;
+        background: #059669;
+        color: white;
+    }
+    
+    .progress-step-label {
+        font-size: 0.875rem;
+        color: #6b7280;
+        font-weight: 500;
+    }
+    
+    .progress-step.active .progress-step-label {
+        color: #10b981;
+        font-weight: 600;
+    }
+    
+    /* Step Content */
+    .wizard-content {
+        padding: 2rem 3rem;
+        min-height: 400px;
+    }
+    
+    .step-content {
+        display: none;
+    }
+    
+    .step-content.active {
+        display: block;
+        animation: fadeIn 0.3s ease;
+    }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .step-title {
+        color: #10b981;
+        font-size: 1.5rem;
+        font-weight: 700;
+        margin-bottom: 1.5rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 3px solid #f0fdf4;
+    }
+    
+    /* Form Styling */
+    .form-label {
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 0.5rem;
+    }
+    
+    .form-control, .form-select {
+        border: 2px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 0.75rem;
+        transition: all 0.3s ease;
+    }
+    
+    .form-control:focus, .form-select:focus {
+        border-color: #10b981;
+        box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+    }
+    
+    .required::after {
+        content: ' *';
+        color: #dc2626;
+    }
+    
+    /* Navigation */
+    .wizard-footer {
+        padding: 1.5rem 3rem 2rem;
+        border-top: 2px solid #f3f4f6;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+    
+    .btn-wizard {
+        padding: 0.75rem 2rem;
+        border-radius: 8px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+    
+    .btn-prev {
+        background: white;
+        border: 2px solid #10b981;
+        color: #10b981;
+    }
+    
+    .btn-prev:hover {
+        background: #f0fdf4;
+        color: #10b981;
+    }
+    
+    .btn-next, .btn-submit {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        border: none;
+        color: white;
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    }
+    
+    .btn-next:hover, .btn-submit:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4);
+        color: white;
+    }
+    
+    .password-strength-meter {
+        height: 8px;
+        border-radius: 4px;
+        background: #e5e7eb;
+        margin-top: 0.5rem;
+    }
+    
+    .password-strength-bar {
+        height: 100%;
+        transition: all 0.3s ease;
+        border-radius: 4px;
+    }
+    
+    .strength-weak { background: #dc2626; width: 25%; }
+    .strength-fair { background: #f59e0b; width: 50%; }
+    .strength-good { background: #10b981; width: 75%; }
+    .strength-strong { background: #059669; width: 100%; }
+    
+    .profile-preview {
+        text-align: center;
+        padding: 1rem;
+        background: #f9fafb;
+        border-radius: 12px;
+    }
+    
+    .profile-preview img {
+        max-width: 200px;
+        border-radius: 50%;
+        border: 4px solid #10b981;
+    }
+</style>
 
-      reader.onload = function(e) {
-          document.getElementById('profile-img-preview').src = e.target.result;
-          document.getElementById('profile-img-preview').style.display = 'block';
-      };
-
-      reader.readAsDataURL(file);
-  }
-
-  document.getElementById('{{ form.profile_image.id_for_label }}').addEventListener('change', function() {
-      previewImage(this);
-  });
-</script>
-
-<div class="container mt-5">
-    <div class="card shadow">
-        <!-- Card Header -->
-        <div class="card-header">
-            <h3 class="mb-2">{% if is_update %}Update Teacher{% else %}Register Teacher{% endif %}</h3>
-        </div>
-
-        <!-- Card Body -->
-        <div class="card-body">
-            <form method="post" enctype="multipart/form-data" class="needs-validation" novalidate action="{% if is_update %}{% url 'teacher_update' teacher.user.id %}{% else %}{% url 'teacher_create' %}{% endif %}">
-                {% csrf_token %}
+<div class="wizard-container">
+    <form method="post" enctype="multipart/form-data" id="teacherForm">
+        {% csrf_token %}
+        
+        <div class="wizard-card">
+            <div class="wizard-header">
+                <h2>
+                    <i class="bi bi-person-badge me-2"></i>
+                    {% if is_update %}Update Teacher{% else %}Register New Teacher{% endif %}
+                </h2>
+                <p>{% if is_update %}Update teacher information{% else %}Complete the steps below to add a new teacher{% endif %}</p>
+            </div>
+            
+            <!-- Progress Bar -->
+            <div class="progress-bar-container">
+                <div class="progress-steps">
+                    <div class="progress-step active">
+                        <div class="progress-step-circle">1</div>
+                        <div class="progress-step-label">Account</div>
+                    </div>
+                    <div class="progress-step">
+                        <div class="progress-step-circle">2</div>
+                        <div class="progress-step-label">Personal</div>
+                    </div>
+                    <div class="progress-step">
+                        <div class="progress-step-circle">3</div>
+                        <div class="progress-step-label">Professional</div>
+                    </div>
+                    <div class="progress-step">
+                        <div class="progress-step-circle">4</div>
+                        <div class="progress-step-label">Review</div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Wizard Content -->
+            <div class="wizard-content">
                 
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <label for="{{ form.username.id_for_label }}">{{ form.username.label }}</label>
-                        {{ form.username }}
-                        <div class="invalid-feedback">{{ form.username.errors }}</div>
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <label for="{{ form.email.id_for_label }}">{{ form.email.label }}</label>
-                        {{ form.email }}
-                        <div class="invalid-feedback">{{ form.email.errors }}</div>
-                    </div>
-                </div>
-
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <label for="{{ form.first_name.id_for_label }}">{{ form.first_name.label }}</label>
-                        {{ form.first_name }}
-                        <div class="invalid-feedback">{{ form.first_name.errors }}</div>
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <label for="{{ form.last_name.id_for_label }}">{{ form.last_name.label }}</label>
-                        {{ form.last_name }}
-                        <div class="invalid-feedback">{{ form.last_name.errors }}</div>
-                    </div>
-                </div>
-
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <label for="{{ form.password1.id_for_label }}">{{ form.password1.label }}</label>
-                        {{ form.password1 }}
-                        <div class="invalid-feedback">{{ form.password1.errors }}</div>
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <label for="{{ form.password2.id_for_label }}">{{ form.password2.label }}</label>
-                        {{ form.password2 }}
-                        <div class="invalid-feedback">{{ form.password2.errors }}</div>
+                <!-- Step 1: Account Information -->
+                <div class="step-content active" data-step="1">
+                    <h3 class="step-title">Account Information</h3>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="id_username" class="form-label required">Username</label>
+                            {{ form.username }}
+                            <div class="form-text">Choose a unique username</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="id_email" class="form-label required">Email Address</label>
+                            {{ form.email }}
+                            <div class="form-text">For official communications</div>
+                        </div>
+                        {% if not is_update %}
+                        <div class="col-md-6">
+                            <label for="id_password1" class="form-label required">Password</label>
+                            {{ form.password1 }}
+                            <div class="password-strength-meter">
+                                <div class="password-strength-bar" id="strengthBar"></div>
+                            </div>
+                            <small id="strengthText" class="form-text text-muted"></small>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="id_password2" class="form-label required">Confirm Password</label>
+                            {{ form.password2 }}
+                            <div class="form-text">Re-enter password</div>
+                        </div>
+                        {% endif %}
                     </div>
                 </div>
-
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <label for="{{ form.date_of_birth.id_for_label }}">{{ form.date_of_birth.label }}</label>
-                        {{ form.date_of_birth }}
-                        <div class="invalid-feedback">{{ form.date_of_birth.errors }}</div>
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        <label for="{{ form.contact.id_for_label }}">{{ form.contact.label }}</label>
-                        {{ form.contact }}
-                        <div class="invalid-feedback">{{ form.contact.errors }}</div>
+                
+                <!-- Step 2: Personal Details -->
+                <div class="step-content" data-step="2">
+                    <h3 class="step-title">Personal Details</h3>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="id_first_name" class="form-label required">First Name</label>
+                            {{ form.first_name }}
+                        </div>
+                        <div class="col-md-6">
+                            <label for="id_last_name" class="form-label required">Last Name</label>
+                            {{ form.last_name }}
+                        </div>
+                        <div class="col-md-6">
+                            <label for="id_gender" class="form-label required">Gender</label>
+                            {{ form.gender }}
+                        </div>
+                        <div class="col-md-6">
+                            <label for="id_date_of_birth" class="form-label required">Date of Birth</label>
+                            {{ form.date_of_birth }}
+                            <div class="form-text">Format: YYYY-MM-DD</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="id_contact" class="form-label required">Contact Number</label>
+                            {{ form.contact }}
+                        </div>
+                        <div class="col-12">
+                            <label for="id_address" class="form-label required">Address</label>
+                            {{ form.address }}
+                        </div>
                     </div>
                 </div>
-
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        <label for="{{ form.address.id_for_label }}">{{ form.address.label }}</label>
-                        {{ form.address }}
-                        <div class="invalid-feedback">{{ form.address.errors }}</div>
+                
+                <!-- Step 3: Professional Information -->
+                <div class="step-content" data-step="3">
+                    <h3 class="step-title">Professional Information</h3>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="id_nin" class="form-label">
+                                <i class="bi bi-credit-card-2-front me-2"></i>
+                                National Identification Number (NIN)
+                            </label>
+                            {{ form.nin }}
+                            <div class="form-text">Optional: 11-digit NIN</div>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="id_highest_education" class="form-label">
+                                <i class="bi bi-mortarboard-fill me-2"></i>
+                                Highest Educational Qualification
+                            </label>
+                            {{ form.highest_education }}
+                        </div>
+                        <div class="col-12">
+                            <label for="id_profile_image" class="form-label">Profile Picture</label>
+                            {{ form.profile_image }}
+                            <div class="form-text">Upload a professional photo (optional)</div>
+                        </div>
+                        <div class="col-12" id="imagePreview" style="display:none;">
+                            <div class="profile-preview">
+                                <img src="" alt="Preview" id="previewImg">
+                                <p class="mb-0 text-muted mt-2">Preview</p>
+                            </div>
+                        </div>
                     </div>
-                    <div class="col-md-6 mb-3">
-                        <label for="{{ form.gender.id_for_label }}">{{ form.gender.label }}</label>
-                        {{ form.gender }}
-                        <div class="invalid-feedback">{{ form.gender.errors }}</div>
+                </div>
+                
+                <!-- Step 4: Review -->
+                <div class="step-content" data-step="4">
+                    <h3 class="step-title">Review & Confirm</h3>
+                    <div class="alert alert-info mb-4">
+                        <i class="bi bi-info-circle me-2"></i>
+                        Please review the information before submitting
                     </div>
+                    <div id="reviewContent" class="row g-3">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                    {% if is_update and teacher.ndpr_consent %}
+                    <div class="alert alert-success mt-4">
+                        <i class="bi bi-shield-check me-2"></i>
+                        <strong>NDPR Consent:</strong> Given on {{ teacher.ndpr_consent_date|date:"F d, Y" }}
+                    </div>
+                    {% endif %}
                 </div>
-
-                <div class="mb-3">
-                    <label for="{{ form.profile_image.id_for_label }}">{{ form.profile_image.label }}</label>
-                    {{ form.profile_image }}
-                    <div class="invalid-feedback">{{ form.profile_image.errors }}</div>
-                    <img id="profile-img-preview" src="#" alt="Profile Image Preview" style="display: none; width: 150px; margin-top: 10px;">
-                </div>
-
-                <div class="d-grid">
-                    <button type="submit" class="btn btn-primary">
-                        {% if is_update %}Update Teacher{% else %}Register Teacher{% endif %}
-                    </button>
-                </div>
-            </form>
-        </div>
-
-        <!-- Card Footer -->
-        <div class="card-footer">
-            <!-- Error Section -->
-            {% if form.errors %}
-                <div class="text-danger mb-3">
-                    <h5>There were some errors with your submission:</h5>
-                    <ul>
+                
+                {% if form.errors %}
+                <div class="alert alert-danger mt-3">
+                    <strong>Please correct the following errors:</strong>
+                    <ul class="mb-0">
                         {% for field, errors in form.errors.items %}
-                            <li><strong>{{ field }}</strong>: {{ errors|join:", " }}</li>
+                            {% for error in errors %}
+                                <li>{{ field }}: {{ error }}</li>
+                            {% endfor %}
                         {% endfor %}
                     </ul>
                 </div>
-            {% endif %}
-            
-            <!-- Navigation Links -->
-            <div class="text-end">
-                {% if is_update %}
-                    <a href="{% url 'teacher_detail' teacher.user.id %}" class="btn btn-secondary">Back to Details</a>
-                {% else %}
-                    <a href="{% url 'teacher_list' %}" class="btn btn-secondary">Back to Teacher List</a>
                 {% endif %}
             </div>
+            
+            <!-- Navigation Footer -->
+            <div class="wizard-footer">
+                <button type="button" class="btn btn-wizard btn-prev" id="prevBtn" style="display:none;">
+                    <i class="bi bi-arrow-left me-2"></i>Previous
+                </button>
+                <a href="{% if is_update %}{% url 'teacher_detail' teacher.user.id %}{% else %}{% url 'teacher_list' %}{% endif %}" class="btn btn-outline-secondary">
+                    <i class="bi bi-x-circle me-2"></i>Cancel
+                </a>
+                <button type="button" class="btn btn-wizard btn-next" id="nextBtn">
+                    Next<i class="bi bi-arrow-right ms-2"></i>
+                </button>
+                <button type="submit" class="btn btn-wizard btn-submit" id="submitBtn" style="display:none;">
+                    <i class="bi bi-check-circle me-2"></i>
+                    {% if is_update %}Update Teacher{% else %}Register Teacher{% endif %}
+                </button>
+            </div>
         </div>
-    </div>
+    </form>
 </div>
+
+<script>
+    let currentStep = 1;
+    const totalSteps = 4;
+    
+    // Add Bootstrap classes
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('input, select, textarea').forEach(el => {
+            if (!el.classList.contains('form-control') && !el.classList.contains('form-select')) {
+                if (el.tagName === 'SELECT') {
+                    el.classList.add('form-select');
+                } else if (el.type !== 'file' && el.type !== 'checkbox') {
+                    el.classList.add('form-control');
+                } else if (el.type === 'file') {
+                    el.classList.add('form-control');
+                }
+            }
+        });
+        
+        // Image preview
+        const imageInput = document.getElementById('id_profile_image');
+        if (imageInput) {
+            imageInput.addEventListener('change', function() {
+                const file = this.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function(e) {
+                        document.getElementById('previewImg').src = e.target.result;
+                        document.getElementById('imagePreview').style.display = 'block';
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        }
+    });
+    
+    function updateProgress() {
+        // Update circles
+        document.querySelectorAll('.progress-step').forEach((step, index) => {
+            const stepNum = index + 1;
+            if (stepNum < currentStep) {
+                step.classList.add('completed');
+                step.classList.remove('active');
+            } else if (stepNum === currentStep) {
+                step.classList.add('active');
+                step.classList.remove('completed');
+            } else {
+                step.classList.remove('active', 'completed');
+            }
+        });
+        
+        // Update content
+        document.querySelectorAll('.step-content').forEach(content => {
+            content.classList.remove('active');
+        });
+        document.querySelector(`.step-content[data-step="${currentStep}"]`).classList.add('active');
+        
+        // Update buttons
+        document.getElementById('prevBtn').style.display = currentStep === 1 ? 'none' : 'inline-block';
+        document.getElementById('nextBtn').style.display = currentStep === totalSteps ? 'none' : 'inline-block';
+        document.getElementById('submitBtn').style.display = currentStep === totalSteps ? 'inline-block' : 'none';
+        
+        // Populate review
+        if (currentStep === totalSteps) {
+            populateReview();
+        }
+    }
+    
+    function populateReview() {
+        const reviewContent = document.getElementById('reviewContent');
+        const ninValue = document.getElementById('id_nin').value || 'Not provided';
+        const educationSelect = document.getElementById('id_highest_education');
+        const educationText = educationSelect.options[educationSelect.selectedIndex].text;
+        const dobValue = document.getElementById('id_date_of_birth').value || 'Not provided';
+        
+        let passwordSection = '';
+        {% if not is_update %}
+        passwordSection = `
+            <div class="col-12 mt-3"><h5>Security</h5></div>
+            <div class="col-12"><span class="badge bg-success">Password set successfully</span></div>
+        `;
+        {% endif %}
+        
+        reviewContent.innerHTML = `
+            <div class="col-12"><h5>Account Information</h5></div>
+            <div class="col-md-6"><strong>Username:</strong> ${document.getElementById('id_username').value}</div>
+            <div class="col-md-6"><strong>Email:</strong> ${document.getElementById('id_email').value}</div>
+            ${passwordSection}
+            
+            <div class="col-12 mt-3"><h5>Personal Details</h5></div>
+            <div class="col-md-6"><strong>First Name:</strong> ${document.getElementById('id_first_name').value}</div>
+            <div class="col-md-6"><strong>Last Name:</strong> ${document.getElementById('id_last_name').value}</div>
+            <div class="col-md-6"><strong>Gender:</strong> ${document.getElementById('id_gender').options[document.getElementById('id_gender').selectedIndex].text}</div>
+            <div class="col-md-6"><strong>Date of Birth:</strong> ${dobValue}</div>
+            <div class="col-md-6"><strong>Contact:</strong> ${document.getElementById('id_contact').value}</div>
+            <div class="col-12"><strong>Address:</strong> ${document.getElementById('id_address').value}</div>
+            
+            <div class="col-12 mt-3"><h5>Professional Information</h5></div>
+            <div class="col-md-6"><strong>NIN:</strong> ${ninValue}</div>
+            <div class="col-md-6"><strong>Highest Education:</strong> ${educationText}</div>
+        `;
+    }
+    
+    document.getElementById('nextBtn').addEventListener('click', function() {
+        if (currentStep < totalSteps) {
+            currentStep++;
+            updateProgress();
+        }
+    });
+    
+    document.getElementById('prevBtn').addEventListener('click', function() {
+        if (currentStep > 1) {
+            currentStep--;
+            updateProgress();
+        }
+    });
+    
+    {% if not is_update %}
+    // Password Strength Meter
+    const password1Field = document.getElementById('id_password1');
+    if (password1Field) {
+        password1Field.addEventListener('input', function() {
+            const password = this.value;
+            let strength = 0;
+            
+            if (password.length >= 8) strength++;
+            if (password.match(/[a-z]/) && password.match(/[A-Z]/)) strength++;
+            if (password.match(/[0-9]/)) strength++;
+            if (password.match(/[^a-zA-Z0-9]/)) strength++;
+            
+            const strengthBar = document.getElementById('strengthBar');
+            const strengthText = document.getElementById('strengthText');
+            
+            const strengthLevels = [
+                { class: 'strength-weak', text: 'Weak' },
+                { class: 'strength-fair', text: 'Fair' },
+                { class: 'strength-good', text: 'Good' },
+                { class: 'strength-strong', text: 'Strong' }
+            ];
+            
+            if (password.length > 0) {
+                const level = strengthLevels[strength - 1] || strengthLevels[0];
+                strengthBar.className = 'password-strength-bar ' + level.class;
+                strengthText.textContent = 'Password strength: ' + level.text;
+            } else {
+                strengthBar.className = 'password-strength-bar';
+                strengthText.textContent = '';
+            }
+        });
+    }
+    {% endif %}
+    
+    updateProgress();
+</script>
 {% endblock %}

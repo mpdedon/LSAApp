@@ -250,6 +250,20 @@ def create_student_fee_records(sender, instance, created, **kwargs):
                 )
 
 
+@receiver(post_save, sender=Student)
+def create_cumulative_record(sender, instance, created, **kwargs):
+    """
+    Automatically create a CumulativeRecord when a Student is created.
+    This prevents RelatedObjectDoesNotExist errors.
+    """
+    if created:
+        from core.models import CumulativeRecord
+        CumulativeRecord.objects.get_or_create(
+            student=instance,
+            defaults={'cumulative_gpa': Decimal('0.00')}
+        )
+
+
 @receiver(post_save, sender=StudentFeeRecord)
 def update_financial_record_on_fee_change(sender, instance, created, **kwargs):
     """

@@ -1,52 +1,51 @@
-{% extends 'base.html' %}
+{% extends 'base_admin_sidebar.html' %}
+{% load crispy_forms_tags %}
 {% load static %}
 
-{# Determine title based on whether we are updating (object exists) or creating #}
 {% block title %}{% if form.instance.pk %}Edit Assignment{% else %}Assign Teacher{% endif %}{% endblock %}
 
 {% block content %}
-<div class="container my-4">
-     <div class="row justify-content-center"> {# Center the form card #}
-        <div class="col-md-8 col-lg-7">
-            <div class="card shadow-sm">
-                <div class="card-header bg-light d-flex justify-content-between align-items-center flex-wrap">
-                     <h4 class="card-title mb-0 h5">
-                         {% if form.instance.pk %}
-                             <i class="fas fa-edit me-2"></i>Edit Assignment
-                         {% else %}
-                              <i class="fas fa-plus me-2"></i>Assign New Teacher
-                         {% endif %}
-                     </h4>
-                      <a href="{% url 'teacher_assignment_list' %}" class="btn btn-outline-secondary btn-sm mt-2 mt-md-0">
-                         <i class="fas fa-times me-1"></i> Cancel
-                     </a>
+<div class="container-fluid px-4 py-3">
+    <div class="row justify-content-center">
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm">
+                <!-- Header with Teal gradient -->
+                <div class="card-header text-white py-3" style="background: linear-gradient(135deg, #14b8a6 0%, #0891b2 100%);">
+                    <h5 class="mb-0 fw-bold">
+                        {% if form.instance.pk %}
+                            <i class="bi bi-pencil-square me-2"></i>Edit Teacher Assignment
+                        {% else %}
+                            <i class="bi bi-plus-circle me-2"></i>Assign New Teacher
+                        {% endif %}
+                    </h5>
                 </div>
-                <div class="card-body">
-                     <form method="post" novalidate> {# novalidate prevents browser validation if you prefer Django's #}
+
+                <div class="card-body p-4">
+                    <form method="post" novalidate>
                         {% csrf_token %}
 
-                        {# Display non-field errors if any #}
                         {% if form.non_field_errors %}
-                            <div class="alert alert-danger" role="alert">
+                            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                                <i class="bi bi-exclamation-triangle-fill me-2"></i>
                                 {% for error in form.non_field_errors %}
                                     <p class="mb-0">{{ error }}</p>
                                 {% endfor %}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
                             </div>
                         {% endif %}
 
-                        {{ form.as_p }}
+                        {{ form|crispy }}
 
-                        <div class="mt-4 text-end"> {# Move save button to the right #}
-                             <button type="submit" class="btn btn-success">
-                                 <i class="fas fa-save me-1"></i> Save Assignment
-                             </button>
+                        <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
+                            <a href="{% url 'teacher_assignment_list' %}" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left me-1"></i>Cancel
+                            </a>
+                            <button type="submit" class="btn btn-info">
+                                <i class="bi bi-check-circle me-1"></i>Save Assignment
+                            </button>
                         </div>
                     </form>
                 </div>
-                 {# Optional: Add a footer if needed, e.g., for extra notes #}
-                 {# <div class="card-footer bg-light text-muted small"> #}
-                 {#    Ensure all fields are correct before saving. #}
-                 {# </div> #}
             </div>
         </div>
     </div>

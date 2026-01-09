@@ -1,0 +1,278 @@
+{% extends 'base_admin_sidebar.html' %}
+{% load static %}
+
+{% block content %}
+<style>
+    .user-detail-card {
+        max-width: 1000px;
+        margin: 2rem auto;
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        overflow: hidden;
+    }
+    
+    .user-detail-header {
+        background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
+        color: white;
+        padding: 2rem;
+    }
+    
+    .user-profile-image {
+        width: 120px;
+        height: 120px;
+        border-radius: 50%;
+        border: 5px solid white;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        object-fit: cover;
+    }
+    
+    .info-section {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        margin-bottom: 1.5rem;
+    }
+    
+    .info-row {
+        display: flex;
+        padding: 1rem 0;
+        border-bottom: 1px solid #f3f4f6;
+    }
+    
+    .info-row:last-child {
+        border-bottom: none;
+    }
+    
+    .info-label {
+        flex: 0 0 200px;
+        color: #6b7280;
+        font-weight: 600;
+    }
+    
+    .info-value {
+        flex: 1;
+        color: #111827;
+    }
+    
+    .action-card {
+        background: linear-gradient(135deg, #f0fdfa 0%, #ccfbf1 100%);
+        border-left: 4px solid #14b8a6;
+        padding: 1.5rem;
+        border-radius: 8px;
+        margin-bottom: 1.5rem;
+    }
+</style>
+
+<div class="user-detail-card">
+    <div class="user-detail-header">
+        <div class="row align-items-center">
+            <div class="col-md-8">
+                <div class="d-flex align-items-center">
+                    {% if profile and profile.profile_image %}
+                        <img src="{{ profile.profile_image.url }}" alt="{{ target_user.get_full_name }}" class="user-profile-image me-4">
+                    {% else %}
+                        <div class="user-profile-image me-4 bg-white d-flex align-items-center justify-content-center">
+                            <i class="bi bi-person-circle fs-1 text-muted"></i>
+                        </div>
+                    {% endif %}
+                    <div>
+                        <h2 class="mb-2">{{ target_user.get_full_name|default:target_user.username }}</h2>
+                        <p class="mb-1 opacity-75">
+                            <i class="bi bi-at me-2"></i>{{ target_user.username }}
+                        </p>
+                        <span class="badge {% if target_user.is_active %}bg-success{% else %}bg-danger{% endif %} me-2">
+                            {% if target_user.is_active %}Active{% else %}Inactive{% endif %}
+                        </span>
+                        <span class="badge bg-light text-dark">{{ target_user.get_role_display }}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4 text-md-end mt-3 mt-md-0">
+                <a href="{% url 'user_account_list' %}" class="btn btn-light">
+                    <i class="bi bi-arrow-left me-2"></i>Back to List
+                </a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="p-4">
+        <!-- Quick Actions -->
+        <div class="action-card">
+            <h5 class="mb-3">
+                <i class="bi bi-lightning-fill me-2"></i>Quick Actions
+            </h5>
+            <div class="btn-group" role="group">
+                <a href="{% url 'reset_user_password' target_user.id %}" class="btn btn-warning">
+                    <i class="bi bi-key me-2"></i>Reset Password
+                </a>
+                <form method="post" action="{% url 'toggle_user_status' target_user.id %}" style="display: inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn {% if target_user.is_active %}btn-danger{% else %}btn-success{% endif %}"
+                            onclick="return confirm('Are you sure you want to {% if target_user.is_active %}deactivate{% else %}activate{% endif %} this account?')">
+                        <i class="bi {% if target_user.is_active %}bi-toggle-off{% else %}bi-toggle-on{% endif %} me-2"></i>
+                        {% if target_user.is_active %}Deactivate{% else %}Activate{% endif %}
+                    </button>
+                </form>
+                {% if target_user.role == 'student' %}
+                    <a href="{% url 'student_detail' target_user.student.pk %}" class="btn btn-primary">
+                        <i class="bi bi-person-badge me-2"></i>View Full Profile
+                    </a>
+                {% elif target_user.role == 'teacher' %}
+                    <a href="{% url 'teacher_detail' target_user.teacher.pk %}" class="btn btn-success">
+                        <i class="bi bi-person-badge me-2"></i>View Full Profile
+                    </a>
+                {% elif target_user.role == 'guardian' %}
+                    <a href="{% url 'guardian_detail' target_user.guardian.pk %}" class="btn btn-info">
+                        <i class="bi bi-person-badge me-2"></i>View Full Profile
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Account Information -->
+        <div class="info-section">
+            <h5 class="mb-3">
+                <i class="bi bi-person-circle me-2"></i>Account Information
+            </h5>
+            <div class="info-row">
+                <div class="info-label">User ID</div>
+                <div class="info-value"><strong>#{{ target_user.id }}</strong></div>
+            </div>
+            <div class="info-row">
+                <div class="info-label">Username</div>
+                <div class="info-value">{{ target_user.username }}</div>
+            </div>
+            <div class="info-row">
+                <div class="info-label">Email Address</div>
+                <div class="info-value">
+                    <i class="bi bi-envelope me-2"></i>{{ target_user.email }}
+                </div>
+            </div>
+            <div class="info-row">
+                <div class="info-label">Role</div>
+                <div class="info-value">
+                    <span class="badge bg-primary">{{ target_user.get_role_display }}</span>
+                </div>
+            </div>
+            <div class="info-row">
+                <div class="info-label">Account Status</div>
+                <div class="info-value">
+                    <span class="badge {% if target_user.is_active %}bg-success{% else %}bg-danger{% endif %}">
+                        {% if target_user.is_active %}Active{% else %}Inactive{% endif %}
+                    </span>
+                </div>
+            </div>
+            <div class="info-row">
+                <div class="info-label">Staff Status</div>
+                <div class="info-value">
+                    {% if target_user.is_staff %}
+                        <i class="bi bi-check-circle-fill text-success me-2"></i>Yes
+                    {% else %}
+                        <i class="bi bi-x-circle-fill text-danger me-2"></i>No
+                    {% endif %}
+                </div>
+            </div>
+            <div class="info-row">
+                <div class="info-label">Superuser Status</div>
+                <div class="info-value">
+                    {% if target_user.is_superuser %}
+                        <i class="bi bi-check-circle-fill text-success me-2"></i>Yes
+                    {% else %}
+                        <i class="bi bi-x-circle-fill text-danger me-2"></i>No
+                    {% endif %}
+                </div>
+            </div>
+            <div class="info-row">
+                <div class="info-label">Date Joined</div>
+                <div class="info-value">
+                    <i class="bi bi-calendar-check me-2"></i>{{ target_user.date_joined|date:"F d, Y - g:i A" }}
+                </div>
+            </div>
+            <div class="info-row">
+                <div class="info-label">Last Login</div>
+                <div class="info-value">
+                    <i class="bi bi-clock-history me-2"></i>
+                    {% if target_user.last_login %}
+                        {{ target_user.last_login|date:"F d, Y - g:i A" }}
+                    {% else %}
+                        Never
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Profile Information (if exists) -->
+        {% if profile %}
+        <div class="info-section">
+            <h5 class="mb-3">
+                <i class="bi bi-person-vcard me-2"></i>Profile Information
+            </h5>
+            <div class="info-row">
+                <div class="info-label">Full Name</div>
+                <div class="info-value">{{ target_user.get_full_name }}</div>
+            </div>
+            {% if target_user.role == 'student' %}
+                <div class="info-row">
+                    <div class="info-label">LSA Number</div>
+                    <div class="info-value">{{ profile.LSA_number }}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Current Class</div>
+                    <div class="info-value">
+                        {% if profile.current_class %}
+                            {{ profile.current_class.name }}
+                        {% else %}
+                            Not assigned
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Guardian</div>
+                    <div class="info-value">
+                        {% if profile.student_guardian %}
+                            <a href="{% url 'guardian_detail' profile.student_guardian.pk %}">
+                                {{ profile.student_guardian.user.get_full_name }}
+                            </a>
+                        {% else %}
+                            Not assigned
+                        {% endif %}
+                    </div>
+                </div>
+            {% elif target_user.role == 'teacher' %}
+                <div class="info-row">
+                    <div class="info-label">Employee ID</div>
+                    <div class="info-value">{{ profile.employee_id }}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Contact Number</div>
+                    <div class="info-value">{{ profile.contact|default:"Not provided" }}</div>
+                </div>
+            {% elif target_user.role == 'guardian' %}
+                <div class="info-row">
+                    <div class="info-label">Contact Number</div>
+                    <div class="info-value">{{ profile.contact|default:"Not provided" }}</div>
+                </div>
+                <div class="info-row">
+                    <div class="info-label">Wards Count</div>
+                    <div class="info-value">{{ profile.students.count }}</div>
+                </div>
+            {% endif %}
+            <div class="info-row">
+                <div class="info-label">Gender</div>
+                <div class="info-value">{{ profile.get_gender_display }}</div>
+            </div>
+            <div class="info-row">
+                <div class="info-label">Status</div>
+                <div class="info-value">
+                    <span class="badge {% if profile.status == 'active' %}bg-success{% elif profile.status == 'dormant' %}bg-warning{% else %}bg-secondary{% endif %}">
+                        {{ profile.get_status_display }}
+                    </span>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

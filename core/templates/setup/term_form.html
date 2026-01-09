@@ -1,79 +1,122 @@
-{% extends 'base.html' %}
-
+{% extends 'base_admin_sidebar.html' %}
 {% load crispy_forms_tags %}
+
+{% block title %}{% if is_update %}Update Term{% else %}Create Term{% endif %}{% endblock %}
+
 {% block content %}
-<div class="container mt-4" style="max-width: 600px;">
-    <div class="card">
-        <div class="card-header">
-            <h2 class="text-center mb-4">{% if is_update %}Update Term{% else %}Create Term{% endif %}</h2>
-        </div>
-        <div class="card-body">
-            <form method="post" enctype="multipart/form-data" class="needs-validation" novalidate action="{% if is_update %}{% url 'term_update' term.id %}{% else %}{% url 'term_create' %}{% endif %}">
-                {% csrf_token %}
-                
-                <div class="form-row">
-                    <div class="form-group col-md-12">
-                        {{ form.session|as_crispy_field }}
-                        <div class="invalid-feedback">
-                            {{ form.session.errors }}
-                        </div>
-                    </div>
-                    <div class="form-group col-md-12">
-                        {{ form.name|as_crispy_field }}
-                        <div class="invalid-feedback">
-                            {{ form.name.errors }}
-                        </div>
-                    </div>
+<div class="container-fluid px-4 py-3">
+    <!-- Header with Cyan gradient -->
+    <div class="card border-0 shadow-sm mb-4" style="background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);">
+        <div class="card-body py-3">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h4 class="text-white mb-1">
+                        <i class="bi bi-calendar3 me-2"></i>
+                        {% if is_update %}Update Term{% else %}Create New Term{% endif %}
+                    </h4>
+                    <p class="text-white-50 mb-0 small">
+                        {% if is_update %}Modify term details{% else %}Set up a new academic term{% endif %}
+                    </p>
                 </div>
-
-                <div class="form-row">
-                    <div class="form-group col-md-12">
-                        {{ form.start_date|as_crispy_field }} 
-                        <div class="invalid-feedback">
-                            {{ form.start_date.errors }}
-                        </div>
-                    </div>
-                    <div class="form-group col-md-12">
-                        {{ form.end_date|as_crispy_field }}
-                        <div class="invalid-feedback">
-                            {{ form.end_date.errors }}
-                        </div>
-                    </div>
-                </div>
-
-                <div class="form-row">
-                    <div class="form-group col-md-12">
-                        {{ form.is_active|as_crispy_field }}
-                        <div class="invalid-feedback">
-                            {{ form.is_active.errors }}
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="text-center">
-                    {% if is_update %}
-                        <button type="submit" class="btn btn-primary">Update Term</button>
-                    {% else %}
-                        <button type="submit" class="btn btn-success">Create Term</button>
-                    {% endif %}
-                </div>
-            </form>
+                <a href="{% url 'term_list' %}" class="btn btn-outline-light btn-sm">
+                    <i class="bi bi-arrow-left me-1"></i> Back to Terms
+                </a>
+            </div>
         </div>
     </div>
-    
-    <br>
-    <div class="text-center">
-        <a href="{% url 'term_list' %}" class="btn btn-outline-secondary">Back to Term List</a>
+
+    <!-- Form Card -->
+    <div class="row justify-content-center">
+        <div class="col-lg-7">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body p-4">
+                    <form method="post" action="{% if is_update %}{% url 'term_update' term.id %}{% else %}{% url 'term_create' %}{% endif %}">
+                        {% csrf_token %}
+                        
+                        {% if form.errors %}
+                            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                                <strong>Please correct the following errors:</strong>
+                                <ul class="mb-0 mt-2">
+                                    {% for field, errors in form.errors.items %}
+                                        {% for error in errors %}
+                                            <li>{{ field }}: {{ error }}</li>
+                                        {% endfor %}
+                                    {% endfor %}
+                                </ul>
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endif %}
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                {{ form.session|as_crispy_field }}
+                            </div>
+                            <div class="col-md-6">
+                                {{ form.name|as_crispy_field }}
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                {{ form.start_date|as_crispy_field }}
+                            </div>
+                            <div class="col-md-6">
+                                {{ form.end_date|as_crispy_field }}
+                            </div>
+                        </div>
+
+                        {{ form.is_active|as_crispy_field }}
+
+                        {% if not is_update and show_rollover_option %}
+                            <div class="card bg-light border-cyan mt-3 mb-3" style="border-left: 4px solid #06b6d4;">
+                                <div class="card-body">
+                                    <h6 class="card-title text-cyan mb-3">
+                                        <i class="bi bi-arrow-repeat me-1"></i> Rollover Assignments from Previous Term
+                                    </h6>
+                                    <div class="form-check mb-2">
+                                        <input class="form-check-input" type="checkbox" name="rollover_assignments" id="rollover_assignments" checked>
+                                        <label class="form-check-label fw-bold" for="rollover_assignments">
+                                            Auto-rollover all assignments to this new term
+                                        </label>
+                                    </div>
+                                    <small class="text-muted d-block mt-2">
+                                        <i class="bi bi-info-circle me-1"></i>
+                                        This will copy:
+                                    </small>
+                                    <ul class="small text-muted mb-0">
+                                        <li><strong>Teacher Assignments</strong> from {{ previous_term }}</li>
+                                        <li><strong>Class Subject Assignments</strong> from {{ previous_term }}</li>
+                                        <li><strong>Subject Teacher Assignments</strong> from {{ previous_term }}</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        {% endif %}
+
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-cyan btn-lg">
+                                <i class="bi bi-check-circle me-2"></i>
+                                {% if is_update %}Update Term{% else %}Create Term{% endif %}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
-<
-<script type="text/javascript">
-    $(document).ready(function(){
-        $('.datepicker').datepicker({
-            format: 'yyyy-mm-dd',
-            autoclose: true,
-            todayHighlight: true
-        });
-    });
-</script>
+
+<style>
+    .text-cyan { color: #06b6d4; }
+    .btn-cyan {
+        background: linear-gradient(135deg, #06b6d4 0%, #0891b2 100%);
+        border: none;
+        color: white;
+    }
+    .btn-cyan:hover {
+        background: linear-gradient(135deg, #0891b2 0%, #0e7490 100%);
+        color: white;
+    }
+    .border-cyan { border-color: #06b6d4 !important; }
+</style>
 {% endblock %}

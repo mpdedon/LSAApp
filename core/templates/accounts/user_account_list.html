@@ -1,0 +1,472 @@
+{% extends 'base_admin_sidebar.html' %}
+{% load static %}
+
+{% block content %}
+<style>
+    /* User Account Management - Teal Theme */
+    .account-header {
+        background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
+        color: white;
+        padding: 2rem;
+        border-radius: 15px 15px 0 0;
+        margin: -1rem -1rem 0 -1rem;
+    }
+    
+    .account-card {
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        overflow: hidden;
+    }
+    
+    .account-tabs {
+        background: white;
+        border-bottom: 2px solid #f3f4f6;
+    }
+    
+    .account-tabs .nav-link {
+        color: #6b7280;
+        font-weight: 500;
+        padding: 1rem 1.5rem;
+        border: none;
+        border-bottom: 3px solid transparent;
+        transition: all 0.3s ease;
+    }
+    
+    .account-tabs .nav-link:hover {
+        color: #14b8a6;
+        background-color: #f0fdfa;
+    }
+    
+    .account-tabs .nav-link.active {
+        color: #14b8a6;
+        background-color: #f0fdfa;
+        border-bottom-color: #14b8a6;
+        font-weight: 600;
+    }
+    
+    .account-btn-primary {
+        background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
+        border: none;
+        color: white;
+        font-weight: 600;
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
+    }
+    
+    .account-btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(20, 184, 166, 0.4);
+        color: white;
+    }
+    
+    .account-stat-card {
+        background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
+        color: white;
+        padding: 1.5rem;
+        border-radius: 12px;
+        text-align: center;
+        box-shadow: 0 4px 12px rgba(20, 184, 166, 0.3);
+        transition: all 0.3s ease;
+    }
+    
+    .account-stat-card:hover {
+        transform: translateY(-4px);
+        box-shadow: 0 6px 20px rgba(20, 184, 166, 0.4);
+    }
+    
+    .account-stat-number {
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+    }
+    
+    .account-stat-label {
+        font-size: 0.875rem;
+        opacity: 0.95;
+        font-weight: 500;
+    }
+    
+    .account-table {
+        border-radius: 8px;
+        overflow: hidden;
+    }
+    
+    .account-table thead {
+        background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
+        color: white;
+    }
+    
+    .account-table thead th {
+        font-weight: 600;
+        padding: 1rem;
+        border: none;
+    }
+    
+    .account-table tbody tr {
+        transition: all 0.2s ease;
+    }
+    
+    .account-table tbody tr:hover {
+        background-color: #f0fdfa;
+        transform: scale(1.01);
+    }
+    
+    .role-badge {
+        padding: 0.375rem 0.75rem;
+        border-radius: 12px;
+        font-size: 0.875rem;
+        font-weight: 600;
+    }
+    
+    .role-student { background-color: #a78bfa; color: white; }
+    .role-teacher { background-color: #10b981; color: white; }
+    .role-guardian { background-color: #3b82f6; color: white; }
+    .role-admin { background-color: #f59e0b; color: white; }
+    
+    .status-badge {
+        padding: 0.375rem 0.75rem;
+        border-radius: 12px;
+        font-size: 0.875rem;
+        font-weight: 600;
+    }
+    
+    .status-active { background-color: #10b981; color: white; }
+    .status-inactive { background-color: #ef4444; color: white; }
+    
+    .action-btn {
+        padding: 0.375rem 0.75rem;
+        border-radius: 6px;
+        font-size: 0.875rem;
+        transition: all 0.2s ease;
+    }
+    
+    .action-btn:hover {
+        transform: scale(1.05);
+    }
+</style>
+
+<div class="container-fluid px-4 py-4">
+    <!-- Header with Stats -->
+    <div class="account-card mb-4">
+        <div class="account-header">
+            <div class="row align-items-center">
+                <div class="col-md-6">
+                    <h2 class="mb-2">
+                        <i class="bi bi-person-gear me-2"></i>User Account Management
+                    </h2>
+                    <p class="mb-0 opacity-75">Manage all user accounts and permissions</p>
+                </div>
+                <div class="col-md-6 text-md-end mt-3 mt-md-0">
+                    <a href="{% url 'school-setup' %}" class="btn account-btn-primary">
+                        <i class="bi bi-speedometer2 me-2"></i>Dashboard
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stats Cards -->
+        <div class="p-4">
+            <div class="row g-3">
+                <div class="col-md-3 col-6">
+                    <div class="account-stat-card">
+                        <div class="account-stat-number">{{ counts.total }}</div>
+                        <div class="account-stat-label">Total Users</div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-6">
+                    <div class="account-stat-card" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
+                        <div class="account-stat-number">{{ counts.active }}</div>
+                        <div class="account-stat-label">Active</div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-6">
+                    <div class="account-stat-card" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);">
+                        <div class="account-stat-number">{{ counts.inactive }}</div>
+                        <div class="account-stat-label">Inactive</div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-6">
+                    <div class="account-stat-card" style="background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);">
+                        <div class="account-stat-number">{{ counts.students }}</div>
+                        <div class="account-stat-label">Students</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="row g-3 mt-2">
+                <div class="col-md-4">
+                    <div class="account-stat-card" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%);">
+                        <div class="account-stat-number">{{ counts.teachers }}</div>
+                        <div class="account-stat-label">Teachers</div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="account-stat-card" style="background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);">
+                        <div class="account-stat-number">{{ counts.guardians }}</div>
+                        <div class="account-stat-label">Guardians</div>
+                    </div>
+                </div>
+                <div class="col-md-4">
+                    <div class="account-stat-card" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
+                        <div class="account-stat-number">{{ counts.admins }}</div>
+                        <div class="account-stat-label">Admins</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filters and Actions -->
+    <div class="account-card">
+        <!-- Filter Tabs -->
+        <div class="account-tabs">
+            <ul class="nav nav-tabs border-0">
+                <li class="nav-item">
+                    <a class="nav-link {% if not status_filter %}active{% endif %}" href="?per_page={{ per_page }}">
+                        <i class="bi bi-people me-2"></i>All Users
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if status_filter == 'active' %}active{% endif %}" href="?status=active&per_page={{ per_page }}">
+                        <i class="bi bi-check-circle me-2"></i>Active ({{ counts.active }})
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link {% if status_filter == 'inactive' %}active{% endif %}" href="?status=inactive&per_page={{ per_page }}">
+                        <i class="bi bi-x-circle me-2"></i>Inactive ({{ counts.inactive }})
+                    </a>
+                </li>
+            </ul>
+        </div>
+
+        <!-- Search and Filters -->
+        <div class="p-4">
+            <form method="post" action="{% url 'bulk_user_action' %}" id="bulk-action-form">
+                {% csrf_token %}
+                <div class="row g-3 mb-4">
+                    <!-- Search -->
+                    <div class="col-md-4">
+                        <form method="get" action="">
+                            <input type="hidden" name="status" value="{{ status_filter }}">
+                            <input type="hidden" name="role" value="{{ role_filter }}">
+                            <input type="hidden" name="per_page" value="{{ per_page }}">
+                            <div class="input-group">
+                                <input type="text" name="q" class="form-control" 
+                                       placeholder="Search users..." 
+                                       value="{{ query }}">
+                                <button class="btn account-btn-primary" type="submit">
+                                    <i class="bi bi-search"></i>
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Role Filter -->
+                    <div class="col-md-3">
+                        <select class="form-select" onchange="filterByRole(this.value)">
+                            <option value="">All Roles</option>
+                            <option value="student" {% if role_filter == 'student' %}selected{% endif %}>Students</option>
+                            <option value="teacher" {% if role_filter == 'teacher' %}selected{% endif %}>Teachers</option>
+                            <option value="guardian" {% if role_filter == 'guardian' %}selected{% endif %}>Guardians</option>
+                            <option value="admin" {% if role_filter == 'admin' %}selected{% endif %}>Admins</option>
+                        </select>
+                    </div>
+
+                    <!-- Bulk Actions -->
+                    <div class="col-md-3">
+                        <div class="input-group">
+                            <select name="action" class="form-select" required>
+                                <option value="" disabled selected>Bulk Actions</option>
+                                <option value="activate">Activate</option>
+                                <option value="deactivate">Deactivate</option>
+                                <option value="delete">Delete</option>
+                            </select>
+                            <button type="submit" class="btn btn-secondary">
+                                <i class="bi bi-lightning me-2"></i>Apply
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Items Per Page -->
+                    <div class="col-md-2">
+                        <select class="form-select" onchange="changePerPage(this.value)">
+                            <option value="10" {% if per_page == 10 %}selected{% endif %}>10</option>
+                            <option value="20" {% if per_page == 20 %}selected{% endif %}>20</option>
+                            <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
+                            <option value="100" {% if per_page == 100 %}selected{% endif %}>100</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- User Table -->
+                <div class="table-responsive">
+                    <table class="table account-table table-hover">
+                        <thead>
+                            <tr>
+                                <th style="width: 50px;">
+                                    <input type="checkbox" id="select-all" class="form-check-input">
+                                </th>
+                                <th>ID</th>
+                                <th>Username</th>
+                                <th>Full Name</th>
+                                <th>Email</th>
+                                <th>Role</th>
+                                <th>Status</th>
+                                <th>Date Joined</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for user in page_obj %}
+                            <tr>
+                                <td>
+                                    <input type="checkbox" name="selected_users" 
+                                           value="{{ user.id }}" 
+                                           class="form-check-input select-user">
+                                </td>
+                                <td><strong>#{{ user.id }}</strong></td>
+                                <td>
+                                    <i class="bi bi-person-circle me-2"></i>{{ user.username }}
+                                </td>
+                                <td>{{ user.get_full_name|default:"-" }}</td>
+                                <td>
+                                    <i class="bi bi-envelope me-1"></i>{{ user.email }}
+                                </td>
+                                <td>
+                                    <span class="role-badge role-{{ user.role }}">
+                                        {{ user.get_role_display }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <span class="status-badge status-{% if user.is_active %}active{% else %}inactive{% endif %}">
+                                        {% if user.is_active %}Active{% else %}Inactive{% endif %}
+                                    </span>
+                                </td>
+                                <td>{{ user.date_joined|date:"M d, Y" }}</td>
+                                <td>
+                                    <div class="btn-group btn-group-sm">
+                                        <a href="{% url 'user_account_detail' user.id %}" 
+                                           class="btn btn-info action-btn" 
+                                           title="View Details">
+                                            <i class="bi bi-eye"></i>
+                                        </a>
+                                        <a href="{% url 'reset_user_password' user.id %}" 
+                                           class="btn btn-warning action-btn" 
+                                           title="Reset Password">
+                                            <i class="bi bi-key"></i>
+                                        </a>
+                                        <form method="post" action="{% url 'toggle_user_status' user.id %}" 
+                                              style="display: inline;">
+                                            {% csrf_token %}
+                                            <button type="submit" 
+                                                    class="btn {% if user.is_active %}btn-danger{% else %}btn-success{% endif %} action-btn" 
+                                                    title="{% if user.is_active %}Deactivate{% else %}Activate{% endif %}"
+                                                    onclick="return confirm('Are you sure?')">
+                                                <i class="bi {% if user.is_active %}bi-toggle-off{% else %}bi-toggle-on{% endif %}"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="9" class="text-center py-4">
+                                    <i class="bi bi-inbox fs-1 d-block mb-2 text-muted"></i>
+                                    No users found
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </form>
+
+            <!-- Pagination -->
+            {% if page_obj.has_other_pages %}
+            <nav aria-label="Page navigation" class="mt-4">
+                <ul class="pagination justify-content-center">
+                    {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}&status={{ status_filter }}&role={{ role_filter }}&q={{ query }}&per_page={{ per_page }}">
+                            <i class="bi bi-chevron-left"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                    
+                    {% for num in page_obj.paginator.page_range %}
+                        {% if page_obj.number == num %}
+                        <li class="page-item active">
+                            <span class="page-link">{{ num }}</span>
+                        </li>
+                        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                        <li class="page-item">
+                            <a class="page-link" href="?page={{ num }}&status={{ status_filter }}&role={{ role_filter }}&q={{ query }}&per_page={{ per_page }}">{{ num }}</a>
+                        </li>
+                        {% endif %}
+                    {% endfor %}
+                    
+                    {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}&status={{ status_filter }}&role={{ role_filter }}&q={{ query }}&per_page={{ per_page }}">
+                            <i class="bi bi-chevron-right"></i>
+                        </a>
+                    </li>
+                    {% endif %}
+                </ul>
+            </nav>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+    // Select all functionality
+    document.getElementById('select-all').addEventListener('change', function() {
+        const checkboxes = document.querySelectorAll('.select-user');
+        checkboxes.forEach(checkbox => {
+            checkbox.checked = this.checked;
+        });
+    });
+
+    // Change per page
+    function changePerPage(value) {
+        const url = new URL(window.location.href);
+        url.searchParams.set('per_page', value);
+        url.searchParams.set('page', '1');
+        window.location.href = url.toString();
+    }
+
+    // Filter by role
+    function filterByRole(role) {
+        const url = new URL(window.location.href);
+        if (role) {
+            url.searchParams.set('role', role);
+        } else {
+            url.searchParams.delete('role');
+        }
+        url.searchParams.set('page', '1');
+        window.location.href = url.toString();
+    }
+
+    // Bulk action confirmation
+    document.getElementById('bulk-action-form').addEventListener('submit', function(e) {
+        const checkedBoxes = document.querySelectorAll('.select-user:checked');
+        if (checkedBoxes.length === 0) {
+            e.preventDefault();
+            alert('Please select at least one user.');
+            return false;
+        }
+        
+        const action = this.querySelector('[name="action"]').value;
+        if (action === 'delete') {
+            if (!confirm(`Are you sure you want to delete ${checkedBoxes.length} user(s)? This action cannot be undone.`)) {
+                e.preventDefault();
+                return false;
+            }
+        }
+    });
+</script>
+{% endblock %}

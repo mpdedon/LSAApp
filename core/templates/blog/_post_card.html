@@ -2,7 +2,11 @@
 <div class="card blog-post-card mb-4 shadow-sm">
     {% if post.featured_image %}
         <a href="{{ post.get_absolute_url }}">
-            <img src="{{ post.featured_image.url }}" class="card-img-top" alt="{{ post.title }}">
+            <img src="{{ post.featured_image.url }}" class="card-img-top" alt="{{ post.title }}" onerror="this.src='https://via.placeholder.com/800x400/1a1a2e/8b5cf6?text={{ post.title|urlencode }}'">
+        </a>
+    {% else %}
+        <a href="{{ post.get_absolute_url }}">
+            <img src="https://via.placeholder.com/800x400/1a1a2e/8b5cf6?text={{ post.title|urlencode }}" class="card-img-top" alt="{{ post.title }}">
         </a>
     {% endif %}
     <div class="card-body">

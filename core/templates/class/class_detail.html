@@ -1,156 +1,236 @@
-{% extends 'base.html' %}
+{% extends 'base_admin_sidebar.html' %}
 {% load static %}
 
 {% block title %}{{ class_instance.name }} Details{% endblock %}
 
 {% block content %}
-<div class="container my-4">
-
-    <!-- Main Class Info Card -->
-    <div class="card shadow-sm mb-4">
-        <div class="card-header bg-light d-flex justify-content-between align-items-center flex-wrap">
-            <h4 class="card-title mb-0 h5 me-3">
-                <i class="fas fa-chalkboard me-2"></i>Class: {{ class_instance.name }}
-            </h4>
-            <div>
-                <a href="{% url 'class_list' %}" class="btn btn-outline-secondary btn-sm me-1 mt-1 mt-md-0" title="Back to Class List">
-                    <i class="fas fa-arrow-left me-1"></i> Back
-                </a>
-                <a href="{% url 'class_update' class_instance.pk %}" class="btn btn-outline-warning btn-sm me-1 mt-1 mt-md-0" title="Edit Class Details">
-                    <i class="fas fa-edit me-1"></i> Edit Class
-                </a>
-                <a href="{% url 'class_delete' class_instance.pk %}" class="btn btn-outline-danger btn-sm mt-1 mt-md-0" title="Delete Class">
-                    <i class="fas fa-trash-alt me-1"></i> Delete Class
-                </a>
+<div class="container-fluid">
+    <!-- Page Header -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none;">
+                <div class="card-body py-3">
+                    <div class="d-flex justify-content-between align-items-center flex-wrap">
+                        <div class="text-white">
+                            <h4 class="mb-1 fw-bold"><i class="bi bi-building me-2"></i>{{ class_instance.name }}</h4>
+                            <p class="mb-0 small opacity-75">
+                                {% if active_session and active_term %}
+                                {{ active_session.name }} - {{ active_term.name }}
+                                {% else %}
+                                Class Details
+                                {% endif %}
+                            </p>
+                        </div>
+                        <div class="d-flex gap-2 mt-2 mt-md-0">
+                            <a href="{% url 'class_list' %}" class="btn btn-light btn-sm">
+                                <i class="bi bi-arrow-left me-1"></i> Back
+                            </a>
+                            <a href="{% url 'class_update' class_instance.pk %}" class="btn btn-warning btn-sm">
+                                <i class="bi bi-pencil me-1"></i> Edit
+                            </a>
+                            <a href="{% url 'class_delete' class_instance.pk %}" class="btn btn-danger btn-sm">
+                                <i class="bi bi-trash me-1"></i> Delete
+                            </a>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
-        <div class="card-body">
-            <dl class="row">
-                <dt class="col-sm-3">Level:</dt>
-                <dd class="col-sm-9">
-                    <span class="badge bg-secondary fw-normal">{{ class_instance.get_school_level_display }}</span>
-                </dd>
+    </div>
 
-                <dt class="col-sm-3">Description:</dt>
-                <dd class="col-sm-9">{{ class_instance.description|linebreaksbr|default:"N/A" }}</dd>
+    <!-- Class Info Cards -->
+    <div class="row g-3 mb-4">
+        <!-- Class Details -->
+        <div class="col-lg-8">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-header bg-light border-0">
+                    <h5 class="mb-0"><i class="bi bi-info-circle me-2"></i>Class Information</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <div class="border rounded p-3" style="background: rgba(102, 126, 234, 0.05);">
+                                <small class="text-muted d-block mb-1">School Level</small>
+                                <span class="badge bg-secondary">{{ class_instance.get_school_level_display }}</span>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="border rounded p-3" style="background: rgba(102, 126, 234, 0.05);">
+                                <small class="text-muted d-block mb-1">Order</small>
+                                <strong>{{ class_instance.order|default:"N/A" }}</strong>
+                            </div>
+                        </div>
+                        <div class="col-12">
+                            <div class="border rounded p-3" style="background: rgba(102, 126, 234, 0.05);">
+                                <small class="text-muted d-block mb-1">Description</small>
+                                <p class="mb-0">{{ class_instance.description|linebreaksbr|default:"No description provided" }}</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
 
-                <dt class="col-sm-3">Form Teacher:</dt>
-                <dd class="col-sm-9">
-                    {% with form_teacher=class_instance.form_teacher %}
-                        {% if form_teacher %}
-                           <i class="fas fa-user-tie text-muted me-1"></i>
-                           {% if form_teacher.user %}
-                               {{ form_teacher.user.get_full_name }}
-                           {% else %}
-                               {{ form_teacher }} 
-                           {% endif %}
+        <!-- Quick Stats -->
+        <div class="col-lg-4">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-header bg-light border-0">
+                    <h5 class="mb-0"><i class="bi bi-bar-chart me-2"></i>Quick Stats</h5>
+                </div>
+                <div class="card-body">
+                    <!-- Form Teacher -->
+                    <!-- Form Teacher -->
+                    <div class="mb-3 pb-3 border-bottom">
+                        <div class="d-flex align-items-center">
+                            <div class="flex-shrink-0">
+                                <div class="rounded-circle bg-primary bg-opacity-10 p-2" style="width: 45px; height: 45px; display: flex; align-items: center; justify-content: center;">
+                                    <i class="bi bi-person-badge text-primary fs-5"></i>
+                                </div>
+                            </div>
+                            <div class="flex-grow-1 ms-3">
+                                <small class="text-muted d-block">Form Teacher</small>
+                                {% if form_teacher %}
+                                <strong class="text-dark">{{ form_teacher.user.get_full_name }}</strong>
+                                {% else %}
+                                <span class="text-muted fst-italic">Not Assigned</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Student Count -->
+                    <div class="text-center p-3 rounded mb-2" style="background: rgba(13, 110, 253, 0.1);">
+                        <i class="bi bi-people-fill text-primary fs-2"></i>
+                        <h3 class="mb-0 text-primary mt-2">{{ class_instance.enrolled_students.count }}</h3>
+                        <small class="text-muted">Students Enrolled</small>
+                    </div>
+
+                    <!-- Subject Count -->
+                    <div class="text-center p-3 rounded" style="background: rgba(13, 202, 240, 0.1);">
+                        <i class="bi bi-book-fill text-info fs-2"></i>
+                        <h3 class="mb-0 text-info mt-2">{{ optimized_subject_assignments|length }}</h3>
+                        <small class="text-muted">Subjects Assigned</small>
+                        {% if active_session and active_term %}
+                            <div class="small text-muted mt-1">
+                                <span class="badge bg-info">{{ active_term.name }}</span>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Students Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-light border-0 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-people me-2"></i>Students Enrolled ({{ class_instance.enrolled_students.count }})</h5>
+                    <a href="{% url 'enrol_student' class_instance.pk %}" class="btn btn-success btn-sm">
+                        <i class="bi bi-plus-lg me-1"></i> Enroll Student
+                    </a>
+                </div>
+                <div class="card-body p-0">
+                    {% with students=class_instance.enrolled_students.all %}
+                        {% if students %}
+                        <div class="table-responsive">
+                            <table class="table table-hover mb-0 align-middle">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th class="ps-3">Student Name</th>
+                                        <th>LSA Number</th>
+                                        <th>Gender</th>
+                                        <th class="text-end pe-3">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for student in students %}
+                                    <tr>
+                                        <td class="ps-3">
+                                            <i class="bi bi-person-circle text-muted me-2"></i>
+                                            <strong>{{ student.user.get_full_name }}</strong>
+                                        </td>
+                                        <td>
+                                            {% if student.LSA_number %}
+                                            <span class="badge bg-secondary">{{ student.LSA_number }}</span>
+                                            {% else %}
+                                            <span class="text-muted">-</span>
+                                            {% endif %}
+                                        </td>
+                                        <td>{{ student.get_gender_display }}</td>
+                                        <td class="text-end pe-3">
+                                            <form method="POST" 
+                                                action="{% url 'unenroll_student' student_id=student.pk class_id=class_instance.pk %}" 
+                                                class="d-inline" 
+                                                onsubmit="return confirm('Are you sure you want to unenroll {{ student.user.get_full_name }}?');">
+                                                {% csrf_token %}
+                                                <button type="submit" class="btn btn-sm btn-outline-danger">
+                                                    <i class="bi bi-x-circle me-1"></i> Unenroll
+                                                </button>
+                                            </form>
+                                        </td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
                         {% else %}
-                           <span class="text-danger fst-italic"><i class="fas fa-exclamation-circle me-1"></i>Not Assigned</span>
+                        <div class="text-center py-5">
+                            <i class="bi bi-people" style="font-size: 3rem; color: #e9ecef;"></i>
+                            <p class="text-muted mt-3 mb-0">No students are currently enrolled in this class.</p>
+                        </div>
                         {% endif %}
                     {% endwith %}
-                </dd>
-
-                <dt class="col-sm-3">Student Count:</dt>
-                <dd class="col-sm-9">
-                     <span class="badge rounded-pill bg-primary">
-                        <i class="fas fa-users me-1"></i> {{ class_instance.enrolled_students.count }}
-                     </span>
-                </dd>
-
-                 <dt class="col-sm-3">Subject Count:</dt>
-                 <dd class="col-sm-9">
-                     {# Assumes class_instance.subject_assignments exists and is the correct relation #}
-                     <span class="badge rounded-pill bg-info text-dark">
-                        <i class="fas fa-book me-1"></i> {{ class_instance.subject_assignments.count }}
-                     </span>
-                 </dd>
-            </dl>
+                </div>
+            </div>
         </div>
     </div>
 
-    <!-- Students Section Card -->
-    <div class="card shadow-sm mb-4">
-         <div class="card-header bg-light d-flex justify-content-between align-items-center">
-            <h5 class="mb-0 h6"><i class="fas fa-user-graduate me-2"></i>Students Enrolled</h5>
-            <a href="{% url 'enrol_student' class_instance.pk %}" class="btn btn-success btn-sm">
-                <i class="fas fa-plus me-1"></i> Enroll Student
-            </a>
-         </div>
-         <div class="card-body p-0"> 
-            {% with students=class_instance.enrolled_students.all %}
-                {% if students %}
-                <ul class="list-group list-group-flush">
-                    {% for student in students %}
-                    <li class="list-group-item d-flex justify-content-between align-items-center flex-wrap">
-                        <div>
-                            <i class="fas fa-user text-muted me-1"></i>
-                            <strong>{{ student.user.get_full_name }}</strong>
-                            {% if student.LSA_number %}<small class="text-muted"> ({{ student.LSA_number }})</small>{% endif %}
-                            - {{ student.get_gender_display }}
-                            {# Optional: Link to student detail page #}
-                            {# <a href="{% url 'student_detail' student.pk %}" class="btn btn-link btn-sm p-0 ms-2"><i class="fas fa-eye"></i></a> #}
-                        </div>
-                         <div class="mt-1 mt-md-0">
-                            <form method="POST" 
-                                action="{% url 'unenroll_student' student_id=student.pk class_id=class_instance.pk %}" 
-                                class="d-inline" 
-                                onsubmit="return confirm('Are you sure you want to unenroll this student?');">
-                                {% csrf_token %}
-                                <button type="submit" class="btn btn-sm btn-outline-danger">Unenroll</button>
-                            </form>
-                        </div>
-                    </li>
-                    {% endfor %}
-                </ul>
-                {% else %}
-                <div class="text-center text-muted p-4">
-                    <p class="mb-0"><i class="fas fa-info-circle me-1"></i>No students are currently enrolled in this class.</p>
+    <!-- Subjects Section -->
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-light border-0 d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0"><i class="bi bi-book me-2"></i>Subjects Assigned ({{ optimized_subject_assignments|length }})</h5>
+                    <a href="{% url 'assign_class_subject' class_instance.pk %}" class="btn btn-primary btn-sm">
+                        <i class="bi bi-plus-lg me-1"></i> Assign Subject
+                    </a>
                 </div>
-                {% endif %}
-            {% endwith %}
-         </div>
-    </div>
-
-    <div class="card shadow-sm mb-4">
-        <div class="card-header bg-light d-flex justify-content-between align-items-center">
-            <h5 class="mb-0 h6"><i class="fas fa-book-open me-2"></i>Subjects Assigned</h5>
-             <a href="{% url 'assign_class_subject' class_instance.pk %}" class="btn btn-primary btn-sm">
-                <i class="fas fa-plus me-1"></i> Assign Subject
-             </a>
-        </div>
-        <div class="card-body p-0"> {# Remove padding for table #}
-            {% with subject_assignments=optimized_subject_assignments %}
-                {% if subject_assignments %}
-                <div class="table-responsive">
-                    <table class="table table-hover table-sm align-middle mb-0">
-                        <thead class="table-light" style="font-size: 0.9em;">
-                            <tr>
-                                <th class="ps-3">Subject</th>
-                                <th>Session</th>
-                                <th>Term</th>
-                                <th class="text-center pe-3">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for assignment in subject_assignments %}
-                            <tr>
-                                <td class="ps-3">{{ assignment.subject.name }}</td>
-                                <td><span class="badge bg-secondary fw-normal">{{ assignment.session }}</span></td>
-                                <td><span class="badge bg-info text-dark fw-normal">{{ assignment.term.name }}</span></td>
-                                
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                <div class="card-body p-0">
+                    {% if optimized_subject_assignments %}
+                    <div class="table-responsive">
+                        <table class="table table-hover mb-0 align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th class="ps-3">Subject</th>
+                                    <th>Session</th>
+                                    <th class="pe-3">Term</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for assignment in optimized_subject_assignments %}
+                                <tr>
+                                    <td class="ps-3">
+                                        <i class="bi bi-book-fill text-primary me-2"></i>
+                                        <strong>{{ assignment.subject.name }}</strong>
+                                    </td>
+                                    <td><span class="badge bg-secondary">{{ assignment.session }}</span></td>
+                                    <td class="pe-3"><span class="badge bg-info">{{ assignment.term.name }}</span></td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5">
+                        <i class="bi bi-book" style="font-size: 3rem; color: #e9ecef;"></i>
+                        <p class="text-muted mt-3 mb-0">No subjects have been assigned to this class yet.</p>
+                    </div>
+                    {% endif %}
                 </div>
-                {% else %}
-                <div class="text-center text-muted p-4">
-                     <p class="mb-0"><i class="fas fa-info-circle me-1"></i>No subjects have been assigned to this class yet.</p>
-                </div>
-                {% endif %}
-            {% endwith %}
+            </div>
         </div>
     </div>
-
-</div> {# End Container #}
+</div>
 {% endblock %}

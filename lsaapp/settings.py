@@ -136,8 +136,8 @@ AUTH_PASSWORD_VALIDATORS = [
     {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
 ]
 
-LOGIN_URL = 'login' 
-LOGOUT_REDIRECT_URL = 'login'
+LOGIN_URL = '/auth/login/'
+LOGOUT_REDIRECT_URL = '/auth/login/'
 LOGIN_REDIRECT_URL = 'home'
 
 LANGUAGE_CODE = 'en-us'
@@ -157,7 +157,7 @@ STATICFILES_FINDERS = [
 ]
 
 MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'mediafiles'
+MEDIA_ROOT = BASE_DIR / 'media'  # Changed from 'mediafiles' to 'media' for consistency
 
 STORAGES = {
     "default": {
@@ -173,14 +173,17 @@ STORAGES = {
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Security settings should be controlled by environment variables
-CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', cast=Csv(), default='http://localhost:8000,http://127.0.0.1:8000')
+CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', cast=Csv(), default='http://localhost:8000,http://127.0.0.1:8000,https://learnswift.icu')
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 SECURE_SSL_REDIRECT = config('SECURE_SSL_REDIRECT', default=False, cast=bool)
 SESSION_COOKIE_SECURE = config('SESSION_COOKIE_SECURE', default=False, cast=bool)
 CSRF_COOKIE_SECURE = config('CSRF_COOKIE_SECURE', default=False, cast=bool)
+SECURE_HSTS_SECONDS = config('SECURE_HSTS_SECONDS', default=0, cast=int)
+SECURE_HSTS_PRELOAD = config('SECURE_HSTS_PRELOAD', default=False, cast=bool)
+SECURE_HSTS_INCLUDE_SUBDOMAINS = config('SECURE_HSTS_INCLUDE_SUBDOMAINS', default=False, cast=bool)
 
 # Set a session timeout (optional)
-SESSION_EXPIRE_AT_BROWSER_CLOSE = False
+SESSION_EXPIRE_AT_BROWSER_CLOSE = config('SESSION_EXPIRE_AT_BROWSER_CLOSE', default=False, cast=bool)
 
 LOG_DIR = '/tmp/logs'
 if not os.path.exists(LOG_DIR):
@@ -323,168 +326,9 @@ CKEDITOR_5_CONFIGS = {
 }
 
 # Define a constant in settings.py to specify file upload permissions
-CKEDITOR_5_FILE_UPLOAD_PERMISSION = "staff"  # Possible values: "staff", "authenticated", "any
+CKEDITOR_5_FILE_UPLOAD_PERMISSION = "staff"  # Possible values: "staff", "authenticated", "any"
 CKEDITOR_5_MAX_FILE_SIZE = 5
 CKEDITOR_5_UPLOAD_FILE_TYPES = ['jpeg', 'pdf', 'png']
 
-MIDDLEWARE = [
-    'django.middleware.security.SecurityMiddleware',
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'whitenoise.middleware.WhiteNoiseMiddleware',
-]
-
-ROOT_URLCONF = 'lsaapp.urls'
-
-TEMPLATES = [
-    {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
-        'APP_DIRS': True,
-        'OPTIONS': {
-            'context_processors': [
-                'django.template.context_processors.debug',
-                'django.template.context_processors.request',
-                'django.contrib.auth.context_processors.auth',
-                'django.contrib.messages.context_processors.messages',
-            ],
-        },
-    },
-]
-
-WSGI_APPLICATION = 'lsaapp.wsgi.application'
-
-
-# Database
-# https://docs.djangoproject.com/en/4.2/ref/settings/#databases
-
-DATABASE_URL = os.getenv("DATABASE_URL")  # Fetch database URL from environment variables
-
-if DATABASE_URL:
-    DATABASES = {
-        'default': dj_database_url.config(default=DATABASE_URL)
-    }
-else:
-    DATABASES = {
-        'default': {
-            'ENGINE': 'django.db.backends.postgresql',
-            'NAME': 'lsaapp', 
-            'USER': 'lsaapp_user', 
-            'PASSWORD': 'password',  
-            'HOST': 'localhost',
-            'PORT': '5432',
-            'OPTIONS': {
-            'options': '-c search_path=lsaapp_schema'
-        },
-        'TEST': {
-            'OPTIONS': {
-                'options': f'-c search_path=lsaapp_schema,public',
-            }
-        
-        }
-    }
-}
-
-AUTH_USER_MODEL = 'core.CustomUser'
-
-# Password validation
-# https://docs.djangoproject.com/en/4.2/ref/settings/#auth-password-validators
-
-AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-]
-
-LOGIN_URL = 'auth/login'
-LOGOUT_REDIRECT_URL = 'auth/login'
-LOGIN_REDIRECT_URL = 'home'
-
-# Internationalization
-# https://docs.djangoproject.com/en/4.2/topics/i18n/
-
-LANGUAGE_CODE = 'en-us'
-
-TIME_ZONE = 'UTC'
-
-USE_I18N = True
-
-USE_TZ = True
-
-
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/4.2/howto/static-files/
-
-STATIC_URL = '/static/'
-STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, 'core/static')
-    ]
-STATIC_ROOT = BASE_DIR / "staticfiles"
-# STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
-# STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
-
-
-# Media files
-
-MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
-
-# Default primary key field type
-# https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
-
-DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-
-# Ensure secure cookies for production
-SECURE_SSL_REDIRECT = False
-SESSION_COOKIE_SECURE = False
-CSRF_COOKIE_SECURE = False
-SECURE_HSTS_SECONDS = 0
-SECURE_HSTS_PRELOAD = False
-SECURE_HSTS_INCLUDE_SUBDOMAINS = False
-
-CSRF_TRUSTED_ORIGINS = [
-    'http://localhost:8001'
-    'https://learnswift.icu',  # Add your domain here
-]
-
-# Set a session timeout (optional)
-SESSION_EXPIRE_AT_BROWSER_CLOSE = True
-
-LOG_DIR = '/tmp/logs'
-if not os.path.exists(LOG_DIR):
-    os.makedirs(LOG_DIR)
-
-LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'handlers': {
-        'console': {
-            'level': 'ERROR',
-            'class': 'logging.StreamHandler',
-        },
-        'file': {
-            'level': 'ERROR',
-            'class': 'logging.FileHandler',
-            'filename': os.path.join(LOG_DIR, 'error.log'),
-            'mode': 'a',  # Append mode
-        },
-    },
-    'loggers': {
-        'django': {
-            'handlers': ['file', 'console'],  # Log to both file and console
-            'level': 'ERROR',
-            'propagate': True,
-        },
-    },
-    
-}
-
-
-
-CELERY_BROKER_URL = 'redis://localhost:6379/0'
-CELERY_ACCEPT_CONTENT = ['json']
-CELERY_TASK_SERIALIZER = 'json'
+# --- Remove all duplicate sections below (already defined above) ---
+# All configuration is now consolidated at the top of the file

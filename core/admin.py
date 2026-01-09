@@ -17,6 +17,7 @@ from .models import (
     # Communication and Blog Models
     Message, Notification, EmailCampaign, Post, Category, Tag,
 )
+from core.system_settings import SystemSettings
 from django.utils.html import format_html # For custom display fields
 
 # --- Admin Actions (Define these once at the top) ---
@@ -198,6 +199,57 @@ class PostAdmin(admin.ModelAdmin):
         ('SEO', {'classes': ('collapse',), 'fields': ('meta_description', 'meta_keywords')}),
     )
     readonly_fields = ('slug', 'views_count', 'created_at', 'updated_at')
+
+
+# --- System Settings Admin ---
+
+@admin.register(SystemSettings)
+class SystemSettingsAdmin(admin.ModelAdmin):
+    """
+    Admin for system-wide settings. Only one instance should exist.
+    """
+    list_display = ('school_name', 'school_email', 'last_modified')
+    fieldsets = (
+        ('School Information', {
+            'fields': ('school_name', 'school_motto', 'school_logo', 'school_address', 
+                      'school_phone', 'school_email', 'school_website')
+        }),
+        ('Email Configuration', {
+            'fields': ('email_host', 'email_port', 'email_use_tls', 'email_use_ssl', 
+                      'email_host_user', 'default_from_email')
+        }),
+        ('Academic Settings', {
+            'fields': ('passing_grade', 'grading_system', 'academic_year_start_month',
+                      'default_term_duration_weeks', 'number_of_terms_per_session')
+        }),
+        ('Assessment Configuration', {
+            'fields': ('assignment_max_score', 'assessment_max_score', 'exam_max_score',
+                      'enable_assignments', 'enable_assessments', 'enable_exams')
+        }),
+        ('Result Configuration', {
+            'fields': ('show_position', 'auto_promote_students', 'result_approval_required')
+        }),
+        ('Attendance & Fees', {
+            'fields': ('attendance_threshold', 'late_arrival_grace_period',
+                      'enable_fee_module', 'default_currency', 'currency_symbol',
+                      'late_payment_penalty_enabled', 'late_payment_penalty_percentage')
+        }),
+        ('Platform Features', {
+            'fields': ('enable_lms', 'enable_blog', 'enable_messaging', 'enable_notifications')
+        }),
+        ('Security', {
+            'fields': ('require_email_verification', 'session_timeout_minutes', 'max_login_attempts')
+        }),
+    )
+    readonly_fields = ('last_modified',)
+    
+    def has_add_permission(self, request):
+        # Only allow one instance
+        return not SystemSettings.objects.exists()
+    
+    def has_delete_permission(self, request, obj=None):
+        # Don't allow deletion
+        return False
 
 
 # --- Other Models (Simple Registration) ---

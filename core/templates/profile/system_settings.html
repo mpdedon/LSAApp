@@ -1,0 +1,660 @@
+{% extends 'base_admin_sidebar.html' %}
+{% load static %}
+
+{% block title %}System Settings - LSA Admin{% endblock %}
+
+{% block content %}
+<style>
+    .settings-container {
+        max-width: 1400px;
+        margin: 0 auto;
+    }
+    .nav-pills .nav-link {
+        border-radius: 8px;
+        padding: 12px 24px;
+        margin-bottom: 8px;
+        transition: all 0.3s ease;
+        color: #6c757d;
+        font-weight: 500;
+    }
+    .nav-pills .nav-link:hover {
+        background-color: rgba(102, 126, 234, 0.1);
+        color: #667eea;
+    }
+    .nav-pills .nav-link.active {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    }
+    .settings-card {
+        border: none;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        margin-bottom: 1.5rem;
+        overflow: hidden;
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    .settings-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+    }
+    .settings-card .card-header {
+        background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+        border-bottom: 2px solid #667eea;
+        padding: 1rem 1.25rem;
+    }
+    .settings-card .card-header h6 {
+        margin: 0;
+        font-weight: 600;
+        color: #495057;
+        font-size: 1rem;
+    }
+    .form-label {
+        font-weight: 500;
+        color: #495057;
+        margin-bottom: 0.5rem;
+        font-size: 0.9rem;
+    }
+    .form-control, .form-select {
+        border-radius: 8px;
+        border: 1px solid #dee2e6;
+        padding: 0.625rem 0.875rem;
+        transition: all 0.2s ease;
+    }
+    .form-control:focus, .form-select:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.15);
+    }
+    .form-check-input:checked {
+        background-color: #667eea;
+        border-color: #667eea;
+    }
+    .tab-content {
+        animation: fadeIn 0.3s ease-in;
+    }
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+</style>
+
+<div class="settings-container px-3">
+    <!-- Header -->
+    <div class="card border-0 shadow-sm mb-4">
+        <div class="card-body" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 12px; padding: 2rem;">
+            <div class="d-flex align-items-center text-white">
+                <div class="p-3 rounded-circle" style="background: rgba(255,255,255,0.2);">
+                    <i class="bi bi-gear-fill" style="font-size: 2rem;"></i>
+                </div>
+                <div class="ms-3">
+                    <h2 class="mb-1 fw-bold">System Settings</h2>
+                    <p class="mb-0 opacity-90">Configure and customize your school management system</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <form method="POST" enctype="multipart/form-data" novalidate>
+        {% csrf_token %}
+        
+        <div class="row">
+            <!-- Navigation Tabs -->
+            <div class="col-lg-3 mb-4">
+                <div class="card border-0 shadow-sm" style="border-radius: 12px;">
+                    <div class="card-body p-3">
+                        <div class="nav flex-column nav-pills" id="settings-tabs" role="tablist">
+                            <button class="nav-link active" id="school-tab" data-bs-toggle="pill" data-bs-target="#school" type="button" role="tab">
+                                <i class="bi bi-building me-2"></i>School Info
+                            </button>
+                            <button class="nav-link" id="academic-tab" data-bs-toggle="pill" data-bs-target="#academic" type="button" role="tab">
+                                <i class="bi bi-mortarboard me-2"></i>Academic
+                            </button>
+                            <button class="nav-link" id="communication-tab" data-bs-toggle="pill" data-bs-target="#communication" type="button" role="tab">
+                                <i class="bi bi-envelope me-2"></i>Communication
+                            </button>
+                            <button class="nav-link" id="financial-tab" data-bs-toggle="pill" data-bs-target="#financial" type="button" role="tab">
+                                <i class="bi bi-credit-card me-2"></i>Financial
+                            </button>
+                            <button class="nav-link" id="platform-tab" data-bs-toggle="pill" data-bs-target="#platform" type="button" role="tab">
+                                <i class="bi bi-toggles me-2"></i>Platform
+                            </button>
+                            <button class="nav-link" id="security-tab" data-bs-toggle="pill" data-bs-target="#security" type="button" role="tab">
+                                <i class="bi bi-shield-check me-2"></i>Security
+                            </button>
+                            <button class="nav-link" id="reports-tab" data-bs-toggle="pill" data-bs-target="#reports" type="button" role="tab">
+                                <i class="bi bi-file-earmark-text me-2"></i>Reports
+                            </button>
+                            <button class="nav-link" id="system-tab" data-bs-toggle="pill" data-bs-target="#system" type="button" role="tab">
+                                <i class="bi bi-tools me-2"></i>System
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Content -->
+            <div class="col-lg-9">
+                <div class="tab-content" id="settings-tabContent">
+                    
+                    <!-- School Information Tab -->
+                    <div class="tab-pane fade show active" id="school" role="tabpanel">
+                        <div class="settings-card card">
+                            <div class="card-header">
+                                <h6><i class="bi bi-building text-primary me-2"></i>School Information</h6>
+                            </div>
+                            <div class="card-body p-4">
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">School Name <span class="text-danger">*</span></label>
+                                        {{ form.school_name }}
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">School Motto</label>
+                                        {{ form.school_motto }}
+                                    </div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">School Logo</label>
+                                    {{ form.school_logo }}
+                                    <small class="text-muted d-block mt-1">Recommended size: 200x200px</small>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">School Address</label>
+                                    {{ form.school_address }}
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-4 mb-3">
+                                        <label class="form-label">Phone Number</label>
+                                        {{ form.school_phone }}
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <label class="form-label">Email</label>
+                                        {{ form.school_email }}
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <label class="form-label">Website</label>
+                                        {{ form.school_website }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Academic Configuration Tab -->
+                    <div class="tab-pane fade" id="academic" role="tabpanel">
+                        <div class="settings-card card">
+                            <div class="card-header">
+                                <h6><i class="bi bi-mortarboard text-primary me-2"></i>Academic Settings</h6>
+                            </div>
+                            <div class="card-body p-4">
+                                <div class="row">
+                                    <div class="col-md-4 mb-3">
+                                        <label class="form-label">Passing Grade (%)</label>
+                                        {{ form.passing_grade }}
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <label class="form-label">Academic Year Start</label>
+                                        {{ form.academic_year_start_month }}
+                                        <small class="text-muted d-block">Month (1-12)</small>
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <label class="form-label">Attendance Threshold (%)</label>
+                                        {{ form.attendance_threshold }}
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Terms per Session</label>
+                                        {{ form.number_of_terms_per_session }}
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Term Duration (weeks)</label>
+                                        {{ form.default_term_duration_weeks }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="settings-card card">
+                            <div class="card-header">
+                                <h6><i class="bi bi-clipboard-check text-primary me-2"></i>Assessment Configuration</h6>
+                            </div>
+                            <div class="card-body p-4">
+                                <div class="row">
+                                    <div class="col-md-4 mb-3">
+                                        <label class="form-label">Assignment Max Score</label>
+                                        {{ form.assignment_max_score }}
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <label class="form-label">Assessment Max Score</label>
+                                        {{ form.assessment_max_score }}
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <label class="form-label">Exam Max Score</label>
+                                        {{ form.exam_max_score }}
+                                    </div>
+                                </div>
+                                <div class="form-check mb-2">
+                                    {{ form.show_position }}
+                                    <label class="form-check-label" for="id_show_position">
+                                        Show class position on results
+                                    </label>
+                                </div>
+                                <div class="form-check mb-2">
+                                    {{ form.result_approval_required }}
+                                    <label class="form-check-label" for="id_result_approval_required">
+                                        Require admin approval for results
+                                    </label>
+                                </div>
+                                <div class="form-check">
+                                    {{ form.auto_promote_students }}
+                                    <label class="form-check-label" for="id_auto_promote_students">
+                                        Auto-promote students at session end
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="settings-card card">
+                            <div class="card-header">
+                                <h6><i class="bi bi-bar-chart text-primary me-2"></i>Grading System</h6>
+                            </div>
+                            <div class="card-body p-4">
+                                <div class="mb-3">
+                                    <label class="form-label">Grading Scale Configuration</label>
+                                    {{ form.grading_system_json }}
+                                    <small class="text-muted d-block mt-1">
+                                        {{ form.grading_system_json.help_text }}
+                                    </small>
+                                </div>
+                                <div class="alert alert-info">
+                                    <i class="bi bi-lightbulb me-2"></i>
+                                    <strong>Example Format:</strong>
+                                    <pre class="mb-0 mt-2" style="background: white; padding: 10px; border-radius: 6px;">{{ '{\n  "A": {"min_score": 70, "max_score": 100, "remark": "Excellent"},\n  "B": {"min_score": 60, "max_score": 69, "remark": "Very Good"}\n}' }}</pre>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Communication Tab -->
+                    <div class="tab-pane fade" id="communication" role="tabpanel">
+                        <div class="settings-card card">
+                            <div class="card-header">
+                                <h6><i class="bi bi-envelope text-primary me-2"></i>Email Configuration</h6>
+                            </div>
+                            <div class="card-body p-4">
+                                <div class="row">
+                                    <div class="col-md-8 mb-3">
+                                        <label class="form-label">Email Host</label>
+                                        {{ form.email_host }}
+                                        <small class="text-muted d-block">SMTP server (e.g., smtp.gmail.com)</small>
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <label class="form-label">Port</label>
+                                        {{ form.email_port }}
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Host User</label>
+                                        {{ form.email_host_user }}
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Default From Email</label>
+                                        {{ form.default_from_email }}
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="form-check mb-3">
+                                            {{ form.email_use_tls }}
+                                            <label class="form-check-label" for="id_email_use_tls">
+                                                Use TLS
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="form-check mb-3">
+                                            {{ form.email_use_ssl }}
+                                            <label class="form-check-label" for="id_email_use_ssl">
+                                                Use SSL
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="alert alert-info small">
+                                    <i class="bi bi-info-circle me-2"></i>
+                                    Email password must be configured in settings.py for security
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="settings-card card">
+                            <div class="card-header">
+                                <h6><i class="bi bi-phone text-primary me-2"></i>SMS Configuration</h6>
+                            </div>
+                            <div class="card-body p-4">
+                                <div class="form-check mb-3">
+                                    {{ form.enable_sms }}
+                                    <label class="form-check-label" for="id_enable_sms">
+                                        Enable SMS Notifications
+                                    </label>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">SMS Provider</label>
+                                        {{ form.sms_provider }}
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Sender ID/Name</label>
+                                        {{ form.sms_sender_id }}
+                                    </div>
+                                </div>
+                                <div class="alert alert-info small">
+                                    <i class="bi bi-info-circle me-2"></i>
+                                    SMS API key must be configured separately for security
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Financial Tab -->
+                    <div class="tab-pane fade" id="financial" role="tabpanel">
+                        <div class="settings-card card">
+                            <div class="card-header">
+                                <h6><i class="bi bi-cash-stack text-primary me-2"></i>Fee Management</h6>
+                            </div>
+                            <div class="card-body p-4">
+                                <div class="form-check mb-3">
+                                    {{ form.enable_fee_module }}
+                                    <label class="form-check-label" for="id_enable_fee_module">
+                                        Enable fee management module
+                                    </label>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-4 mb-3">
+                                        <label class="form-label">Currency</label>
+                                        {{ form.default_currency }}
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <label class="form-label">Currency Symbol</label>
+                                        {{ form.currency_symbol }}
+                                    </div>
+                                    <div class="col-md-4 mb-3">
+                                        <label class="form-label">Late Grace Period (min)</label>
+                                        {{ form.late_arrival_grace_period }}
+                                    </div>
+                                </div>
+                                <div class="form-check mb-3">
+                                    {{ form.late_payment_penalty_enabled }}
+                                    <label class="form-check-label" for="id_late_payment_penalty_enabled">
+                                        Enable late payment penalties
+                                    </label>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Late Payment Penalty (%)</label>
+                                    {{ form.late_payment_penalty_percentage }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="settings-card card">
+                            <div class="card-header">
+                                <h6><i class="bi bi-credit-card text-primary me-2"></i>Payment Gateway</h6>
+                            </div>
+                            <div class="card-body p-4">
+                                <div class="form-check mb-3">
+                                    {{ form.enable_online_payment }}
+                                    <label class="form-check-label" for="id_enable_online_payment">
+                                        Enable Online Fee Payment
+                                    </label>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Payment Provider</label>
+                                        {{ form.payment_provider }}
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Public Key</label>
+                                        {{ form.payment_public_key }}
+                                    </div>
+                                </div>
+                                <div class="form-check mb-3">
+                                    {{ form.payment_test_mode }}
+                                    <label class="form-check-label" for="id_payment_test_mode">
+                                        Use Test Mode
+                                    </label>
+                                </div>
+                                <div class="alert alert-info small">
+                                    <i class="bi bi-info-circle me-2"></i>
+                                    Secret key must be configured separately for security
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="settings-card card">
+                            <div class="card-header">
+                                <h6><i class="bi bi-person-plus text-primary me-2"></i>Student Admission</h6>
+                            </div>
+                            <div class="card-body p-4">
+                                <div class="form-check mb-3">
+                                    {{ form.enable_online_admission }}
+                                    <label class="form-check-label" for="id_enable_online_admission">
+                                        Enable Online Admission Portal
+                                    </label>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Admission Fee</label>
+                                        {{ form.admission_fee }}
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Max Students per Class</label>
+                                        {{ form.max_students_per_class }}
+                                    </div>
+                                </div>
+                                <div class="form-check">
+                                    {{ form.require_admission_approval }}
+                                    <label class="form-check-label" for="id_require_admission_approval">
+                                        Require Admin Approval for Admissions
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Platform Tab -->
+                    <div class="tab-pane fade" id="platform" role="tabpanel">
+                        <div class="settings-card card">
+                            <div class="card-header">
+                                <h6><i class="bi bi-toggles text-primary me-2"></i>Platform Features</h6>
+                            </div>
+                            <div class="card-body p-4">
+                                <h6 class="mb-3 text-muted">Assessment Features</h6>
+                                <div class="row mb-3">
+                                    <div class="col-md-4">
+                                        <div class="form-check">
+                                            {{ form.enable_assignments }}
+                                            <label class="form-check-label" for="id_enable_assignments">
+                                                Enable Assignments
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="form-check">
+                                            {{ form.enable_assessments }}
+                                            <label class="form-check-label" for="id_enable_assessments">
+                                                Enable Assessments
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="form-check">
+                                            {{ form.enable_exams }}
+                                            <label class="form-check-label" for="id_enable_exams">
+                                                Enable Exams
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <hr class="my-4">
+
+                                <h6 class="mb-3 text-muted">Platform Modules</h6>
+                                <div class="row">
+                                    <div class="col-md-6 mb-2">
+                                        <div class="form-check">
+                                            {{ form.enable_lms }}
+                                            <label class="form-check-label" for="id_enable_lms">
+                                                Learning Management System
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6 mb-2">
+                                        <div class="form-check">
+                                            {{ form.enable_blog }}
+                                            <label class="form-check-label" for="id_enable_blog">
+                                                Blog/News
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6 mb-2">
+                                        <div class="form-check">
+                                            {{ form.enable_messaging }}
+                                            <label class="form-check-label" for="id_enable_messaging">
+                                                Internal Messaging
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6 mb-2">
+                                        <div class="form-check">
+                                            {{ form.enable_notifications }}
+                                            <label class="form-check-label" for="id_enable_notifications">
+                                                Notifications
+                                            </label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Security Tab -->
+                    <div class="tab-pane fade" id="security" role="tabpanel">
+                        <div class="settings-card card">
+                            <div class="card-header">
+                                <h6><i class="bi bi-shield-check text-primary me-2"></i>Security & Privacy</h6>
+                            </div>
+                            <div class="card-body p-4">
+                                <div class="form-check mb-4">
+                                    {{ form.require_email_verification }}
+                                    <label class="form-check-label" for="id_require_email_verification">
+                                        Require email verification for new accounts
+                                    </label>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Session Timeout (minutes)</label>
+                                        {{ form.session_timeout_minutes }}
+                                        <small class="text-muted d-block">Auto-logout after inactivity</small>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label class="form-label">Max Login Attempts</label>
+                                        {{ form.max_login_attempts }}
+                                        <small class="text-muted d-block">Before account lockout</small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Reports Tab -->
+                    <div class="tab-pane fade" id="reports" role="tabpanel">
+                        <div class="settings-card card">
+                            <div class="card-header">
+                                <h6><i class="bi bi-file-earmark-text text-primary me-2"></i>Report Card Configuration</h6>
+                            </div>
+                            <div class="card-body p-4">
+                                <div class="mb-3">
+                                    <label class="form-label">Report Card Header</label>
+                                    {{ form.report_card_header }}
+                                    <small class="text-muted d-block">Custom text for report card header</small>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Report Card Footer</label>
+                                    {{ form.report_card_footer }}
+                                    <small class="text-muted d-block">Custom text for report card footer</small>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Principal Signature</label>
+                                    {{ form.principal_signature }}
+                                    <small class="text-muted d-block mt-1">Upload principal's signature image</small>
+                                </div>
+                                <div class="form-check">
+                                    {{ form.show_student_photo_on_report }}
+                                    <label class="form-check-label" for="id_show_student_photo_on_report">
+                                        Show Student Photo on Report Card
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- System Tab -->
+                    <div class="tab-pane fade" id="system" role="tabpanel">
+                        <div class="settings-card card">
+                            <div class="card-header">
+                                <h6><i class="bi bi-database text-primary me-2"></i>Backup & Maintenance</h6>
+                            </div>
+                            <div class="card-body p-4">
+                                <h6 class="mb-3 text-muted">Automatic Backups</h6>
+                                <div class="form-check mb-3">
+                                    {{ form.auto_backup_enabled }}
+                                    <label class="form-check-label" for="id_auto_backup_enabled">
+                                        Enable Automatic Backups
+                                    </label>
+                                </div>
+                                <div class="mb-4">
+                                    <label class="form-label">Backup Frequency (days)</label>
+                                    {{ form.backup_frequency_days }}
+                                </div>
+
+                                <hr class="my-4">
+
+                                <h6 class="mb-3 text-muted">Maintenance Mode</h6>
+                                <div class="alert alert-warning">
+                                    <i class="bi bi-exclamation-triangle me-2"></i>
+                                    <strong>Warning:</strong> Enabling maintenance mode will restrict access to admins only
+                                </div>
+                                <div class="form-check mb-3">
+                                    {{ form.maintenance_mode }}
+                                    <label class="form-check-label" for="id_maintenance_mode">
+                                        <strong class="text-danger">Enable Maintenance Mode</strong>
+                                    </label>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label">Maintenance Message</label>
+                                    {{ form.maintenance_message }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- Submit Buttons -->
+        <div class="card border-0 shadow-sm mb-4" style="border-radius: 12px;">
+            <div class="card-body p-4 text-center">
+                <button type="submit" class="btn btn-lg px-5" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border: none; border-radius: 8px;">
+                    <i class="bi bi-check2-circle me-2"></i>Save All Settings
+                </button>
+                <a href="{% url 'school-setup' %}" class="btn btn-outline-secondary btn-lg ms-3 px-5" style="border-radius: 8px;">
+                    <i class="bi bi-x-circle me-2"></i>Cancel
+                </a>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}

@@ -1,46 +1,559 @@
-<!-- student_detail.html -->
-
-{% extends "base.html" %}
+{% extends "base_admin_sidebar.html" %}
+{% load static %}
 
 {% block content %}
-<div class="container mt-4">
-    <h2 class="mb-4">Student Details</h2>
-    {% load static %}
-    <div class="card" style="width: 22rem; margin: 0 auto;">
-        <div class="card-header">
-            {% if student.profile_image %}
-                <img src="{{ student.profile_image.url }}" class="card-img-top" alt="{{ student.user.get_full_name }}" style="max-height: 300px; object-fit: cover;">
-            {% else %}
-                <img src="{% static 'images/default.jpg' %}" class="card-img-top" alt="Default Profile Image" style="max-height: 300px; object-fit: cover;">
-            {% endif %}
+<style>
+    /* Student Detail - Purple Theme */
+    .student-detail-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 2rem;
+        border-radius: 15px 15px 0 0;
+        margin: -1rem -1rem 0 -1rem;
+    }
+    
+    .student-profile-card {
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        overflow: hidden;
+        margin-bottom: 2rem;
+    }
+    
+    .student-profile-image {
+        width: 150px;
+        height: 150px;
+        border-radius: 50%;
+        border: 5px solid white;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        object-fit: cover;
+    }
+    
+    .student-detail-tabs {
+        background: white;
+        border-radius: 10px;
+        padding: 0.5rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    
+    .student-detail-tabs .nav-link {
+        color: #6b7280;
+        font-weight: 500;
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+        border: none;
+    }
+    
+    .student-detail-tabs .nav-link:hover {
+        background-color: #f3f4f6;
+        color: #667eea;
+    }
+    
+    .student-detail-tabs .nav-link.active {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+    
+    .student-info-card {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        margin-bottom: 1.5rem;
+    }
+    
+    .student-info-item {
+        display: flex;
+        padding: 1rem 0;
+        border-bottom: 1px solid #f3f4f6;
+    }
+    
+    .student-info-item:last-child {
+        border-bottom: none;
+    }
+    
+    .student-info-label {
+        flex: 0 0 180px;
+        color: #6b7280;
+        font-weight: 600;
+    }
+    
+    .student-info-value {
+        flex: 1;
+        color: #111827;
+    }
+    
+    .student-stat-box {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        text-align: center;
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    }
+    
+    .student-stat-number {
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+    }
+    
+    .student-stat-label {
+        font-size: 0.875rem;
+        opacity: 0.9;
+    }
+    
+    .student-badge-large {
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 0.875rem;
+    }
+    
+    .student-timeline {
+        position: relative;
+        padding-left: 2rem;
+    }
+    
+    .student-timeline-item {
+        position: relative;
+        padding-bottom: 2rem;
+    }
+    
+    .student-timeline-item::before {
+        content: '';
+        position: absolute;
+        left: -2rem;
+        top: 8px;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: #667eea;
+        border: 3px solid white;
+        box-shadow: 0 0 0 2px #667eea;
+    }
+    
+    .student-timeline-item::after {
+        content: '';
+        position: absolute;
+        left: -1.55rem;
+        top: 20px;
+        width: 2px;
+        height: calc(100% - 20px);
+        background: #e5e7eb;
+    }
+    
+    .student-timeline-item:last-child::after {
+        display: none;
+    }
+    
+    .student-action-button {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    }
+    
+    .student-action-button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+        color: white;
+    }
+    
+    .student-secondary-button {
+        background: white;
+        color: #667eea;
+        border: 2px solid #667eea;
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+    
+    .student-secondary-button:hover {
+        background: #667eea;
+        color: white;
+    }
+</style>
+
+<div class="container-fluid px-4 py-4">
+    <!-- Profile Header -->
+    <div class="student-profile-card">
+        <div class="student-detail-header">
+            <div class="row align-items-center">
+                <div class="col-md-auto text-center text-md-start mb-3 mb-md-0">
+                    {% if student.profile_image %}
+                        <img src="{{ student.profile_image.url }}" class="student-profile-image" alt="{{ student.user.get_full_name }}">
+                    {% else %}
+                        <div class="student-profile-image d-inline-flex align-items-center justify-content-center" 
+                             style="background: rgba(255,255,255,0.2); font-size: 3rem; font-weight: 700;">
+                            {{ student.user.first_name|slice:":1" }}{{ student.user.last_name|slice:":1" }}
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="col-md">
+                    <h2 class="mb-2">{{ student.user.get_full_name }}</h2>
+                    <p class="mb-2 opacity-75">
+                        <i class="bi bi-hash me-2"></i>{{ student.LSA_number }}
+                        <span class="mx-3">|</span>
+                        <i class="bi bi-envelope me-2"></i>{{ student.user.email }}
+                    </p>
+                    <div>
+                        <span class="student-badge-large {% if student.status == 'active' %}bg-success{% elif student.status == 'dormant' %}bg-warning{% else %}bg-secondary{% endif %}">
+                            {{ student.get_status_display }}
+                        </span>
+                        {% if student.current_class %}
+                        <span class="student-badge-large bg-white text-dark ms-2">
+                            <i class="bi bi-book me-1"></i>{{ student.current_class.name }}
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="col-md-auto text-center text-md-end mt-3 mt-md-0">
+                    <div class="d-flex gap-2 flex-wrap justify-content-center justify-content-md-end">
+                        <a href="{% url 'student_update' student.user.id %}" class="btn student-action-button">
+                            <i class="bi bi-pencil me-2"></i>Edit
+                        </a>
+                        <a href="{% url 'student_list' %}" class="btn student-secondary-button">
+                            <i class="bi bi-arrow-left me-2"></i>Back
+                        </a>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="card-body">
-            <h5 class="card-title">{{ student.get_full_name }}</h5>
-            <p class="card-text">
-                <strong>Name:</strong> {{ student.user.get_full_name }}<br>
-                <strong>LSA Number:</strong> {{ student.LSA_number }}<br>
-                <strong>Age:</strong> {{ student.age }}<br>
-                <strong>Gender:</strong> {{ student.get_gender_display }}<br>
-                <strong>Class:</strong> {{ student.current_class.name }}<br>
-                <strong>Guardian:</strong> <a href="{% url 'guardian_detail' student.student_guardian.user.id %}">{{ student.student_guardian.user.get_full_name }}</a><br>
-                <strong>Relationship:</strong> {{ student.relationship }}<br>
-            </p>
-            <div>
-                {% if superuser %}
-                <a href="{% url 'view_enrollments' student.user.id %}" class="btn btn-secondary">View Enrollments</a>
-                {% endif %}
+
+        <!-- Quick Stats -->
+        <div class="p-4">
+            <div class="row g-3">
+                <div class="col-md-3 col-6">
+                    <div class="student-stat-box">
+                        <div class="student-stat-number">{{ student.age }}</div>
+                        <div class="student-stat-label">Years Old</div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-6">
+                    <div class="student-stat-box">
+                        <div class="student-stat-number">
+                            {% if student.result_set.exists %}
+                                {{ student.result_set.first.average_score|floatformat:1 }}%
+                            {% else %}
+                                --
+                            {% endif %}
+                        </div>
+                        <div class="student-stat-label">Avg Score</div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-6">
+                    <div class="student-stat-box">
+                        <div class="student-stat-number">{{ student.attendance_set.count }}</div>
+                        <div class="student-stat-label">Attendance</div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-6">
+                    <div class="student-stat-box">
+                        <div class="student-stat-number">{{ student.assignments_submitted.count }}</div>
+                        <div class="student-stat-label">Assignments</div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
-    {% if superuser %}
-        <a href="{% url 'student_update' student.user.id %}" class="btn btn-warning">Edit</a>
-        <form action="{% url 'student_delete' student.user.id %}" method="POST" style="display:inline;">
-            {% csrf_token %}
-            <button type="submit" class="btn btn-danger" onclick="return confirm('Are you sure you want to delete this student?');">Delete</button>
-        </form>
-        <a href="{% url 'student_list' %}" class="btn btn-secondary">Back to List</a>
-    {% endif %}
-</div>
-<br>
 
+    <!-- Tabs -->
+    <div class="student-detail-tabs mb-4">
+        <ul class="nav nav-pills" id="student-tabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="overview-tab" data-bs-toggle="pill" data-bs-target="#overview" type="button">
+                    <i class="bi bi-person me-2"></i>Overview
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="academic-tab" data-bs-toggle="pill" data-bs-target="#academic" type="button">
+                    <i class="bi bi-book me-2"></i>Academic
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="financial-tab" data-bs-toggle="pill" data-bs-target="#financial" type="button">
+                    <i class="bi bi-cash-coin me-2"></i>Financial
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="history-tab" data-bs-toggle="pill" data-bs-target="#history" type="button">
+                    <i class="bi bi-clock-history me-2"></i>History
+                </button>
+            </li>
+        </ul>
+    </div>
+
+    <!-- Tab Content -->
+    <div class="tab-content" id="student-tabs-content">
+        <!-- Overview Tab -->
+        <div class="tab-pane fade show active" id="overview" role="tabpanel">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="student-info-card">
+                        <h5 class="mb-3">
+                            <i class="bi bi-person-badge me-2 text-primary"></i>
+                            Personal Information
+                        </h5>
+                        <div class="student-info-item">
+                            <div class="student-info-label">Full Name</div>
+                            <div class="student-info-value">{{ student.user.get_full_name }}</div>
+                        </div>
+                        <div class="student-info-item">
+                            <div class="student-info-label">LSA Number</div>
+                            <div class="student-info-value">{{ student.LSA_number }}</div>
+                        </div>
+                        <div class="student-info-item">
+                            <div class="student-info-label">Date of Birth</div>
+                            <div class="student-info-value">{{ student.date_of_birth|date:"F d, Y" }} ({{ student.age }} years)</div>
+                        </div>
+                        <div class="student-info-item">
+                            <div class="student-info-label">Gender</div>
+                            <div class="student-info-value">
+                                {% if student.gender == 'M' %}
+                                    <i class="bi bi-gender-male text-primary"></i> Male
+                                {% else %}
+                                    <i class="bi bi-gender-female text-danger"></i> Female
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="student-info-item">
+                            <div class="student-info-label">Email</div>
+                            <div class="student-info-value">{{ student.user.email }}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="student-info-card">
+                        <h5 class="mb-3">
+                            <i class="bi bi-people me-2 text-primary"></i>
+                            Guardian Information
+                        </h5>
+                        {% if student.student_guardian %}
+                        <div class="student-info-item">
+                            <div class="student-info-label">Guardian Name</div>
+                            <div class="student-info-value">
+                                <a href="{% url 'guardian_detail' student.student_guardian.user.id %}" class="text-decoration-none">
+                                    {{ student.student_guardian.user.get_full_name }}
+                                </a>
+                            </div>
+                        </div>
+                        <div class="student-info-item">
+                            <div class="student-info-label">Relationship</div>
+                            <div class="student-info-value">{{ student.relationship }}</div>
+                        </div>
+                        <div class="student-info-item">
+                            <div class="student-info-label">Contact</div>
+                            <div class="student-info-value">{{ student.student_guardian.contact|default:"Not provided" }}</div>
+                        </div>
+                        <div class="student-info-item">
+                            <div class="student-info-label">Email</div>
+                            <div class="student-info-value">{{ student.student_guardian.user.email }}</div>
+                        </div>
+                        {% else %}
+                        <p class="text-muted">No guardian assigned</p>
+                        {% endif %}
+                    </div>
+
+                    <div class="student-info-card mt-3">
+                        <h5 class="mb-3">
+                            <i class="bi bi-mortarboard me-2 text-primary"></i>
+                            Academic Information
+                        </h5>
+                        <div class="student-info-item">
+                            <div class="student-info-label">Current Class</div>
+                            <div class="student-info-value">
+                                {% if student.current_class %}
+                                    <span class="badge bg-primary">{{ student.current_class.name }}</span>
+                                {% else %}
+                                    <span class="text-muted">Not assigned</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="student-info-item">
+                            <div class="student-info-label">Status</div>
+                            <div class="student-info-value">
+                                <span class="badge {% if student.status == 'active' %}bg-success{% elif student.status == 'dormant' %}bg-warning{% else %}bg-secondary{% endif %}">
+                                    {{ student.get_status_display }}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="student-info-item">
+                            <div class="student-info-label">Date Joined</div>
+                            <div class="student-info-value">{{ student.user.date_joined|date:"F d, Y" }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Academic Tab -->
+        <div class="tab-pane fade" id="academic" role="tabpanel">
+            <div class="student-info-card">
+                <h5 class="mb-4">
+                    <i class="bi bi-trophy me-2 text-primary"></i>
+                    Recent Results
+                </h5>
+                {% if student.result_set.exists %}
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Term</th>
+                                <th>Average Score</th>
+                                <th>Position</th>
+                                <th>GPA</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for result in student.result_set.all|slice:":5" %}
+                            <tr>
+                                <td>{{ result.term }}</td>
+                                <td>{{ result.average_score|floatformat:2 }}%</td>
+                                <td>{{ result.position|default:"--" }}</td>
+                                <td>{{ result.term_gpa|floatformat:2 }}</td>
+                                <td>
+                                    {% if result.is_approved %}
+                                        <span class="badge bg-success">Approved</span>
+                                    {% else %}
+                                        <span class="badge bg-warning">Pending</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted text-center py-4">No results available yet</p>
+                {% endif %}
+            </div>
+
+            <div class="student-info-card mt-3">
+                <h5 class="mb-4">
+                    <i class="bi bi-clipboard-check me-2 text-primary"></i>
+                    Assignments
+                </h5>
+                {% if student.assignments_submitted.exists %}
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Assignment</th>
+                                <th>Subject</th>
+                                <th>Submitted</th>
+                                <th>Score</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for submission in student.assignments_submitted.all|slice:":5" %}
+                            <tr>
+                                <td>{{ submission.assignment.title }}</td>
+                                <td>{{ submission.assignment.subject.name }}</td>
+                                <td>{{ submission.submitted_at|date:"M d, Y" }}</td>
+                                <td>
+                                    {% if submission.score %}
+                                        {{ submission.score }}/{{ submission.assignment.total_score }}
+                                    {% else %}
+                                        <span class="text-muted">Not graded</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted text-center py-4">No assignments submitted yet</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Financial Tab -->
+        <div class="tab-pane fade" id="financial" role="tabpanel">
+            <div class="student-info-card">
+                <h5 class="mb-4">
+                    <i class="bi bi-wallet2 me-2 text-primary"></i>
+                    Fee Records
+                </h5>
+                {% if student.financial_records.exists %}
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Term</th>
+                                <th>Total Fee</th>
+                                <th>Paid</th>
+                                <th>Balance</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for record in student.financial_records.all %}
+                            <tr>
+                                <td>{{ record.term }}</td>
+                                <td>₦{{ record.total_fee|floatformat:2 }}</td>
+                                <td>₦{{ record.total_paid|floatformat:2 }}</td>
+                                <td>₦{{ record.outstanding_balance|floatformat:2 }}</td>
+                                <td>
+                                    {% if record.outstanding_balance <= 0 %}
+                                        <span class="badge bg-success">Paid</span>
+                                    {% else %}
+                                        <span class="badge bg-warning">Owing</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted text-center py-4">No fee records available</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- History Tab -->
+        <div class="tab-pane fade" id="history" role="tabpanel">
+            <div class="student-info-card">
+                <h5 class="mb-4">
+                    <i class="bi bi-clock-history me-2 text-primary"></i>
+                    Class Progression History
+                </h5>
+                <div class="student-timeline">
+                    {% if student.promotion_history %}
+                        {% for entry in student.promotion_history %}
+                        <div class="student-timeline-item">
+                            <div class="fw-semibold">{{ entry.date|date:"F d, Y" }}</div>
+                            <div class="text-muted">{{ entry.action }}</div>
+                            {% if entry.from_class %}
+                            <small class="text-muted">From: {{ entry.from_class }}</small>
+                            {% endif %}
+                            {% if entry.to_class %}
+                            <small class="text-muted d-block">To: {{ entry.to_class }}</small>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <p class="text-muted">No history recorded yet</p>
+                    {% endif %}
+                    
+                    <div class="student-timeline-item">
+                        <div class="fw-semibold">{{ student.user.date_joined|date:"F d, Y" }}</div>
+                        <div class="text-muted">Student Registration</div>
+                        <small class="text-muted">Joined the school</small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}

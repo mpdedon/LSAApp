@@ -15,6 +15,9 @@ from decimal import Decimal
 from django_ckeditor_5.fields import CKEditor5Field
 import json
 
+# Import SystemSettings for global access
+from core.system_settings import SystemSettings
+
 
 # Create your models here.
 
@@ -76,6 +79,10 @@ class ProfileManager(models.Manager):
                 existing.save()
                 return existing
         return super().create(**kwargs)
+    
+    def active_only(self):
+        """Filter to return only active profiles (excludes dormant and left)."""
+        return self.filter(status='active')
 
     @classmethod
     def get_current_session(cls):
@@ -313,6 +320,10 @@ class Student(models.Model):
     current_class = models.ForeignKey('Class', on_delete=models.SET_NULL, null=True, blank=True, related_name='enrolled_students', default=None, db_index=True)
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='active')
     promotion_history = models.TextField(blank=True)  # To store history of movements as JSON
+    
+    # NDPR Compliance - Guardian consent for student data
+    ndpr_consent = models.BooleanField(default=False, verbose_name="NDPR Consent (Guardian)")
+    ndpr_consent_date = models.DateTimeField(null=True, blank=True, verbose_name="Consent Date")
 
     def __str__(self):
         return self.user.get_full_name()
@@ -416,12 +427,35 @@ class Guardian(models.Model):
         ('left', 'Left School'),
     ]
 
+    EDUCATION_CHOICES = [
+        ('Primary', 'Primary Education'),
+        ('SSCE', 'SSCE/WAEC/NECO'),
+        ('OND', 'Ordinary National Diploma (OND)'),
+        ('NCE', 'Nigeria Certificate in Education (NCE)'),
+        ('HND', 'Higher National Diploma (HND)'),
+        ('BSc', "Bachelor's Degree"),
+        ('PGD', 'Postgraduate Diploma (PGD)'),
+        ('MSc', "Master's Degree"),
+        ('PhD', 'Doctorate (PhD)'),
+        ('None', 'No Formal Education'),
+        ('Other', 'Other'),
+    ]
+
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, primary_key=True, related_name='guardian')
     gender = models.CharField(max_length=1, choices=GENDER_CHOICES, default='M')
     profile_image = models.ImageField(upload_to='profile_images/', default='images/default.jpg', null=True, blank=True)
     contact = models.CharField(max_length=15, null=True)
     address = models.TextField()
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='active')
+    
+    # Additional Profile Information
+    nin = models.CharField(max_length=11, null=True, blank=True, unique=True, verbose_name="National Identification Number")
+    occupation = models.CharField(max_length=100, null=True, blank=True, verbose_name="Occupation")
+    highest_education = models.CharField(max_length=50, null=True, blank=True, choices=EDUCATION_CHOICES, verbose_name="Highest Educational Qualification")
+    
+    # NDPR Compliance
+    ndpr_consent = models.BooleanField(default=False, verbose_name="NDPR Consent")
+    ndpr_consent_date = models.DateTimeField(null=True, blank=True, verbose_name="Consent Date")
 
     def student_count(self):
         return self.students.count()  
@@ -446,6 +480,18 @@ class Teacher(models.Model):
         ('left', 'Left School'),
     ]
 
+    EDUCATION_CHOICES = [
+        ('SSCE', 'SSCE/WAEC/NECO'),
+        ('OND', 'Ordinary National Diploma (OND)'),
+        ('NCE', 'Nigeria Certificate in Education (NCE)'),
+        ('HND', 'Higher National Diploma (HND)'),
+        ('BSc', "Bachelor's Degree (BSc/BA/BEd)"),
+        ('PGD', 'Postgraduate Diploma (PGD)'),
+        ('MSc', "Master's Degree (MSc/MA/MEd)"),
+        ('PhD', 'Doctorate (PhD)'),
+        ('Other', 'Other'),
+    ]
+
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE, primary_key=True, related_name='teacher')
     employee_id = models.CharField(max_length=20, unique=True, null=True)
     profile_image = models.ImageField(upload_to='profile_images/', default='images/default.jpg', null=True, blank=True)
@@ -454,6 +500,14 @@ class Teacher(models.Model):
     contact = models.CharField(max_length=15, null=True)
     address = models.TextField()
     status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='active')
+    
+    # Additional Profile Information
+    nin = models.CharField(max_length=11, null=True, blank=True, unique=True, verbose_name="National Identification Number")
+    highest_education = models.CharField(max_length=50, null=True, blank=True, choices=EDUCATION_CHOICES, verbose_name="Highest Educational Qualification")
+    
+    # NDPR Compliance
+    ndpr_consent = models.BooleanField(default=False, verbose_name="NDPR Consent")
+    ndpr_consent_date = models.DateTimeField(null=True, blank=True, verbose_name="Consent Date")
 
     def current_classes(self):
         """Retrieve all classes where the teacher is a form teacher."""
@@ -540,20 +594,49 @@ class Class(models.Model):
     students = models.ManyToManyField('Student', related_name='classes', blank=True)
     order = models.PositiveIntegerField(null=True, blank=True, unique=True)
 
-    def form_teacher(self):
-        """Retrieve the teacher who is the form teacher for this class."""
+    def form_teacher(self, session=None, term=None):
+        """Retrieve the teacher who is the form teacher for this class in a specific session/term.
+        Falls back to the most recent assignment in the same session if term-specific assignment doesn't exist."""
         try:
-            # Use select_related to fetch related teacher and user efficiently in one go
+            from core.models import TeacherAssignment
+            
+            # First, try to find assignment for specific session AND term
+            if session and term:
+                form_teacher_assignment = TeacherAssignment.objects.select_related('teacher__user').filter(
+                    class_assigned=self,
+                    is_form_teacher=True,
+                    session=session,
+                    term=term
+                ).first()
+                
+                if form_teacher_assignment:
+                    return form_teacher_assignment.teacher
+                
+                # Fallback: Find most recent assignment in the same session (any term)
+                form_teacher_assignment = TeacherAssignment.objects.select_related('teacher__user', 'term').filter(
+                    class_assigned=self,
+                    is_form_teacher=True,
+                    session=session
+                ).order_by('-term__order').first()
+                
+                if form_teacher_assignment:
+                    return form_teacher_assignment.teacher
+                else:
+                    return None
+            
+            # If no session/term provided, get any form teacher assignment
             form_teacher_assignment = TeacherAssignment.objects.select_related('teacher__user').filter(
                 class_assigned=self,
                 is_form_teacher=True
-            ).first()
+            ).order_by('-session__start_date', '-term__order').first()
+            
             return form_teacher_assignment.teacher if form_teacher_assignment else None
-        except NameError: # Handle case where TeacherAssignment is not defined/imported
-             print("Warning: TeacherAssignment model not found or imported.")
+            
+        except NameError:
              return None
-        except AttributeError: # Handle case where teacher or user is missing
-             print("Warning: Teacher or User missing for form teacher assignment.")
+        except AttributeError:
+             return None
+        except Exception:
              return None
     
     def next_class(self):
@@ -1721,3 +1804,142 @@ class Post(models.Model):
     def increment_views(self):
         self.views_count += 1
         self.save(update_fields=['views_count']) # Save only this field to avoid triggering other save logic/signals
+
+
+class ActivityLog(models.Model):
+    """
+    Tracks user activities across the platform for monitoring and analytics.
+    """
+    ACTIVITY_TYPES = [
+        # Teacher Activities
+        ('attendance_marked', 'Marked Attendance'),
+        ('assessment_created', 'Created Assessment'),
+        ('exam_created', 'Created Exam'),
+        ('assignment_created', 'Created Assignment'),
+        ('score_uploaded', 'Uploaded Student Scores'),
+        ('result_approved', 'Approved Results'),
+        ('course_created', 'Created LMS Course'),
+        ('course_updated', 'Updated LMS Course'),
+        ('content_uploaded', 'Uploaded Course Content'),
+        
+        # Guardian Activities
+        ('guardian_login', 'Guardian Logged In'),
+        ('view_student_results', 'Viewed Student Results'),
+        ('view_attendance', 'Viewed Attendance'),
+        ('view_fees', 'Viewed Fee Records'),
+        ('message_sent', 'Sent Message'),
+        ('payment_made', 'Made Payment'),
+        
+        # Student Activities
+        ('student_login', 'Student Logged In'),
+        ('assignment_submitted', 'Submitted Assignment'),
+        ('assessment_submitted', 'Submitted Assessment'),
+        ('exam_submitted', 'Submitted Exam'),
+        ('course_viewed', 'Viewed Course'),
+        ('course_enrolled', 'Enrolled in Course'),
+        ('lesson_completed', 'Completed Lesson'),
+        ('result_viewed', 'Viewed Results'),
+        
+        # General Activities
+        ('login', 'User Logged In'),
+        ('logout', 'User Logged Out'),
+        ('profile_updated', 'Updated Profile'),
+    ]
+    
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='activity_logs')
+    activity_type = models.CharField(max_length=50, choices=ACTIVITY_TYPES)
+    description = models.TextField(blank=True)
+    
+    # Related objects (optional - for linking to specific records)
+    related_model = models.CharField(max_length=100, blank=True, help_text="Model name (e.g., 'Assessment', 'Attendance')")
+    related_id = models.PositiveIntegerField(null=True, blank=True, help_text="ID of the related object")
+    
+    # Metadata
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True)
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['-created_at', 'user']),
+            models.Index(fields=['activity_type', '-created_at']),
+            models.Index(fields=['user', 'activity_type']),
+        ]
+    
+    def __str__(self):
+        return f"{self.user.get_full_name()} - {self.get_activity_type_display()} at {self.created_at}"
+    
+    @property
+    def week_number(self):
+        """Get the week number within the active term"""
+        from core.models import Term
+        active_term = Term.objects.filter(is_active=True).first()
+        if active_term and active_term.start_date:
+            delta = self.created_at.date() - active_term.start_date
+            return (delta.days // 7) + 1
+        return None
+    
+    @property
+    def user_class(self):
+        """Get the class of the user (for teachers and students)"""
+        try:
+            if hasattr(self.user, 'teacher'):
+                # Get classes the teacher is assigned to
+                from core.models import TeacherAssignment
+                assignments = TeacherAssignment.objects.filter(
+                    teacher=self.user.teacher,
+                    is_active=True
+                ).select_related('class_assigned')
+                if assignments.exists():
+                    classes = [a.class_assigned.name for a in assignments[:3]]
+                    return ', '.join(classes) if classes else 'No class assigned'
+                return 'No class assigned'
+            elif hasattr(self.user, 'student'):
+                # Get current enrollment
+                from core.models import Enrollment, Term
+                active_term = Term.objects.filter(is_active=True).first()
+                if active_term:
+                    enrollment = Enrollment.objects.filter(
+                        student=self.user.student,
+                        term=active_term,
+                        is_active=True
+                    ).select_related('class_enrolled').first()
+                    if enrollment:
+                        return enrollment.class_enrolled.name
+                return 'Not enrolled'
+        except:
+            pass
+        return None
+    
+    @property
+    def guardian_context(self):
+        """Get guardian's ward information"""
+        try:
+            if hasattr(self.user, 'guardian'):
+                students = self.user.guardian.student_set.all()
+                if students.exists():
+                    # Get students and their classes
+                    from core.models import Enrollment, Term
+                    active_term = Term.objects.filter(is_active=True).first()
+                    wards = []
+                    for student in students[:3]:  # Limit to 3
+                        if active_term:
+                            enrollment = Enrollment.objects.filter(
+                                student=student,
+                                term=active_term,
+                                is_active=True
+                            ).select_related('class_enrolled').first()
+                            if enrollment:
+                                wards.append(f"{student.user.get_full_name()} ({enrollment.class_enrolled.name})")
+                            else:
+                                wards.append(student.user.get_full_name())
+                        else:
+                            wards.append(student.user.get_full_name())
+                    return ', '.join(wards) if wards else 'No wards'
+                return 'No wards'
+        except:
+            pass
+        return None

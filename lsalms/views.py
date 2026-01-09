@@ -672,7 +672,8 @@ class LMSAdminDashboardView(LoginRequiredMixin, UserPassesTestMixin, TemplateVie
         context['total_enrollments'] = active_enrollment_count
         
         context['online_academy_students'] = Student.objects.filter(
-            lsalms_enrollments__course__course_type=Course.CourseType.EXTERNAL
+            lsalms_enrollments__course__course_type=Course.CourseType.EXTERNAL,
+            status='active'
         ).distinct().count()
 
         # --- 2. Full Course Management List (with Search & Pagination) ---
@@ -692,7 +693,9 @@ class LMSAdminDashboardView(LoginRequiredMixin, UserPassesTestMixin, TemplateVie
         context['all_courses'] = paginator.get_page(page_number)
 
         # --- 3. Student Performance Leaderboard (with Final Grades) ---
-        top_students_qs = Student.objects.annotate(
+        top_students_qs = Student.objects.filter(
+            status='active'
+        ).annotate(
             average_lms_grade=Avg('lsalms_enrollments__grade_report__final_score')
         ).filter(average_lms_grade__isnull=False).order_by('-average_lms_grade')
         
@@ -700,7 +703,8 @@ class LMSAdminDashboardView(LoginRequiredMixin, UserPassesTestMixin, TemplateVie
 
         context['at_risk_students'] = Student.objects.filter(
             lsalms_enrollments__isnull=False, 
-            lsalms_enrollments__lesson_progress__isnull=True
+            lsalms_enrollments__lesson_progress__isnull=True,
+            status='active'
         ).distinct()[:5]
 
         # --- 4. Recent Activity Feed ---
@@ -856,8 +860,8 @@ class CourseSubscriptionConfirmView(LoginRequiredMixin, DetailView):
 def subscribe_to_course_view(request, course_id):
     """
     This view handles the final enrollment action after confirmation.
-    In a real app, this would be where payment gateway logic is integrated.
-    For the MVP, it simulates a successful payment and creates the enrollment.
+    For paid courses: Payment gateway logic should be integrated.
+    For free courses: Auto-enroll any authenticated user.
     """
     course = get_object_or_404(Course, pk=course_id, course_type=Course.CourseType.EXTERNAL)
     
@@ -868,12 +872,20 @@ def subscribe_to_course_view(request, course_id):
 
     student = request.user.student
     
-    # --- PAYMENT GATEWAY INTEGRATION WOULD GO HERE ---
-    # 1. Initiate payment with Paystack/Stripe for course.subscription_fee.
-    # 2. On successful payment callback from the gateway, execute the logic below.
-    # ---
+    # Check if course is paid or free
+    is_paid_course = course.is_subscription_based
     
-    # --- MVP SIMULATION: Assume payment was successful ---
+    if is_paid_course:
+        # --- PAYMENT GATEWAY INTEGRATION WOULD GO HERE ---
+        # 1. Initiate payment with Paystack/Stripe for course subscription.
+        # 2. On successful payment callback from the gateway, execute the enrollment logic below.
+        # ---
+        
+        # --- MVP SIMULATION: Assume payment was successful for paid courses ---
+        messages.warning(request, f"Payment processing for '{course.title}' would happen here. For now, you've been enrolled as a test.")
+    
+    # For both free and paid courses, create the enrollment
+    # (In production, paid course enrollment would only happen after payment confirmation)
     
     # Calculate subscription end date (e.g., 365 days of access)
     subscription_duration = timedelta(days=365)
@@ -887,8 +899,12 @@ def subscribe_to_course_view(request, course_id):
     )
     
     if created:
-        messages.success(request, f"Congratulations! You have successfully enrolled in '{course.title}'.")
+        if is_paid_course:
+            messages.success(request, f"Congratulations! You have successfully subscribed to '{course.title}'.")
+        else:
+            messages.success(request, f"Congratulations! You have successfully enrolled in '{course.title}' for free!")
     else:
-        messages.info(request, f"Your subscription for '{course.title}' has been renewed or updated.")
+        messages.info(request, f"Your access to '{course.title}' has been renewed or updated.")
         
-    return redirect('student_dashboard')
+    # Redirect to the course detail page in the LMS (authenticated course view)
+    return redirect('lsalms:course_detail', slug=course.slug)

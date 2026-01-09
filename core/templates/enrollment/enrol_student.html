@@ -1,14 +1,339 @@
-{% extends 'base.html' %}
-
-{% block title %}Assign Student to Class{% endblock %}
+{% extends 'base_admin_sidebar.html' %}
+{% load static %}
 
 {% block content %}
-<div class="container mt-5">
-    <h2 class="text-center mb-4">Assign Student to Class</h2>
-    <form method="POST">
-        {% csrf_token %}
-        {{ form.as_p }}
-        <button type="submit" class="btn btn-primary">Assign Student</button>
-    </form>
+<style>
+    /* Enrollment - Purple Theme */
+    .enroll-header {
+        background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+        color: white;
+        padding: 2rem;
+        border-radius: 15px 15px 0 0;
+        margin: -1rem -1rem 0 -1rem;
+    }
+    
+    .enroll-card {
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        overflow: hidden;
+        margin-bottom: 2rem;
+    }
+    
+    .enroll-btn-primary {
+        background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+        border: none;
+        color: white;
+        font-weight: 600;
+        padding: 0.75rem 2rem;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 12px rgba(139, 92, 246, 0.3);
+    }
+    
+    .enroll-btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(139, 92, 246, 0.4);
+        color: white;
+    }
+    
+    .enroll-btn-secondary {
+        background: white;
+        border: 2px solid #8b5cf6;
+        color: #8b5cf6;
+        font-weight: 600;
+        padding: 0.75rem 2rem;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+    }
+    
+    .enroll-btn-secondary:hover {
+        background: #f5f3ff;
+        transform: translateY(-2px);
+    }
+    
+    .form-control:focus, .form-select:focus {
+        border-color: #8b5cf6;
+        box-shadow: 0 0 0 0.25rem rgba(139, 92, 246, 0.15);
+    }
+    
+    .form-label {
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 0.5rem;
+    }
+    
+    .form-control, .form-select {
+        border: 2px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 0.75rem;
+        transition: all 0.3s ease;
+    }
+    
+    .form-control:hover, .form-select:hover {
+        border-color: #c4b5fd;
+    }
+    
+    .info-box {
+        background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+        border-left: 4px solid #3b82f6;
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 1.5rem;
+    }
+    
+    .success-message {
+        background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
+        border-left: 4px solid #10b981;
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 1.5rem;
+    }
+    
+    .error-message {
+        background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+        border-left: 4px solid #ef4444;
+        padding: 1rem;
+        border-radius: 8px;
+        margin-bottom: 1.5rem;
+    }
+    
+    .required-field::after {
+        content: " *";
+        color: #ef4444;
+    }
+    
+    .form-text {
+        color: #6b7280;
+        font-size: 0.875rem;
+        margin-top: 0.25rem;
+    }
+    
+    .step-indicator {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 2rem;
+    }
+    
+    .step {
+        flex: 1;
+        text-align: center;
+        padding: 1rem;
+        background: #f3f4f6;
+        border-radius: 8px;
+        margin: 0 0.5rem;
+        position: relative;
+    }
+    
+    .step.active {
+        background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
+        color: white;
+        font-weight: 600;
+    }
+    
+    .step::after {
+        content: '';
+        position: absolute;
+        right: -1rem;
+        top: 50%;
+        transform: translateY(-50%);
+        width: 0;
+        height: 0;
+        border-top: 20px solid transparent;
+        border-bottom: 20px solid transparent;
+        border-left: 20px solid #f3f4f6;
+    }
+    
+    .step.active::after {
+        border-left-color: #7c3aed;
+    }
+    
+    .step:last-child::after {
+        display: none;
+    }
+</style>
+
+<div class="container-fluid px-4 py-4">
+    <div class="enroll-card">
+        <div class="enroll-header">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h2 class="mb-2">
+                        <i class="bi bi-person-plus-fill me-2"></i>Student Enrollment
+                    </h2>
+                    <p class="mb-0 opacity-75">Assign students to classes for academic sessions</p>
+                </div>
+                <div class="col-md-4 text-end">
+                    <a href="{% url 'student_list' %}" class="btn enroll-btn-secondary">
+                        <i class="bi bi-arrow-left me-2"></i>Back to Students
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="p-4">
+            <!-- Info Box -->
+            <div class="info-box">
+                <div class="d-flex align-items-start">
+                    <i class="bi bi-info-circle-fill text-primary fs-4 me-3"></i>
+                    <div>
+                        <strong>Enrollment Guidelines:</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>Ensure the student has a valid account before enrollment</li>
+                            <li>Select the appropriate class, session, and term</li>
+                            <li>Students can be enrolled in multiple classes across different terms</li>
+                            <li>Mark enrollment as active to enable access to class materials</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Messages -->
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="{% if message.tags == 'success' %}success-message{% elif message.tags == 'error' %}error-message{% else %}info-box{% endif %}">
+                        <i class="bi {% if message.tags == 'success' %}bi-check-circle-fill{% elif message.tags == 'error' %}bi-exclamation-circle-fill{% else %}bi-info-circle-fill{% endif %} me-2"></i>
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+            <!-- Enrollment Form -->
+            <form method="POST" id="enrollmentForm" class="needs-validation" novalidate>
+                {% csrf_token %}
+                
+                <div class="row g-4">
+                    <!-- Student Selection -->
+                    <div class="col-md-6">
+                        <label for="{{ form.student.id_for_label }}" class="form-label required-field">
+                            <i class="bi bi-person me-2"></i>Select Student
+                        </label>
+                        {{ form.student }}
+                        {% if form.student.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.student.errors.0 }}
+                            </div>
+                        {% endif %}
+                        <div class="form-text">Choose the student to enroll in the class</div>
+                    </div>
+
+                    <!-- Class Selection -->
+                    <div class="col-md-6">
+                        <label for="{{ form.class_enrolled.id_for_label }}" class="form-label required-field">
+                            <i class="bi bi-building me-2"></i>Select Class
+                        </label>
+                        {{ form.class_enrolled }}
+                        {% if form.class_enrolled.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.class_enrolled.errors.0 }}
+                            </div>
+                        {% endif %}
+                        <div class="form-text">The class the student will be assigned to</div>
+                    </div>
+
+                    <!-- Session Selection -->
+                    <div class="col-md-6">
+                        <label for="{{ form.session.id_for_label }}" class="form-label required-field">
+                            <i class="bi bi-calendar-range me-2"></i>Academic Session
+                        </label>
+                        {{ form.session }}
+                        {% if form.session.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.session.errors.0 }}
+                            </div>
+                        {% endif %}
+                        <div class="form-text">The academic year for this enrollment</div>
+                    </div>
+
+                    <!-- Term Selection -->
+                    <div class="col-md-6">
+                        <label for="{{ form.term.id_for_label }}" class="form-label required-field">
+                            <i class="bi bi-calendar-week me-2"></i>Academic Term
+                        </label>
+                        {{ form.term }}
+                        {% if form.term.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.term.errors.0 }}
+                            </div>
+                        {% endif %}
+                        <div class="form-text">The specific term within the session</div>
+                    </div>
+
+                    <!-- Active Status -->
+                    <div class="col-12">
+                        <div class="form-check form-switch">
+                            {{ form.is_active }}
+                            <label class="form-check-label" for="{{ form.is_active.id_for_label }}">
+                                <i class="bi bi-toggle-on me-2"></i><strong>Active Enrollment</strong>
+                                <span class="form-text d-block">Enable this to give the student immediate access to class resources</span>
+                            </label>
+                        </div>
+                        {% if form.is_active.errors %}
+                            <div class="invalid-feedback d-block">
+                                {{ form.is_active.errors.0 }}
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <!-- Form Actions -->
+                <div class="d-flex justify-content-between align-items-center mt-5 pt-4 border-top">
+                    <a href="{% url 'student_list' %}" class="btn enroll-btn-secondary">
+                        <i class="bi bi-x-circle me-2"></i>Cancel
+                    </a>
+                    <button type="submit" class="btn enroll-btn-primary" id="submitBtn">
+                        <i class="bi bi-check-circle me-2"></i>Enroll Student
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
 </div>
+
+<script>
+    // Form validation
+    (function () {
+        'use strict'
+        var forms = document.querySelectorAll('.needs-validation')
+        Array.prototype.slice.call(forms).forEach(function (form) {
+            form.addEventListener('submit', function (event) {
+                if (!form.checkValidity()) {
+                    event.preventDefault()
+                    event.stopPropagation()
+                }
+                form.classList.add('was-validated')
+            }, false)
+        })
+    })()
+
+    // Add form-control classes to Django form fields
+    document.addEventListener('DOMContentLoaded', function() {
+        const selects = document.querySelectorAll('select');
+        selects.forEach(select => {
+            if (!select.classList.contains('form-select')) {
+                select.classList.add('form-select');
+            }
+        });
+
+        const checkboxes = document.querySelectorAll('input[type="checkbox"]');
+        checkboxes.forEach(checkbox => {
+            if (!checkbox.classList.contains('form-check-input')) {
+                checkbox.classList.add('form-check-input');
+            }
+        });
+
+        // Dynamic class info on selection
+        const classSelect = document.getElementById('{{ form.class_enrolled.id_for_label }}');
+        if (classSelect) {
+            classSelect.addEventListener('change', function() {
+                const submitBtn = document.getElementById('submitBtn');
+                if (this.value) {
+                    submitBtn.innerHTML = '<i class="bi bi-check-circle me-2"></i>Enroll in ' + this.options[this.selectedIndex].text;
+                } else {
+                    submitBtn.innerHTML = '<i class="bi bi-check-circle me-2"></i>Enroll Student';
+                }
+            });
+        }
+    });
+</script>
 {% endblock %}

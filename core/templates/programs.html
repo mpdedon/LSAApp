@@ -148,151 +148,571 @@
 </script>
 {% endblock %}
 
-
 {% block content %}
-<section class="page-header py-5 text-center text-white bg-success">
-    <div class="container">
-        <h1 class="display-5 fw-bold">Our Educational Programs</h1>
-        <p class="lead col-lg-8 mx-auto">Discover how LearnSwift Academia nurtures well-rounded individuals through a unique blend of faith-based values, academic rigor, and practical skills.</p>
-    </div>
-</section>
+<style>
+  /* 🎨 CYBERPUNK DESIGN SYSTEM */
+  :root {
+    --cyan: #06b6d4;
+    --purple: #8b5cf6;
+    --pink: #ec4899;
+    --emerald: #10b981;
+    --deep-navy: #0f172a;
+    --slate-900: #0f172a;
+    --slate-800: #1e293b;
+    --slate-700: #334155;
+  }
 
-<section class="py-5">
-  <div class="container programs-container">
+  /* Particle Background */
+  #particles-programs {
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    z-index: 0;
+    background: linear-gradient(135deg, var(--deep-navy) 0%, #1a1a2e 100%);
+    pointer-events: none;
+  }
 
-    {# Program 1: LearnSwift Academia #}
-    <div class="program-item card mb-5 shadow-sm overflow-hidden">
-      <div class="row g-0">
-        <div class="col-md-5">
-           {# IMAGE PROMPT: "Students in uniform engaged in a combined Islamic and Western studies class at LearnSwift Academia" #}
-           <img src="{% static 'images/school.jpeg' %}" alt="LearnSwift Academia Primary and Secondary School students learning" class="img-fluid program-image"/>
-        </div>
-        <div class="col-md-7 d-flex align-items-center">
-          <div class="card-body p-4">
-            <h3 class="fw-bold card-title text-success mb-3">1. LearnSwift Academia (Primary & Secondary)</h3>
-            <p class="card-text text-muted">
-              Our core program integrates a standard Western curriculum with comprehensive Islamic studies. Students excel academically while strengthening their identity and moral compass through Quran, Hadith, and Fiqh.
-            </p>
-            <h6 class="fw-semibold mt-3">Key Outcomes:</h6>
-            <ul class="list-styled">
-              <li><i class="fas fa-certificate text-primary me-2"></i>Official Certificates (Common Entrance, BECE, WAEC, NECO).</li>
-              <li><i class="fas fa-brain text-primary me-2"></i>Strong academic foundation & critical thinking skills.</li>
-              <li><i class="fas fa-heart text-primary me-2"></i>Solid grounding in Islamic values and character (Akhlaq).</li>
-              <li><i class="fas fa-users text-primary me-2"></i>Development of leadership potential and social responsibility.</li>
-            </ul>
-            <a href="#" class="btn btn-outline-success mt-3">Learn More & Apply</a> {# Link to specific page/admission #}
-          </div>
-        </div>
-      </div>
-    </div>
+  body {
+    position: relative;
+  }
 
-    {# Program 2: Swift Aleem Academy #}
-    <div class="program-item card mb-5 shadow-sm overflow-hidden">
-      <div class="row g-0 flex-md-row-reverse"> {# Reversed layout #}
-        <div class="col-md-5">
-          {# IMAGE PROMPT: "Students diligently studying Quran or Arabic texts in a traditional Madrasah setting within LearnSwift" #}
-           <img src="{% static 'images/madrasah.jpeg' %}" alt="Swift Aleem Academy students studying Arabic and Islamic Sciences" class="img-fluid program-image"/>
-        </div>
-        <div class="col-md-7 d-flex align-items-center">
-          <div class="card-body p-4">
-            <h3 class="fw-bold card-title text-success mb-3">2. Swift Aleem Academy (Arabic & Islamic Studies)</h3>
-            <p class="card-text text-muted">
-              For students seeking deeper religious knowledge, this track offers intensive study of Arabic language (Nahw, Sarf, Balagha), Quran memorization (Hifz) and recitation (Tajweed), Hadith, Fiqh, and Seerah.
-            </p>
-             <h6 class="fw-semibold mt-3">Key Outcomes:</h6>
-             <ul class="list-styled">
-                <li><i class="fas fa-quran text-primary me-2"></i>Proficiency in Quran memorization and Tajweed.</li>
-                <li><i class="fas fa-language text-primary me-2"></i>Mastery of classical and modern standard Arabic.</li>
-                <li><i class="fas fa-book-open text-primary me-2"></i>In-depth understanding of core Islamic sciences.</li>
-                <li><i class="fas fa-mosque text-primary me-2"></i>Strengthened spiritual connection and practice.</li>
-             </ul>
-            <a href="#" class="btn btn-outline-success mt-3">Explore This Track</a>
-          </div>
-        </div>
-      </div>
-    </div>
+  /* Programs Hero */
+  .programs-hero {
+    position: relative;
+    z-index: 1;
+    padding: clamp(4rem, 12vh, 8rem) 0 clamp(3rem, 8vh, 6rem);
+    background: linear-gradient(180deg, rgba(236, 72, 153, 0.1) 0%, transparent 100%);
+    overflow: hidden;
+  }
 
-    {# Program 3: Vocational Academy #}
-     <div class="program-item card mb-5 shadow-sm overflow-hidden">
-      <div class="row g-0">
-        <div class="col-md-5">
-          {# IMAGE PROMPT: "Students learning a vocational skill like fashion design or electronics repair at LearnSwift Academy" #}
-           <img src="{% static 'images/vocational.jpg' %}" alt="Students learning hands-on vocational skills at LearnSwift" class="img-fluid program-image"/>
-        </div>
-        <div class="col-md-7 d-flex align-items-center">
-          <div class="card-body p-4">
-            <h3 class="fw-bold card-title text-success mb-3">3. Vocational Academy (Embedded)</h3>
-            <p class="card-text text-muted">
-              Integrated within our main school, this program equips students with practical, income-generating skills. Choose from tracks like Fashion Design, ICT Essentials, Basic Electronics, Culinary Arts, and more.
-            </p>
-            <h6 class="fw-semibold mt-3">Key Outcomes:</h6>
-            <ul class="list-styled">
-                <li><i class="fas fa-tools text-primary me-2"></i>Certification in a chosen vocational trade.</li>
-                <li><i class="fas fa-lightbulb text-primary me-2"></i>Development of practical, hands-on expertise.</li>
-                <li><i class="fas fa-briefcase text-primary me-2"></i>Entrepreneurial skills and mindset.</li>
-                <li><i class="fas fa-hand-holding-usd text-primary me-2"></i>Pathways to self-reliance and job creation.</li>
-            </ul>
-             <a href="#" class="btn btn-outline-success mt-3">Discover Trade Options</a>
-          </div>
-        </div>
-      </div>
-    </div>
+  .programs-hero::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--cyan), var(--purple), var(--pink), transparent);
+    animation: shimmer 3s linear infinite;
+  }
 
-    {# Program 4: Coding Academy #}
-    <div class="program-item card mb-5 shadow-sm overflow-hidden">
-       <div class="row g-0 flex-md-row-reverse"> {# Reversed layout #}
-        <div class="col-md-5">
-           {# IMAGE PROMPT: "Teenage students looking focused while coding on laptops in a tech lab at LearnSwift Academy" #}
-           <img src="{% static 'images/coding.jpg' %}" alt="LearnSwift Coding Academy students learning programming" class="img-fluid program-image"/>
-        </div>
-        <div class="col-md-7 d-flex align-items-center">
-          <div class="card-body p-4">
-            <h3 class="fw-bold card-title text-success mb-3">4. Coding Academy (Specialized)</h3>
-            <p class="card-text text-muted">
-              Prepare for the digital future with our dedicated Coding Academy. We offer courses in web development (HTML, CSS, JavaScript, Python/Django), mobile app development, UI/UX design, and data basics.
-            </p>
-             <h6 class="fw-semibold mt-3">Key Outcomes:</h6>
-             <ul class="list-styled">
-                <li><i class="fas fa-code text-primary me-2"></i>Proficiency in multiple programming languages/stacks.</li>
-                <li><i class="fas fa-laptop-code text-primary me-2"></i>Ability to build websites and applications.</li>
-                <li><i class="fas fa-project-diagram text-primary me-2"></i>Strong problem-solving and logical thinking skills.</li>
-                <li><i class="fas fa-file-code text-primary me-2"></i>Portfolio of completed tech projects.</li>
-             </ul>
-            <a href="#" class="btn btn-outline-success mt-3">View Coding Courses</a>
-          </div>
-        </div>
-      </div>
-    </div>
+  @keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+  }
 
-    {# Program 5: LearnSwift Online Academy #}
-     <div class="program-item card mb-5 shadow-sm overflow-hidden">
-      <div class="row g-0">
-        <div class="col-md-5">
-           {# IMAGE PROMPT: "Screenshot of the LearnSwift Online Academy interface or a student learning online happily" #}
-           <img src="{% static 'images/online.jpg' %}" alt="LearnSwift Online Academy virtual learning platform" class="img-fluid program-image"/>
-        </div>
-        <div class="col-md-7 d-flex align-items-center">
-          <div class="card-body p-4">
-            <h3 class="fw-bold card-title text-success mb-3">5. LearnSwift Online Academy</h3>
-            <p class="card-text text-muted">
-              Access quality Islamic and academic education from anywhere. Our online platform offers flexible, interactive learning experiences mirroring our on-campus programs, perfect for remote students.
-            </p>
-             <h6 class="fw-semibold mt-3">Key Outcomes:</h6>
-             <ul class="list-styled">
-                <li><i class="fas fa-globe text-primary me-2"></i>Access to quality education regardless of location.</li>
-                <li><i class="fas fa-clock text-primary me-2"></i>Flexible learning schedule and self-paced options.</li>
-                <li><i class="fas fa-video text-primary me-2"></i>Engaging virtual classrooms and resources.</li>
-                <li><i class="fas fa-check-double text-primary me-2"></i>Accredited online certificates.</li>
-            </ul>
-            <a href="{% url 'lsalms:academy_hub' %}" class="btn btn-outline-success mt-3">Explore Online Learning</a>
-          </div>
-        </div>
-      </div>
-    </div>
+  .programs-hero h1 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: clamp(2.5rem, 6vw, 4rem);
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--pink), var(--purple), var(--cyan));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 1.5rem;
+  }
 
+  .programs-hero p {
+    color: #cbd5e1;
+    font-size: clamp(1rem, 2vw, 1.25rem);
+    max-width: 900px;
+    margin: 0 auto;
+  }
+
+  /* Programs Container */
+  .programs-container {
+    position: relative;
+    z-index: 1;
+    padding: clamp(3rem, 8vh, 6rem) 0;
+  }
+
+  /* Program Card */
+  .program-card {
+    background: rgba(30, 41, 59, 0.7);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(139, 92, 246, 0.2);
+    border-radius: 24px;
+    overflow: hidden;
+    margin-bottom: clamp(2.5rem, 5vw, 4rem);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+  }
+
+  .program-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: linear-gradient(90deg, var(--cyan), var(--purple), var(--pink));
+    opacity: 0;
+    transition: opacity 0.3s ease;
+  }
+
+  .program-card:hover::before {
+    opacity: 1;
+  }
+
+  .program-card:hover {
+    transform: translateY(-8px);
+    border-color: rgba(139, 92, 246, 0.4);
+    box-shadow: 0 25px 70px rgba(139, 92, 246, 0.3);
+  }
+
+  /* Program Image */
+  .program-image-wrapper {
+    position: relative;
+    overflow: hidden;
+    height: 100%;
+    min-height: 350px;
+  }
+
+  .program-image {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    filter: brightness(0.85) saturate(1.2);
+  }
+
+  .program-card:hover .program-image {
+    transform: scale(1.05);
+    filter: brightness(1) saturate(1.4);
+  }
+
+  .program-image-wrapper::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(180deg, transparent 0%, rgba(15, 23, 42, 0.4) 100%);
+  }
+
+  /* Program Content */
+  .program-content {
+    padding: clamp(2rem, 4vw, 3rem);
+  }
+
+  .program-number {
+    display: inline-block;
+    width: 40px;
+    height: 40px;
+    background: linear-gradient(135deg, var(--cyan), var(--purple));
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    color: white;
+    margin-bottom: 1rem;
+    font-size: 1.1rem;
+  }
+
+  .program-title {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: clamp(1.5rem, 3vw, 2rem);
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--cyan), var(--purple));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin-bottom: 1rem;
+  }
+
+  .program-card:nth-child(2) .program-title {
+    background: linear-gradient(135deg, var(--emerald), var(--cyan));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .program-card:nth-child(3) .program-title {
+    background: linear-gradient(135deg, var(--pink), var(--purple));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .program-card:nth-child(4) .program-title {
+    background: linear-gradient(135deg, var(--purple), var(--pink));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .program-card:nth-child(5) .program-title {
+    background: linear-gradient(135deg, var(--cyan), var(--emerald));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .program-description {
+    color: #cbd5e1;
+    font-size: clamp(1rem, 1.8vw, 1.1rem);
+    line-height: 1.7;
+    margin-bottom: 1.5rem;
+  }
+
+  .program-outcomes {
+    margin-top: 1.5rem;
+  }
+
+  .program-outcomes h6 {
+    color: #e2e8f0;
+    font-weight: 600;
+    font-size: 1.05rem;
+    margin-bottom: 1rem;
+  }
+
+  .program-outcomes ul {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .program-outcomes li {
+    color: #cbd5e1;
+    padding: 0.75rem 0;
+    font-size: 0.95rem;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .program-outcomes li i {
+    color: var(--cyan);
+    margin-top: 0.25rem;
+    font-size: 1rem;
+  }
+
+  .program-card:nth-child(2) .program-outcomes li i {
+    color: var(--emerald);
+  }
+
+  .program-card:nth-child(3) .program-outcomes li i {
+    color: var(--pink);
+  }
+
+  .program-card:nth-child(4) .program-outcomes li i {
+    color: var(--purple);
+  }
+
+  .program-card:nth-child(5) .program-outcomes li i {
+    color: var(--cyan);
+  }
+
+  /* Program CTA Button */
+  .btn-program {
+    background: linear-gradient(135deg, var(--cyan), var(--purple));
+    border: none;
+    border-radius: 12px;
+    padding: 0.875rem 2rem;
+    font-weight: 600;
+    font-size: 0.95rem;
+    color: white;
+    text-decoration: none;
+    display: inline-block;
+    margin-top: 1.5rem;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s ease;
+  }
+
+  .btn-program::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    transition: left 0.5s ease;
+  }
+
+  .btn-program:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 30px rgba(6, 182, 212, 0.4);
+    color: white;
+  }
+
+  .btn-program:hover::before {
+    left: 100%;
+  }
+
+  /* Scroll Reveal Animation */
+  .reveal {
+    opacity: 0;
+    transform: translateY(30px);
+    transition: all 0.8s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .reveal.active {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* Footer Fix */
+  footer.footer-section {
+    position: relative;
+    z-index: 10;
+    margin-top: 0;
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .programs-hero {
+      padding: 4rem 0 3rem;
+    }
+
+    .program-image-wrapper {
+      min-height: 250px;
+    }
+
+    .program-content {
+      padding: 1.5rem;
+    }
+
+    .program-card {
+      margin-bottom: 2rem;
+    }
+
+    .btn-program {
+      width: 100%;
+      text-align: center;
+    }
+  }
+
+  @media (max-width: 480px) {
+    .program-image-wrapper {
+      min-height: 220px;
+    }
+  }
+</style>
+
+<div id="particles-programs"></div>
+
+<div id="particles-programs"></div>
+
+<!-- Hero Section -->
+<section class="programs-hero">
+  <div class="container text-center">
+    <h1 class="reveal">Our Educational Programs</h1>
+    <p class="reveal">Discover how LearnSwift Academia nurtures well-rounded individuals through a unique blend of faith-based values, academic rigor, and practical skills.</p>
   </div>
 </section>
 
-{% include 'partials/cta_section.html' %} 
+<!-- Programs Container -->
+<div class="container programs-container">
+
+  <!-- Program 1: LearnSwift Academia -->
+  <div class="program-card reveal">
+    <div class="row g-0">
+      <div class="col-lg-5">
+        <div class="program-image-wrapper">
+          <img src="{% static 'images/school.jpeg' %}" alt="LearnSwift Academia Primary and Secondary School students learning" class="program-image"/>
+        </div>
+      </div>
+      <div class="col-lg-7 d-flex align-items-center">
+        <div class="program-content">
+          <div class="program-number">1</div>
+          <h3 class="program-title">LearnSwift Academia (Primary & Secondary)</h3>
+          <p class="program-description">
+            Our core program integrates a standard Western curriculum with comprehensive Islamic studies. Students excel academically while strengthening their identity and moral compass through Quran, Hadith, and Fiqh.
+          </p>
+          <div class="program-outcomes">
+            <h6>Key Outcomes:</h6>
+            <ul>
+              <li><i class="fas fa-certificate"></i> Official Certificates (Common Entrance, BECE, WAEC, NECO).</li>
+              <li><i class="fas fa-brain"></i> Strong academic foundation & critical thinking skills.</li>
+              <li><i class="fas fa-heart"></i> Solid grounding in Islamic values and character (Akhlaq).</li>
+              <li><i class="fas fa-users"></i> Development of leadership potential and social responsibility.</li>
+            </ul>
+          </div>
+          <a href="#" class="btn-program">Learn More & Apply</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Program 2: Swift Aleem Academy -->
+  <div class="program-card reveal">
+    <div class="row g-0 flex-lg-row-reverse">
+      <div class="col-lg-5">
+        <div class="program-image-wrapper">
+          <img src="{% static 'images/madrasah.jpeg' %}" alt="Swift Aleem Academy students studying Arabic and Islamic Sciences" class="program-image"/>
+        </div>
+      </div>
+      <div class="col-lg-7 d-flex align-items-center">
+        <div class="program-content">
+          <div class="program-number">2</div>
+          <h3 class="program-title">Swift Aleem Academy (Arabic & Islamic Studies)</h3>
+          <p class="program-description">
+            For students seeking deeper religious knowledge, this track offers intensive study of Arabic language (Nahw, Sarf, Balagha), Quran memorization (Hifz) and recitation (Tajweed), Hadith, Fiqh, and Seerah.
+          </p>
+          <div class="program-outcomes">
+            <h6>Key Outcomes:</h6>
+            <ul>
+              <li><i class="fas fa-quran"></i> Proficiency in Quran memorization and Tajweed.</li>
+              <li><i class="fas fa-language"></i> Mastery of classical and modern standard Arabic.</li>
+              <li><i class="fas fa-book-open"></i> In-depth understanding of core Islamic sciences.</li>
+              <li><i class="fas fa-mosque"></i> Strengthened spiritual connection and practice.</li>
+            </ul>
+          </div>
+          <a href="#" class="btn-program">Explore This Track</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Program 3: Vocational Academy -->
+  <div class="program-card reveal">
+    <div class="row g-0">
+      <div class="col-lg-5">
+        <div class="program-image-wrapper">
+          <img src="{% static 'images/vocational.jpg' %}" alt="Students learning hands-on vocational skills at LearnSwift" class="program-image"/>
+        </div>
+      </div>
+      <div class="col-lg-7 d-flex align-items-center">
+        <div class="program-content">
+          <div class="program-number">3</div>
+          <h3 class="program-title">Vocational Academy (Embedded)</h3>
+          <p class="program-description">
+            Integrated within our main school, this program equips students with practical, income-generating skills. Choose from tracks like Fashion Design, ICT Essentials, Basic Electronics, Culinary Arts, and more.
+          </p>
+          <div class="program-outcomes">
+            <h6>Key Outcomes:</h6>
+            <ul>
+              <li><i class="fas fa-tools"></i> Certification in a chosen vocational trade.</li>
+              <li><i class="fas fa-lightbulb"></i> Development of practical, hands-on expertise.</li>
+              <li><i class="fas fa-briefcase"></i> Entrepreneurial skills and mindset.</li>
+              <li><i class="fas fa-hand-holding-usd"></i> Pathways to self-reliance and job creation.</li>
+            </ul>
+          </div>
+          <a href="#" class="btn-program">Discover Trade Options</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Program 4: Coding Academy -->
+  <div class="program-card reveal">
+    <div class="row g-0 flex-lg-row-reverse">
+      <div class="col-lg-5">
+        <div class="program-image-wrapper">
+          <img src="{% static 'images/coding.jpg' %}" alt="LearnSwift Coding Academy students learning programming" class="program-image"/>
+        </div>
+      </div>
+      <div class="col-lg-7 d-flex align-items-center">
+        <div class="program-content">
+          <div class="program-number">4</div>
+          <h3 class="program-title">Coding Academy (Specialized)</h3>
+          <p class="program-description">
+            Prepare for the digital future with our dedicated Coding Academy. We offer courses in web development (HTML, CSS, JavaScript, Python/Django), mobile app development, UI/UX design, and data basics.
+          </p>
+          <div class="program-outcomes">
+            <h6>Key Outcomes:</h6>
+            <ul>
+              <li><i class="fas fa-code"></i> Proficiency in multiple programming languages/stacks.</li>
+              <li><i class="fas fa-laptop-code"></i> Ability to build websites and applications.</li>
+              <li><i class="fas fa-project-diagram"></i> Strong problem-solving and logical thinking skills.</li>
+              <li><i class="fas fa-file-code"></i> Portfolio of completed tech projects.</li>
+            </ul>
+          </div>
+          <a href="#" class="btn-program">View Coding Courses</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Program 5: LearnSwift Online Academy -->
+  <div class="program-card reveal">
+    <div class="row g-0">
+      <div class="col-lg-5">
+        <div class="program-image-wrapper">
+          <img src="{% static 'images/online.jpg' %}" alt="LearnSwift Online Academy virtual learning platform" class="program-image"/>
+        </div>
+      </div>
+      <div class="col-lg-7 d-flex align-items-center">
+        <div class="program-content">
+          <div class="program-number">5</div>
+          <h3 class="program-title">LearnSwift Online Academy</h3>
+          <p class="program-description">
+            Access quality Islamic and academic education from anywhere. Our online platform offers flexible, interactive learning experiences mirroring our on-campus programs, perfect for remote students.
+          </p>
+          <div class="program-outcomes">
+            <h6>Key Outcomes:</h6>
+            <ul>
+              <li><i class="fas fa-globe"></i> Access to quality education regardless of location.</li>
+              <li><i class="fas fa-clock"></i> Flexible learning schedule and self-paced options.</li>
+              <li><i class="fas fa-video"></i> Engaging virtual classrooms and resources.</li>
+              <li><i class="fas fa-check-double"></i> Accredited online certificates.</li>
+            </ul>
+          </div>
+          <a href="{% url 'lsalms:academy_hub' %}" class="btn-program">Explore Online Learning</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+{% include 'partials/cta_section.html' %}
+
+<script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
+<script>
+  // Particles.js Configuration
+  particlesJS('particles-programs', {
+    particles: {
+      number: { value: 80, density: { enable: true, value_area: 800 } },
+      color: { value: ['#06b6d4', '#8b5cf6', '#ec4899'] },
+      shape: { type: 'circle' },
+      opacity: { value: 0.5, random: true },
+      size: { value: 3, random: true },
+      line_linked: {
+        enable: true,
+        distance: 150,
+        color: '#8b5cf6',
+        opacity: 0.2,
+        width: 1
+      },
+      move: {
+        enable: true,
+        speed: 2,
+        direction: 'none',
+        random: true,
+        out_mode: 'out'
+      }
+    },
+    interactivity: {
+      detect_on: 'canvas',
+      events: {
+        onhover: { enable: true, mode: 'grab' },
+        resize: true
+      },
+      modes: {
+        grab: { distance: 140, line_linked: { opacity: 0.5 } }
+      }
+    },
+    retina_detect: true
+  });
+
+  // Scroll Reveal Animation
+  const observerOptions = {
+    threshold: 0.1,
+    rootMargin: '0px 0px -50px 0px'
+  };
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('active');
+      }
+    });
+  }, observerOptions);
+
+  document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
+</script>
 
 {% endblock %}

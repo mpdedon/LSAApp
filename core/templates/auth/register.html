@@ -1,30 +1,658 @@
 {% extends 'auth/base_auth.html' %}
-
 {% load static %}
+
+{% block title %}Register - LearnSwift Academia{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* Keep purple gradient for register page */
+  body.auth-body {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%) !important;
+  }
+
+  .register-container {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 3rem 1rem;
+    position: relative;
+  }
+
+  /* Floating School Objects with Multiple Colors */
+  .floating-object {
+    position: absolute;
+    animation: floatRandom 25s infinite ease-in-out;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.2;
+  }
+
+  .floating-object:nth-child(1) {
+    top: 5%;
+    left: 10%;
+    animation-delay: 0s;
+    animation-duration: 20s;
+  }
+
+  .floating-object:nth-child(2) {
+    top: 15%;
+    right: 5%;
+    animation-delay: 3s;
+    animation-duration: 25s;
+  }
+
+  .floating-object:nth-child(3) {
+    bottom: 10%;
+    left: 15%;
+    animation-delay: 6s;
+    animation-duration: 22s;
+  }
+
+  .floating-object:nth-child(4) {
+    bottom: 20%;
+    right: 10%;
+    animation-delay: 9s;
+    animation-duration: 28s;
+  }
+
+  .floating-object:nth-child(5) {
+    top: 40%;
+    left: 5%;
+    animation-delay: 12s;
+    animation-duration: 24s;
+  }
+
+  .floating-object:nth-child(6) {
+    top: 50%;
+    right: 8%;
+    animation-delay: 15s;
+    animation-duration: 26s;
+  }
+
+  @keyframes floatRandom {
+    0%, 100% {
+      transform: translate(0, 0) rotate(0deg) scale(1);
+    }
+    25% {
+      transform: translate(50px, -40px) rotate(90deg) scale(1.1);
+    }
+    50% {
+      transform: translate(-30px, -80px) rotate(180deg) scale(0.9);
+    }
+    75% {
+      transform: translate(-60px, -40px) rotate(270deg) scale(1.05);
+    }
+  }
+
+  /* Floating Info Cards */
+  .floating-info-card {
+    position: absolute;
+    background: rgba(255, 255, 255, 0.12);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 16px;
+    padding: 1.25rem;
+    color: white;
+    animation: floatUpDown 5s ease-in-out infinite;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+    max-width: 200px;
+  }
+
+  .floating-info-card.card-1 {
+    top: 10%;
+    left: -180px;
+    animation-delay: 0s;
+  }
+
+  .floating-info-card.card-2 {
+    bottom: 15%;
+    right: -180px;
+    animation-delay: 2.5s;
+  }
+
+  @keyframes floatUpDown {
+    0%, 100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-25px);
+    }
+  }
+
+  .info-card-icon {
+    font-size: 2.5rem;
+    margin-bottom: 0.75rem;
+    display: block;
+  }
+
+  .info-card-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+  }
+
+  .info-card-text {
+    font-size: 0.85rem;
+    opacity: 0.9;
+  }
+
+  .register-header {
+    text-align: center;
+    margin-bottom: 3rem;
+    animation: fadeInDown 0.6s ease;
+    position: relative;
+    z-index: 1;
+  }
+
+  @keyframes fadeInDown {
+    from {
+      opacity: 0;
+      transform: translateY(-30px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .register-title {
+    color: white;
+    font-size: 2.5rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    font-family: 'Poppins', sans-serif;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+  }
+
+  .register-subtitle {
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 1.1rem;
+    font-weight: 400;
+  }
+
+  .role-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 2rem;
+    max-width: 900px;
+    margin: 0 auto;
+    position: relative;
+    z-index: 1;
+  }
+
+  .role-card {
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 24px;
+    padding: 2.5rem 2rem;
+    text-decoration: none;
+    color: white;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+    animation: slideUp 0.6s ease;
+    animation-fill-mode: both;
+  }
+
+  .role-card:nth-child(1) {
+    animation-delay: 0.1s;
+  }
+
+  .role-card:nth-child(2) {
+    animation-delay: 0.2s;
+  }
+
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(40px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .role-card::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.1) 0%, transparent 70%);
+    opacity: 0;
+    transition: opacity 0.4s ease;
+  }
+
+  .role-card:hover::before {
+    animation: rotate 10s linear infinite;
+    opacity: 1;
+  }
+
+  @keyframes rotate {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  .role-card:hover {
+    transform: translateY(-10px) scale(1.02);
+    border-color: rgba(255, 255, 255, 0.6);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    background: rgba(255, 255, 255, 0.2);
+  }
+
+  .role-icon-wrapper {
+    width: 100px;
+    height: 100px;
+    margin: 0 auto 1.5rem;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    z-index: 1;
+    transition: all 0.4s ease;
+  }
+
+  .role-card:hover .role-icon-wrapper {
+    transform: scale(1.1) rotate(5deg);
+    background: rgba(255, 255, 255, 0.3);
+  }
+
+  .role-icon {
+    width: 70px;
+    height: 70px;
+    object-fit: cover;
+    border-radius: 50%;
+    transition: all 0.4s ease;
+  }
+
+  .role-card:hover .role-icon {
+    transform: scale(1.1);
+  }
+
+  .role-title {
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    text-align: center;
+    font-family: 'Poppins', sans-serif;
+    position: relative;
+    z-index: 1;
+  }
+
+  .role-description {
+    font-size: 1rem;
+    line-height: 1.6;
+    text-align: center;
+    opacity: 0.9;
+    margin-bottom: 1.5rem;
+    position: relative;
+    z-index: 1;
+  }
+
+  .role-features {
+    list-style: none;
+    padding: 0;
+    margin: 0 0 1.5rem 0;
+    position: relative;
+    z-index: 1;
+  }
+
+  .role-features li {
+    padding: 0.5rem 0;
+    display: flex;
+    align-items: center;
+    font-size: 0.95rem;
+  }
+
+  .role-features li i {
+    margin-right: 0.75rem;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 1.1rem;
+  }
+
+  .role-cta {
+    background: white;
+    color: #667eea;
+    padding: 0.875rem 2rem;
+    border-radius: 12px;
+    font-weight: 600;
+    font-size: 1rem;
+    text-align: center;
+    display: inline-block;
+    width: 100%;
+    transition: all 0.3s ease;
+    position: relative;
+    z-index: 1;
+  }
+
+  .role-card:hover .role-cta {
+    background: rgba(255, 255, 255, 0.95);
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  }
+
+  .login-prompt {
+    text-align: center;
+    margin-top: 3rem;
+    animation: fadeIn 1s ease 0.4s both;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  .login-prompt p {
+    color: rgba(255, 255, 255, 0.95);
+    font-size: 1.1rem;
+    margin: 0;
+  }
+
+  .login-prompt a {
+    color: white;
+    font-weight: 700;
+    text-decoration: none;
+    padding: 0.5rem 1.5rem;
+    border: 2px solid white;
+    border-radius: 8px;
+    display: inline-block;
+    margin-left: 1rem;
+    transition: all 0.3s ease;
+  }
+
+  .login-prompt a:hover {
+    background: white;
+    color: #667eea;
+    transform: translateY(-2px);
+  }
+
+  @media (max-width: 992px) {
+    .floating-info-card {
+      display: none;
+    }
+  }
+
+  @media (max-width: 768px) {
+    .register-title {
+      font-size: 2rem;
+    }
+
+    .role-cards {
+      grid-template-columns: 1fr;
+      gap: 1.5rem;
+    }
+
+    .login-prompt p {
+      font-size: 1rem;
+    }
+
+    .login-prompt a {
+      display: block;
+      margin: 1rem auto 0;
+      max-width: 200px;
+    }
+
+    .floating-object {
+      opacity: 0.1;
+    }
+  }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="container mt-5">
-    <h2 class="text-center">Select Registration Category</h2>
-    <div class="row justify-content-center mt-4">
-        <div class="col-md-5 text-center mb-4">
-            <div class="card shadow-sm">
-                <img src="{% static 'images/teacher_reg.jpg' %}" alt="Teacher" class="card-img-top" style="height: 200px; object-fit: cover;">
-                <div class="card-body">
-                    <h4 class="card-title">Teacher</h4>
-                    <p class="card-text">As a teacher, you can manage classrooms, assignments, and more. Your role includes the ability to track students' progress and create engaging learning experiences.</p>
-                    <a href="{% url 'teacher_register' %}" class="btn btn-lg btn-info">Register as Teacher</a>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-5 text-center mb-4">
-            <div class="card shadow-sm">
-                <img src="{% static 'images/teacher.jpg' %}" alt="Guardian" class="card-img-top" style="height: 200px; object-fit: cover;">
-                <div class="card-body">
-                    <h4 class="card-title">Guardian</h4>
-                    <p class="card-text">As a guardian, you will have access to your child's school activities, grades, and events. Stay connected and monitor progress throughout their academic journey.</p>
-                    <a href="{% url 'guardian_register' %}" class="btn btn-lg btn-info">Register as Guardian</a>
-                </div>
-            </div>
-        </div>
+<div class="register-container">
+  <!-- Colorful Floating School Objects -->
+  <svg class="floating-object" width="90" height="90" viewBox="0 0 90 90">
+    <!-- Rainbow Book -->
+    <defs>
+      <linearGradient id="bookGrad1" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" style="stop-color:#10b981;stop-opacity:1" />
+        <stop offset="100%" style="stop-color:#059669;stop-opacity:1" />
+      </linearGradient>
+    </defs>
+    <rect x="20" y="25" width="25" height="40" fill="url(#bookGrad1)" rx="2"/>
+    <rect x="45" y="25" width="25" height="40" fill="#34d399" opacity="0.9" rx="2"/>
+    <line x1="45" y1="25" x2="45" y2="65" stroke="white" stroke-width="2"/>
+  </svg>
+
+  <svg class="floating-object" width="80" height="80" viewBox="0 0 80 80">
+    <!-- Orange Graduation Cap -->
+    <defs>
+      <linearGradient id="capGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" style="stop-color:#f59e0b;stop-opacity:1" />
+        <stop offset="100%" style="stop-color:#d97706;stop-opacity:1" />
+      </linearGradient>
+    </defs>
+    <polygon points="40,15 10,30 40,40 70,30" fill="url(#capGrad)"/>
+    <rect x="35" y="40" width="10" height="20" fill="#f59e0b"/>
+    <rect x="30" y="60" width="20" height="5" fill="#d97706" rx="2"/>
+  </svg>
+
+  <svg class="floating-object" width="70" height="70" viewBox="0 0 70 70">
+    <!-- Pink Pencil -->
+    <defs>
+      <linearGradient id="pencilGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" style="stop-color:#ec4899;stop-opacity:1" />
+        <stop offset="100%" style="stop-color:#be185d;stop-opacity:1" />
+      </linearGradient>
+    </defs>
+    <polygon points="15,60 20,55 50,20 45,10 10,45" fill="url(#pencilGrad)"/>
+    <polygon points="45,10 50,20 60,15 55,5" fill="#fbbf24"/>
+  </svg>
+
+  <svg class="floating-object" width="75" height="75" viewBox="0 0 75 75">
+    <!-- Red Apple -->
+    <defs>
+      <radialGradient id="appleGrad">
+        <stop offset="0%" style="stop-color:#ef4444;stop-opacity:1" />
+        <stop offset="100%" style="stop-color:#dc2626;stop-opacity:1" />
+      </radialGradient>
+    </defs>
+    <circle cx="37" cy="42" r="22" fill="url(#appleGrad)"/>
+    <path d="M37 20 Q32 15 32 10" stroke="#10b981" stroke-width="3" fill="none"/>
+    <ellipse cx="47" cy="35" rx="10" ry="14" fill="#f87171" opacity="0.7"/>
+  </svg>
+
+  <svg class="floating-object" width="85" height="85" viewBox="0 0 85 85">
+    <!-- Blue Backpack -->
+    <defs>
+      <linearGradient id="backpackGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+        <stop offset="0%" style="stop-color:#3b82f6;stop-opacity:1" />
+        <stop offset="100%" style="stop-color:#1d4ed8;stop-opacity:1" />
+      </linearGradient>
+    </defs>
+    <rect x="25" y="30" width="35" height="40" fill="url(#backpackGrad)" rx="5"/>
+    <rect x="30" y="35" width="25" height="15" fill="#60a5fa" rx="3"/>
+    <path d="M35 30 Q35 20 42.5 20 Q50 20 50 30" stroke="#1d4ed8" stroke-width="3" fill="none"/>
+  </svg>
+
+  <svg class="floating-object" width="65" height="65" viewBox="0 0 65 65">
+    <!-- Purple Calculator -->
+    <defs>
+      <linearGradient id="calcGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" style="stop-color:#a855f7;stop-opacity:1" />
+        <stop offset="100%" style="stop-color:#7c3aed;stop-opacity:1" />
+      </linearGradient>
+    </defs>
+    <rect x="15" y="10" width="35" height="45" fill="url(#calcGrad)" rx="4"/>
+    <rect x="20" y="15" width="25" height="10" fill="#c4b5fd" rx="2"/>
+    <circle cx="25" cy="32" r="3" fill="#e9d5ff"/>
+    <circle cx="32.5" cy="32" r="3" fill="#e9d5ff"/>
+    <circle cx="40" cy="32" r="3" fill="#e9d5ff"/>
+  </svg>
+
+  <!-- Floating Info Cards -->
+  <div class="floating-info-card card-1">
+    <span class="info-card-icon">✨</span>
+    <div class="info-card-title">Easy Setup</div>
+    <div class="info-card-text">Get started in less than 2 minutes</div>
+  </div>
+
+  <div class="floating-info-card card-2">
+    <span class="info-card-icon">🔒</span>
+    <div class="info-card-title">100% Secure</div>
+    <div class="info-card-text">Your data is encrypted and protected</div>
+  </div>
+
+  <div class="container">
+    <!-- Header -->
+    <div class="register-header">
+      <h1 class="register-title">Join LearnSwift Academia</h1>
+      <p class="register-subtitle">Choose your role to get started on your educational journey</p>
     </div>
+
+    <!-- Role Selection Cards -->
+    <div class="role-cards">
+      <!-- Teacher Card -->
+      <a href="{% url 'teacher_register' %}" class="role-card">
+        <div class="role-icon-wrapper">
+          <img src="{% static 'images/teacher.jpg' %}" alt="Teacher" class="role-icon">
+        </div>
+        <h2 class="role-title">Teacher</h2>
+        <p class="role-description">
+          Empower students and shape the future through quality education
+        </p>
+        <ul class="role-features">
+          <li>
+            <i class="bi bi-check-circle-fill"></i>
+            Create and manage classes
+          </li>
+          <li>
+            <i class="bi bi-check-circle-fill"></i>
+            Track student progress
+          </li>
+          <li>
+            <i class="bi bi-check-circle-fill"></i>
+            Assign and grade assessments
+          </li>
+          <li>
+            <i class="bi bi-check-circle-fill"></i>
+            Communicate with parents
+          </li>
+        </ul>
+        <div class="role-cta">
+          <i class="bi bi-person-badge me-2"></i>Register as Teacher
+        </div>
+      </a>
+
+      <!-- Guardian Card -->
+      <a href="{% url 'guardian_register' %}" class="role-card">
+        <div class="role-icon-wrapper">
+          <img src="{% static 'images/guardian.jpg' %}" alt="Guardian" class="role-icon">
+        </div>
+        <h2 class="role-title">Guardian</h2>
+        <p class="role-description">
+          Stay connected with your child's educational progress and achievements
+        </p>
+        <ul class="role-features">
+          <li>
+            <i class="bi bi-check-circle-fill"></i>
+            Monitor student performance
+          </li>
+          <li>
+            <i class="bi bi-check-circle-fill"></i>
+            View attendance records
+          </li>
+          <li>
+            <i class="bi bi-check-circle-fill"></i>
+            Access fee information
+          </li>
+          <li>
+            <i class="bi bi-check-circle-fill"></i>
+            Connect with teachers
+          </li>
+        </ul>
+        <div class="role-cta">
+          <i class="bi bi-people-fill me-2"></i>Register as Guardian
+        </div>
+      </a>
+    </div>
+
+    <!-- Login Prompt -->
+    <div class="login-prompt">
+      <p>
+        Already have an account?
+        <a href="{% url 'login' %}">
+          <i class="bi bi-box-arrow-in-right me-2"></i>Login Here
+        </a>
+      </p>
+    </div>
+  </div>
 </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // Add smooth scroll behavior
+  document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+    anchor.addEventListener('click', function (e) {
+      e.preventDefault();
+      const target = document.querySelector(this.getAttribute('href'));
+      if (target) {
+        target.scrollIntoView({
+          behavior: 'smooth',
+          block: 'start'
+        });
+      }
+    });
+  });
+
+  // Add card interaction effects
+  const roleCards = document.querySelectorAll('.role-card');
+  
+  roleCards.forEach(card => {
+    card.addEventListener('mouseenter', function(e) {
+      this.style.zIndex = '10';
+    });
+
+    card.addEventListener('mouseleave', function(e) {
+      this.style.zIndex = '1';
+    });
+
+    // Add click ripple effect
+    card.addEventListener('click', function(e) {
+      const ripple = document.createElement('div');
+      ripple.style.position = 'absolute';
+      ripple.style.borderRadius = '50%';
+      ripple.style.background = 'rgba(255, 255, 255, 0.6)';
+      ripple.style.width = '20px';
+      ripple.style.height = '20px';
+      ripple.style.left = e.offsetX + 'px';
+      ripple.style.top = e.offsetY + 'px';
+      ripple.style.transform = 'translate(-50%, -50%)';
+      ripple.style.animation = 'ripple 0.6s ease-out';
+      ripple.style.pointerEvents = 'none';
+
+      this.appendChild(ripple);
+
+      setTimeout(() => {
+        ripple.remove();
+      }, 600);
+    });
+  });
+
+  // Add CSS for ripple animation
+  const style = document.createElement('style');
+  style.textContent = `
+    @keyframes ripple {
+      to {
+        width: 300px;
+        height: 300px;
+        opacity: 0;
+      }
+    }
+  `;
+  document.head.appendChild(style);
+</script>
 {% endblock %}

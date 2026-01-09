@@ -1,164 +1,901 @@
 {% extends 'auth/base_auth.html' %}
-
 {% load static %}
-{% load form_tags %}
-{% block title %}Login{% endblock %}
 
-{% block content %}
-<!-- Full-page container with no margin/padding between navbar and background image -->
-<div class="container-fluid p-0" style="height: 100vh; background: url('{% static "images/lsa1.jpg" %}') no-repeat center center/cover; background-size: cover;">
-    <div class="row w-100 h-100">
-        <!-- Left Side: Motivational Text with Box -->
-        <div class="col-md-6 d-flex flex-column justify-content-center align-items-center p-5" style="background: rgba(0, 0, 0, 0.5);">
-            <div class="text-box text-white p-4 rounded shadow-lg">
-                <h1 class="display-4 fw-bold mb-3 animate__animated animate__fadeInDown">Empowering Future Leaders</h1>
-                <p class="lead text-center animate__animated animate__fadeInUp mb-5">Your child's education starts here. Let’s create a bright future together!</p>
-            </div>
-        </div>
+{% block title %}Login - LearnSwift Academia{% endblock %}
 
-        <!-- Right Side: Login Form -->
-        <div class="col-md-6 d-flex justify-content-center align-items-center">
-            <div class="login-form card shadow-lg p-5 animate__animated animate__fadeInUp" style="width: 80%; max-width: 450px; border-radius: 20px; background: rgba(255, 255, 255, 0.9);">
-                <h2 class="text-center mb-4">Login</h2>
-                <form method="POST" action="{% url 'login' %}" class="needs-validation" novalidate>
-                    {% csrf_token %}
-                    {% if form.non_field_errors %}
-                        <div class="alert alert-danger">
-                            {{ form.non_field_errors }}
-                        </div>
-                    {% endif %}
+{% block extra_css %}
+<style>
+  /* Vibrant Lemon-Green Gradient Background */
+  body.auth-body {
+    background: linear-gradient(135deg, #84cc16 0%, #65a30d 25%, #a3e635 50%, #bef264 75%, #84cc16 100%) !important;
+    background-size: 400% 400%;
+    animation: vibrantShift 12s ease infinite !important;
+  }
 
-                    <div class="mb-3 position-relative">
-                        <label for="username" class="form-label">Username</label>
-                        <div class="input-group">
-                            <span class="input-group-text bg-light border-0 rounded-start"><i class="bi bi-person"></i></span>
-                            {{ form.username|add_class:"form-control border-start-0 rounded-end" }}
-                        </div>
-                        {% if form.username.errors %}
-                            <div class="text-danger">
-                                {{ form.username.errors.0 }}
-                            </div>
-                        {% endif %}
-                    </div>
+  @keyframes vibrantShift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
 
-                    <div class="mb-3 position-relative">
-                        <label for="password" class="form-label">Password</label>
-                        <div class="input-group">
-                            <span class="input-group-text bg-light border-0 rounded-start"><i class="bi bi-lock"></i></span>
-                            {{ form.password|add_class:"form-control border-start-0 rounded-end" }}
-                        </div>
-                        {% if form.password.errors %}
-                            <div class="text-danger">
-                                {{ form.password.errors.0 }}
-                            </div>
-                        {% endif %}
-                    </div>
+  /* Graffiti Style Overlay */
+  body.auth-body::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: 
+      radial-gradient(circle at 20% 30%, rgba(255, 255, 255, 0.1) 0%, transparent 50%),
+      radial-gradient(circle at 80% 70%, rgba(0, 0, 0, 0.05) 0%, transparent 50%),
+      radial-gradient(circle at 40% 80%, rgba(255, 255, 255, 0.08) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 0;
+  }
 
-                    <!-- Forgot Password -->
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <div>
-                            <a href="{% url 'password_reset' %}" class="small text-decoration-none">Forgot Password?</a>
-                        </div>
-                    </div>
-                    <!-- Submit Button -->
-                    <button type="submit" class="btn btn-primary w-100 rounded-pill">Login</button>
-                </form>
-                <!-- OAuth Buttons -->
-                <div class="mt-4">
-                    <p class="text-center">Or sign in with</p>
-                    <div class="d-flex justify-content-center">
-                        <a href="#" class="btn btn-light border rounded-circle me-2 d-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
-                            <i class="bi bi-google fs-4"></i>
-                        </a>
-                        <a href="#" class="btn btn-light border rounded-circle me-2 d-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
-                            <i class="bi bi-facebook fs-4"></i>
-                        </a>
-                        <a href="#" class="btn btn-light border rounded-circle d-flex align-items-center justify-content-center" style="width: 50px; height: 50px;">
-                            <i class="bi bi-twitter fs-4"></i>
-                        </a>
-                    </div>
-                </div>
-                <!-- Register Link -->
-                <div class="text-center mt-4">
-                    <p class="small">Don't have an account? <a href="{% url 'register' %}" class="text-decoration-none">Register</a></p>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
+  .login-container {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem 1rem;
+    position: relative;
+    overflow: hidden;
+  }
 
-<script>
-    function togglePassword() {
-        const passwordField = document.getElementById('password');
-        const passwordIcon = document.getElementById('password-icon');
-        if (passwordField.type === 'password') {
-            passwordField.type = 'text';
-            passwordIcon.classList.remove('bi-eye');
-            passwordIcon.classList.add('bi-eye-slash');
-        } else {
-            passwordField.type = 'password';
-            passwordIcon.classList.remove('bi-eye-slash');
-            passwordIcon.classList.add('bi-eye');
-        }
+  /* Bold Solid Floating 3D Objects */
+  .floating-blob {
+    position: absolute;
+    animation: boldFloat 15s infinite ease-in-out;
+    pointer-events: none;
+    filter: drop-shadow(0 10px 30px rgba(0, 0, 0, 0.3));
+  }
+
+  .blob-1 {
+    top: 10%;
+    left: 5%;
+    animation-delay: 0s;
+    animation-duration: 18s;
+  }
+
+  .blob-2 {
+    top: 60%;
+    right: 8%;
+    animation-delay: 3s;
+    animation-duration: 20s;
+  }
+
+  .blob-3 {
+    bottom: 15%;
+    left: 10%;
+    animation-delay: 6s;
+    animation-duration: 22s;
+  }
+
+  .blob-4 {
+    top: 30%;
+    right: 15%;
+    animation-delay: 9s;
+    animation-duration: 19s;
+  }
+
+  .blob-5 {
+    bottom: 40%;
+    left: 15%;
+    animation-delay: 12s;
+    animation-duration: 21s;
+  }
+
+  .blob-6 {
+    top: 50%;
+    right: 5%;
+    animation-delay: 15s;
+    animation-duration: 17s;
+  }
+
+  @keyframes boldFloat {
+    0%, 100% {
+      transform: translate(0, 0) rotate(0deg) scale(1);
     }
-</script>
+    25% {
+      transform: translate(60px, -50px) rotate(90deg) scale(1.2);
+    }
+    50% {
+      transform: translate(-40px, -100px) rotate(180deg) scale(0.9);
+    }
+    75% {
+      transform: translate(-80px, -60px) rotate(270deg) scale(1.1);
+    }
+  }
 
+  /* Modern Login Card with Mesh Gradient */
+  .login-card {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(40px);
+    -webkit-backdrop-filter: blur(40px);
+    border: 3px solid rgba(255, 255, 255, 0.8);
+    border-radius: 32px;
+    padding: 3.5rem 3rem;
+    box-shadow: 
+      0 30px 90px rgba(0, 0, 0, 0.25),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.6);
+    max-width: 520px;
+    width: 100%;
+    animation: slideUpBold 0.8s cubic-bezier(0.34, 1.56, 0.64, 1);
+    position: relative;
+    overflow: hidden;
+    z-index: 10;
+  }
+
+  @keyframes slideUpBold {
+    from {
+      opacity: 0;
+      transform: translateY(60px) scale(0.9);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  .login-card::before {
+    content: '';
+    position: absolute;
+    top: -50%;
+    left: -50%;
+    width: 200%;
+    height: 200%;
+    background: 
+      radial-gradient(circle at 30% 30%, rgba(132, 204, 22, 0.15) 0%, transparent 50%),
+      radial-gradient(circle at 70% 70%, rgba(190, 242, 100, 0.15) 0%, transparent 50%);
+    animation: meshRotate 20s linear infinite;
+    z-index: -1;
+  }
+
+  @keyframes meshRotate {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+
+  /* Modern Header */
+  .login-header {
+    text-align: center;
+    margin-bottom: 2.5rem;
+    position: relative;
+    z-index: 1;
+  }
+
+  .login-logo {
+    width: 100px;
+    height: 100px;
+    margin: 0 auto 1.5rem;
+    border-radius: 28px;
+    border: 4px solid #84cc16;
+    padding: 0.75rem;
+    background: linear-gradient(135deg, #84cc16, #65a30d);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: logoPulse 3s ease infinite;
+    position: relative;
+    box-shadow: 
+      0 10px 40px rgba(132, 204, 22, 0.4),
+      inset 0 -2px 10px rgba(0, 0, 0, 0.2);
+  }
+
+  @keyframes logoPulse {
+    0%, 100% { 
+      transform: scale(1) rotate(0deg);
+      box-shadow: 0 10px 40px rgba(132, 204, 22, 0.4);
+    }
+    50% { 
+      transform: scale(1.08) rotate(2deg);
+      box-shadow: 0 15px 50px rgba(132, 204, 22, 0.6);
+    }
+  }
+
+  .login-logo img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 22px;
+  }
+
+  /* Ultra-modern security badge */
+  .security-badge {
+    position: absolute;
+    top: -12px;
+    right: -12px;
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.4rem;
+    animation: badgeBounce 2s ease infinite;
+    box-shadow: 
+      0 6px 20px rgba(16, 185, 129, 0.5),
+      0 0 0 4px rgba(255, 255, 255, 0.8);
+    border: 3px solid white;
+  }
+
+  @keyframes badgeBounce {
+    0%, 100% {
+      transform: scale(1) translateY(0);
+    }
+    50% {
+      transform: scale(1.15) translateY(-3px);
+    }
+  }
+
+  .login-title {
+    color: #1a1a1a;
+    font-size: 2.5rem;
+    font-weight: 800;
+    margin-bottom: 0.5rem;
+    font-family: 'Poppins', sans-serif;
+    letter-spacing: -0.5px;
+    background: linear-gradient(135deg, #1a1a1a, #4a4a4a);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .login-subtitle {
+    color: #6b7280;
+    font-size: 1.05rem;
+    font-weight: 500;
+  }
+
+  /* Modern Form Styling */
+  .form-group {
+    position: relative;
+    margin-bottom: 1.75rem;
+    z-index: 1;
+  }
+
+  .form-label {
+    color: #374151;
+    font-weight: 600;
+    margin-bottom: 0.75rem;
+    font-size: 0.95rem;
+    display: block;
+  }
+
+  .form-control {
+    background: #f9fafb;
+    border: 2px solid #e5e7eb;
+    border-radius: 14px;
+    color: #1f2937;
+    padding: 1.1rem 1.1rem 1.1rem 3.2rem;
+    height: 58px;
+    font-size: 1rem;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    font-weight: 500;
+  }
+
+  .form-control:focus {
+    background: white;
+    border-color: #84cc16;
+    color: #1f2937;
+    box-shadow: 
+      0 0 0 4px rgba(132, 204, 22, 0.15),
+      0 4px 12px rgba(132, 204, 22, 0.1);
+    transform: translateY(-1px);
+  }
+
+  .form-control::placeholder {
+    color: #9ca3af;
+    font-weight: 400;
+  }
+
+  .input-icon {
+    position: absolute;
+    left: 1.1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #6b7280;
+    font-size: 1.4rem;
+    z-index: 2;
+    pointer-events: none;
+    transition: all 0.3s ease;
+  }
+
+  .form-control:focus ~ .input-icon {
+    color: #84cc16;
+    transform: translateY(-50%) scale(1.1);
+  }
+
+  .password-toggle {
+    position: absolute;
+    right: 1.1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #6b7280;
+    cursor: pointer;
+    z-index: 2;
+    padding: 0.5rem;
+    transition: all 0.3s ease;
+    font-size: 1.2rem;
+  }
+
+  .password-toggle:hover {
+    color: #84cc16;
+    transform: translateY(-50%) scale(1.15);
+  }
+
+  .remember-forgot {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    position: relative;
+    z-index: 1;
+  }
+
+  .form-check {
+    display: flex;
+    align-items: center;
+  }
+
+  .form-check-input {
+    background: #f9fafb;
+    border: 2px solid #e5e7eb;
+    width: 1.4rem;
+    height: 1.4rem;
+    margin-right: 0.6rem;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+
+  .form-check-input:checked {
+    background: linear-gradient(135deg, #84cc16, #65a30d);
+    border-color: #84cc16;
+  }
+
+  .form-check-label {
+    color: #4b5563;
+    font-size: 0.95rem;
+    cursor: pointer;
+    font-weight: 500;
+  }
+
+  .forgot-link {
+    color: #84cc16;
+    text-decoration: none;
+    font-size: 0.95rem;
+    font-weight: 600;
+    transition: all 0.3s ease;
+  }
+
+  .forgot-link:hover {
+    color: #65a30d;
+    text-decoration: underline;
+  }
+
+  /* Ultra-Modern Button */
+  .btn-login {
+    width: 100%;
+    padding: 1.2rem;
+    font-size: 1.15rem;
+    font-weight: 700;
+    border: none;
+    border-radius: 14px;
+    background: linear-gradient(135deg, #84cc16 0%, #65a30d 100%);
+    color: white;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+    z-index: 1;
+    box-shadow: 
+      0 10px 30px rgba(132, 204, 22, 0.4),
+      inset 0 -2px 0 rgba(0, 0, 0, 0.2);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  }
+
+  .btn-login::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    transition: left 0.5s ease;
+  }
+
+  .btn-login:hover::before {
+    left: 100%;
+  }
+
+  .btn-login:hover {
+    transform: translateY(-3px);
+    box-shadow: 
+      0 15px 40px rgba(132, 204, 22, 0.5),
+      inset 0 -2px 0 rgba(0, 0, 0, 0.2);
+  }
+
+  .btn-login:active {
+    transform: translateY(-1px);
+  }
+
+  /* Modern Divider */
+  .divider {
+    display: flex;
+    align-items: center;
+    text-align: center;
+    margin: 2rem 0;
+    position: relative;
+    z-index: 1;
+  }
+
+  .divider::before,
+  .divider::after {
+    content: '';
+    flex: 1;
+    border-bottom: 2px solid #e5e7eb;
+  }
+
+  .divider span {
+    padding: 0 1.5rem;
+    color: #9ca3af;
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .register-link {
+    text-align: center;
+    margin-top: 1.5rem;
+    position: relative;
+    z-index: 1;
+  }
+
+  .register-link p {
+    color: #6b7280;
+    margin: 0;
+    font-weight: 500;
+  }
+
+  .register-link a {
+    color: #84cc16;
+    font-weight: 700;
+    text-decoration: none;
+    transition: all 0.3s ease;
+  }
+
+  .register-link a:hover {
+    color: #65a30d;
+    text-decoration: underline;
+  }
+
+  /* Modern Security Panel */
+  .security-info {
+    margin-top: 2rem;
+    padding: 1.5rem;
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(5, 150, 105, 0.05));
+    border: 2px solid rgba(16, 185, 129, 0.2);
+    border-radius: 16px;
+    position: relative;
+    z-index: 1;
+  }
+
+  .security-info-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    color: #065f46;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    font-size: 1.05rem;
+  }
+
+  .security-info-header i {
+    color: #10b981;
+    font-size: 1.5rem;
+  }
+
+  .security-features {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .security-features li {
+    color: #047857;
+    font-size: 0.9rem;
+    padding: 0.6rem 0;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    font-weight: 500;
+  }
+
+  .security-features li i {
+    color: #10b981;
+    font-size: 1.1rem;
+  }
+
+  .error-message {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(220, 38, 38, 0.1));
+    border: 2px solid rgba(239, 68, 68, 0.3);
+    color: #991b1b;
+    padding: 1rem 1.25rem;
+    border-radius: 12px;
+    margin-bottom: 1.5rem;
+    position: relative;
+    z-index: 1;
+    animation: shake 0.5s ease;
+    font-weight: 600;
+  }
+
+  @keyframes shake {
+    0%, 100% { transform: translateX(0); }
+    10%, 30%, 50%, 70%, 90% { transform: translateX(-8px); }
+    20%, 40%, 60%, 80% { transform: translateX(8px); }
+  }
+
+  /* Floating Stats with modern design */
+  .floating-stat {
+    position: absolute;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    border: 2px solid rgba(132, 204, 22, 0.3);
+    border-radius: 20px;
+    padding: 1.5rem;
+    color: #1f2937;
+    animation: floatStatBold 6s ease-in-out infinite;
+    box-shadow: 
+      0 20px 60px rgba(0, 0, 0, 0.15),
+      inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+    min-width: 180px;
+    z-index: 5;
+  }
+
+  .floating-stat.stat-1 {
+    top: 12%;
+    left: -220px;
+    animation-delay: 0s;
+  }
+
+  .floating-stat.stat-2 {
+    bottom: 18%;
+    right: -220px;
+    animation-delay: 3s;
+  }
+
+  @keyframes floatStatBold {
+    0%, 100% {
+      transform: translateY(0) scale(1);
+    }
+    50% {
+      transform: translateY(-30px) scale(1.05);
+    }
+  }
+
+  .stat-icon {
+    font-size: 3rem;
+    margin-bottom: 0.75rem;
+    display: block;
+  }
+
+  .stat-value {
+    font-size: 2rem;
+    font-weight: 800;
+    color: #84cc16;
+    font-family: 'Poppins', sans-serif;
+  }
+
+  .stat-label {
+    font-size: 0.9rem;
+    color: #6b7280;
+    font-weight: 600;
+  }
+
+  @media (max-width: 992px) {
+    .floating-stat {
+      display: none;
+    }
+  }
+
+  @media (max-width: 576px) {
+    .login-card {
+      padding: 2.5rem 2rem;
+      border-radius: 24px;
+    }
+
+    .login-title {
+      font-size: 2rem;
+    }
+
+    .login-logo {
+      width: 85px;
+      height: 85px;
+    }
+
+    .floating-blob {
+      opacity: 0.6;
+    }
+  }
+</style>
 {% endblock %}
 
-<style>
-/* Full-page container, no margins or paddings */
-.container-fluid {
-    padding: 0;
-    height: 100vh;
-    background: url('{% static "images/lsa1.jpg" %}') no-repeat center center/cover;
-    background-size: cover;
-}
+{% block content %}
+<div class="login-container">
+  <!-- Bold Solid Floating Abstract Shapes -->
+  <svg class="floating-blob blob-1" width="150" height="150" viewBox="0 0 150 150">
+    <defs>
+      <linearGradient id="blob1" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" style="stop-color:#fbbf24;stop-opacity:1" />
+        <stop offset="100%" style="stop-color:#f59e0b;stop-opacity:1" />
+      </linearGradient>
+    </defs>
+    <path d="M75,25 Q110,40 120,75 Q110,110 75,125 Q40,110 30,75 Q40,40 75,25" fill="url(#blob1)" />
+    <circle cx="60" cy="60" r="15" fill="#fcd34d" opacity="0.7"/>
+  </svg>
 
-/* Left-side text box styling */
-.text-box {
-    background: rgba(0, 0, 0, 0.6); /* Semi-transparent black background */
-    border-radius: 15px;
-    width: 100%;
-}
+  <svg class="floating-blob blob-2" width="180" height="180" viewBox="0 0 180 180">
+    <defs>
+      <linearGradient id="blob2" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" style="stop-color:#84cc16;stop-opacity:1" />
+        <stop offset="100%" style="stop-color:#65a30d;stop-opacity:1" />
+      </linearGradient>
+    </defs>
+    <path d="M90,20 L140,70 L120,130 L60,140 L30,90 L50,40 Z" fill="url(#blob2)" />
+    <rect x="70" y="70" width="40" height="40" fill="#a3e635" opacity="0.6" rx="8"/>
+  </svg>
 
-/* Card styling */
-.card {
-    backdrop-filter: blur(10px);
-    border: none;
-}
+  <svg class="floating-blob blob-3" width="130" height="130" viewBox="0 0 130 130">
+    <defs>
+      <radialGradient id="blob3">
+        <stop offset="0%" style="stop-color:#ec4899;stop-opacity:1" />
+        <stop offset="100%" style="stop-color:#be185d;stop-opacity:1" />
+      </radialGradient>
+    </defs>
+    <circle cx="65" cy="65" r="50" fill="url(#blob3)" />
+    <circle cx="50" cy="50" r="20" fill="#f9a8d4" opacity="0.8"/>
+  </svg>
 
-/* Input styling */
-.input-group .form-control {
-    border-radius: 0 !important;
-}
+  <svg class="floating-blob blob-4" width="160" height="160" viewBox="0 0 160 160">
+    <defs>
+      <linearGradient id="blob4" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" style="stop-color:#06b6d4;stop-opacity:1" />
+        <stop offset="100%" style="stop-color:#0891b2;stop-opacity:1" />
+      </linearGradient>
+    </defs>
+    <polygon points="80,10 150,50 130,120 60,150 20,100 40,40" fill="url(#blob4)" />
+    <circle cx="80" cy="80" r="25" fill="#67e8f9" opacity="0.7"/>
+  </svg>
 
-.input-group-text {
-    border-radius: 0 !important;
-}
+  <svg class="floating-blob blob-5" width="140" height="140" viewBox="0 0 140 140">
+    <defs>
+      <linearGradient id="blob5" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" style="stop-color:#a855f7;stop-opacity:1" />
+        <stop offset="100%" style="stop-color:#7c3aed;stop-opacity:1" />
+      </linearGradient>
+    </defs>
+    <path d="M70,15 Q120,30 125,70 Q120,110 70,125 Q20,110 15,70 Q20,30 70,15" fill="url(#blob5)" />
+    <ellipse cx="70" cy="70" rx="30" ry="40" fill="#c4b5fd" opacity="0.6"/>
+  </svg>
 
-/* Button styling */
-.btn-primary {
-    background-color: #007bff;
-    border: none;
-    padding: 10px;
-    font-size: 1.1rem;
-}
+  <svg class="floating-blob blob-6" width="170" height="170" viewBox="0 0 170 170">
+    <defs>
+      <linearGradient id="blob6" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" style="stop-color:#ef4444;stop-opacity:1" />
+        <stop offset="100%" style="stop-color:#dc2626;stop-opacity:1" />
+      </linearGradient>
+    </defs>
+    <rect x="25" y="25" width="120" height="120" rx="30" fill="url(#blob6)" />
+    <circle cx="55" cy="55" r="18" fill="#fca5a5" opacity="0.7"/>
+  </svg>
 
-.btn-primary:hover {
-    background-color: #0056b3;
-}
+  <!-- Modern Floating Stats -->
+  <div class="floating-stat stat-1">
+    <span class="stat-icon">🎓</span>
+    <div class="stat-value">500+</div>
+    <div class="stat-label">Active Students</div>
+  </div>
 
-/* OAuth button styling */
-.btn-light {
-    color: #6c757d;
-    background-color: #f8f9fa;
-    border-color: #ced4da;
-}
+  <div class="floating-stat stat-2">
+    <span class="stat-icon">👨‍🏫</span>
+    <div class="stat-value">50+</div>
+    <div class="stat-label">Expert Teachers</div>
+  </div>
 
-/* Adjustments for the 2-column layout */
-@media (max-width: 768px) {
-    .col-md-6 {
-        width: 100%;
-    }
-}
-</style>
+  <!-- Modern Login Card -->
+  <div class="login-card">
+    <!-- Header -->
+    <div class="login-header">
+      <div class="login-logo">
+        <img src="{% static 'images/logo.jpg' %}" alt="LSA Logo">
+        <div class="security-badge" title="Verified & Secure">
+          <i class="bi bi-patch-check-fill"></i>
+        </div>
+      </div>
+      <h1 class="login-title">Welcome Back!</h1>
+      <p class="login-subtitle">Sign in to continue your learning journey</p>
+    </div>
+
+    <!-- Error Messages -->
+    {% if form.errors or form.non_field_errors %}
+    <div class="error-message">
+      <i class="bi bi-exclamation-triangle-fill me-2"></i>
+      {% if form.non_field_errors %}
+        {{ form.non_field_errors.0 }}
+      {% else %}
+        Please correct the errors below.
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Login Form -->
+    <form method="post" action="{% url 'login' %}" novalidate id="loginForm">
+      {% csrf_token %}
+      
+      <div class="form-group">
+        <label for="id_username" class="form-label">Username</label>
+        <div class="position-relative">
+          <input 
+            type="text" 
+            name="username" 
+            id="id_username" 
+            class="form-control {% if form.username.errors %}is-invalid{% endif %}"
+            placeholder="Enter your username"
+            value="{{ form.username.value|default:'' }}"
+            required
+            autofocus
+          >
+          <i class="bi bi-person-circle input-icon"></i>
+        </div>
+        {% if form.username.errors %}
+          <small class="text-danger d-block mt-1">{{ form.username.errors.0 }}</small>
+        {% endif %}
+      </div>
+
+      <div class="form-group">
+        <label for="id_password" class="form-label">Password</label>
+        <div class="position-relative">
+          <input 
+            type="password" 
+            name="password" 
+            id="id_password" 
+            class="form-control {% if form.password.errors %}is-invalid{% endif %}"
+            placeholder="Enter your password"
+            required
+          >
+          <i class="bi bi-shield-lock-fill input-icon"></i>
+          <i class="bi bi-eye password-toggle" id="togglePassword"></i>
+        </div>
+        {% if form.password.errors %}
+          <small class="text-danger d-block mt-1">{{ form.password.errors.0 }}</small>
+        {% endif %}
+      </div>
+
+      <div class="remember-forgot">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="remember_me" name="remember_me">
+          <label class="form-check-label" for="remember_me">
+            Remember me
+          </label>
+        </div>
+        <a href="#" class="forgot-link">Forgot Password?</a>
+      </div>
+
+      <button type="submit" class="btn btn-login">
+        <i class="bi bi-shield-check me-2"></i>Sign In Securely
+      </button>
+    </form>
+
+    <!-- Divider -->
+    <div class="divider">
+      <span>New Here?</span>
+    </div>
+
+    <!-- Register Link -->
+    <div class="register-link">
+      <p>Don't have an account? <a href="{% url 'register' %}">Create Account</a></p>
+    </div>
+
+    <!-- Security Info -->
+    <div class="security-info">
+      <div class="security-info-header">
+        <i class="bi bi-shield-check"></i>
+        <span>Bank-Level Security</span>
+      </div>
+      <ul class="security-features">
+        <li>
+          <i class="bi bi-check-circle-fill"></i>
+          End-to-End 256-bit Encryption
+        </li>
+        <li>
+          <i class="bi bi-check-circle-fill"></i>
+          Secure Session & Activity Tracking
+        </li>
+        <li>
+          <i class="bi bi-check-circle-fill"></i>
+          Data Privacy NDPR Compliant
+        </li>
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // Password toggle with smooth animation
+  const togglePassword = document.getElementById('togglePassword');
+  const passwordInput = document.getElementById('id_password');
+
+  if (togglePassword && passwordInput) {
+    togglePassword.addEventListener('click', function() {
+      const type = passwordInput.type === 'password' ? 'text' : 'password';
+      passwordInput.type = type;
+      
+      this.classList.toggle('bi-eye');
+      this.classList.toggle('bi-eye-slash');
+    });
+  }
+
+  // Enhanced form validation
+  const loginForm = document.getElementById('loginForm');
+  if (loginForm) {
+    loginForm.addEventListener('submit', function(e) {
+      const username = document.getElementById('id_username').value.trim();
+      const password = document.getElementById('id_password').value.trim();
+
+      if (!username || !password) {
+        e.preventDefault();
+        
+        // Create custom error
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'error-message';
+        errorDiv.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-2"></i>Please fill in all required fields.';
+        
+        const firstFormGroup = document.querySelector('.form-group');
+        firstFormGroup.parentNode.insertBefore(errorDiv, firstFormGroup);
+        
+        setTimeout(() => errorDiv.remove(), 4000);
+      }
+    });
+  }
+
+  // Enhanced focus effects
+  const inputs = document.querySelectorAll('.form-control');
+  inputs.forEach(input => {
+    input.addEventListener('focus', function() {
+      this.parentElement.querySelector('.input-icon')?.classList.add('text-success');
+    });
+
+    input.addEventListener('blur', function() {
+      this.parentElement.querySelector('.input-icon')?.classList.remove('text-success');
+    });
+  });
+
+  // Activity tracking with timestamp
+  loginForm?.addEventListener('submit', function() {
+    const now = new Date();
+    localStorage.setItem('lastLoginAttempt', now.toISOString());
+    localStorage.setItem('loginAttemptCount', 
+      (parseInt(localStorage.getItem('loginAttemptCount') || '0') + 1).toString()
+    );
+  });
+
+  // Success tracking
+  if (window.location.search.includes('login=success')) {
+    localStorage.setItem('lastSuccessfulLogin', new Date().toISOString());
+  }
+
+  // Console log for debugging
+  console.log('🎓 LearnSwift Academia - Secure Login Portal');
+  console.log('Last Login Attempt:', localStorage.getItem('lastLoginAttempt') || 'Never');
+  console.log('Total Attempts:', localStorage.getItem('loginAttemptCount') || '0');
+</script>
+{% endblock %}

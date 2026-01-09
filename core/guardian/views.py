@@ -77,8 +77,9 @@ class GuardianListView(View, AdminRequiredMixin):
     def get(self, request, *args, **kwargs):
         query = request.GET.get('q', '')
         status = request.GET.get('status', 'active')
+        per_page = int(request.GET.get('per_page', 20))
 
-        guardians = Guardian.objects.filter(status=status).order_by('user__first_name', 'user__last_name')
+        guardians = Guardian.objects.filter(status=status).select_related('user').prefetch_related('students').order_by('user__first_name', 'user__last_name')
 
         if query:
             guardians = guardians.filter(
@@ -89,14 +90,27 @@ class GuardianListView(View, AdminRequiredMixin):
                 Q(contact__icontains=query) 
             )
 
-        paginator = Paginator(guardians, 20)
+        # Count stats for all statuses
+        active_count = Guardian.objects.filter(status='active').count()
+        dormant_count = Guardian.objects.filter(status='dormant').count()
+        left_count = Guardian.objects.filter(status='left').count()
+        total_count = Guardian.objects.count()
+
+        paginator = Paginator(guardians, per_page)
         page_number = request.GET.get('page')
         page_obj = paginator.get_page(page_number)
 
         return render(request, self.template_name, {
             'page_obj': page_obj,
             'active_tab': status,
+            'per_page': per_page,
             'query': query,
+            'counts': {
+                'active': active_count,
+                'dormant': dormant_count,
+                'left': left_count,
+                'total': total_count
+            }
         })
 
 class GuardianBulkActionView(View, AdminRequiredMixin):
@@ -146,35 +160,32 @@ class GuardianUpdateView(View):
 
     def get(self, request, pk, *args, **kwargs):
         guardian = get_object_or_404(Guardian, pk=pk)
-        form = GuardianRegistrationForm(instance=guardian.user, guardian_instance=guardian)
+        form = GuardianRegistrationForm(instance=guardian.user, guardian_instance=guardian, is_update=True)
         return render(request, self.template_name, {'form': form, 'is_update': True, 'guardian': guardian})
     
     def post(self, request, pk, *args, **kwargs):
         guardian = get_object_or_404(Guardian, pk=pk)
-        form = GuardianRegistrationForm(request.POST, request.FILES, instance=guardian.user, guardian_instance=guardian)
+        form = GuardianRegistrationForm(request.POST, request.FILES, instance=guardian.user, guardian_instance=guardian, is_update=True)
 
         if form.is_valid():
-            user = form.save(commit=False)
-            user.save()
-
-            guardian.gender = form.cleaned_data['gender']
-            guardian.profile_image = form.cleaned_data['profile_image']
-            guardian.contact = form.cleaned_data['contact']
-            guardian.address= form.cleaned_data['address']
-
-            guardian.save()
-            
+            form.save()  # This will save both user and guardian
             return redirect('guardian_detail', pk=guardian.pk)
             
-        print(f"Form Errors: {form.errors}")
         return render(request, self.template_name, {'form': form, 'is_update': True, 'guardian': guardian})
   
 class GuardianDetailView(View):
     template_name = 'guardian/guardian_detail.html'
 
     def get(self, request, pk, *args, **kwargs):
-        guardian = get_object_or_404(Guardian, pk=pk)
-        return render(request, self.template_name, {'guardian': guardian})
+        guardian = get_object_or_404(
+            Guardian.objects.prefetch_related(
+                'students__user',
+                'students__current_class'
+            ),
+            pk=pk
+        )
+        students = guardian.students.select_related('user', 'current_class').all()
+        return render(request, self.template_name, {'guardian': guardian, 'students': students})
     
 class GuardianDeleteView(View):
     template_name = 'guardian/guardian_confirm_delete.html'
@@ -252,7 +263,7 @@ def get_student_for_item(request, item, item_type_verbose, submit_url_name, temp
     """
     if hasattr(request.user, 'guardian'):
         guardian = request.user.guardian
-        students = Student.objects.filter(student_guardian=guardian, current_class=item.class_assigned)
+        students = Student.objects.filter(student_guardian=guardian, current_class=item.class_assigned, status='active')
         if not students.exists():
             messages.error(request, "No students associated with this guardian are in this class.")
             return redirect('guardian_dashboard')
@@ -703,6 +714,7 @@ def _get_student_for_result_view(request, parent_item, item_type_verbose, result
         
         # Get all students of this guardian in the item's class
         students_qs = Student.objects.filter(
+            status='active',
             student_guardian=guardian,
             current_class=parent_item_class_assigned
         )
@@ -1042,9 +1054,16 @@ def view_termly_result(request, student_id, term_id):
     subject_results_list = result.subject_results.select_related('subject').order_by('subject__name')
 
     # Cumulative GPA (ensure the record is up-to-date)
-    cumulative_record = student.cumulative_record
-    cumulative_record.update_cumulative_gpa() 
-    cumulative_gpa = cumulative_record.cumulative_gpa
+    try:
+        cumulative_record = student.cumulative_record
+        cumulative_record.update_cumulative_gpa() 
+        cumulative_gpa = cumulative_record.cumulative_gpa
+    except Student.cumulative_record.RelatedObjectDoesNotExist:
+        # Create cumulative record if it doesn't exist
+        from core.models import CumulativeRecord
+        cumulative_record = CumulativeRecord.objects.create(student=student)
+        cumulative_record.update_cumulative_gpa(save=True)
+        cumulative_gpa = cumulative_record.cumulative_gpa
     
     # If this is the first term within THIS SESSION for the student, show term GPA
     # as the cumulative GPA for display purposes (tests expect this behaviour).
@@ -1184,8 +1203,15 @@ def view_sessional_result(request, student_id, session_id):
         sessional_result.calculate_sessional_summary(save=True)
         sessional_result.refresh_from_db()
 
-    student.cumulative_record.update_cumulative_gpa(save=True)
-    cumulative_gpa = student.cumulative_record.cumulative_gpa
+    # Update cumulative GPA (create record if doesn't exist)
+    try:
+        student.cumulative_record.update_cumulative_gpa(save=True)
+        cumulative_gpa = student.cumulative_record.cumulative_gpa
+    except Student.cumulative_record.RelatedObjectDoesNotExist:
+        from core.models import CumulativeRecord
+        cumulative_record = CumulativeRecord.objects.create(student=student)
+        cumulative_record.update_cumulative_gpa(save=True)
+        cumulative_gpa = cumulative_record.cumulative_gpa
 
     # 3. ===== Prepare Data for the Template =====
 
@@ -1369,10 +1395,11 @@ def compose_message(request):
         if student:
             teacher_ids = Teacher.objects.filter(
                 Q(teacherassignment__class_assigned=student.current_class) |
-                Q(subjectassignment__class_assigned=student.current_class)
+                Q(subjectassignment__class_assigned=student.current_class),
+                status='active'
             ).values_list('user_id', flat=True)
             recipient_qs = CustomUser.objects.filter(Q(id__in=teacher_ids) | Q(role='admin')).exclude(pk=sender.pk).distinct()
-            student_context_qs = Student.objects.filter(pk=student.pk)
+            student_context_qs = Student.objects.filter(pk=student.pk, status='active')
 
     elif sender.role == 'teacher':
         # Teachers can message guardians of their students, colleagues, and admins
@@ -1398,7 +1425,8 @@ def compose_message(request):
             wards = guardian.students.all()
             teacher_ids = Teacher.objects.filter(
                 Q(teacherassignment__class_assigned__in=wards.values_list('current_class', flat=True)) |
-                Q(subjectassignment__class_assigned__in=wards.values_list('current_class', flat=True))
+                Q(subjectassignment__class_assigned__in=wards.values_list('current_class', flat=True)),
+                status='active'
             ).values_list('user_id', flat=True)
             recipient_qs = CustomUser.objects.filter(Q(id__in=teacher_ids) | Q(role='admin')).distinct()
             student_context_qs = wards
@@ -1496,6 +1524,112 @@ def message_thread(request, thread_id):
         'reply_recipient': reply_recipient,
     }
     return render(request, 'messaging/message_thread.html', context)
+
+
+@login_required
+def export_guardians(request):
+    """Export guardian data to Excel or PDF"""
+    import openpyxl
+    from openpyxl.styles import Font, Alignment, PatternFill
+    from django.http import HttpResponse
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import letter, landscape
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
+    from io import BytesIO
+    
+    export_format = request.GET.get('format', 'excel')
+    status_filter = request.GET.get('status', '')
+    
+    guardians = Guardian.objects.select_related('user').order_by('user__last_name')
+    
+    if status_filter:
+        guardians = guardians.filter(status=status_filter)
+    
+    if export_format == 'excel':
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Guardians"
+        
+        header_fill = PatternFill(start_color="3B82F6", end_color="3B82F6", fill_type="solid")
+        header_font = Font(bold=True, color="FFFFFF", size=12)
+        header_alignment = Alignment(horizontal="center", vertical="center")
+        
+        headers = ['First Name', 'Last Name', 'Email', 'Gender', 'Contact', 
+                   'Address', 'Number of Wards', 'Status']
+        ws.append(headers)
+        
+        for cell in ws[1]:
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = header_alignment
+        
+        for guardian in guardians:
+            ws.append([
+                guardian.user.first_name,
+                guardian.user.last_name,
+                guardian.user.email,
+                guardian.get_gender_display(),
+                guardian.contact or '',
+                guardian.address or '',
+                guardian.wards.count(),
+                guardian.get_status_display()
+            ])
+        
+        for column in ws.columns:
+            max_length = 0
+            column_letter = column[0].column_letter
+            for cell in column:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            adjusted_width = min(max_length + 2, 50)
+            ws.column_dimensions[column_letter].width = adjusted_width
+        
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename="guardians_{timezone.now().strftime("%Y%m%d")}.xlsx"'
+        wb.save(response)
+        return response
+        
+    elif export_format == 'pdf':
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=landscape(letter))
+        elements = []
+        
+        data = [['Name', 'Email', 'Gender', 'Contact', 'Wards', 'Status']]
+        
+        for guardian in guardians:
+            data.append([
+                guardian.user.get_full_name(),
+                guardian.user.email,
+                guardian.get_gender_display(),
+                guardian.contact or 'N/A',
+                str(guardian.wards.count()),
+                guardian.get_status_display()
+            ])
+        
+        table = Table(data)
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#3B82F6')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        
+        elements.append(table)
+        doc.build(elements)
+        
+        buffer.seek(0)
+        response = HttpResponse(buffer.read(), content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="guardians_{timezone.now().strftime("%Y%m%d")}.pdf"'
+        return response
 
 
 

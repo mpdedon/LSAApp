@@ -90,7 +90,7 @@ def calculate_and_migrate_results_data(apps, schema_editor):
     print(f"    ... Done calculating for {all_results_to_process.count()} term results.")
 
     # 2. Create/populate SessionalResult and CumulativeRecord for each student
-    all_students = Student.objects.all()
+    all_students = Student.objects.filter(status='active')
     print(f"  - Creating/updating sessional and cumulative records for {all_students.count()} students...")
     for student in all_students:
         student_sessions = Session.objects.filter(terms__result__student=student).distinct()        

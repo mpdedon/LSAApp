@@ -38,10 +38,32 @@ class TeacherRegistrationForm(UserCreationForm):
         required=False,
         widget=forms.ClearableFileInput(attrs={'class': 'form-control-file'})
     )
+    nin = forms.CharField(
+        max_length=11,
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': '12345678901',
+            'pattern': '[0-9]{11}',
+            'title': '11-digit National Identification Number'
+        }),
+        help_text='Optional: Your 11-digit NIN'
+    )
+    highest_education = forms.ChoiceField(
+        choices=[('', '-- Select Qualification --')] + Teacher.EDUCATION_CHOICES,
+        required=False,
+        widget=forms.Select(attrs={'class': 'form-control'})
+    )
+    ndpr_consent = forms.BooleanField(
+        required=True,
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        label='I consent to the collection and processing of my personal data',
+        help_text='Required: You must agree to our data protection policy to register'
+    )
 
     def __init__(self, *args, **kwargs):
         self.is_update = kwargs.pop('is_update', False)
-        teacher_instance = kwargs.pop('teacher_instance', None)  # Extract student_instance if provided
+        self.teacher_instance = kwargs.pop('teacher_instance', None)  # Store teacher_instance
         super().__init__(*args, **kwargs)
 
         if self.is_update:
@@ -49,13 +71,15 @@ class TeacherRegistrationForm(UserCreationForm):
             self.fields.pop('password1', None)
             self.fields.pop('password2', None)
 
-        # Populate initial data if a student instance is provided
-        if teacher_instance:
-            self.fields['date_of_birth'].initial = teacher_instance.date_of_birth
-            self.fields['gender'].initial = teacher_instance.gender
-            self.fields['profile_image'].initial = teacher_instance.profile_image
-            self.fields['contact'].initial = teacher_instance.contact
-            self.fields['address'].initial = teacher_instance.address
+        # Populate initial data if a teacher instance is provided
+        if self.teacher_instance:
+            self.fields['date_of_birth'].initial = self.teacher_instance.date_of_birth
+            self.fields['gender'].initial = self.teacher_instance.gender
+            self.fields['profile_image'].initial = self.teacher_instance.profile_image
+            self.fields['contact'].initial = self.teacher_instance.contact
+            self.fields['address'].initial = self.teacher_instance.address
+            self.fields['nin'].initial = self.teacher_instance.nin
+            self.fields['highest_education'].initial = self.teacher_instance.highest_education
 
 
     class Meta:
@@ -101,8 +125,17 @@ class TeacherRegistrationForm(UserCreationForm):
         return email
 
     def save(self, commit=True):
-        user = super().save(commit=False)
-        user.role = 'teacher'  # Assign the 'teacher' role
+        if self.is_update:
+            # For updates, just update the user instance directly
+            user = self.instance
+            user.username = self.cleaned_data['username']
+            user.email = self.cleaned_data['email']
+            user.first_name = self.cleaned_data['first_name']
+            user.last_name = self.cleaned_data['last_name']
+        else:
+            # For new users, use the parent's save method
+            user = super().save(commit=False)
+            user.role = 'teacher'  # Assign the 'teacher' role only for new users
 
         if commit:
             user.save()
@@ -114,19 +147,28 @@ class TeacherRegistrationForm(UserCreationForm):
             teacher.contact = self.cleaned_data['contact']
             teacher.address = self.cleaned_data['address']
             teacher.gender = self.cleaned_data['gender']
-            teacher.profile_image = self.cleaned_data.get('profile_image')
+            teacher.nin = self.cleaned_data.get('nin')
+            teacher.highest_education = self.cleaned_data.get('highest_education')
+            if self.cleaned_data.get('profile_image'):
+                teacher.profile_image = self.cleaned_data['profile_image']
+            if commit:
+                teacher.save()
         else:
+            from django.utils import timezone
             teacher = Teacher(
                 user=user,
                 date_of_birth=self.cleaned_data['date_of_birth'],
                 contact=self.cleaned_data['contact'],
                 address=self.cleaned_data['address'],
                 gender=self.cleaned_data['gender'],
-                profile_image=self.cleaned_data.get('profile_image')
+                profile_image=self.cleaned_data.get('profile_image'),
+                nin=self.cleaned_data.get('nin'),
+                highest_education=self.cleaned_data.get('highest_education'),
+                ndpr_consent=self.cleaned_data.get('ndpr_consent', False),
+                ndpr_consent_date=timezone.now() if self.cleaned_data.get('ndpr_consent') else None
             )
-
-        if commit:
-            teacher.save()
+            if commit:
+                teacher.save()
 
         return teacher
 

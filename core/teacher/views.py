@@ -120,7 +120,7 @@ def TeacherProfileView(request):
 def teacher_dashboard(request):
     teacher = Teacher.objects.get(user=request.user)
     current_class = teacher.current_class
-    students = Student.objects.filter(current_class=current_class)
+    students = Student.objects.filter(current_class=current_class, status='active').order_by('user__last_name', 'user__first_name')
     subjects = current_class.subjects.all() if current_class else []
     
     context = {
@@ -137,25 +137,40 @@ class TeacherListView(View, AdminRequiredMixin):
     def get(self, request, *args, **kwargs):
         status = request.GET.get('status', 'active')
         query = request.GET.get('q', '')
+        per_page = int(request.GET.get('per_page', 20))
 
-        teachers = Teacher.objects.filter(status=status).order_by('employee_id')
+        teachers = Teacher.objects.filter(status=status).select_related('user').order_by('employee_id')
 
         if query:
             teachers = teachers.filter(
                 Q(user__username__icontains=query)  |
                 Q(user__first_name__icontains=query) |
                 Q(user__last_name__icontains=query) |
-                Q(user__email__icontains=query) 
-                                        )
+                Q(user__email__icontains=query) |
+                Q(employee_id__icontains=query)
+            )
+
+        # Count stats for all statuses
+        active_count = Teacher.objects.filter(status='active').count()
+        dormant_count = Teacher.objects.filter(status='dormant').count()
+        left_count = Teacher.objects.filter(status='left').count()
+        total_count = Teacher.objects.count()
 
         # Pagination
-        paginator = Paginator(teachers, 20)  # Show 15 teachers per page
+        paginator = Paginator(teachers, per_page)
         page_number = request.GET.get('page')
         page_obj = paginator.get_page(page_number)
 
         return render(request, self.template_name, {
             'page_obj': page_obj,
             'active_tab': status,
+            'per_page': per_page,
+            'counts': {
+                'active': active_count,
+                'dormant': dormant_count,
+                'left': left_count,
+                'total': total_count
+            }
         })
 
 class TeacherBulkActionView(View, AdminRequiredMixin):
@@ -168,16 +183,17 @@ class TeacherBulkActionView(View, AdminRequiredMixin):
             return redirect('teacher_list')
 
         teachers = Teacher.objects.filter(user__id__in=selected_teachers)
+        count = teachers.count()
 
         if action == 'mark_active':
             teachers.update(status='active')
-            messages.success(request, "Selected teachers marked as active.")
+            messages.success(request, f"{count} teacher(s) marked as active.")
         elif action == 'mark_inactive':
             teachers.update(status='dormant')
-            messages.success(request, "Selected teachers marked as dormant.")
+            messages.success(request, f"{count} teacher(s) marked as dormant.")
         elif action == 'mark_left':
             teachers.update(status='left')
-            messages.success(request, "Selected teachers marked left.")
+            messages.success(request, f"{count} teacher(s) marked as left.")
         else:
             messages.error(request, "Invalid bulk action.")
 
@@ -202,27 +218,17 @@ class TeacherUpdateView(View):
 
     def get(self, request, pk, *args, **kwargs):
         teacher = get_object_or_404(Teacher, pk=pk)
-        form = TeacherRegistrationForm(instance=teacher.user, teacher_instance=teacher)
+        form = TeacherRegistrationForm(instance=teacher.user, teacher_instance=teacher, is_update=True)
         return render(request, self.template_name, {'form': form, 'is_update': True, 'teacher': teacher})
 
     def post(self, request, pk, *args, **kwargs):
         teacher = get_object_or_404(Teacher, pk=pk)
-        form = TeacherRegistrationForm(request.POST, request.FILES, instance=teacher.user, teacher_instance=teacher)
+        form = TeacherRegistrationForm(request.POST, request.FILES, instance=teacher.user, teacher_instance=teacher, is_update=True)
+        
         if form.is_valid():
-            user = form.save(commit=False)
-            user.save()
-
-            teacher.gender = form.cleaned_data['gender']
-            teacher.date_of_birth = form.cleaned_data['date_of_birth']
-            teacher.contact = form.cleaned_data['contact']
-            teacher.profile_image = form.cleaned_data['profile_image']
-            teacher.address = form.cleaned_data['address']
-
-            teacher.save()
-
+            form.save()  # This will save both user and teacher
             return redirect('teacher_detail', pk=teacher.pk)
         
-        print(f"Form Errors: {form.errors}")
         return render(request, self.template_name, {'form': form, 'is_update': True, 'teacher': teacher})
  
 class TeacherDetailView(View):
@@ -790,10 +796,11 @@ def compose_message(request):
         if student:
             teacher_ids = Teacher.objects.filter(
                 Q(teacherassignment__class_assigned=student.current_class) |
-                Q(subjectassignment__class_assigned=student.current_class)
+                Q(subjectassignment__class_assigned=student.current_class),
+                status='active'
             ).values_list('user_id', flat=True)
             recipient_qs = CustomUser.objects.filter(Q(id__in=teacher_ids) | Q(role='admin')).exclude(pk=sender.pk).distinct()
-            student_context_qs = Student.objects.filter(pk=student.pk)
+            student_context_qs = Student.objects.filter(pk=student.pk, status='active')
 
     elif sender.role == 'teacher':
         # Teachers can message guardians of their students, colleagues, and admins
@@ -819,7 +826,8 @@ def compose_message(request):
             wards = guardian.students.all()
             teacher_ids = Teacher.objects.filter(
                 Q(teacherassignment__class_assigned__in=wards.values_list('current_class', flat=True)) |
-                Q(subjectassignment__class_assigned__in=wards.values_list('current_class', flat=True))
+                Q(subjectassignment__class_assigned__in=wards.values_list('current_class', flat=True)),
+                status='active'
             ).values_list('user_id', flat=True)
             recipient_qs = CustomUser.objects.filter(Q(id__in=teacher_ids) | Q(role='admin')).distinct()
             student_context_qs = wards
@@ -1671,7 +1679,7 @@ def grade_essay_assessment(request, submission_id):
 @login_required
 def create_exam(request):
     user = request.user
-    teacher_profile = Teacher.objects.filter(user=user).first() 
+    teacher_profile = Teacher.objects.filter(user=user, status='active').first() 
 
     if teacher_profile:
         assigned_classes_qs = teacher_profile.assigned_classes()
@@ -1730,7 +1738,7 @@ def create_exam(request):
 def update_exam(request, exam_id):
     exam = get_object_or_404(Exam, id=exam_id)
     user = request.user
-    teacher_profile = Teacher.objects.filter(user=user).first()
+    teacher_profile = Teacher.objects.filter(user=user, status='active').first()
 
     # Authorization: allow superuser, creators, or class form teacher
     if not _user_can_edit_created_object(user, exam):
@@ -2047,3 +2055,110 @@ def grade_essay_exam(request, submission_id):
     }
 
     return render(request, 'exam/grade_essay_exam.html', context)
+
+
+@login_required
+def export_teachers(request):
+    """Export teacher data to Excel or PDF"""
+    import openpyxl
+    from openpyxl.styles import Font, Alignment, PatternFill
+    from django.http import HttpResponse
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import letter, landscape
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle
+    from io import BytesIO
+    
+    export_format = request.GET.get('format', 'excel')
+    status_filter = request.GET.get('status', '')
+    
+    teachers = Teacher.objects.select_related('user').order_by('user__last_name')
+    
+    if status_filter:
+        teachers = teachers.filter(status=status_filter)
+    
+    if export_format == 'excel':
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Teachers"
+        
+        header_fill = PatternFill(start_color="10B981", end_color="10B981", fill_type="solid")
+        header_font = Font(bold=True, color="FFFFFF", size=12)
+        header_alignment = Alignment(horizontal="center", vertical="center")
+        
+        headers = ['Employee ID', 'First Name', 'Last Name', 'Email', 'Gender', 
+                   'Date of Birth', 'Contact', 'Address', 'Status']
+        ws.append(headers)
+        
+        for cell in ws[1]:
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = header_alignment
+        
+        for teacher in teachers:
+            ws.append([
+                teacher.employee_id if hasattr(teacher, 'employee_id') else '',
+                teacher.user.first_name,
+                teacher.user.last_name,
+                teacher.user.email,
+                teacher.get_gender_display(),
+                teacher.date_of_birth.strftime('%Y-%m-%d') if teacher.date_of_birth else '',
+                teacher.contact or '',
+                teacher.address or '',
+                teacher.get_status_display()
+            ])
+        
+        for column in ws.columns:
+            max_length = 0
+            column_letter = column[0].column_letter
+            for cell in column:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            adjusted_width = min(max_length + 2, 50)
+            ws.column_dimensions[column_letter].width = adjusted_width
+        
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename="teachers_{timezone.now().strftime("%Y%m%d")}.xlsx"'
+        wb.save(response)
+        return response
+        
+    elif export_format == 'pdf':
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=landscape(letter))
+        elements = []
+        
+        data = [['Employee ID', 'Name', 'Email', 'Gender', 'Contact', 'Status']]
+        
+        for teacher in teachers:
+            data.append([
+                teacher.employee_id if hasattr(teacher, 'employee_id') else '',
+                teacher.user.get_full_name(),
+                teacher.user.email,
+                teacher.get_gender_display(),
+                teacher.contact or 'N/A',
+                teacher.get_status_display()
+            ])
+        
+        table = Table(data)
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#10B981')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black)
+        ]))
+        
+        elements.append(table)
+        doc.build(elements)
+        
+        buffer.seek(0)
+        response = HttpResponse(buffer.read(), content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="teachers_{timezone.now().strftime("%Y%m%d")}.pdf"'
+        return response

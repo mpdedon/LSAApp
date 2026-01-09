@@ -1,46 +1,98 @@
-<!-- subject_list.html -->
-
-{% extends 'base.html' %} <!-- Assuming you have a base.html for common layout -->
+{% extends 'base_admin_sidebar.html' %}
+{% load static %}
 
 {% block content %}
-<div class="container mt-4">
-    <h2>Subject List</h2>
-    <a href="{% url 'subject_create' %}" class="btn btn-success mb-3">Add New Subject</a>
-    {% if subjects %}
-        <table class="table table-striped table-bordered">
-            <thead class="thead-dark">
-                <tr>
-                    <th>Subject Name</th>
-                    <th>Description</th>
-                    <th>Weight</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                <!-- Loop through all subjects and display them -->
-                {% for subject in subjects %}
-                    <tr>
-                        <td>{{ subject.name }}</td>
-                        <td>{{ subject.description|truncatewords:10 }}</td> <!-- Truncate long descriptions -->
-                        <td>{{ subject.subject_weight }}</td>
-                        <td>
-                            <!-- Action buttons for editing, deleting, and viewing more details -->
-                            <a href="{% url 'subject_detail' subject.id %}" class="btn btn-info btn-sm">View</a>
-                            <a href="{% url 'subject_update' subject.id %}" class="btn btn-warning btn-sm">Edit</a>
-                            <a href="{% url 'subject_delete' subject.id %}" class="btn btn-danger btn-sm" 
-                               onclick="return confirm('Are you sure you want to delete this subject?');">
-                               Delete
-                            </a>
-                        </td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    {% else %}
-        <div class="alert alert-warning">
-            No subjects found. Click "Add New Subject" to create one.
+<div class="container-fluid px-4 py-3">
+    <!-- Header with gradient -->
+    <div class="card border-0 shadow-sm mb-4" style="background: linear-gradient(135deg, #aed63f 0%, #5fa24b 100%);">
+        <div class="card-body py-3">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h4 class="text-white mb-1"><i class="bi bi-book me-2"></i>Subjects</h4>
+                    <p class="text-white-50 mb-0 small">Manage curriculum subjects</p>
+                </div>
+                <a href="{% url 'subject_create' %}" class="btn btn-light btn-sm">
+                    <i class="bi bi-plus-circle me-1"></i>Add Subject
+                </a>
+            </div>
         </div>
-    {% endif %}
+    </div>
+
+    <!-- Subjects Grid -->
+    <div class="row g-3">
+        {% for subject in subjects %}
+        <div class="col-xl-3 col-lg-4 col-md-6">
+            <div class="card h-100 border-0 shadow-sm hover-lift">
+                <!-- Card Header -->
+                <div class="card-header text-white py-2" style="background: linear-gradient(135deg, #eaa166 0%, #d48318 100%);">
+                    <h6 class="mb-0 fw-bold">{{ subject.name }}</h6>
+                </div>
+
+                <!-- Card Body -->
+                <div class="card-body py-2">
+                    <!-- Description -->
+                    <div class="mb-2">
+                        <small class="text-muted d-block" style="font-size: 0.7rem;">DESCRIPTION</small>
+                        <p class="mb-0 small text-truncate" title="{{ subject.description }}">
+                            {% if subject.description %}
+                                {{ subject.description|truncatewords:10 }}
+                            {% else %}
+                                <em class="text-muted">No description</em>
+                            {% endif %}
+                        </p>
+                    </div>
+
+                    <!-- Weight -->
+                    <div class="d-flex align-items-center gap-2 mt-2">
+                        <div class="flex-fill text-center p-2 rounded" style="background-color: #f8f9fa;">
+                            <small class="text-muted d-block" style="font-size: 0.7rem;">WEIGHT</small>
+                            <strong class="text-primary">{{ subject.subject_weight }}</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Card Footer - Actions -->
+                <div class="card-footer bg-light border-0 py-2">
+                    <div class="d-flex justify-content-end gap-1">
+                        <a href="{% url 'subject_detail' subject.id %}" 
+                           class="btn btn-sm btn-outline-primary" 
+                           title="View">
+                            <i class="bi bi-eye"></i>
+                        </a>
+                        <a href="{% url 'subject_update' subject.id %}" 
+                           class="btn btn-sm btn-outline-success" 
+                           title="Edit">
+                            <i class="bi bi-pencil"></i>
+                        </a>
+                        <a href="{% url 'subject_delete' subject.id %}" 
+                           class="btn btn-sm btn-outline-danger" 
+                           title="Delete"
+                           onclick="return confirm('Are you sure you want to delete this subject?');">
+                            <i class="bi bi-trash"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12">
+            <div class="alert alert-info text-center">
+                <i class="bi bi-info-circle me-2"></i>No subjects found. <a href="{% url 'subject_create' %}">Add your first subject</a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
 </div>
+
+<style>
+    .hover-lift {
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+    
+    .hover-lift:hover {
+        transform: translateY(-5px);
+        box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.15) !important;
+    }
+</style>
 {% endblock %}
 

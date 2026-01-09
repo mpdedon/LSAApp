@@ -1,47 +1,106 @@
-<!-- session_list.html -->
+﻿{% extends 'base_admin_sidebar.html' %}
 
-{% extends 'base.html' %}
+{% block title %}Session Management{% endblock %}
 
 {% block content %}
-<div class="container mt-5">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h2>Session List</h2>
-        <a href="{% url 'session_create' %}" class="btn btn-primary">Add New Session</a>
+<div class="container-fluid px-4 py-3">
+    <!-- Header with Indigo gradient -->
+    <div class="card border-0 shadow-sm mb-4" style="background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);">
+        <div class="card-body py-3">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h4 class="text-white mb-1"><i class="bi bi-calendar-range me-2"></i>Academic Sessions</h4>
+                    <p class="text-white-50 mb-0 small">Manage all academic session periods</p>
+                </div>
+                <a href="{% url 'session_create' %}" class="btn btn-light btn-sm">
+                    <i class="bi bi-plus-circle me-1"></i> Create New Session
+                </a>
+            </div>
+        </div>
     </div>
 
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                <i class="bi bi-info-circle-fill me-2"></i>{{ message }}
+                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
     {% if sessions %}
-        <table class="table table-bordered table-striped">
-            <thead class="thead-dark">
-                <tr>
-                    <th scope="col">#</th>
-                    <th scope="col">Session Name</th>
-                    <th scope="col">Start Date</th>
-                    <th scope="col">End Date</th>
-                    <th scope="col" class="text-center">Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for session in sessions %}
-                    <tr>
-                        <th scope="row">{{ forloop.counter }}</th>
-                        <td>{{ session.name }}</td>
-                        <td>{{ session.start_date|date:"F j, Y" }}</td>
-                        <td>{{ session.end_date|date:"F j, Y" }}</td>
-                        <td class="text-center">
-                            <a href="{% url 'session_detail' session.id %}" class="btn btn-info btn-sm">View</a>
-                            <a href="{% url 'session_update' session.id %}" class="btn btn-warning btn-sm">Edit</a>
-                            <a href="{% url 'session_delete' session.id %}" class="btn btn-danger btn-sm"
-                               onclick="return confirm('Are you sure you want to delete this session?');">Delete</a>
-                        </td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        <div class="card border-0 shadow-sm">
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th class="ps-4" style="width: 5%;">#</th>
+                                <th style="width: 30%;">Session Name</th>
+                                <th style="width: 18%;">Start Date</th>
+                                <th style="width: 18%;">End Date</th>
+                                <th class="text-center" style="width: 12%;">Status</th>
+                                <th class="text-center pe-4" style="width: 17%;">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for session in sessions %}
+                                <tr>
+                                    <td class="ps-4">{{ forloop.counter }}</td>
+                                    <td class="fw-semibold">{{ session.name }}</td>
+                                    <td>{{ session.start_date|date:"M d, Y" }}</td>
+                                    <td>{{ session.end_date|date:"M d, Y" }}</td>
+                                    <td class="text-center">
+                                        {% if session.is_active %}
+                                            <span class="badge bg-success"><i class="bi bi-check-circle me-1"></i>Active</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Inactive</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-center pe-4">
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <a href="{% url 'session_detail' session.id %}" class="btn btn-outline-info" title="View Details">
+                                                <i class="bi bi-eye"></i>
+                                            </a>
+                                            <a href="{% url 'session_update' session.id %}" class="btn btn-outline-warning" title="Edit">
+                                                <i class="bi bi-pencil"></i>
+                                            </a>
+                                            <a href="{% url 'session_delete' session.id %}" class="btn btn-outline-danger" title="Delete"
+                                               onclick="return confirm('Are you sure you want to delete {{ session.name }}?');">
+                                                <i class="bi bi-trash"></i>
+                                            </a>
+                                        </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
     {% else %}
-        <div class="alert alert-warning">
-            No sessions available. Click <a href="{% url 'session_create' %}" class="alert-link">here</a> to add a new session.
+        <div class="card border-0 shadow-sm">
+            <div class="card-body text-center py-5">
+                <i class="bi bi-calendar-x display-1 text-muted mb-3"></i>
+                <h5 class="text-muted">No Sessions Available</h5>
+                <p class="text-muted">Get started by creating your first academic session.</p>
+                <a href="{% url 'session_create' %}" class="btn btn-indigo">
+                    <i class="bi bi-plus-circle me-2"></i>Create New Session
+                </a>
+            </div>
         </div>
     {% endif %}
 </div>
-{% endblock %}
 
+<style>
+    .btn-indigo {
+        background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+        border: none;
+        color: white;
+    }
+    .btn-indigo:hover {
+        background: linear-gradient(135deg, #4f46e5 0%, #4338ca 100%);
+        color: white;
+    }
+</style>
+{% endblock %}

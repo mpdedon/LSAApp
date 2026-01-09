@@ -1,197 +1,963 @@
 <!-- student_form.html -->
 
-{% extends 'base.html' %}
+{% extends 'base_admin_sidebar.html' %}
 {% load add_class %}
+{% load static %}
 
 {% block content %}
-<script>
-  function previewImage(input) {
-      var file = input.files[0];
-      var reader = new FileReader();
+<style>
+    /* Student Form - Purple Theme */
+    .student-wizard-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 2rem;
+        border-radius: 15px 15px 0 0;
+        box-shadow: 0 4px 6px rgba(102, 126, 234, 0.3);
+    }
+    
+    .student-wizard-container {
+        max-width: 900px;
+        margin: 2rem auto;
+    }
+    
+    .student-wizard-card {
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        overflow: hidden;
+    }
+    
+    .student-wizard-steps {
+        display: flex;
+        justify-content: space-between;
+        background: white;
+        padding: 1.5rem 2rem;
+        border-bottom: 2px solid #f3f4f6;
+    }
+    
+    .student-wizard-step {
+        flex: 1;
+        text-align: center;
+        position: relative;
+        cursor: pointer;
+    }
+    
+    .student-wizard-step:not(:last-child)::after {
+        content: '';
+        position: absolute;
+        top: 20px;
+        right: -50%;
+        width: 100%;
+        height: 2px;
+        background: #e5e7eb;
+        z-index: -1;
+    }
+    
+    .student-wizard-step.active:not(:last-child)::after {
+        background: linear-gradient(to right, #667eea, #764ba2);
+    }
+    
+    .student-wizard-step-number {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        background: #e5e7eb;
+        color: #6b7280;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+        transition: all 0.3s ease;
+    }
+    
+    .student-wizard-step.active .student-wizard-step-number {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        transform: scale(1.1);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    }
+    
+    .student-wizard-step.completed .student-wizard-step-number {
+        background: #10b981;
+        color: white;
+    }
+    
+    .student-wizard-step-title {
+        font-size: 0.875rem;
+        font-weight: 500;
+        color: #6b7280;
+    }
+    
+    .student-wizard-step.active .student-wizard-step-title {
+        color: #667eea;
+        font-weight: 600;
+    }
+    
+    .student-wizard-step.completed .student-wizard-step-title {
+        color: #10b981;
+    }
+    
+    .student-wizard-content {
+        padding: 2rem;
+        min-height: 400px;
+    }
+    
+    .student-wizard-panel {
+        display: none;
+        animation: fadeIn 0.3s ease-in;
+    }
+    
+    .student-wizard-panel.active {
+        display: block;
+    }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .student-form-group {
+        margin-bottom: 1.5rem;
+    }
+    
+    .student-form-label {
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 0.5rem;
+        display: block;
+    }
+    
+    .student-form-label.required::after {
+        content: ' *';
+        color: #dc2626;
+    }
+    
+    .student-form-control {
+        border: 2px solid #e5e7eb;
+        border-radius: 8px;
+        padding: 0.75rem 1rem;
+        font-size: 0.9375rem;
+        transition: all 0.2s ease;
+    }
+    
+    .student-form-control:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        outline: none;
+    }
+    
+    .student-form-control.is-invalid {
+        border-color: #dc2626;
+    }
+    
+    .student-form-help {
+        font-size: 0.8125rem;
+        color: #6b7280;
+        margin-top: 0.25rem;
+    }
+    
+    .student-form-error {
+        color: #dc2626;
+        font-size: 0.8125rem;
+        margin-top: 0.25rem;
+        display: flex;
+        align-items-center;
+    }
+    
+    .student-form-error i {
+        margin-right: 0.25rem;
+    }
+    
+    .student-image-upload {
+        border: 2px dashed #d1d5db;
+        border-radius: 12px;
+        padding: 2rem;
+        text-align: center;
+        transition: all 0.3s ease;
+        cursor: pointer;
+        background: #f9fafb;
+    }
+    
+    .student-image-upload:hover {
+        border-color: #667eea;
+        background: #f3f4f6;
+    }
+    
+    .student-image-upload.drag-over {
+        border-color: #667eea;
+        background: #ede9fe;
+    }
+    
+    .student-image-preview {
+        max-width: 200px;
+        max-height: 200px;
+        border-radius: 12px;
+        margin: 1rem auto;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        display: none;
+    }
+    
+    .student-image-preview.show {
+        display: block;
+    }
+    
+    .student-wizard-buttons {
+        display: flex;
+        justify-content: space-between;
+        padding: 1.5rem 2rem;
+        background: #f9fafb;
+        border-top: 2px solid #e5e7eb;
+    }
+    
+    .student-btn {
+        padding: 0.75rem 2rem;
+        border-radius: 8px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        border: none;
+        cursor: pointer;
+    }
+    
+    .student-btn-prev {
+        background: white;
+        color: #6b7280;
+        border: 2px solid #e5e7eb;
+    }
+    
+    .student-btn-prev:hover {
+        background: #f3f4f6;
+        border-color: #d1d5db;
+    }
+    
+    .student-btn-next, .student-btn-submit {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    }
+    
+    .student-btn-next:hover, .student-btn-submit:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+    }
+    
+    .student-summary-card {
+        background: #f9fafb;
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 1rem;
+    }
+    
+    .student-summary-title {
+        font-weight: 600;
+        color: #374151;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid #e5e7eb;
+    }
+    
+    .student-summary-item {
+        display: flex;
+        justify-content: space-between;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid #e5e7eb;
+    }
+    
+    .student-summary-label {
+        color: #6b7280;
+        font-weight: 500;
+    }
+    
+    .student-summary-value {
+        color: #111827;
+        font-weight: 600;
+    }
+    
+    .student-progress-bar {
+        height: 6px;
+        background: #e5e7eb;
+        border-radius: 10px;
+        overflow: hidden;
+        margin: 1rem 0;
+    }
+    
+    .student-progress-fill {
+        height: 100%;
+        background: linear-gradient(to right, #667eea, #764ba2);
+        transition: width 0.3s ease;
+    }
+</style>
 
-      reader.onload = function(e) {
-          document.getElementById('profile-img-preview').src = e.target.result;
-          document.getElementById('profile-img-preview').style.display = 'block';
-      };
-
-      reader.readAsDataURL(file);
-  }
-
-  document.getElementById('{{ form.profile_image.id_for_label }}').addEventListener('change', function() {
-      previewImage(this);
-  });
-</script>
-
-<div class="container mt-5">
-    <div class="card shadow">
-        <!-- Card Header -->
-        <div class="card-header">
-            <h3 class="mb-2">{% if is_update %}Update Student{% else %}Register Student{% endif %}</h3>
+<div class="student-wizard-container">
+    <div class="student-wizard-card">
+        <!-- Header -->
+        <div class="student-wizard-header">
+            <div class="text-center">
+                <h2 class="mb-2">
+                    <i class="bi bi-person-plus-fill me-2"></i>
+                    {% if is_update %}Update Student Information{% else %}New Student Registration{% endif %}
+                </h2>
+                <p class="mb-0 opacity-75">
+                    {% if is_update %}Update the student's details below{% else %}Complete the form below to register a new student{% endif %}
+                </p>
+            </div>
+            <div class="student-progress-bar mt-3">
+                <div class="student-progress-fill" id="progress-bar" style="width: 33%;"></div>
+            </div>
         </div>
 
-        <!-- Card Body -->
-        <div class="card-body">
-            <form method="post" enctype="multipart/form-data" novalidate>
-                {% csrf_token %}
-                
-                <div class="row">
-                    <!-- Username -->
-                    <div class="col-md-6 mb-3">
-                        {{ form.username.label_tag }}
-                        {{ form.username|add_class:"form-control" }}
-                        {% if form.username.help_text %}
-                            <small class="form-text text-muted">{{ form.username.help_text }}</small>
-                        {% endif %}
-                        {% for error in form.username.errors %}
-                            <div class="text-danger">{{ error }}</div>
-                        {% endfor %}
+        <!-- Multi-step Form (only for new registrations) -->
+        {% if not is_update %}
+        <div class="student-wizard-steps">
+            <div class="student-wizard-step active" data-step="1">
+                <div class="student-wizard-step-number">1</div>
+                <div class="student-wizard-step-title">Account Info</div>
+            </div>
+            <div class="student-wizard-step" data-step="2">
+                <div class="student-wizard-step-number">2</div>
+                <div class="student-wizard-step-title">Personal Details</div>
+            </div>
+            <div class="student-wizard-step" data-step="3">
+                <div class="student-wizard-step-number">3</div>
+                <div class="student-wizard-step-title">Guardian & Class</div>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Form -->
+        <form method="post" enctype="multipart/form-data" id="student-form" novalidate>
+            {% csrf_token %}
+            
+            <div class="student-wizard-content">
+                <!-- Step 1: Account Information (or all fields for update) -->
+                <div class="student-wizard-panel {% if is_update %}active{% else %}active{% endif %}" data-panel="1">
+                    <h4 class="mb-4">
+                        <i class="bi bi-person-badge me-2 text-primary"></i>
+                        {% if is_update %}Student Information{% else %}Account Information{% endif %}
+                    </h4>
+                    
+                    <div class="row">
+                        <div class="col-md-6 student-form-group">
+                            <label class="student-form-label required">Username</label>
+                            {{ form.username|add_class:"form-control student-form-control" }}
+                            {% if form.username.help_text %}
+                                <small class="student-form-help">{{ form.username.help_text }}</small>
+                            {% endif %}
+                            {% for error in form.username.errors %}
+                                <div class="student-form-error">
+                                    <i class="bi bi-exclamation-circle"></i>{{ error }}
+                                </div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="col-md-6 student-form-group">
+                            <label class="student-form-label required">Email</label>
+                            {{ form.email|add_class:"form-control student-form-control" }}
+                            {% for error in form.email.errors %}
+                                <div class="student-form-error">
+                                    <i class="bi bi-exclamation-circle"></i>{{ error }}
+                                </div>
+                            {% endfor %}
+                        </div>
                     </div>
 
-                    <!-- Email -->
-                    <div class="col-md-6 mb-3">
-                        {{ form.email.label_tag }}
-                        {{ form.email|add_class:"form-control" }}
-                        {% for error in form.email.errors %}
-                            <div class="text-danger">{{ error }}</div>
-                        {% endfor %}
-                    </div>
-                </div>
+                    <div class="row">
+                        <div class="col-md-6 student-form-group">
+                            <label class="student-form-label required">First Name</label>
+                            {{ form.first_name|add_class:"form-control student-form-control" }}
+                            {% for error in form.first_name.errors %}
+                                <div class="student-form-error">
+                                    <i class="bi bi-exclamation-circle"></i>{{ error }}
+                                </div>
+                            {% endfor %}
+                        </div>
 
-                <div class="row">
-                    <!-- First Name -->
-                    <div class="col-md-6 mb-3">
-                        {{ form.first_name.label_tag }}
-                        {{ form.first_name|add_class:"form-control" }}
-                        {% for error in form.first_name.errors %}
-                            <div class="text-danger">{{ error }}</div>
-                        {% endfor %}
+                        <div class="col-md-6 student-form-group">
+                            <label class="student-form-label required">Last Name</label>
+                            {{ form.last_name|add_class:"form-control student-form-control" }}
+                            {% for error in form.last_name.errors %}
+                                <div class="student-form-error">
+                                    <i class="bi bi-exclamation-circle"></i>{{ error }}
+                                </div>
+                            {% endfor %}
+                        </div>
                     </div>
 
-                    <!-- Last Name -->
-                    <div class="col-md-6 mb-3">
-                        {{ form.last_name.label_tag }}
-                        {{ form.last_name|add_class:"form-control" }}
-                        {% for error in form.last_name.errors %}
-                            <div class="text-danger">{{ error }}</div>
-                        {% endfor %}
+                    {% if not is_update %}
+                    <div class="row">
+                        <div class="col-md-6 student-form-group">
+                            <label class="student-form-label required">Password</label>
+                            {{ form.password1|add_class:"form-control student-form-control" }}
+                            <small class="student-form-help">
+                                <i class="bi bi-info-circle me-1"></i>
+                                Password must be at least 8 characters
+                            </small>
+                            {% for error in form.password1.errors %}
+                                <div class="student-form-error">
+                                    <i class="bi bi-exclamation-circle"></i>{{ error }}
+                                </div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="col-md-6 student-form-group">
+                            <label class="student-form-label required">Confirm Password</label>
+                            {{ form.password2|add_class:"form-control student-form-control" }}
+                            {% for error in form.password2.errors %}
+                                <div class="student-form-error">
+                                    <i class="bi bi-exclamation-circle"></i>{{ error }}
+                                </div>
+                            {% endfor %}
+                        </div>
                     </div>
+                    {% endif %}
+                    
+                    {% if is_update %}
+                    <!-- Show all fields for update mode -->
+                    <hr class="my-4">
+                    <h5 class="mb-3">
+                        <i class="bi bi-person-lines-fill me-2 text-primary"></i>
+                        Personal Details
+                    </h5>
+                    
+                    <div class="row">
+                        <div class="col-md-6 student-form-group">
+                            <label class="student-form-label required">Date of Birth</label>
+                            {{ form.date_of_birth|add_class:"form-control student-form-control" }}
+                            {% for error in form.date_of_birth.errors %}
+                                <div class="student-form-error">
+                                    <i class="bi bi-exclamation-circle"></i>{{ error }}
+                                </div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="col-md-6 student-form-group">
+                            <label class="student-form-label required">Gender</label>
+                            {{ form.gender|add_class:"form-select student-form-control" }}
+                            {% for error in form.gender.errors %}
+                                <div class="student-form-error">
+                                    <i class="bi bi-exclamation-circle"></i>{{ error }}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-12 student-form-group">
+                            <label class="student-form-label">Profile Image</label>
+                            <div class="student-image-upload" id="image-upload-area">
+                                <i class="bi bi-cloud-upload text-primary" style="font-size: 3rem;"></i>
+                                <p class="mb-2 mt-2">Click to upload or drag and drop</p>
+                                <small class="text-muted">PNG, JPG up to 5MB</small>
+                                {{ form.profile_image|add_class:"d-none" }}
+                            </div>
+                            <img id="profile-img-preview" class="student-image-preview" src="#" alt="Preview">
+                            {% for error in form.profile_image.errors %}
+                                <div class="student-form-error">
+                                    <i class="bi bi-exclamation-circle"></i>{{ error }}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    
+                    <hr class="my-4">
+                    <h5 class="mb-3">
+                        <i class="bi bi-people-fill me-2 text-primary"></i>
+                        Guardian & Class Assignment
+                    </h5>
+                    
+                    <div class="row">
+                        <div class="col-md-6 student-form-group">
+                            <label class="student-form-label">Guardian</label>
+                            {{ form.student_guardian|add_class:"form-select student-form-control" }}
+                            {% for error in form.student_guardian.errors %}
+                                <div class="student-form-error">
+                                    <i class="bi bi-exclamation-circle"></i>{{ error }}
+                                </div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="col-md-6 student-form-group">
+                            <label class="student-form-label">Relationship</label>
+                            {{ form.relationship|add_class:"form-control student-form-control" }}
+                            <small class="student-form-help">e.g., Father, Mother, Uncle, etc.</small>
+                            {% for error in form.relationship.errors %}
+                                <div class="student-form-error">
+                                    <i class="bi bi-exclamation-circle"></i>{{ error }}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 student-form-group">
+                            <label class="student-form-label">Current Class</label>
+                            {{ form.current_class|add_class:"form-select student-form-control" }}
+                            {% for error in form.current_class.errors %}
+                                <div class="student-form-error">
+                                    <i class="bi bi-exclamation-circle"></i>{{ error }}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endif %}
                 </div>
 
                 {% if not is_update %}
-                <div class="row">
-                    <!-- Password1 -->
-                    <div class="col-md-6 mb-3">
-                        {{ form.password1.label_tag }}
-                        {{ form.password1|add_class:"form-control" }}
-                        {% for error in form.password1.errors %}
-                            <div class="text-danger">{{ error }}</div>
-                        {% endfor %}
+                <!-- Step 2: Personal Details -->
+                <div class="student-wizard-panel" data-panel="2">
+                    <h4 class="mb-4">
+                        <i class="bi bi-person-lines-fill me-2 text-primary"></i>
+                        Personal Details
+                    </h4>
+                    
+                    <div class="row">
+                        <div class="col-md-6 student-form-group">
+                            <label class="student-form-label required">Date of Birth</label>
+                            {{ form.date_of_birth|add_class:"form-control student-form-control" }}
+                            {% for error in form.date_of_birth.errors %}
+                                <div class="student-form-error">
+                                    <i class="bi bi-exclamation-circle"></i>{{ error }}
+                                </div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="col-md-6 student-form-group">
+                            <label class="student-form-label required">Gender</label>
+                            {{ form.gender|add_class:"form-select student-form-control" }}
+                            {% for error in form.gender.errors %}
+                                <div class="student-form-error">
+                                    <i class="bi bi-exclamation-circle"></i>{{ error }}
+                                </div>
+                            {% endfor %}
+                        </div>
                     </div>
 
-                    <!-- Password2 -->
-                    <div class="col-md-6 mb-3">
-                        {{ form.password2.label_tag }}
-                        {{ form.password2|add_class:"form-control" }}
-                        {% for error in form.password2.errors %}
-                            <div class="text-danger">{{ error }}</div>
-                        {% endfor %}
-                    </div>
-                </div>
-                {% endif %}
-
-                <div class="row">
-                    <!-- Date of Birth -->
-                    <div class="col-md-6 mb-3">
-                        {{ form.date_of_birth.label_tag }}
-                        {{ form.date_of_birth|add_class:"form-control" }}
-                        {% for error in form.date_of_birth.errors %}
-                            <div class="text-danger">{{ error }}</div>
-                        {% endfor %}
-                    </div>
-
-                    <!-- Gender -->
-                    <div class="col-md-6 mb-3">
-                        {{ form.gender.label_tag }}
-                        {{ form.gender|add_class:"form-select" }}
-                        {% for error in form.gender.errors %}
-                            <div class="text-danger">{{ error }}</div>
-                        {% endfor %}
-                    </div>
-                </div>
-
-                <div class="row">
-                    <!-- Profile Image -->
-                    <div class="col-md-6 mb-3">
-                        {{ form.profile_image.label_tag }}
-                        {{ form.profile_image|add_class:"form-control" }}
-                        {% for error in form.profile_image.errors %}
-                            <div class="text-danger">{{ error }}</div>
-                        {% endfor %}
-                        <img id="profile-img-preview" src="#" alt="Profile Image Preview" style="display: none; width: 150px; margin-top: 10px;">
-                    </div>
-
-                    <!-- Student Guardian -->
-                    <div class="col-md-6 mb-3">
-                        {{ form.student_guardian.label_tag }}
-                        {{ form.student_guardian|add_class:"form-select" }}
-                        {% for error in form.student_guardian.errors %}
-                            <div class="text-danger">{{ error }}</div>
-                        {% endfor %}
+                    <div class="row">
+                        <div class="col-md-12 student-form-group">
+                            <label class="student-form-label">Profile Image</label>
+                            <div class="student-image-upload" id="image-upload-area">
+                                <i class="bi bi-cloud-upload text-primary" style="font-size: 3rem;"></i>
+                                <p class="mb-2 mt-2">Click to upload or drag and drop</p>
+                                <small class="text-muted">PNG, JPG up to 5MB</small>
+                                {{ form.profile_image|add_class:"d-none" }}
+                            </div>
+                            <img id="profile-img-preview" class="student-image-preview" src="#" alt="Preview">
+                            {% for error in form.profile_image.errors %}
+                                <div class="student-form-error">
+                                    <i class="bi bi-exclamation-circle"></i>{{ error }}
+                                </div>
+                            {% endfor %}
+                        </div>
                     </div>
                 </div>
 
-                <div class="row">
-                    <!-- Relationship -->
-                    <div class="col-md-6 mb-3">
-                        {{ form.relationship.label_tag }}
-                        {{ form.relationship|add_class:"form-control" }}
-                        {% for error in form.relationship.errors %}
-                            <div class="text-danger">{{ error }}</div>
-                        {% endfor %}
+                <!-- Step 3: Guardian & Class -->
+                <div class="student-wizard-panel" data-panel="3">
+                    <h4 class="mb-4">
+                        <i class="bi bi-people-fill me-2 text-primary"></i>
+                        Guardian & Class Assignment
+                    </h4>
+                    
+                    <div class="row">
+                        <div class="col-md-6 student-form-group">
+                            <label class="student-form-label">Guardian</label>
+                            {{ form.student_guardian|add_class:"form-select student-form-control" }}
+                            <small class="student-form-help">Select the student's guardian</small>
+                            {% for error in form.student_guardian.errors %}
+                                <div class="student-form-error">
+                                    <i class="bi bi-exclamation-circle"></i>{{ error }}
+                                </div>
+                            {% endfor %}
+                        </div>
+
+                        <div class="col-md-6 student-form-group">
+                            <label class="student-form-label">Relationship</label>
+                            {{ form.relationship|add_class:"form-control student-form-control" }}
+                            <small class="student-form-help">e.g., Father, Mother, Uncle, etc.</small>
+                            {% for error in form.relationship.errors %}
+                                <div class="student-form-error">
+                                    <i class="bi bi-exclamation-circle"></i>{{ error }}
+                                </div>
+                            {% endfor %}
+                        </div>
                     </div>
 
-                    <!-- Current Class -->
-                    <div class="col-md-6 mb-3">
-                        {{ form.current_class.label_tag }}
-                        {{ form.current_class|add_class:"form-select" }}
-                        {% for error in form.current_class.errors %}
-                            <div class="text-danger">{{ error }}</div>
-                        {% endfor %}
+                    <div class="row">
+                        <div class="col-md-6 student-form-group">
+                            <label class="student-form-label">Current Class</label>
+                            {{ form.current_class|add_class:"form-select student-form-control" }}
+                            <small class="student-form-help">Assign student to a class (optional)</small>
+                            {% for error in form.current_class.errors %}
+                                <div class="student-form-error">
+                                    <i class="bi bi-exclamation-circle"></i>{{ error }}
+                                </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <!-- Summary Section -->
+                    <div class="mt-4">
+                        <div class="student-summary-card">
+                            <div class="student-summary-title">
+                                <i class="bi bi-clipboard-check me-2"></i>
+                                Review Information
+                            </div>
+                            <div id="summary-content">
+                                <!-- Filled by JavaScript -->
+                            </div>
+                        </div>
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle me-2"></i>
+                            <strong>Ready to submit:</strong> Please review all information above before proceeding.
+                        </div>
                     </div>
                 </div>
-
-                <!-- Submit Button -->
-                <div class="d-grid">
-                    <button type="submit" class="btn btn-primary">
-                        {% if is_update %}Update Student{% else %}Register Student{% endif %}
-                    </button>
-                </div>
-            </form>
-        </div>
-
-        <!-- Card Footer -->
-        <div class="card-footer">
-            <!-- General Errors -->
-            {% if form.errors %}
-                <div class="text-danger mb-3">
-                    <h5>There were some errors with your submission:</h5>
-                    <ul>
-                        {% for field, errors in form.errors.items %}
-                            <li><strong>{{ field }}</strong>: {{ errors|join:", " }}</li>
-                        {% endfor %}
-                    </ul>
-                </div>
-            {% endif %}
-
-            <!-- Back Link -->
-            <div class="text-end">
-                {% if superuser and is_update %}
-                    <a href="{% url 'student_detail' student.user.id %}" class="btn btn-secondary">Back to Details</a>
-                {% elif superuser %}
-                    <a href="{% url 'student_list' %}" class="btn btn-secondary">Back to Students List</a>
                 {% endif %}
             </div>
-        </div>
+
+            <!-- Navigation Buttons -->
+            <div class="student-wizard-buttons">
+                <button type="button" class="student-btn student-btn-prev" id="prev-btn" style="{% if is_update %}display: none;{% endif %}">
+                    <i class="bi bi-arrow-left me-2"></i>Previous
+                </button>
+                
+                {% if is_update %}
+                <a href="{% url 'student_list' %}" class="student-btn student-btn-prev">
+                    <i class="bi bi-arrow-left me-2"></i>Back to List
+                </a>
+                {% endif %}
+                
+                <div>
+                    {% if is_update %}
+                    <button type="submit" class="student-btn student-btn-submit">
+                        <i class="bi bi-check-circle me-2"></i>Update Student
+                    </button>
+                    {% else %}
+                    <button type="button" class="student-btn student-btn-next" id="next-btn">
+                        Next<i class="bi bi-arrow-right ms-2"></i>
+                    </button>
+                    <button type="submit" class="student-btn student-btn-submit" id="submit-btn" style="display: none;">
+                        <i class="bi bi-check-circle me-2"></i>Register Student
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+        </form>
     </div>
 </div>
+
+<script>
+    // Multi-step wizard functionality
+    let currentStep = 1;
+    const totalSteps = 3;
+    const isUpdate = {{ is_update|default:'false'|lower }};
+    
+    if (!isUpdate) {
+        // Step navigation
+        document.getElementById('next-btn').addEventListener('click', function() {
+            if (validateStep(currentStep)) {
+                if (currentStep < totalSteps) {
+                    currentStep++;
+                    updateWizard();
+                }
+            }
+        });
+
+        document.getElementById('prev-btn').addEventListener('click', function() {
+            if (currentStep > 1) {
+                currentStep--;
+                updateWizard();
+            }
+        });
+
+        function updateWizard() {
+            // Update steps
+            document.querySelectorAll('.student-wizard-step').forEach((step, index) => {
+                const stepNum = index + 1;
+                step.classList.remove('active', 'completed');
+                
+                if (stepNum === currentStep) {
+                    step.classList.add('active');
+                } else if (stepNum < currentStep) {
+                    step.classList.add('completed');
+                }
+            });
+
+            // Update panels
+            document.querySelectorAll('.student-wizard-panel').forEach((panel, index) => {
+                panel.classList.remove('active');
+                if (index + 1 === currentStep) {
+                    panel.classList.add('active');
+                }
+            });
+
+            // Update buttons
+            document.getElementById('prev-btn').style.display = currentStep === 1 ? 'none' : 'block';
+            document.getElementById('next-btn').style.display = currentStep === totalSteps ? 'none' : 'block';
+            document.getElementById('submit-btn').style.display = currentStep === totalSteps ? 'block' : 'none';
+
+            // Update progress bar
+            const progress = (currentStep / totalSteps) * 100;
+            document.getElementById('progress-bar').style.width = progress + '%';
+
+            // Update summary on last step
+            if (currentStep === totalSteps) {
+                updateSummary();
+            }
+        }
+
+        function validateStep(step) {
+            const panel = document.querySelector(`.student-wizard-panel[data-panel="${step}"]`);
+            const inputs = panel.querySelectorAll('input[required], select[required]');
+            let isValid = true;
+
+            inputs.forEach(input => {
+                if (!input.value || (input.type === 'email' && !input.checkValidity())) {
+                    input.classList.add('is-invalid');
+                    isValid = false;
+                } else {
+                    input.classList.remove('is-invalid');
+                }
+            });
+
+            if (!isValid) {
+                alert('Please fill in all required fields before proceeding.');
+            }
+
+            return isValid;
+        }
+
+        function updateSummary() {
+            const form = document.getElementById('student-form');
+            const summary = document.getElementById('summary-content');
+            
+            const username = form.querySelector('[name="username"]').value;
+            const email = form.querySelector('[name="email"]').value;
+            const firstName = form.querySelector('[name="first_name"]').value;
+            const lastName = form.querySelector('[name="last_name"]').value;
+            const dob = form.querySelector('[name="date_of_birth"]').value;
+            const gender = form.querySelector('[name="gender"]').selectedOptions[0]?.text || '';
+            const guardian = form.querySelector('[name="student_guardian"]').selectedOptions[0]?.text || 'None';
+            const relationship = form.querySelector('[name="relationship"]').value || 'N/A';
+            const currentClass = form.querySelector('[name="current_class"]').selectedOptions[0]?.text || 'Not Assigned';
+
+            summary.innerHTML = `
+                <div class="student-summary-item">
+                    <span class="student-summary-label">Username:</span>
+                    <span class="student-summary-value">${username}</span>
+                </div>
+                <div class="student-summary-item">
+                    <span class="student-summary-label">Full Name:</span>
+                    <span class="student-summary-value">${firstName} ${lastName}</span>
+                </div>
+                <div class="student-summary-item">
+                    <span class="student-summary-label">Email:</span>
+                    <span class="student-summary-value">${email}</span>
+                </div>
+                <div class="student-summary-item">
+                    <span class="student-summary-label">Date of Birth:</span>
+                    <span class="student-summary-value">${dob}</span>
+                </div>
+                <div class="student-summary-item">
+                    <span class="student-summary-label">Gender:</span>
+                    <span class="student-summary-value">${gender}</span>
+                </div>
+                <div class="student-summary-item">
+                    <span class="student-summary-label">Guardian:</span>
+                    <span class="student-summary-value">${guardian}</span>
+                </div>
+                <div class="student-summary-item">
+                    <span class="student-summary-label">Relationship:</span>
+                    <span class="student-summary-value">${relationship}</span>
+                </div>
+                <div class="student-summary-item">
+                    <span class="student-summary-label">Class:</span>
+                    <span class="student-summary-value">${currentClass}</span>
+                </div>
+            `;
+        }
+    }
+
+    // Image upload functionality
+    const imageUploadArea = document.getElementById('image-upload-area');
+    const imageInput = document.querySelector('input[name="profile_image"]');
+    const imagePreview = document.getElementById('profile-img-preview');
+
+    if (imageUploadArea && imageInput) {
+        imageUploadArea.addEventListener('click', function() {
+            imageInput.click();
+        });
+
+        imageInput.addEventListener('change', function() {
+            previewImage(this);
+        });
+
+        // Drag and drop
+        imageUploadArea.addEventListener('dragover', function(e) {
+            e.preventDefault();
+            this.classList.add('drag-over');
+        });
+
+        imageUploadArea.addEventListener('dragleave', function() {
+            this.classList.remove('drag-over');
+        });
+
+        imageUploadArea.addEventListener('drop', function(e) {
+            e.preventDefault();
+            this.classList.remove('drag-over');
+            
+            if (e.dataTransfer.files.length) {
+                imageInput.files = e.dataTransfer.files;
+                previewImage(imageInput);
+            }
+        });
+    }
+
+    function previewImage(input) {
+        if (input.files && input.files[0]) {
+            const reader = new FileReader();
+            
+            reader.onload = function(e) {
+                imagePreview.src = e.target.result;
+                imagePreview.classList.add('show');
+            };
+            
+            reader.readAsDataURL(input.files[0]);
+        }
+    }
+    
+    // Real-time validation
+    const form = document.getElementById('student-form');
+    
+    // Email validation
+    const emailInput = form.querySelector('[name="email"]');
+    if (emailInput) {
+        emailInput.addEventListener('blur', function() {
+            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            const errorDiv = this.nextElementSibling;
+            
+            if (this.value && !emailRegex.test(this.value)) {
+                this.classList.add('is-invalid');
+                if (!errorDiv || !errorDiv.classList.contains('student-form-error')) {
+                    const newError = document.createElement('div');
+                    newError.className = 'student-form-error';
+                    newError.innerHTML = '<i class="bi bi-exclamation-circle"></i>Please enter a valid email address';
+                    this.parentNode.insertBefore(newError, this.nextSibling);
+                }
+            } else {
+                this.classList.remove('is-invalid');
+                if (errorDiv && errorDiv.classList.contains('student-form-error')) {
+                    errorDiv.remove();
+                }
+            }
+        });
+    }
+    
+    // Username validation (check availability)
+    const usernameInput = form.querySelector('[name="username"]');
+    if (usernameInput) {
+        let usernameTimeout;
+        usernameInput.addEventListener('input', function() {
+            clearTimeout(usernameTimeout);
+            const username = this.value;
+            
+            if (username.length < 3) {
+                this.classList.remove('is-valid', 'is-invalid');
+                return;
+            }
+            
+            usernameTimeout = setTimeout(() => {
+                // Show loading indicator
+                this.style.backgroundImage = 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'20\' height=\'20\' viewBox=\'0 0 20 20\'%3E%3Ccircle cx=\'10\' cy=\'10\' r=\'8\' fill=\'none\' stroke=\'%23667eea\' stroke-width=\'2\'/%3E%3C/svg%3E")';
+                this.style.backgroundRepeat = 'no-repeat';
+                this.style.backgroundPosition = 'right 10px center';
+                
+                // Simulate API call (replace with actual AJAX in production)
+                setTimeout(() => {
+                    // For now, just validate format
+                    const usernameRegex = /^[a-zA-Z0-9_]{3,30}$/;
+                    if (usernameRegex.test(username)) {
+                        this.classList.add('is-valid');
+                        this.classList.remove('is-invalid');
+                        this.style.backgroundImage = 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'20\' height=\'20\' viewBox=\'0 0 20 20\'%3E%3Cpath fill=\'%2310b981\' d=\'M10 0C4.5 0 0 4.5 0 10s4.5 10 10 10 10-4.5 10-10S15.5 0 10 0zm5 8l-6 6-3-3 1.5-1.5L9 11l4.5-4.5L15 8z\'/%3E%3C/svg%3E")';
+                    } else {
+                        this.classList.add('is-invalid');
+                        this.classList.remove('is-valid');
+                        this.style.backgroundImage = 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' width=\'20\' height=\'20\' viewBox=\'0 0 20 20\'%3E%3Cpath fill=\'%23dc2626\' d=\'M10 0C4.5 0 0 4.5 0 10s4.5 10 10 10 10-4.5 10-10S15.5 0 10 0zm5 13.5L13.5 15 10 11.5 6.5 15 5 13.5 8.5 10 5 6.5 6.5 5 10 8.5 13.5 5 15 6.5 11.5 10 15 13.5z\'/%3E%3C/svg%3E")';
+                    }
+                }, 300);
+            }, 500);
+        });
+    }
+    
+    // Password strength indicator
+    const password1Input = form.querySelector('[name="password1"]');
+    if (password1Input) {
+        password1Input.addEventListener('input', function() {
+            const password = this.value;
+            let strength = 0;
+            let feedback = [];
+            
+            if (password.length >= 8) strength++;
+            if (password.match(/[a-z]/) && password.match(/[A-Z]/)) strength++;
+            if (password.match(/[0-9]/)) strength++;
+            if (password.match(/[^a-zA-Z0-9]/)) strength++;
+            
+            // Remove existing strength indicator
+            const existingIndicator = this.parentNode.querySelector('.password-strength');
+            if (existingIndicator) existingIndicator.remove();
+            
+            if (password.length > 0) {
+                const strengthDiv = document.createElement('div');
+                strengthDiv.className = 'password-strength mt-2';
+                
+                let strengthText = '';
+                let strengthColor = '';
+                
+                if (strength === 1) {
+                    strengthText = 'Weak';
+                    strengthColor = '#dc2626';
+                } else if (strength === 2) {
+                    strengthText = 'Fair';
+                    strengthColor = '#f59e0b';
+                } else if (strength === 3) {
+                    strengthText = 'Good';
+                    strengthColor = '#10b981';
+                } else if (strength === 4) {
+                    strengthText = 'Strong';
+                    strengthColor = '#059669';
+                }
+                
+                strengthDiv.innerHTML = `
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="flex-grow-1">
+                            <div style="height: 4px; background: #e5e7eb; border-radius: 2px; overflow: hidden;">
+                                <div style="height: 100%; width: ${strength * 25}%; background: ${strengthColor}; transition: all 0.3s;"></div>
+                            </div>
+                        </div>
+                        <small style="color: ${strengthColor}; font-weight: 600;">${strengthText}</small>
+                    </div>
+                `;
+                
+                this.parentNode.appendChild(strengthDiv);
+            }
+        });
+    }
+    
+    // Password confirmation match
+    const password2Input = form.querySelector('[name="password2"]');
+    if (password2Input && password1Input) {
+        password2Input.addEventListener('input', function() {
+            if (this.value && password1Input.value) {
+                if (this.value === password1Input.value) {
+                    this.classList.add('is-valid');
+                    this.classList.remove('is-invalid');
+                } else {
+                    this.classList.add('is-invalid');
+                    this.classList.remove('is-valid');
+                }
+            }
+        });
+    }
+</script>
 {% endblock %}

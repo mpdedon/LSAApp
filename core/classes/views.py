@@ -17,27 +17,55 @@ class ClassListView(ListView): # Inherit from ListView
     paginate_by = 15
 
     def get_queryset(self):
-        queryset = Class.objects.annotate(
-            # --- Use the correct related_name from Student.current_class ---
-            student_count=Count('enrolled_students', distinct=True),
-            subject_count=Count('subjects', distinct=True),
-        ).prefetch_related(
-             Prefetch(
-                'teacherassignment_set',
-                queryset=TeacherAssignment.objects.select_related('teacher__user').filter(is_form_teacher=True),
-                to_attr='form_teacher_assignments'
-            )
-        ).order_by('order', 'name')
-
+        from core.models import Session, Term
+        from django.db.models import Q
+        
+        # Get active session and term for filtering
+        active_session = Session.objects.filter(is_active=True).first()
+        active_term = Term.objects.filter(session=active_session, is_active=True).first() if active_session else None
+        
+        # Build annotation with conditional filtering
+        if active_session and active_term:
+            queryset = Class.objects.annotate(
+                student_count=Count('enrolled_students', distinct=True),
+                # Count subjects for current session and term only
+                subject_count=Count(
+                    'subject_assignments',
+                    filter=Q(subject_assignments__session=active_session, subject_assignments__term=active_term),
+                    distinct=True
+                ),
+            ).order_by('order', 'name')
+        else:
+            queryset = Class.objects.annotate(
+                student_count=Count('enrolled_students', distinct=True),
+                subject_count=Count('subject_assignments', distinct=True),
+            ).order_by('order', 'name')
 
         return queryset
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        
+        from core.models import Session, Term
+        active_session = Session.objects.filter(is_active=True).first()
+        active_term = Term.objects.filter(session=active_session, is_active=True).first() if active_session else None
+        
         # Process the prefetched data to easily access the form teacher in the template
-        for class_instance in context['classes']:
-            form_assignment = class_instance.form_teacher_assignments[0] if class_instance.form_teacher_assignments else None
-            class_instance.form_teacher_obj = form_assignment.teacher if form_assignment else None
+        # Handle both paginated and non-paginated lists
+        classes_list = context.get('classes', []) or context.get('object_list', [])
+        for class_instance in classes_list:
+            # Use the form_teacher method with active session/term
+            if active_session and active_term:
+                class_instance.form_teacher_obj = class_instance.form_teacher(session=active_session, term=active_term)
+            else:
+                class_instance.form_teacher_obj = None
+                
+            # Add session/term info for context
+            class_instance.student_count_agg = class_instance.student_count
+            class_instance.subject_count_agg = class_instance.subject_count
+        
+        context['active_session'] = active_session
+        context['active_term'] = active_term
 
         return context
     
@@ -84,11 +112,31 @@ class ClassDetailView(DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         class_instance = self.get_object()
+        
+        from core.models import Session, Term
+        active_session = Session.objects.filter(is_active=True).first()
+        active_term = Term.objects.filter(session=active_session, is_active=True).first() if active_session else None
+        
         context['class_instance'] = class_instance
         context['enrollment_form'] = EnrollmentForm(class_instance=class_instance)
-        subject_assignments = class_instance.subject_assignments.select_related(
-            'subject', 'session', 'term'
-        ).all()      
+        context['active_session'] = active_session
+        context['active_term'] = active_term
+        
+        # Get form teacher for active session/term
+        if active_session and active_term:
+            context['form_teacher'] = class_instance.form_teacher(session=active_session, term=active_term)
+            # Filter subject assignments by current session/term
+            subject_assignments = class_instance.subject_assignments.filter(
+                session=active_session,
+                term=active_term
+            ).select_related('subject', 'session', 'term').order_by('subject__name')
+        else:
+            context['form_teacher'] = None
+            # Show all assignments if no active session/term
+            subject_assignments = class_instance.subject_assignments.select_related(
+                'subject', 'session', 'term'
+            ).all()
+        
         context['optimized_subject_assignments'] = subject_assignments
         return context
 

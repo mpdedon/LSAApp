@@ -1,132 +1,842 @@
-{% extends 'base.html' %}
+{% extends 'base_admin_sidebar.html' %}
+{% load static %}
 
 {% block content %}
-<div class="container mt-4">
-    <div class="card">
-        <!-- Header -->
-        <div class="card-header d-flex justify-content-between align-items-center">
-            <h2 class="mb-3">Student List</h2>
-            <a href="{% url 'student_create' %}" class="btn btn-success">Add New Student</a>
-            <!-- Search -->
-            <form method="get" class="d-inline-flex">
-                <input type="text" name="q" class="form-control me-2" placeholder="Search students" value="{{ request.GET.q }}">
-                <button type="submit" class="btn btn-primary">Search</button>
-            </form>
-        </div>
+<style>
+    /* Student Module - Purple Theme */
+    .student-gradient-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 2rem 1.5rem;
+        border-radius: 10px 10px 0 0;
+        box-shadow: 0 4px 6px rgba(102, 126, 234, 0.3);
+    }
+    
+    .student-btn-primary {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border: none;
+        padding: 0.5rem 1.5rem;
+        border-radius: 8px;
+        color: white;
+        font-weight: 500;
+        transition: all 0.3s ease;
+        box-shadow: 0 2px 4px rgba(102, 126, 234, 0.3);
+    }
+    
+    .student-btn-primary:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        color: white;
+    }
+    
+    .student-search-box {
+        position: relative;
+        flex: 1;
+        max-width: 400px;
+    }
+    
+    .student-search-box input {
+        padding-left: 2.5rem;
+        border-radius: 25px;
+        border: 2px solid #e5e7eb;
+        transition: all 0.3s ease;
+    }
+    
+    .student-search-box input:focus {
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+    }
+    
+    .student-search-icon {
+        position: absolute;
+        left: 1rem;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #6b7280;
+        pointer-events: none;
+    }
+    
+    .student-stats-card {
+        background: white;
+        border-radius: 10px;
+        padding: 1rem;
+        border-left: 4px solid #667eea;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        transition: all 0.3s ease;
+    }
+    
+    .student-stats-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    
+    .student-table {
+        background: white;
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    .student-table thead {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+    
+    .student-table thead th {
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.75rem;
+        letter-spacing: 0.5px;
+        padding: 1rem 0.75rem;
+        border: none;
+    }
+    
+    .student-table tbody tr {
+        transition: all 0.2s ease;
+        border-bottom: 1px solid #f3f4f6;
+    }
+    
+    .student-table tbody tr:hover {
+        background-color: #f9fafb;
+        transform: scale(1.01);
+    }
+    
+    .student-avatar {
+        width: 40px;
+        height: 40px;
+        border-radius: 50%;
+        object-fit: cover;
+        border: 2px solid #667eea;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    .student-badge {
+        padding: 0.35rem 0.75rem;
+        border-radius: 20px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+    
+    .status-active {
+        background-color: #d1fae5;
+        color: #065f46;
+    }
+    
+    .status-dormant {
+        background-color: #fef3c7;
+        color: #92400e;
+    }
+    
+    .status-left {
+        background-color: #e5e7eb;
+        color: #374151;
+    }
+    
+    .student-action-btn {
+        padding: 0.4rem 0.8rem;
+        border-radius: 6px;
+        font-size: 0.875rem;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        border: none;
+        margin: 0 0.15rem;
+    }
+    
+    .student-action-view {
+        background-color: #dbeafe;
+        color: #1e40af;
+    }
+    
+    .student-action-view:hover {
+        background-color: #3b82f6;
+        color: white;
+    }
+    
+    .student-action-edit {
+        background-color: #fef3c7;
+        color: #92400e;
+    }
+    
+    .student-action-edit:hover {
+        background-color: #f59e0b;
+        color: white;
+    }
+    
+    .student-action-delete {
+        background-color: #fee2e2;
+        color: #991b1b;
+    }
+    
+    .student-action-delete:hover {
+        background-color: #dc2626;
+        color: white;
+    }
+    
+    .student-tab {
+        background: white;
+        border-radius: 10px;
+        padding: 0.5rem;
+        margin-bottom: 1.5rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    .student-tab .nav-link {
+        color: #6b7280;
+        font-weight: 500;
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+        border: none;
+    }
+    
+    .student-tab .nav-link:hover {
+        background-color: #f3f4f6;
+        color: #667eea;
+    }
+    
+    .student-tab .nav-link.active {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+    }
+    
+    .student-bulk-actions {
+        background: white;
+        padding: 1rem;
+        border-radius: 10px;
+        margin-bottom: 1rem;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+    }
+    
+    .student-pagination .page-link {
+        color: #667eea;
+        border: 1px solid #e5e7eb;
+        margin: 0 0.15rem;
+        border-radius: 6px;
+        padding: 0.5rem 0.75rem;
+        transition: all 0.2s ease;
+    }
+    
+    .student-pagination .page-link:hover {
+        background-color: #667eea;
+        color: white;
+        border-color: #667eea;
+    }
+    
+    .student-pagination .page-item.active .page-link {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        border-color: #667eea;
+    }
+    
+    .student-export-btn {
+        background-color: white;
+        border: 2px solid #667eea;
+        color: #667eea;
+        padding: 0.5rem 1.25rem;
+        border-radius: 8px;
+        font-weight: 500;
+        transition: all 0.3s ease;
+    }
+    
+    .student-export-btn:hover {
+        background-color: #667eea;
+        color: white;
+    }
+    
+    .student-empty-state {
+        text-align: center;
+        padding: 4rem 2rem;
+        color: #6b7280;
+    }
+    
+    .student-empty-state i {
+        font-size: 4rem;
+        color: #d1d5db;
+        margin-bottom: 1rem;
+    }
+</style>
 
-        <!-- Tabs for Student Status -->
-        <div class="card-header">
-            <ul class="nav nav-tabs">
-                <li class="nav-item">
-                    <a class="nav-link {% if active_tab == 'active' %}active{% endif %}" href="?status=active">Active Students</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link {% if active_tab == 'dormant' %}active{% endif %}" href="?status=dormant">Dormant Students</a>
-                </li>
-                <li class="nav-item">
-                    <a class="nav-link {% if active_tab == 'left' %}active{% endif %}" href="?status=left">Former Students</a>
-                </li>
-            </ul>
+<div class="container-fluid mt-4 px-4">
+    <!-- Header with Stats -->
+    <div class="student-gradient-header mb-4">
+        <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+            <div>
+                <h2 class="mb-1">
+                    <i class="bi bi-people-fill me-2"></i>Student Management
+                </h2>
+                <p class="mb-0 opacity-75">Manage and organize student records</p>
+            </div>
+            <div class="d-flex gap-2 align-items-center flex-wrap">
+                <button type="button" class="student-export-btn" data-bs-toggle="modal" data-bs-target="#exportModal">
+                    <i class="bi bi-download me-2"></i>Export
+                </button>
+                <a href="{% url 'student_create' %}" class="student-btn-primary">
+                    <i class="bi bi-plus-circle me-2"></i>Add New Student
+                </a>
+            </div>
         </div>
-
-        <!-- Bulk Actions and Search -->
-        <div class="card-body">
-            <!-- Bulk Action Form -->
-            <form method="post" action="{% url 'bulk_update_students' %}" id="bulk-action-form">
-                {% csrf_token %}
-                <!-- Bulk Actions -->
-                <div class="d-flex justify-content-between mb-3">
-                    <div class="d-inline-flex">
-                        <select name="action" class="form-select me-2" required>
-                            <option value="" disabled selected>Bulk Actions</option>
-                            <option value="promote">Promote</option>
-                            <option value="demote">Demote</option>
-                            <option value="mark_dormant">Mark as Dormant</option>
-                            <option value="mark_active">Mark as Active</option>
-                            <option value="mark_left">Mark as Left</option>
-                        </select>
-                        <button type="submit" class="btn btn-secondary">Apply</button>
+        
+        <!-- Quick Stats -->
+        <div class="row mt-4 g-3">
+            <div class="col-md-3 col-6">
+                <div class="student-stats-card">
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-check-circle-fill text-success fs-3 me-3"></i>
+                        <div>
+                            <div class="text-muted small">Active</div>
+                            <div class="fs-4 fw-bold">{{ active_count|default:0 }}</div>
+                        </div>
                     </div>
-                    <span>   </span>
                 </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="student-stats-card">
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-pause-circle-fill text-warning fs-3 me-3"></i>
+                        <div>
+                            <div class="text-muted small">Dormant</div>
+                            <div class="fs-4 fw-bold">{{ dormant_count|default:0 }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="student-stats-card">
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-x-circle-fill text-secondary fs-3 me-3"></i>
+                        <div>
+                            <div class="text-muted small">Left</div>
+                            <div class="fs-4 fw-bold">{{ left_count|default:0 }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-3 col-6">
+                <div class="student-stats-card">
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-people-fill text-primary fs-3 me-3"></i>
+                        <div>
+                            <div class="text-muted small">Total</div>
+                            <div class="fs-4 fw-bold">{{ total_count|default:0 }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
-                <!-- Student Table -->
-                <table class="table table-striped table-bordered">
-                    <thead>
-                        <tr>
-                            <th><input type="checkbox" id="select-all"></th>
-                            <th>S/N</th>
-                            <th>LSA Number</th>
-                            <th>Name</th>
-                            <th>Class</th>
-                            <th>Guardian</th>
-                            <th>Status</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for student in page_obj %}
-                        <tr>
-                            <td>
-                                <input type="checkbox" name="selected_students" value="{{ student.user.id }}" class="select-student">
-                            </td>
-                            <td>{{ forloop.counter0|add:page_obj.start_index }}</td>
-                            <td>{{ student.LSA_number }}</td>
-                            <td>{{ student.user.get_full_name }}</td>
-                            <td>{{ student.current_class.name }}</td>
-                            <td>{{ student.student_guardian.user.get_full_name }}</td>
-                            <td>{{ student.get_status_display }}</td>
-                            <td>
-                                <a href="{% url 'student_detail' student.user.id %}" class="btn btn-info btn-sm">V</a>
-                                <a href="{% url 'student_update' student.user.id %}" class="btn btn-warning btn-sm">E</a>
-                                <form action="{% url 'student_delete' student.user.id %}" method="post" style="display:inline;">
-                                    {% csrf_token %}
-                                    <button type="submit" class="btn btn-danger btn-sm"
-                                            onclick="return confirm('Are you sure you want to delete this student?');">D
-                                    </button>
-                                </form>
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="8" class="text-center">No students found in this category.</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+    <!-- Status Tabs -->
+    <div class="student-tab">
+        <ul class="nav nav-pills">
+            <li class="nav-item">
+                <a class="nav-link {% if active_tab == 'active' or not active_tab %}active{% endif %}" href="?status=active">
+                    <i class="bi bi-check-circle me-2"></i>Active Students
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if active_tab == 'dormant' %}active{% endif %}" href="?status=dormant">
+                    <i class="bi bi-pause-circle me-2"></i>Dormant Students
+                </a>
+            </li>
+            <li class="nav-item">
+                <a class="nav-link {% if active_tab == 'left' %}active{% endif %}" href="?status=left">
+                    <i class="bi bi-x-circle me-2"></i>Former Students
+                </a>
+            </li>
+        </ul>
+    </div>
+
+    <!-- Search and Bulk Actions -->
+    <div class="row mb-3">
+        <div class="col-md-4 mb-3 mb-md-0">
+            <form method="get" class="student-search-box">
+                <i class="bi bi-search student-search-icon"></i>
+                <input type="text" name="q" class="form-control" placeholder="Search by name, LSA number, or email..." value="{{ request.GET.q }}">
+                <input type="hidden" name="status" value="{{ active_tab }}">
+                <input type="hidden" name="per_page" value="{{ per_page }}">
             </form>
+        </div>
+        <div class="col-md-5">
+            <div class="student-bulk-actions d-flex gap-2">
+                <select name="bulk-action-select" id="bulk-action-select" class="form-select">
+                    <option value="" selected>Bulk Actions</option>
+                    <option value="promote">Promote Selected</option>
+                    <option value="demote">Demote Selected</option>
+                    <option value="bulk_enroll">Enroll to Class</option>
+                    <option value="mark_active">Mark as Active</option>
+                    <option value="mark_dormant">Mark as Dormant</option>
+                    <option value="mark_left">Mark as Left School</option>
+                </select>
+                <button type="button" id="apply-bulk-action" class="student-btn-primary">
+                    <i class="bi bi-check-lg me-2"></i>Apply
+                </button>
+                <span class="ms-3 align-self-center text-muted" id="selected-count">0 selected</span>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="d-flex align-items-center gap-2">
+                <label class="text-nowrap mb-0 small text-muted">Show:</label>
+                <select id="per-page-selector" class="form-select form-select-sm" onchange="changePerPage(this.value)">
+                    <option value="10" {% if per_page == 10 %}selected{% endif %}>10</option>
+                    <option value="20" {% if per_page == 20 %}selected{% endif %}>20</option>
+                    <option value="50" {% if per_page == 50 %}selected{% endif %}>50</option>
+                    <option value="100" {% if per_page == 100 %}selected{% endif %}>100</option>
+                </select>
+                <span class="text-nowrap small text-muted">per page</span>
+            </div>
+        </div>
+    </div>
 
-            <!-- Pagination -->
-            <nav aria-label="Page navigation">
-                <ul class="pagination justify-content-center">
-                    {% if page_obj.has_previous %}
-                    <li class="page-item">
-                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}&status={{ active_tab }}" 
-                           aria-label="Previous">&laquo;</a>
-                    </li>
-                    {% endif %}
-                    {% for page_num in page_obj.paginator.page_range %}
-                    <li class="page-item {% if page_num == page_obj.number %}active{% endif %}">
-                        <a class="page-link" href="?page={{ page_num }}&status={{ active_tab }}">{{ page_num }}</a>
-                    </li>
+    <!-- Students Table -->
+    <form method="post" action="{% url 'bulk_update_students' %}" id="bulk-action-form">
+        {% csrf_token %}
+        <input type="hidden" name="action" id="bulk-action-input">
+        <input type="hidden" name="target_class" id="target-class-input">
+        
+        <div class="student-table">
+            <table class="table mb-0">
+                <thead>
+                    <tr>
+                        <th style="width: 40px;">
+                            <input type="checkbox" id="select-all" class="form-check-input">
+                        </th>
+                        <th style="width: 60px;">Photo</th>
+                        <th style="width: 120px;">LSA Number</th>
+                        <th>Student Name</th>
+                        <th>Class</th>
+                        <th>Guardian</th>
+                        <th>Gender</th>
+                        <th>Status</th>
+                        <th style="width: 140px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for student in page_obj %}
+                    <tr>
+                        <td>
+                            <input type="checkbox" name="selected_students" value="{{ student.user.id }}" class="form-check-input select-student">
+                        </td>
+                        <td>
+                            {% if student.profile_image %}
+                                <img src="{{ student.profile_image.url }}" alt="{{ student.user.get_full_name }}" class="student-avatar">
+                            {% else %}
+                                <div class="student-avatar bg-gradient d-flex align-items-center justify-content-center text-white fw-bold" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                                    {{ student.user.first_name|slice:":1" }}{{ student.user.last_name|slice:":1" }}
+                                </div>
+                            {% endif %}
+                        </td>
+                        <td class="fw-semibold text-primary">{{ student.LSA_number }}</td>
+                        <td>
+                            <div class="fw-semibold">{{ student.user.get_full_name }}</div>
+                            <small class="text-muted">{{ student.user.email }}</small>
+                        </td>
+                        <td>
+                            {% if student.current_class %}
+                                <span class="badge bg-light text-dark">{{ student.current_class.name }}</span>
+                            {% else %}
+                                <span class="text-muted small">Not Assigned</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if student.student_guardian %}
+                                {{ student.student_guardian.user.get_full_name }}
+                            {% else %}
+                                <span class="text-muted small">N/A</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if student.gender == 'M' %}
+                                <i class="bi bi-gender-male text-primary"></i> Male
+                            {% else %}
+                                <i class="bi bi-gender-female text-danger"></i> Female
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="student-badge status-{{ student.status }}">
+                                {{ student.get_status_display }}
+                            </span>
+                        </td>
+                        <td>
+                            <div class="d-flex gap-1">
+                                <a href="{% url 'student_detail' student.user.id %}" class="student-action-btn student-action-view" title="View Details">
+                                    <i class="bi bi-eye"></i>
+                                </a>
+                                <a href="{% url 'student_update' student.user.id %}" class="student-action-btn student-action-edit" title="Edit">
+                                    <i class="bi bi-pencil"></i>
+                                </a>
+                                <button type="button" class="student-action-btn student-action-delete" title="Delete" 
+                                        onclick="confirmDelete('{{ student.user.id }}', '{{ student.user.get_full_name }}')">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="9">
+                            <div class="student-empty-state">
+                                <i class="bi bi-inbox"></i>
+                                <h5 class="mt-3">No Students Found</h5>
+                                <p class="text-muted">No students match your current filters or search criteria.</p>
+                                {% if request.GET.q %}
+                                    <a href="?status={{ active_tab }}" class="student-btn-primary mt-2">
+                                        <i class="bi bi-arrow-counterclockwise me-2"></i>Clear Search
+                                    </a>
+                                {% else %}
+                                    <a href="{% url 'student_create' %}" class="student-btn-primary mt-2">
+                                        <i class="bi bi-plus-circle me-2"></i>Add First Student
+                                    </a>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
                     {% endfor %}
-                    {% if page_obj.has_next %}
-                    <li class="page-item">
-                        <a class="page-link" href="?page={{ page_obj.next_page_number }}&status={{ active_tab }}" 
-                           aria-label="Next">&raquo;</a>
-                    </li>
-                    {% endif %}
-                </ul>
-            </nav>
+                </tbody>
+            </table>
+        </div>
+    </form>
+
+    <!-- Pagination -->
+    {% if page_obj.has_other_pages %}
+    <nav aria-label="Student pagination" class="mt-4">
+        <ul class="pagination justify-content-center student-pagination">
+            {% if page_obj.has_previous %}
+            <li class="page-item">
+                <a class="page-link" href="?page=1&status={{ active_tab }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">
+                    <i class="bi bi-chevron-double-left"></i>
+                </a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.previous_page_number }}&status={{ active_tab }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">
+                    <i class="bi bi-chevron-left"></i>
+                </a>
+            </li>
+            {% endif %}
+            
+            {% for num in page_obj.paginator.page_range %}
+                {% if page_obj.number == num %}
+                    <li class="page-item active"><span class="page-link">{{ num }}</span></li>
+                {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                    <li class="page-item"><a class="page-link" href="?page={{ num }}&status={{ active_tab }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">{{ num }}</a></li>
+                {% endif %}
+            {% endfor %}
+            
+            {% if page_obj.has_next %}
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.next_page_number }}&status={{ active_tab }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">
+                    <i class="bi bi-chevron-right"></i>
+                </a>
+            </li>
+            <li class="page-item">
+                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}&status={{ active_tab }}{% if request.GET.q %}&q={{ request.GET.q }}{% endif %}">
+                    <i class="bi bi-chevron-double-right"></i>
+                </a>
+            </li>
+            {% endif %}
+        </ul>
+        <p class="text-center text-muted small mt-2">
+            Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ page_obj.paginator.count }} students
+        </p>
+    </nav>
+    {% endif %}
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div class="modal fade" id="deleteModal" tabindex="-1" aria-labelledby="deleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteModalLabel">
+                    <i class="bi bi-exclamation-triangle me-2"></i>Confirm Delete
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p>Are you sure you want to delete <strong id="delete-student-name"></strong>?</p>
+                <p class="text-danger small mb-0">
+                    <i class="bi bi-info-circle me-1"></i>This action cannot be undone.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <form id="delete-form" method="post" style="display: inline;">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-trash me-2"></i>Delete Student
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Export Modal -->
+<div class="modal fade" id="exportModal" tabindex="-1" aria-labelledby="exportModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header student-gradient-header">
+                <h5 class="modal-title text-white" id="exportModalLabel">
+                    <i class="bi bi-download me-2"></i>Export Students
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <form id="export-form" method="get" action="{% url 'export_students' %}">
+                    <div class="mb-3">
+                        <label for="export-format" class="form-label fw-semibold">
+                            <i class="bi bi-file-earmark me-2"></i>Select Format
+                        </label>
+                        <select class="form-select" id="export-format" name="format" required>
+                            <option value="excel" selected>
+                                <i class="bi bi-file-excel"></i> Excel (.xlsx)
+                            </option>
+                            <option value="pdf">PDF Document (.pdf)</option>
+                        </select>
+                        <small class="text-muted">Choose your preferred export format</small>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="export-status" class="form-label fw-semibold">
+                            <i class="bi bi-filter me-2"></i>Filter by Status
+                        </label>
+                        <select class="form-select" id="export-status" name="status">
+                            <option value="">All Students</option>
+                            <option value="active">Active Only</option>
+                            <option value="dormant">Dormant Only</option>
+                            <option value="left">Former Students Only</option>
+                        </select>
+                        <small class="text-muted">Leave empty to export all students</small>
+                    </div>
+                    
+                    <div class="alert alert-info d-flex align-items-start">
+                        <i class="bi bi-info-circle me-2 mt-1"></i>
+                        <div>
+                            <strong>Tip:</strong> Excel format includes all columns and is best for data analysis. 
+                            PDF format is optimized for printing and sharing.
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" form="export-form" class="student-btn-primary">
+                    <i class="bi bi-download me-2"></i>Export Now
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Bulk Enrollment Modal -->
+<div class="modal fade" id="bulkEnrollModal" tabindex="-1" aria-labelledby="bulkEnrollModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header student-gradient-header">
+                <h5 class="modal-title text-white" id="bulkEnrollModalLabel">
+                    <i class="bi bi-people-fill me-2"></i>Bulk Enrollment
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-info mb-3">
+                    <i class="bi bi-info-circle me-2"></i>
+                    <span id="bulk-enroll-count">0</span> student(s) will be enrolled to the selected class.
+                </div>
+                
+                <div class="mb-3">
+                    <label for="bulk-enroll-class" class="form-label fw-semibold">
+                        <i class="bi bi-book me-2"></i>Select Class
+                    </label>
+                    <select class="form-select" id="bulk-enroll-class" required>
+                        <option value="" selected>-- Choose a class --</option>
+                        {% for class in all_classes %}
+                        <option value="{{ class.id }}" 
+                                data-capacity="{{ class.capacity|default:'0' }}"
+                                data-current="{{ class.enrolled_students.count }}">
+                            {{ class.name }} 
+                            {% if class.capacity %}
+                                ({{ class.enrolled_students.count }}/{{ class.capacity }} enrolled)
+                            {% else %}
+                                ({{ class.enrolled_students.count }} enrolled)
+                            {% endif %}
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+                
+                <div id="capacity-warning" class="alert alert-warning d-none">
+                    <i class="bi bi-exclamation-triangle me-2"></i>
+                    <span id="capacity-message"></span>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" id="confirm-bulk-enroll" class="student-btn-primary">
+                    <i class="bi bi-check-circle me-2"></i>Enroll Students
+                </button>
+            </div>
         </div>
     </div>
 </div>
 
 <script>
     // Select all checkboxes
-    document.getElementById('select-all').addEventListener('change', function () {
-    const checkboxes = document.querySelectorAll('.select-student');
-    checkboxes.forEach(checkbox => checkbox.checked = this.checked);
-});
+    const selectAllCheckbox = document.getElementById('select-all');
+    const studentCheckboxes = document.querySelectorAll('.select-student');
+    const selectedCountSpan = document.getElementById('selected-count');
+    const bulkActionSelect = document.getElementById('bulk-action-select');
+    const applyBulkActionBtn = document.getElementById('apply-bulk-action');
+    const bulkActionInput = document.getElementById('bulk-action-input');
+    const bulkActionForm = document.getElementById('bulk-action-form');
+    
+    // Update selected count
+    function updateSelectedCount() {
+        const checkedCount = document.querySelectorAll('.select-student:checked').length;
+        selectedCountSpan.textContent = `${checkedCount} selected`;
+        selectAllCheckbox.indeterminate = checkedCount > 0 && checkedCount < studentCheckboxes.length;
+        selectAllCheckbox.checked = checkedCount === studentCheckboxes.length && checkedCount > 0;
+    }
+    
+    // Select all functionality
+    selectAllCheckbox.addEventListener('change', function() {
+        studentCheckboxes.forEach(checkbox => {
+            checkbox.checked = this.checked;
+        });
+        updateSelectedCount();
+    });
+    
+    // Individual checkbox change
+    studentCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', updateSelectedCount);
+    });
+    
+    // Apply bulk action
+    applyBulkActionBtn.addEventListener('click', function() {
+        const selectedAction = bulkActionSelect.value;
+        const checkedStudents = document.querySelectorAll('.select-student:checked');
+        
+        if (!selectedAction) {
+            alert('Please select an action first.');
+            return;
+        }
+        
+        if (checkedStudents.length === 0) {
+            alert('Please select at least one student.');
+            return;
+        }
+        
+        // Handle bulk enrollment separately
+        if (selectedAction === 'bulk_enroll') {
+            document.getElementById('bulk-enroll-count').textContent = checkedStudents.length;
+            const modal = new bootstrap.Modal(document.getElementById('bulkEnrollModal'));
+            modal.show();
+            return;
+        }
+        
+        // Confirmation messages
+        const actionMessages = {
+            'promote': 'promote',
+            'demote': 'demote',
+            'mark_active': 'mark as active',
+            'mark_dormant': 'mark as dormant',
+            'mark_left': 'mark as left school'
+        };
+        
+        const actionText = actionMessages[selectedAction] || selectedAction.replace('_', ' ');
+        
+        if (confirm(`Are you sure you want to ${actionText} ${checkedStudents.length} student(s)?`)) {
+            bulkActionInput.value = selectedAction;
+            bulkActionForm.submit();
+        }
+    });
+    
+    // Bulk enrollment confirmation
+    document.getElementById('confirm-bulk-enroll').addEventListener('click', function() {
+        const classSelect = document.getElementById('bulk-enroll-class');
+        const selectedClass = classSelect.value;
+        
+        if (!selectedClass) {
+            alert('Please select a class.');
+            return;
+        }
+        
+        const selectedOption = classSelect.options[classSelect.selectedIndex];
+        const capacity = parseInt(selectedOption.dataset.capacity) || 0;
+        const currentEnrollment = parseInt(selectedOption.dataset.current) || 0;
+        const checkedCount = document.querySelectorAll('.select-student:checked').length;
+        
+        // Check capacity
+        if (capacity > 0) {
+            const availableSlots = capacity - currentEnrollment;
+            if (checkedCount > availableSlots) {
+                alert(`Cannot enroll ${checkedCount} students. Only ${availableSlots} slots available.`);
+                return;
+            }
+        }
+        
+        // Submit form
+        bulkActionInput.value = 'bulk_enroll';
+        document.getElementById('target-class-input').value = selectedClass;
+        
+        const modal = bootstrap.Modal.getInstance(document.getElementById('bulkEnrollModal'));
+        modal.hide();
+        bulkActionForm.submit();
+    });
+    
+    // Show capacity warning when class is selected
+    document.getElementById('bulk-enroll-class').addEventListener('change', function() {
+        const selectedOption = this.options[this.selectedIndex];
+        const capacity = parseInt(selectedOption.dataset.capacity) || 0;
+        const currentEnrollment = parseInt(selectedOption.dataset.current) || 0;
+        const checkedCount = document.querySelectorAll('.select-student:checked').length;
+        const warningDiv = document.getElementById('capacity-warning');
+        const messageSpan = document.getElementById('capacity-message');
+        
+        if (capacity > 0) {
+            const availableSlots = capacity - currentEnrollment;
+            if (checkedCount > availableSlots) {
+                messageSpan.textContent = `Warning: You selected ${checkedCount} students but only ${availableSlots} slots are available in this class.`;
+                warningDiv.classList.remove('d-none');
+            } else {
+                messageSpan.textContent = `${availableSlots} slots available. Your ${checkedCount} student(s) will fit.`;
+                warningDiv.classList.remove('d-none');
+                warningDiv.classList.remove('alert-warning');
+                warningDiv.classList.add('alert-success');
+            }
+        } else {
+            warningDiv.classList.add('d-none');
+        }
+    });
+    
+    // Delete confirmation
+    function confirmDelete(studentId, studentName) {
+        const modal = new bootstrap.Modal(document.getElementById('deleteModal'));
+        document.getElementById('delete-student-name').textContent = studentName;
+        document.getElementById('delete-form').action = `/students/${studentId}/delete/`;
+        modal.show();
+    }
+    
+    // Auto-submit search on input (with debounce)
+    let searchTimeout;
+    const searchInput = document.querySelector('.student-search-box input[name="q"]');
+    if (searchInput) {
+        searchInput.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            searchTimeout = setTimeout(() => {
+                if (this.value.length >= 3 || this.value.length === 0) {
+                    this.form.submit();
+                }
+            }, 500);
+        });
+    }
+    
+    // Items per page selector
+    function changePerPage(perPage) {
+        const url = new URL(window.location);
+        url.searchParams.set('per_page', perPage);
+        url.searchParams.set('page', '1'); // Reset to first page
+        window.location.href = url.toString();
+    }
 </script>
 {% endblock %}

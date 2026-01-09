@@ -1,14 +1,37 @@
-<!-- subject_assignment_form.html -->
-
-{% extends 'base.html' %}
-
-{% block title %}Create or Update Subject Assignment{% endblock %}
+{% extends 'base_admin_sidebar.html' %}
+{% load crispy_forms_tags %}
 
 {% block content %}
-<h2>Create or Update Subject Assignment</h2>
-<form method="post">
-    {% csrf_token %}
-    {{ form.as_p }}
-    <button type="submit">Save</button>
-</form>
+<div class="container-fluid px-4 py-3">
+    <div class="row justify-content-center">
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm">
+                <!-- Header with gradient -->
+                <div class="card-header text-white py-3" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                    <h5 class="mb-0 fw-bold">
+                        <i class="bi bi-journal-text me-2"></i>
+                        Create or Update Subject Assignment
+                    </h5>
+                </div>
+
+                <div class="card-body p-4">
+                    <form method="post">
+                        {% csrf_token %}
+                        
+                        {{ form|crispy }}
+
+                        <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
+                            <a href="{% url 'subject_assignment_list' %}" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left me-1"></i>Cancel
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-check-circle me-1"></i>Save Assignment
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}

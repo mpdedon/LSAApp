@@ -54,17 +54,23 @@ class StudentListView(View):
     template_name = 'student/student_list.html'
 
     def get(self, request, *args, **kwargs):
+        from core.models import Class
+        
         query = request.GET.get('q', '')
         status = request.GET.get('status', 'active')  # Default to 'active'
+        per_page = int(request.GET.get('per_page', 20))  # Items per page selector
 
         # Filter students by status
-        students = Student.objects.filter(status=status).order_by('current_class')
+        students = Student.objects.filter(status=status).select_related(
+            'user', 'current_class', 'student_guardian__user'
+        ).order_by('current_class', 'user__last_name')
 
         # Apply search filter
         if query:
             students = students.filter(
                 Q(user__first_name__icontains=query) |
                 Q(user__last_name__icontains=query) |
+                Q(user__email__icontains=query) |
                 Q(LSA_number__icontains=query) |
                 Q(current_class__name__icontains=query) |
                 Q(student_guardian__user__first_name__icontains=query) |
@@ -72,13 +78,28 @@ class StudentListView(View):
             )
 
         # Paginate students
-        paginator = Paginator(students, 20)  # Show 15 students per page
+        paginator = Paginator(students, per_page)
         page_number = request.GET.get('page')
         page_obj = paginator.get_page(page_number)
+        
+        # Get stats for all statuses
+        active_count = Student.objects.filter(status='active').count()
+        dormant_count = Student.objects.filter(status='dormant').count()
+        left_count = Student.objects.filter(status='left').count()
+        total_count = active_count + dormant_count + left_count
+        
+        # Get all classes for bulk enrollment
+        all_classes = Class.objects.all().order_by('order')
 
         return render(request, self.template_name, {
             'page_obj': page_obj,
-            'active_tab': status
+            'active_tab': status,
+            'active_count': active_count,
+            'dormant_count': dormant_count,
+            'left_count': left_count,
+            'total_count': total_count,
+            'all_classes': all_classes,
+            'per_page': per_page,
         })
 
 class BulkUpdateStudentsView(View):
@@ -90,33 +111,60 @@ class BulkUpdateStudentsView(View):
             messages.error(request, "No students selected for the bulk action.")
             return redirect("student_list")
 
+        # FIXED: Remove status filter to allow updates on all students
         students = Student.objects.filter(user__id__in=selected_students)
 
         if action == "promote":
+            promoted_count = 0
             for student in students:
                 if student.current_class and student.current_class.next_class:
                     student.current_class = student.current_class.next_class()
                     student.save()
-            messages.success(request, "Selected students have been promoted.")
+                    promoted_count += 1
+            messages.success(request, f"{promoted_count} student(s) have been promoted.")
         
         elif action == "demote":
+            demoted_count = 0
             for student in students:
                 if student.current_class and student.current_class.previous_class:
                     student.current_class = student.current_class.previous_class()
                     student.save()
-            messages.success(request, "Selected students have been demoted.")
+                    demoted_count += 1
+            messages.success(request, f"{demoted_count} student(s) have been demoted.")
 
         elif action == "mark_dormant":
-            students.update(status="dormant")
-            messages.success(request, "Selected students have been marked as dormant.")
+            count = students.update(status="dormant")
+            messages.success(request, f"{count} student(s) marked as dormant.")
         
         elif action == "mark_active":
-            students.update(status="active")
-            messages.success(request, "Selected students have been marked as active.")
+            count = students.update(status="active")
+            messages.success(request, f"{count} student(s) marked as active.")
         
         elif action == "mark_left":
-            students.update(status="left")
-            messages.success(request, "Selected students have been marked as left.")
+            count = students.update(status="left")
+            messages.success(request, f"{count} student(s) marked as left school.")
+        
+        elif action == "bulk_enroll":
+            # Bulk enrollment to a class
+            class_id = request.POST.get("target_class")
+            if not class_id:
+                messages.error(request, "Please select a class for enrollment.")
+                return redirect("student_list")
+            
+            from core.models import Class
+            target_class = get_object_or_404(Class, pk=class_id)
+            
+            # Check capacity if set
+            if target_class.capacity:
+                current_enrollment = target_class.enrolled_students.filter(status='active').count()
+                available_slots = target_class.capacity - current_enrollment
+                
+                if len(selected_students) > available_slots:
+                    messages.error(request, f"Cannot enroll {len(selected_students)} students. Only {available_slots} slots available in {target_class.name}.")
+                    return redirect("student_list")
+            
+            enrolled_count = students.update(current_class=target_class)
+            messages.success(request, f"{enrolled_count} student(s) enrolled to {target_class.name}.")
         
         else:
             messages.error(request, "Invalid action selected.")
@@ -146,26 +194,15 @@ class StudentUpdateView(View):
 
     def get(self, request, pk, *args, **kwargs):
         student = get_object_or_404(Student, pk=pk)
-        form = StudentRegistrationForm(instance=student.user, student_instance=student)
+        form = StudentRegistrationForm(instance=student.user, student_instance=student, is_update=True)
         return render(request, self.template_name, {'form': form, 'is_update': True, 'student': student})
 
     def post(self, request, pk, *args, **kwargs):
         student = get_object_or_404(Student, pk=pk)
-        form = StudentRegistrationForm(request.POST, request.FILES, instance=student.user, student_instance=student)
+        form = StudentRegistrationForm(request.POST, request.FILES, instance=student.user, student_instance=student, is_update=True)
 
-        # Ensure the student fields are updated correctly
         if form.is_valid():
-            user = form.save(commit=False)
-            user.save()
-
-            student.date_of_birth = form.cleaned_data['date_of_birth']
-            student.gender = form.cleaned_data['gender']
-            student.profile_image = form.cleaned_data['profile_image']
-            student.student_guardian = form.cleaned_data['student_guardian']
-            student.relationship = form.cleaned_data['relationship']
-            student.current_class = form.cleaned_data['current_class']
-            student.save()
-
+            form.save()  # This will save both user and student
             return redirect('student_detail', pk=student.pk)
 
         return render(request, self.template_name, {'form': form, 'is_update': True, 'student': student})
@@ -190,9 +227,134 @@ class StudentDeleteView(View):
         return redirect('student_list')
 
 # Example for export_students and student_reports
+@login_required
 def export_students(request):
-    # Implement export logic here
-    pass
+    """Export student data to Excel or PDF based on user choice"""
+    import openpyxl
+    from openpyxl.styles import Font, Alignment, PatternFill
+    from django.http import HttpResponse
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import letter, landscape
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph
+    from reportlab.lib.styles import getSampleStyleSheet
+    from io import BytesIO
+    
+    export_format = request.GET.get('format', 'excel')  # Default to Excel
+    status_filter = request.GET.get('status', '')  # Optional status filter
+    
+    # Get students based on filter
+    students = Student.objects.select_related(
+        'user', 'current_class', 'student_guardian__user'
+    ).order_by('current_class', 'user__last_name')
+    
+    if status_filter:
+        students = students.filter(status=status_filter)
+    
+    if export_format == 'excel':
+        # Create Excel workbook
+        wb = openpyxl.Workbook()
+        ws = wb.active
+        ws.title = "Students"
+        
+        # Header styling
+        header_fill = PatternFill(start_color="667EEA", end_color="667EEA", fill_type="solid")
+        header_font = Font(bold=True, color="FFFFFF", size=12)
+        header_alignment = Alignment(horizontal="center", vertical="center")
+        
+        # Headers
+        headers = ['LSA Number', 'First Name', 'Last Name', 'Email', 'Gender', 'Date of Birth', 
+                   'Class', 'Guardian', 'Relationship', 'Status']
+        ws.append(headers)
+        
+        # Style headers
+        for cell in ws[1]:
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = header_alignment
+        
+        # Add data
+        for student in students:
+            ws.append([
+                student.LSA_number,
+                student.user.first_name,
+                student.user.last_name,
+                student.user.email,
+                student.get_gender_display(),
+                student.date_of_birth.strftime('%Y-%m-%d') if student.date_of_birth else '',
+                student.current_class.name if student.current_class else 'Not Assigned',
+                student.student_guardian.user.get_full_name() if student.student_guardian else 'N/A',
+                student.relationship if student.relationship else '',
+                student.get_status_display()
+            ])
+        
+        # Auto-size columns
+        for column in ws.columns:
+            max_length = 0
+            column_letter = column[0].column_letter
+            for cell in column:
+                try:
+                    if len(str(cell.value)) > max_length:
+                        max_length = len(str(cell.value))
+                except:
+                    pass
+            adjusted_width = min(max_length + 2, 50)
+            ws.column_dimensions[column_letter].width = adjusted_width
+        
+        # Create response
+        response = HttpResponse(
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename="students_{timezone.now().strftime("%Y%m%d")}.xlsx"'
+        wb.save(response)
+        return response
+        
+    elif export_format == 'pdf':
+        # Create PDF
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=landscape(letter))
+        elements = []
+        
+        # Table data
+        data = [['LSA Number', 'Name', 'Email', 'Gender', 'DOB', 'Class', 'Guardian', 'Status']]
+        
+        for student in students:
+            data.append([
+                student.LSA_number,
+                student.user.get_full_name(),
+                student.user.email,
+                student.get_gender_display(),
+                student.date_of_birth.strftime('%Y-%m-%d') if student.date_of_birth else '',
+                student.current_class.name if student.current_class else 'N/A',
+                student.student_guardian.user.get_full_name() if student.student_guardian else 'N/A',
+                student.get_status_display()
+            ])
+        
+        # Create table
+        table = Table(data)
+        table.setStyle(TableStyle([
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#667EEA')),
+            ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+            ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+            ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+            ('FONTSIZE', (0, 0), (-1, 0), 10),
+            ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+            ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+            ('GRID', (0, 0), (-1, -1), 1, colors.black),
+            ('FONTSIZE', (0, 1), (-1, -1), 8),
+        ]))
+        
+        elements.append(table)
+        doc.build(elements)
+        
+        # Create response
+        buffer.seek(0)
+        response = HttpResponse(buffer, content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="students_{timezone.now().strftime("%Y%m%d")}.pdf"'
+        return response
+    
+    else:
+        messages.error(request, "Invalid export format selected.")
+        return redirect('student_list')
 
 def student_reports(request):
     # Implement report generation logic here
@@ -212,7 +374,7 @@ def get_student_for_item(request, item, item_type_verbose, submit_url_name, temp
     """
     if hasattr(request.user, 'guardian'):
         guardian = request.user.guardian
-        students = Student.objects.filter(student_guardian=guardian, current_class=item.class_assigned)
+        students = Student.objects.filter(student_guardian=guardian, current_class=item.class_assigned, status='active')
         if not students.exists():
             messages.error(request, "No students associated with this guardian are in this class.")
             return redirect('guardian_dashboard')
@@ -686,10 +848,11 @@ def compose_message(request):
         if student:
             teacher_ids = Teacher.objects.filter(
                 Q(teacherassignment__class_assigned=student.current_class) |
-                Q(subjectassignment__class_assigned=student.current_class)
+                Q(subjectassignment__class_assigned=student.current_class),
+                status='active'
             ).values_list('user_id', flat=True)
             recipient_qs = CustomUser.objects.filter(Q(id__in=teacher_ids) | Q(role='admin')).exclude(pk=sender.pk).distinct()
-            student_context_qs = Student.objects.filter(pk=student.pk)
+            student_context_qs = Student.objects.filter(pk=student.pk, status='active')
 
     elif sender.role == 'teacher':
         # Teachers can message guardians of their students, colleagues, and admins
@@ -715,7 +878,8 @@ def compose_message(request):
             wards = guardian.students.all()
             teacher_ids = Teacher.objects.filter(
                 Q(teacherassignment__class_assigned__in=wards.values_list('current_class', flat=True)) |
-                Q(subjectassignment__class_assigned__in=wards.values_list('current_class', flat=True))
+                Q(subjectassignment__class_assigned__in=wards.values_list('current_class', flat=True)),
+                status='active'
             ).values_list('user_id', flat=True)
             recipient_qs = CustomUser.objects.filter(Q(id__in=teacher_ids) | Q(role='admin')).distinct()
             student_context_qs = wards

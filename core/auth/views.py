@@ -13,14 +13,15 @@ from django.utils import timezone
 from django.urls import reverse, reverse_lazy, NoReverseMatch
 from django.db.models import Count, Sum, Q, F, Window, OuterRef, Subquery, IntegerField, Value, Prefetch, Max
 from django.db.models.functions import Rank, Coalesce
+from datetime import timedelta
 from collections import defaultdict
 from decimal import Decimal
 from core.models import CustomUser, Student, Teacher, Guardian, Assignment, Result, Attendance, Subject, Class, Payment, ClassSubjectAssignment
 from core.models import Session, Term, Message, Assessment, Exam, Notification, AssignmentSubmission, AcademicAlert, TeacherAssignment
-from core.models import FinancialRecord, StudentFeeRecord, AssessmentSubmission, ExamSubmission, SessionalResult
+from core.models import FinancialRecord, StudentFeeRecord, AssessmentSubmission, ExamSubmission, SessionalResult, Enrollment
 from lsalms.models import Course, CourseEnrollment
 from lsalms.services import update_course_grade_for_student
-from django.db.models import Sum
+from django.db.models import Sum, Avg, Count
 from django.views.generic.edit import FormView
 from django.contrib import messages
 from core.guardian.forms import GuardianRegistrationForm
@@ -43,7 +44,7 @@ class RegisterView(TemplateView):
 
 # Custom Guardian Registration
 class GuardianRegisterView(FormView):
-    template_name = 'auth/guardian_register.html'
+    template_name = 'auth/guardian_register_wizard.html'
 
     def get(self, request, *args, **kwargs):
         form = GuardianRegistrationForm()
@@ -53,6 +54,7 @@ class GuardianRegisterView(FormView):
         form = GuardianRegistrationForm(request.POST, request.FILES)
         if form.is_valid():
             form.save()
+            messages.success(request, "Registration successful! Please login with your credentials.")
             return redirect('login')
         else:
             print(form.errors)
@@ -65,7 +67,7 @@ class GuardianRegisterView(FormView):
 
 # Custom Teacher Registration
 class TeacherRegisterView(FormView):
-    template_name = 'auth/teacher_register.html'
+    template_name = 'auth/teacher_register_wizard.html'
 
     def get(self, request, *args, **kwargs):
         form = TeacherRegistrationForm()
@@ -75,6 +77,7 @@ class TeacherRegisterView(FormView):
         form = TeacherRegistrationForm(request.POST, request.FILES)
         if form.is_valid():
             form.save()
+            messages.success(request, "Registration successful! Please login with your credentials.")
             return redirect('login')
         return render(request, self.template_name, {'form': form})
     
@@ -130,41 +133,261 @@ def admin_required(login_url=None):
 @login_required
 @admin_required() # Apply decorator
 def admin_dashboard(request):
-    # Fetch counts (use .count() for efficiency)
-    student_count = Student.objects.filter(status='active').count() # Count only active?
-    teacher_count = Teacher.objects.filter(status='active').count() # Count only active?
-    guardian_count = Guardian.objects.count()
+    now = timezone.now()
+    active_term = Term.objects.filter(is_active=True).select_related('session').first()
+    active_session = active_term.session if active_term else None
+    
+    # Debug: Print to console
+    print(f"DEBUG - Active Term: {active_term}")
+    print(f"DEBUG - Active Session: {active_session}")
+    if active_term:
+        print(f"DEBUG - Term Name: {active_term.name}, Session Name: {active_session.name}")
+    
+    # === CORE STATISTICS ===
+    student_count = Student.objects.filter(status='active').count()
+    dormant_students = Student.objects.filter(status='dormant').count()
+    left_students = Student.objects.filter(status='left').count()
+    total_students = Student.objects.count()
+    
+    teacher_count = Teacher.objects.filter(status='active').count()
+    dormant_teachers = Teacher.objects.filter(status='dormant').count()
+    
+    guardian_count = Guardian.objects.filter(status='active').count()
     class_count = Class.objects.count()
-    session_count = Session.objects.count()
-    term_count = Term.objects.count()
     subject_count = Subject.objects.count()
-    payment_count = Payment.objects.count() 
-
-    # Fetch recent enrollments (Example using Student's class assignment change)
-    recent_enrollments = Student.objects.select_related(
-        'user', 'current_class', 'current_class__term__session' # Adjust relations
-        ).order_by('-user__date_joined')[:5] # Example: recent student creations
-
-    # Fetch data for charts (Example: Students per class)
+    
+    # === GROWTH TRENDS (last 30 days) ===
+    thirty_days_ago = now - timedelta(days=30)
+    new_students = Student.objects.filter(user__date_joined__gte=thirty_days_ago).count()
+    new_teachers = Teacher.objects.filter(user__date_joined__gte=thirty_days_ago).count()
+    new_guardians = Guardian.objects.filter(user__date_joined__gte=thirty_days_ago).count()
+    
+    # === ACADEMIC PERFORMANCE ===
+    if active_term:
+        # Results statistics
+        approved_results = Result.objects.filter(term=active_term, is_approved=True).count()
+        pending_results = Result.objects.filter(term=active_term, is_approved=False).count()
+        
+        # Submission statistics
+        total_assignments = Assignment.objects.filter(term=active_term, active=True).count()
+        total_assessments = Assessment.objects.filter(term=active_term, is_approved=True).count()
+        total_exams = Exam.objects.filter(term=active_term, is_approved=True).count()
+        
+        assignment_submissions = AssignmentSubmission.objects.filter(assignment__term=active_term).count()
+        assessment_submissions = AssessmentSubmission.objects.filter(assessment__term=active_term).count()
+        exam_submissions = ExamSubmission.objects.filter(exam__term=active_term).count()
+        
+        # Average GPA calculation
+        avg_gpa = Result.objects.filter(term=active_term, is_approved=True).aggregate(
+            avg=Avg('calculated_gpa')
+        )['avg'] or 0
+    else:
+        approved_results = pending_results = 0
+        total_assignments = total_assessments = total_exams = 0
+        assignment_submissions = assessment_submissions = exam_submissions = 0
+        avg_gpa = 0
+    
+    # === FINANCIAL OVERVIEW ===
+    if active_term:
+        total_fees_expected = FinancialRecord.objects.filter(term=active_term).aggregate(
+            total=Sum('net_fee')
+        )['total'] or Decimal('0')
+        
+        total_collected = Payment.objects.filter(
+            financial_record__term=active_term
+        ).aggregate(total=Sum('amount'))['total'] or Decimal('0')
+        
+        outstanding_fees = total_fees_expected - total_collected
+        collection_rate = (total_collected / total_fees_expected * 100) if total_fees_expected > 0 else 0
+        
+        # Payment statistics (last 30 days)
+        recent_payments = Payment.objects.filter(
+            created_at__gte=thirty_days_ago
+        ).aggregate(
+            total=Sum('amount'),
+            count=Count('id')
+        )
+        recent_payment_amount = recent_payments['total'] or Decimal('0')
+        recent_payment_count = recent_payments['count'] or 0
+    else:
+        total_fees_expected = total_collected = outstanding_fees = Decimal('0')
+        collection_rate = 0
+        recent_payment_amount = Decimal('0')
+        recent_payment_count = 0
+    
+    # === ATTENDANCE OVERVIEW ===
+    if active_term:
+        attendance_stats = Attendance.objects.filter(term=active_term).aggregate(
+            total=Count('id'),
+            present=Count('id', filter=Q(is_present=True))
+        )
+        total_attendance_records = attendance_stats['total'] or 0
+        present_records = attendance_stats['present'] or 0
+        attendance_rate = (present_records / total_attendance_records * 100) if total_attendance_records > 0 else 0
+    else:
+        attendance_rate = total_attendance_records = present_records = 0
+    
+    # === ENGAGEMENT METRICS ===
+    # Messages in last 30 days
+    recent_messages = Message.objects.filter(sent_at__gte=thirty_days_ago).count()
+    
+    # Active notifications
+    active_notifications = Notification.objects.filter(
+        is_active=True,
+        expiry_date__gte=now.date()
+    ).count()
+    
+    # === STUDENTS PER CLASS (for charts) ===
     class_counts_query = Class.objects.annotate(
         num_students=Count('enrolled_students', filter=Q(enrolled_students__status='active'))
-    ).order_by('name')
-
+    ).order_by('order')
+    
     student_counts_by_class_labels = [c.name for c in class_counts_query]
     student_counts_by_class_data = [c.num_students for c in class_counts_query]
-
+    
+    # === GENDER DISTRIBUTION ===
+    gender_stats = Student.objects.filter(status='active').values('gender').annotate(
+        count=Count('id')
+    )
+    male_students = next((item['count'] for item in gender_stats if item['gender'] == 'M'), 0)
+    female_students = next((item['count'] for item in gender_stats if item['gender'] == 'F'), 0)
+    
+    # === RECENT ACTIVITIES ===
+    recent_enrollments = Enrollment.objects.filter(
+        student__status='active'
+    ).select_related(
+        'student__user', 
+        'class_enrolled', 
+        'session', 
+        'term'
+    ).order_by('-id')[:5]
+    
+    recent_results = Result.objects.filter(
+        is_approved=True
+    ).select_related('student__user', 'term').order_by('-updated_at')[:5]
+    
+    # === TOP PERFORMING CLASSES (by average GPA) ===
+    if active_term:
+        top_classes = Result.objects.filter(
+            term=active_term,
+            is_approved=True
+        ).values(
+            'student__current_class__name'
+        ).annotate(
+            avg_gpa=Avg('calculated_gpa'),
+            student_count=Count('student')
+        ).order_by('-avg_gpa')[:5]
+    else:
+        top_classes = []
+    
+    # === LMS STATISTICS ===
+    from lsalms.models import Course, CourseEnrollment
+    total_courses = Course.objects.count()
+    active_courses = Course.objects.filter(is_active=True).count()
+    total_enrollments = CourseEnrollment.objects.count()
+    
+    # === SYSTEM HEALTH ===
+    # Users logged in recently (last 7 days)
+    seven_days_ago = now - timedelta(days=7)
+    active_users = CustomUser.objects.filter(
+        last_login__gte=seven_days_ago
+    ).count()
+    
+    # === ADDITIONAL STATISTICS ===
+    # Pending approvals count
+    pending_assessments = Assessment.objects.filter(is_approved=False).count() if active_term else 0
+    pending_exams = Exam.objects.filter(is_approved=False).count() if active_term else 0
+    
+    # Students without fee records
+    students_without_fees = Student.objects.filter(
+        status='active'
+    ).exclude(
+        id__in=FinancialRecord.objects.filter(term=active_term).values_list('student_id', flat=True)
+    ).count() if active_term else 0
+    
+    # Teachers without class assignments
+    teachers_without_class = Teacher.objects.filter(
+        status='active'
+    ).exclude(
+        id__in=TeacherAssignment.objects.filter(term=active_term).values_list('teacher_id', flat=True)
+    ).count() if active_term else 0
+    
+    # Debug output for statistics
+    print(f"DEBUG - Student Count: {student_count}")
+    print(f"DEBUG - Teacher Count: {teacher_count}")
+    print(f"DEBUG - Active Users: {active_users}")
+    print(f"DEBUG - Total Assignments: {total_assignments if active_term else 'N/A'}")
+    print(f"DEBUG - Collection Rate: {collection_rate}%")
+    
     context = {
+        # Core Statistics
         'student_count': student_count,
+        'dormant_students': dormant_students,
+        'left_students': left_students,
+        'total_students': total_students,
         'teacher_count': teacher_count,
+        'dormant_teachers': dormant_teachers,
         'guardian_count': guardian_count,
         'class_count': class_count,
-        'session_count': session_count,
-        'term_count': term_count,
         'subject_count': subject_count,
-        'payment_count': payment_count,
-        'recent_enrollments': recent_enrollments, 
-        'student_counts_by_class_labels': student_counts_by_class_labels, 
-        'student_counts_by_class_data': student_counts_by_class_data,   
+        
+        # Growth Trends
+        'new_students': new_students,
+        'new_teachers': new_teachers,
+        'new_guardians': new_guardians,
+        
+        # Academic Performance
+        'active_term': active_term,
+        'active_session': active_session,
+        'approved_results': approved_results,
+        'pending_results': pending_results,
+        'total_assignments': total_assignments,
+        'total_assessments': total_assessments,
+        'total_exams': total_exams,
+        'assignment_submissions': assignment_submissions,
+        'assessment_submissions': assessment_submissions,
+        'exam_submissions': exam_submissions,
+        'avg_gpa': round(float(avg_gpa), 2) if avg_gpa else 0,
+        
+        # Financial Overview
+        'total_fees_expected': total_fees_expected,
+        'total_collected': total_collected,
+        'outstanding_fees': outstanding_fees,
+        'collection_rate': round(float(collection_rate), 1),
+        'recent_payment_amount': recent_payment_amount,
+        'recent_payment_count': recent_payment_count,
+        
+        # Attendance
+        'attendance_rate': round(float(attendance_rate), 1),
+        'total_attendance_records': total_attendance_records,
+        'present_records': present_records,
+        
+        # Engagement
+        'recent_messages': recent_messages,
+        'active_notifications': active_notifications,
+        
+        # Charts Data
+        'student_counts_by_class_labels': student_counts_by_class_labels,
+        'student_counts_by_class_data': student_counts_by_class_data,
+        'male_students': male_students,
+        'female_students': female_students,
+        
+        # Recent Activities
+        'recent_enrollments': recent_enrollments,
+        'recent_results': recent_results,
+        'top_classes': top_classes,
+        
+        # LMS Statistics
+        'total_courses': total_courses,
+        'active_courses': active_courses,
+        'total_enrollments': total_enrollments,
+        
+        # System Health
+        'active_users': active_users,
+        'pending_assessments': pending_assessments,
+        'pending_exams': pending_exams,
+        'students_without_fees': students_without_fees,
+        'teachers_without_class': teachers_without_class,
     }
 
     return render(request, 'setup/dashboard.html', context) 
@@ -177,7 +400,7 @@ def student_dashboard(request):
         student = Student.objects.select_related(
             'user', 'current_class'
         ).get(user=request.user)
-    except Student.DoesNotExist:
+    except Student.DoesNotExist or student.status != 'active':
         messages.error(request, "Your student profile could not be found.")
         return redirect('login')
 
@@ -327,7 +550,8 @@ def student_dashboard(request):
 
     context['class_teachers'] = Teacher.objects.filter(
         teacherassignment__class_assigned=student.current_class,
-        teacherassignment__term=active_term
+        teacherassignment__term=active_term,
+        status='active'
     ).select_related('user').distinct()
 
     received_messages = Message.objects.filter(
@@ -755,7 +979,7 @@ def guardian_dashboard(request):
         return redirect('logout') 
 
     # --- Base QuerySets ---
-    wards_qs = guardian.students.all().select_related('user', 'current_class')
+    wards_qs = guardian.students.filter(status='active').select_related('user', 'current_class')
     ward_pks = wards_qs.values_list('pk', flat=True)
     
     active_term = Term.objects.filter(is_active=True).select_related('session').first()

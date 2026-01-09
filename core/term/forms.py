@@ -8,6 +8,14 @@ class TermForm(forms.ModelForm):
         model = Term
         fields = ['session', 'name', 'start_date', 'end_date', 'is_active']
         widgets = {
-            'start_date': forms.DateInput(attrs={'class': 'form-control datepicker', 'autocomplete': 'off'}),
-            'end_date': forms.DateInput(attrs={'class': 'form-control datepicker', 'autocomplete': 'off'}),
+            'start_date': forms.DateInput(attrs={
+                'class': 'form-control',
+                'type': 'date',
+                'placeholder': 'Select start date'
+            }),
+            'end_date': forms.DateInput(attrs={
+                'class': 'form-control',
+                'type': 'date',
+                'placeholder': 'Select end date'
+            }),
         }

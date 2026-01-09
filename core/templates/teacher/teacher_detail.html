@@ -1,31 +1,424 @@
-{% extends "base.html" %}
+{% extends "base_admin_sidebar.html" %}
+{% load static %}
 
 {% block content %}
-<div class="container mt-5">
-    <h2 class="mb-4">Teacher Details</h2>
-    <div class="card" style="width: 22rem; margin: 0 auto;">
-        {% load static %}
-        <div class="card-header">
-            {% if teacher.profile_image %}
-                <img src="{{ teacher.profile_image.url }}" class="card-img-top" alt="{{ teacher.user.get_full_name }}" style="max-height: 300px; object-fit: cover;">
-            {% else %}
-                <img src="{% static 'images/default.jpg' %}" class="card-img-top" alt="Default Profile Image" style="max-height: 300px; object-fit: cover;">
-            {% endif %}
-            <br>
-            <h3>{{ teacher.user.first_name }} {{ teacher.user.last_name }}</h3>
+<style>
+    /* Teacher Detail - Green Theme */
+    .teacher-detail-header {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: white;
+        padding: 2rem;
+        border-radius: 15px 15px 0 0;
+        margin: -1rem -1rem 0 -1rem;
+    }
+    
+    .teacher-profile-card {
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        overflow: hidden;
+        margin-bottom: 2rem;
+    }
+    
+    .teacher-profile-image {
+        width: 150px;
+        height: 150px;
+        border-radius: 50%;
+        border: 5px solid white;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        object-fit: cover;
+    }
+    
+    .teacher-detail-tabs {
+        background: white;
+        border-radius: 10px;
+        padding: 0.5rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    
+    .teacher-detail-tabs .nav-link {
+        color: #6b7280;
+        font-weight: 500;
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+        border: none;
+    }
+    
+    .teacher-detail-tabs .nav-link:hover {
+        background-color: #f3f4f6;
+        color: #10b981;
+    }
+    
+    .teacher-detail-tabs .nav-link.active {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: white;
+    }
+    
+    .teacher-info-card {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        margin-bottom: 1.5rem;
+    }
+    
+    .teacher-info-item {
+        display: flex;
+        padding: 1rem 0;
+        border-bottom: 1px solid #f3f4f6;
+    }
+    
+    .teacher-info-item:last-child {
+        border-bottom: none;
+    }
+    
+    .teacher-info-label {
+        flex: 0 0 180px;
+        color: #6b7280;
+        font-weight: 600;
+    }
+    
+    .teacher-info-value {
+        flex: 1;
+        color: #111827;
+    }
+    
+    .teacher-stat-box {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        text-align: center;
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    }
+    
+    .teacher-stat-number {
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+    }
+    
+    .teacher-stat-label {
+        font-size: 0.875rem;
+        opacity: 0.9;
+    }
+    
+    .teacher-badge-large {
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 0.875rem;
+    }
+    
+    .teacher-action-button {
+        background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+        color: white;
+        border: none;
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+    }
+    
+    .teacher-action-button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4);
+        color: white;
+    }
+    
+    .teacher-secondary-button {
+        background: white;
+        color: #10b981;
+        border: 2px solid #10b981;
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+    
+    .teacher-secondary-button:hover {
+        background: #10b981;
+        color: white;
+    }
+</style>
+
+<div class="container-fluid px-4 py-4">
+    <!-- Profile Header -->
+    <div class="teacher-profile-card">
+        <div class="teacher-detail-header">
+            <div class="row align-items-center">
+                <div class="col-md-auto text-center text-md-start mb-3 mb-md-0">
+                    {% if teacher.profile_image %}
+                        <img src="{{ teacher.profile_image.url }}" class="teacher-profile-image" alt="{{ teacher.user.get_full_name }}">
+                    {% else %}
+                        <div class="teacher-profile-image d-inline-flex align-items-center justify-content-center" 
+                             style="background: rgba(255,255,255,0.2); font-size: 3rem; font-weight: 700;">
+                            {{ teacher.user.first_name|slice:":1" }}{{ teacher.user.last_name|slice:":1" }}
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="col-md">
+                    <h2 class="mb-2">{{ teacher.user.get_full_name }}</h2>
+                    <p class="mb-2 opacity-75">
+                        <i class="bi bi-person-badge me-2"></i>{{ teacher.employee_id|default:"No Employee ID" }}
+                        <span class="mx-3">|</span>
+                        <i class="bi bi-envelope me-2"></i>{{ teacher.user.email }}
+                    </p>
+                    <div>
+                        <span class="teacher-badge-large {% if teacher.status == 'active' %}bg-success{% elif teacher.status == 'dormant' %}bg-warning{% else %}bg-secondary{% endif %}">
+                            {{ teacher.get_status_display }}
+                        </span>
+                    </div>
+                </div>
+                <div class="col-md-auto text-center text-md-end mt-3 mt-md-0">
+                    <div class="d-flex gap-2 flex-wrap justify-content-center justify-content-md-end">
+                        <a href="{% url 'teacher_update' teacher.user.id %}" class="btn teacher-action-button">
+                            <i class="bi bi-pencil me-2"></i>Edit
+                        </a>
+                        <a href="{% url 'teacher_list' %}" class="btn teacher-secondary-button">
+                            <i class="bi bi-arrow-left me-2"></i>Back
+                        </a>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="card-body">
-            <p><strong>Username:</strong> {{ teacher.user.username }}</p>
-            <p><strong>Email:</strong> {{ teacher.user.email }}</p>
-            <p><strong>Date of Birth:</strong> {{ teacher.date_of_birth }}</p>
-            <p><strong>Class:</strong> {{ teacher.current_class }}</p>
-            <p><strong>Contact:</strong> {{ teacher.contact }}</p>
-            <p><strong>Address:</strong> {{ teacher.address }}</p>
+
+        <!-- Quick Stats -->
+        <div class="p-4">
+            <div class="row g-3">
+                <div class="col-md-3 col-6">
+                    <div class="teacher-stat-box">
+                        <div class="teacher-stat-number">{{ teacher.age|default:"--" }}</div>
+                        <div class="teacher-stat-label">Years Old</div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-6">
+                    <div class="teacher-stat-box">
+                        <div class="teacher-stat-number">{{ teacher.assigned_subjects.count }}</div>
+                        <div class="teacher-stat-label">Subjects</div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-6">
+                    <div class="teacher-stat-box">
+                        <div class="teacher-stat-number">{{ teacher.assigned_classes.count }}</div>
+                        <div class="teacher-stat-label">Classes</div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-6">
+                    <div class="teacher-stat-box">
+                        <div class="teacher-stat-number">
+                            {% if teacher.user.date_joined %}
+                                {{ teacher.user.date_joined|timesince|truncatewords:1 }}
+                            {% else %}
+                                --
+                            {% endif %}
+                        </div>
+                        <div class="teacher-stat-label">Years of Service</div>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="card-footer">
-            <a href="{% url 'teacher_update' teacher.user.id %}" class="btn btn-warning">Edit</a>
-            <a href="{% url 'teacher_delete' teacher.user.id %}" class="btn btn-danger">Delete</a>
-            <a href="{% url 'teacher_dashboard' %}" class="btn btn-secondary">Back to Dashboard</a>
+    </div>
+
+    <!-- Tabs -->
+    <div class="teacher-detail-tabs mb-4">
+        <ul class="nav nav-pills" id="teacher-tabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="overview-tab" data-bs-toggle="pill" data-bs-target="#overview" type="button">
+                    <i class="bi bi-person me-2"></i>Overview
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="classes-tab" data-bs-toggle="pill" data-bs-target="#classes" type="button">
+                    <i class="bi bi-book me-2"></i>Classes & Subjects
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="performance-tab" data-bs-toggle="pill" data-bs-target="#performance" type="button">
+                    <i class="bi bi-graph-up me-2"></i>Performance
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="history-tab" data-bs-toggle="pill" data-bs-target="#history" type="button">
+                    <i class="bi bi-clock-history me-2"></i>History
+                </button>
+            </li>
+        </ul>
+    </div>
+
+    <!-- Tab Content -->
+    <div class="tab-content" id="teacher-tabs-content">
+        <!-- Overview Tab -->
+        <div class="tab-pane fade show active" id="overview" role="tabpanel">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="teacher-info-card">
+                        <h5 class="mb-3">
+                            <i class="bi bi-person-badge me-2 text-success"></i>
+                            Personal Information
+                        </h5>
+                        <div class="teacher-info-item">
+                            <div class="teacher-info-label">Full Name</div>
+                            <div class="teacher-info-value">{{ teacher.user.get_full_name }}</div>
+                        </div>
+                        <div class="teacher-info-item">
+                            <div class="teacher-info-label">Employee ID</div>
+                            <div class="teacher-info-value">{{ teacher.employee_id|default:"Not assigned" }}</div>
+                        </div>
+                        <div class="teacher-info-item">
+                            <div class="teacher-info-label">Date of Birth</div>
+                            <div class="teacher-info-value">
+                                {% if teacher.date_of_birth %}
+                                    {{ teacher.date_of_birth|date:"F d, Y" }} ({{ teacher.age }} years)
+                                {% else %}
+                                    Not provided
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="teacher-info-item">
+                            <div class="teacher-info-label">Gender</div>
+                            <div class="teacher-info-value">
+                                {% if teacher.gender == 'M' %}
+                                    <i class="bi bi-gender-male text-primary"></i> Male
+                                {% elif teacher.gender == 'F' %}
+                                    <i class="bi bi-gender-female text-danger"></i> Female
+                                {% else %}
+                                    Not specified
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="teacher-info-item">
+                            <div class="teacher-info-label">Email</div>
+                            <div class="teacher-info-value">{{ teacher.user.email }}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="teacher-info-card">
+                        <h5 class="mb-3">
+                            <i class="bi bi-telephone me-2 text-success"></i>
+                            Contact Information
+                        </h5>
+                        <div class="teacher-info-item">
+                            <div class="teacher-info-label">Phone Number</div>
+                            <div class="teacher-info-value">{{ teacher.contact|default:"Not provided" }}</div>
+                        </div>
+                        <div class="teacher-info-item">
+                            <div class="teacher-info-label">Address</div>
+                            <div class="teacher-info-value">{{ teacher.address|default:"Not provided" }}</div>
+                        </div>
+                    </div>
+
+                    <div class="teacher-info-card mt-3">
+                        <h5 class="mb-3">
+                            <i class="bi bi-briefcase me-2 text-success"></i>
+                            Employment Information
+                        </h5>
+                        <div class="teacher-info-item">
+                            <div class="teacher-info-label">Status</div>
+                            <div class="teacher-info-value">
+                                <span class="badge {% if teacher.status == 'active' %}bg-success{% elif teacher.status == 'dormant' %}bg-warning{% else %}bg-secondary{% endif %}">
+                                    {{ teacher.get_status_display }}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="teacher-info-item">
+                            <div class="teacher-info-label">Date Joined</div>
+                            <div class="teacher-info-value">{{ teacher.user.date_joined|date:"F d, Y" }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Classes & Subjects Tab -->
+        <div class="tab-pane fade" id="classes" role="tabpanel">
+            <div class="teacher-info-card">
+                <h5 class="mb-4">
+                    <i class="bi bi-book me-2 text-success"></i>
+                    Assigned Subjects
+                </h5>
+                {% if teacher.assigned_subjects.exists %}
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Subject Name</th>
+                                <th>Class</th>
+                                <th>Students</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for assignment in teacher.assigned_subjects.all %}
+                            <tr>
+                                <td>{{ assignment.subject.name }}</td>
+                                <td>{{ assignment.class_assigned.name }}</td>
+                                <td>{{ assignment.class_assigned.students.count }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                {% else %}
+                <p class="text-muted text-center py-4">No subjects assigned yet</p>
+                {% endif %}
+            </div>
+
+            <div class="teacher-info-card mt-3">
+                <h5 class="mb-4">
+                    <i class="bi bi-people me-2 text-success"></i>
+                    Assigned Classes
+                </h5>
+                {% if teacher.assigned_classes.exists %}
+                <div class="row">
+                    {% for class_item in teacher.assigned_classes.all %}
+                    <div class="col-md-4 mb-3">
+                        <div class="card border-success">
+                            <div class="card-body">
+                                <h6 class="card-title">{{ class_item.name }}</h6>
+                                <p class="card-text text-muted mb-0">
+                                    <small>{{ class_item.students.count }} students</small>
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-muted text-center py-4">No classes assigned yet</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Performance Tab -->
+        <div class="tab-pane fade" id="performance" role="tabpanel">
+            <div class="teacher-info-card">
+                <h5 class="mb-4">
+                    <i class="bi bi-graph-up me-2 text-success"></i>
+                    Teaching Performance
+                </h5>
+                <p class="text-muted text-center py-4">Performance metrics coming soon</p>
+            </div>
+        </div>
+
+        <!-- History Tab -->
+        <div class="tab-pane fade" id="history" role="tabpanel">
+            <div class="teacher-info-card">
+                <h5 class="mb-4">
+                    <i class="bi bi-clock-history me-2 text-success"></i>
+                    Employment History
+                </h5>
+                <div class="teacher-timeline">
+                    <div class="teacher-timeline-item">
+                        <div class="fw-semibold">{{ teacher.user.date_joined|date:"F d, Y" }}</div>
+                        <div class="text-muted">Teacher Registration</div>
+                        <small class="text-muted">Joined the school</small>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 </div>

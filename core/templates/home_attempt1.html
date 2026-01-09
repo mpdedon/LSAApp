@@ -1,0 +1,1075 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}LearnSwift Academia | Islamic School in Lagos for Faith, Intellect & Skills{% endblock %}
+{% block meta_description %}LearnSwift Academia offers holistic Islamic and Western education in Agege, Lagos. We focus on character, critical thinking, STEM, vocational skills, and parental partnership.{% endblock %}
+
+{% block schema_org %}
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "EducationalOrganization",
+  "name": "LearnSwift Academia",
+  "alternateName": "LSA",
+  "url": "https://learnswift.icu/",
+  "logo": "{% static 'images/logo.jpg' %}",
+  "contactPoint": [{
+    "@type": "ContactPoint",
+    "telephone": "+234-703-485-8160",
+    "contactType": "customer service",
+    "areaServed": "NG",
+    "availableLanguage": ["en","yo","ha", "ar"]
+   },{
+    "@type": "ContactPoint",
+    "telephone": "+234-706-236-1134",
+    "contactType": "technical support",
+    "areaServed": "NG",
+    "availableLanguage": "en"
+   },{
+    "@type": "ContactPoint",
+    "email": "learnswift2020@gmail.com",
+    "contactType": "customer service"
+   }],
+  "address": {
+    "@type": "PostalAddress",
+    "streetAddress": "5 Bode Tobun Street, off Oniwaya Road",
+    "addressLocality": "Agege",
+    "addressRegion": "LA",
+    "postalCode": "100283",
+    "addressCountry": "NG"
+  },
+  "description": "LearnSwift Academia provides a balanced education combining Islamic values with modern academics, technology, and vocational skills for primary and secondary students in Lagos, Nigeria."
+}
+</script>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+  /* Ultra-Modern Hero Section */
+  .modern-hero {
+    position: relative;
+    height: 100vh;
+    min-height: 700px;
+    overflow: hidden;
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #334155 100%);
+  }
+  
+  /* Animated gradient overlay */
+  .modern-hero::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, 
+      rgba(132, 204, 22, 0.3) 0%, 
+      rgba(34, 197, 94, 0.2) 50%, 
+      rgba(16, 185, 129, 0.3) 100%);
+    animation: gradientShift 15s ease infinite;
+    z-index: 1;
+  }
+  
+  @keyframes gradientShift {
+    0%, 100% { opacity: 0.3; transform: translateX(0) scale(1); }
+    50% { opacity: 0.6; transform: translateX(10%) scale(1.1); }
+  }
+  
+  /* Floating geometric shapes */
+  .hero-shape {
+    position: absolute;
+    opacity: 0.1;
+    animation: floatShape 20s ease-in-out infinite;
+    z-index: 2;
+  }
+  
+  .shape-1 { top: 10%; left: 5%; animation-duration: 18s; }
+  .shape-2 { top: 60%; right: 10%; animation-duration: 22s; animation-delay: 3s; }
+  .shape-3 { bottom: 15%; left: 15%; animation-duration: 20s; animation-delay: 6s; }
+  .shape-4 { top: 30%; right: 20%; animation-duration: 19s; animation-delay: 9s; }
+  
+  @keyframes floatShape {
+    0%, 100% { transform: translate(0, 0) rotate(0deg); }
+    33% { transform: translate(50px, -50px) rotate(120deg); }
+    66% { transform: translate(-30px, 50px) rotate(240deg); }
+  }
+  
+  /* Hero carousel with modern styling */
+  .modern-hero .carousel-item {
+    height: 100vh;
+    min-height: 700px;
+  }
+  
+  .modern-hero .carousel-item::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: radial-gradient(circle at 30% 50%, 
+      rgba(132, 204, 22, 0.2) 0%, 
+      rgba(0, 0, 0, 0.6) 100%);
+    z-index: 3;
+  }
+  
+  .modern-hero .carousel-caption {
+    z-index: 4;
+    bottom: 30%;
+    left: 10%;
+    right: 10%;
+    text-align: left;
+  }
+  
+  .hero-title {
+    font-size: 4rem;
+    font-weight: 800;
+    line-height: 1.1;
+    margin-bottom: 1.5rem;
+    background: linear-gradient(135deg, #fff 0%, #a3e635 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: titleGlow 3s ease-in-out infinite;
+  }
+  
+  @keyframes titleGlow {
+    0%, 100% { filter: brightness(1); }
+    50% { filter: brightness(1.2); }
+  }
+  
+  .hero-subtitle {
+    font-size: 1.4rem;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.9);
+    margin-bottom: 2rem;
+    max-width: 600px;
+  }
+  
+  .hero-cta {
+    display: inline-flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 1.2rem 2.5rem;
+    font-size: 1.1rem;
+    font-weight: 700;
+    background: linear-gradient(135deg, #84cc16 0%, #22c55e 100%);
+    border: none;
+    border-radius: 50px;
+    color: white;
+    text-decoration: none;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 10px 40px rgba(132, 204, 22, 0.4);
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .hero-cta::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    transition: left 0.5s ease;
+  }
+  
+  .hero-cta:hover {
+    transform: translateY(-3px) scale(1.05);
+    box-shadow: 0 15px 50px rgba(132, 204, 22, 0.6);
+  }
+  
+  .hero-cta:hover::before {
+    left: 100%;
+  }
+  
+  /* Animated Stats Counter Section */
+  .stats-section {
+    position: relative;
+    padding: 80px 0;
+    background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  }
+  
+  .stat-card {
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(20px);
+    border: 2px solid rgba(132, 204, 22, 0.2);
+    border-radius: 24px;
+    padding: 3rem 2rem;
+    text-align: center;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
+  }
+  
+  .stat-card:hover {
+    transform: translateY(-15px) scale(1.03);
+    box-shadow: 0 20px 60px rgba(132, 204, 22, 0.3);
+    border-color: rgba(132, 204, 22, 0.5);
+  }
+  
+  .stat-icon {
+    font-size: 4rem;
+    margin-bottom: 1.5rem;
+    display: inline-block;
+    animation: iconFloat 3s ease-in-out infinite;
+  }
+  
+  @keyframes iconFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
+  
+  .stat-number {
+    font-size: 3.5rem;
+    font-weight: 800;
+    background: linear-gradient(135deg, #84cc16 0%, #22c55e 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    margin: 0;
+    font-family: 'Poppins', sans-serif;
+  }
+  
+  .stat-label {
+    font-size: 1.1rem;
+    color: #64748b;
+    font-weight: 600;
+    margin-top: 0.5rem;
+  }
+  
+  /* Modern Section Headings */
+  .section-heading {
+    font-size: 3rem;
+    font-weight: 800;
+    position: relative;
+    padding-bottom: 1rem;
+    margin-bottom: 3rem;
+    font-family: 'Poppins', sans-serif;
+  }
+  
+  .section-heading::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100px;
+    height: 5px;
+    background: linear-gradient(135deg, #84cc16 0%, #22c55e 100%);
+    border-radius: 10px;
+  }
+  
+  /* Glassmorphic Benefit Cards */
+  .modern-benefit-card {
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(20px);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 28px;
+    padding: 2.5rem;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+    height: 100%;
+  }
+  
+  .modern-benefit-card:hover {
+    transform: translateY(-10px) rotateX(2deg);
+    box-shadow: 0 20px 50px rgba(132, 204, 22, 0.2);
+    border-color: rgba(132, 204, 22, 0.4);
+  }
+  
+  .benefit-icon-wrapper {
+    width: 80px;
+    height: 80px;
+    border-radius: 20px;
+    background: linear-gradient(135deg, #84cc16 0%, #22c55e 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 1.5rem;
+    box-shadow: 0 10px 30px rgba(132, 204, 22, 0.3);
+    transition: transform 0.3s ease;
+  }
+  
+  .modern-benefit-card:hover .benefit-icon-wrapper {
+    transform: rotate(360deg) scale(1.1);
+  }
+  
+  .benefit-icon-wrapper i {
+    font-size: 2.5rem;
+    color: white;
+  }
+  
+  /* Success Stories Section */
+  .stories-section {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    padding: 100px 0;
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .stories-section::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: 
+      radial-gradient(circle at 20% 30%, rgba(132, 204, 22, 0.1) 0%, transparent 50%),
+      radial-gradient(circle at 80% 70%, rgba(34, 197, 94, 0.1) 0%, transparent 50%);
+    pointer-events: none;
+  }
+  
+  .story-card {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(20px);
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-radius: 24px;
+    padding: 2rem;
+    transition: all 0.4s ease;
+    height: 100%;
+  }
+  
+  .story-card:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(132, 204, 22, 0.3);
+    transform: translateY(-10px);
+  }
+  
+  .story-img {
+    width: 100%;
+    height: 250px;
+    object-fit: cover;
+    border-radius: 16px;
+    margin-bottom: 1.5rem;
+  }
+  
+  .story-title {
+    color: #fff;
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+  }
+  
+  .story-text {
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 1rem;
+    line-height: 1.6;
+  }
+  
+  .story-quote {
+    color: #a3e635;
+    font-style: italic;
+    margin-top: 1rem;
+    padding-left: 1rem;
+    border-left: 3px solid #84cc16;
+  }
+  
+  /* Modern Testimonials */
+  .modern-testimonial {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    border-radius: 32px;
+    padding: 3rem;
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.1);
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .modern-testimonial::before {
+    content: '"';
+    position: absolute;
+    top: -20px;
+    left: 20px;
+    font-size: 150px;
+    color: rgba(132, 204, 22, 0.1);
+    font-family: Georgia, serif;
+    line-height: 1;
+  }
+  
+  .testimonial-avatar {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    border: 5px solid #84cc16;
+    object-fit: cover;
+    margin: 0 auto 1.5rem;
+    box-shadow: 0 10px 30px rgba(132, 204, 22, 0.3);
+  }
+  
+  .testimonial-text {
+    font-size: 1.2rem;
+    color: #1e293b;
+    line-height: 1.8;
+    margin-bottom: 1.5rem;
+    position: relative;
+    z-index: 1;
+  }
+  
+  .testimonial-name {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: #0f172a;
+    margin-bottom: 0.3rem;
+  }
+  
+  .testimonial-role {
+    color: #64748b;
+    font-weight: 500;
+  }
+  
+  /* Modern CTA Section */
+  .modern-cta-section {
+    background: linear-gradient(135deg, #84cc16 0%, #22c55e 100%);
+    padding: 100px 0;
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .modern-cta-section::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  }
+  
+  .cta-heading {
+    font-size: 3.5rem;
+    font-weight: 800;
+    color: white;
+    margin-bottom: 1.5rem;
+    text-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  }
+  
+  .cta-subheading {
+    font-size: 1.4rem;
+    color: rgba(255, 255, 255, 0.95);
+    margin-bottom: 3rem;
+  }
+  
+  .cta-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.8rem;
+    padding: 1.5rem 3rem;
+    font-size: 1.2rem;
+    font-weight: 700;
+    background: white;
+    color: #22c55e;
+    border: none;
+    border-radius: 50px;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.2);
+  }
+  
+  .cta-button:hover {
+    transform: translateY(-5px) scale(1.05);
+    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+    color: #16a34a;
+  }
+  
+  .cta-button-outline {
+    background: transparent;
+    color: white;
+    border: 3px solid white;
+  }
+  
+  .cta-button-outline:hover {
+    background: white;
+    color: #22c55e;
+  }
+  
+  /* Modern Footer */
+  .modern-footer {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    padding: 60px 0 30px;
+    position: relative;
+    overflow: hidden;
+  }
+  
+  .modern-footer::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: linear-gradient(90deg, #84cc16 0%, #22c55e 50%, #84cc16 100%);
+    background-size: 200% 100%;
+    animation: gradientSlide 3s ease infinite;
+  }
+  
+  @keyframes gradientSlide {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+  }
+  
+  .footer-logo-text {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: white;
+    margin-bottom: 1rem;
+  }
+  
+  .footer-description {
+    color: rgba(255, 255, 255, 0.7);
+    line-height: 1.8;
+  }
+  
+  .footer-link-list {
+    list-style: none;
+    padding: 0;
+  }
+  
+  .footer-link-list li {
+    margin-bottom: 0.8rem;
+  }
+  
+  .footer-link-list a {
+    color: rgba(255, 255, 255, 0.7);
+    text-decoration: none;
+    transition: all 0.3s ease;
+    display: inline-block;
+  }
+  
+  .footer-link-list a:hover {
+    color: #84cc16;
+    transform: translateX(5px);
+  }
+  
+  .social-icon {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: white;
+    font-size: 1.3rem;
+    margin: 0 0.5rem;
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+  }
+  
+  .social-icon:hover {
+    background: linear-gradient(135deg, #84cc16 0%, #22c55e 100%);
+    transform: translateY(-5px) rotate(360deg);
+    border-color: white;
+    box-shadow: 0 10px 30px rgba(132, 204, 22, 0.5);
+  }
+  
+  /* Responsive adjustments */
+  @media (max-width: 768px) {
+    .hero-title { font-size: 2.5rem; }
+    .hero-subtitle { font-size: 1.1rem; }
+    .section-heading { font-size: 2rem; }
+    .stat-number { font-size: 2.5rem; }
+    .cta-heading { font-size: 2.2rem; }
+    .modern-hero .carousel-caption { text-align: center; left: 5%; right: 5%; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<!-- Ultra-Modern Hero Section -->
+<section class="modern-hero main-content-below-navbar">
+  <!-- Floating Shapes -->
+  <svg class="hero-shape shape-1" width="200" height="200" viewBox="0 0 200 200">
+    <circle cx="100" cy="100" r="80" fill="white"/>
+  </svg>
+  <svg class="hero-shape shape-2" width="180" height="180" viewBox="0 0 180 180">
+    <polygon points="90,10 170,80 140,160 40,160 10,80" fill="white"/>
+  </svg>
+  <svg class="hero-shape shape-3" width="150" height="150" viewBox="0 0 150 150">
+    <rect x="25" y="25" width="100" height="100" rx="20" fill="white"/>
+  </svg>
+  <svg class="hero-shape shape-4" width="160" height="160" viewBox="0 0 160 160">
+    <path d="M80,20 Q140,50 140,100 Q140,150 80,140 Q20,150 20,100 Q20,50 80,20" fill="white"/>
+  </svg>
+  
+  <!-- Hero Carousel -->
+  <div id="heroCarousel" class="carousel slide h-100" data-bs-ride="carousel" data-bs-interval="5000">
+    <div class="carousel-indicators">
+      <button type="button" data-bs-target="#heroCarousel" data-bs-slide-to="0" class="active" aria-current="true" aria-label="Slide 1"></button>
+      <button type="button" data-bs-target="#heroCarousel" data-bs-slide-to="1" aria-label="Slide 2"></button>
+      <button type="button" data-bs-target="#heroCarousel" data-bs-slide-to="2" aria-label="Slide 3"></button>
+      <button type="button" data-bs-target="#heroCarousel" data-bs-slide-to="3" aria-label="Slide 4"></button>
+      <button type="button" data-bs-target="#heroCarousel" data-bs-slide-to="4" aria-label="Slide 5"></button>
+    </div>
+    
+    <div class="carousel-inner h-100">
+      <div class="carousel-item active">
+        <img src="{% static 'images/holistics.jpg' %}" class="d-block w-100 h-100" style="object-fit: cover;" alt="Holistic Development">
+        <div class="carousel-caption" data-aos="fade-up">
+          <h1 class="hero-title">Nurturing Holistic Excellence</h1>
+          <p class="hero-subtitle">Balanced academics, strong character, and deep faith – empowering well-rounded future leaders.</p>
+          <a href="#stats" class="hero-cta">
+            Discover Our Impact
+            <i class="bi bi-arrow-right"></i>
+          </a>
+        </div>
+      </div>
+      
+      <div class="carousel-item">
+        <img src="{% static 'images/personalized.jpg' %}" class="d-block w-100 h-100" style="object-fit: cover;" alt="Personalized Learning">
+        <div class="carousel-caption" data-aos="fade-up">
+          <h1 class="hero-title">Personalized Learning Paths</h1>
+          <p class="hero-subtitle">Tailored education unlocking your child's unique potential and natural talents.</p>
+          <a href="{% url 'programs' %}" class="hero-cta">
+            Explore Programs
+            <i class="bi bi-arrow-right"></i>
+          </a>
+        </div>
+      </div>
+      
+      <div class="carousel-item">
+        <img src="{% static 'images/future_skills.jpg' %}" class="d-block w-100 h-100" style="object-fit: cover;" alt="Future Skills">
+        <div class="carousel-caption" data-aos="fade-up">
+          <h1 class="hero-title">Future-Ready Innovation</h1>
+          <p class="hero-subtitle">Critical thinking, digital mastery, and essential life skills for tomorrow's challenges.</p>
+          <a href="{% url 'programs' %}" class="hero-cta">
+            View Tech Programs
+            <i class="bi bi-arrow-right"></i>
+          </a>
+        </div>
+      </div>
+      
+      <div class="carousel-item">
+        <img src="{% static 'images/parental.jpg' %}" class="d-block w-100 h-100" style="object-fit: cover;" alt="Parental Partnership">
+        <div class="carousel-caption" data-aos="fade-up">
+          <h1 class="hero-title">Powerful Partnerships</h1>
+          <p class="hero-subtitle">Transparent collaboration keeping families informed, involved, and inspired.</p>
+          <a href="{% url 'register' %}" class="hero-cta">
+            Join Our Community
+            <i class="bi bi-arrow-right"></i>
+          </a>
+        </div>
+      </div>
+      
+      <div class="carousel-item">
+        <img src="{% static 'images/character.jpg' %}" class="d-block w-100 h-100" style="object-fit: cover;" alt="Character Education">
+        <div class="carousel-caption" data-aos="fade-up">
+          <h1 class="hero-title">Character-Driven Learning</h1>
+          <p class="hero-subtitle">Instilling courage, honesty, compassion, and Islamic values in every lesson.</p>
+          <a href="#contact-section" class="hero-cta">
+            Inquire About Enrollment
+            <i class="bi bi-arrow-right"></i>
+          </a>
+        </div>
+      </div>
+    </div>
+    
+    <button class="carousel-control-prev" type="button" data-bs-target="#heroCarousel" data-bs-slide="prev">
+      <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+      <span class="visually-hidden">Previous</span>
+    </button>
+    <button class="carousel-control-next" type="button" data-bs-target="#heroCarousel" data-bs-slide="next">
+      <span class="carousel-control-next-icon" aria-hidden="true"></span>
+      <span class="visually-hidden">Next</span>
+    </button>
+  </div>
+</section>
+
+<!-- Animated Stats Section -->
+<section id="stats" class="stats-section">
+  <div class="container">
+    <h2 class="text-center section-heading" data-aos="fade-up">Our Impact in Numbers</h2>
+    <div class="row g-4">
+      <div class="col-lg-3 col-md-6" data-aos="fade-up" data-aos-delay="100">
+        <div class="stat-card">
+          <div class="stat-icon">🎓</div>
+          <div class="stat-number" data-count="500">0</div>
+          <div class="stat-label">Active Students</div>
+        </div>
+      </div>
+      
+      <div class="col-lg-3 col-md-6" data-aos="fade-up" data-aos-delay="200">
+        <div class="stat-card">
+          <div class="stat-icon">👨‍🏫</div>
+          <div class="stat-number" data-count="50">0</div>
+          <div class="stat-label">Expert Teachers</div>
+        </div>
+      </div>
+      
+      <div class="col-lg-3 col-md-6" data-aos="fade-up" data-aos-delay="300">
+        <div class="stat-card">
+          <div class="stat-icon">🏆</div>
+          <div class="stat-number" data-count="98">0</div>
+          <div class="stat-label">Success Rate %</div>
+        </div>
+      </div>
+      
+      <div class="col-lg-3 col-md-6" data-aos="fade-up" data-aos-delay="400">
+        <div class="stat-card">
+          <div class="stat-icon">📚</div>
+          <div class="stat-number" data-count="15">0</div>
+          <div class="stat-label">Years of Excellence</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Modern Benefits Section -->
+<section class="py-5" style="background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);">
+  <div class="container">
+    <h2 class="text-center section-heading" data-aos="fade-up">Why Choose LearnSwift Academia?</h2>
+    <div class="row g-4">
+      <div class="col-lg-4 col-md-6" data-aos="fade-up" data-aos-delay="100">
+        <div class="modern-benefit-card">
+          <div class="benefit-icon-wrapper">
+            <i class="fas fa-seedling"></i>
+          </div>
+          <h5 class="fw-bold text-center mb-3" style="color: #0f172a;">Holistic Development</h5>
+          <p class="text-center" style="color: #64748b;">Balancing rigorous academics, essential character-building based on Islamic principles (Tarbiyah), and spiritual growth for complete personal development.</p>
+        </div>
+      </div>
+      
+      <div class="col-lg-4 col-md-6" data-aos="fade-up" data-aos-delay="200">
+        <div class="modern-benefit-card">
+          <div class="benefit-icon-wrapper">
+            <i class="fas fa-user-check"></i>
+          </div>
+          <h5 class="fw-bold text-center mb-3" style="color: #0f172a;">Personalized Attention</h5>
+          <p class="text-center" style="color: #64748b;">Small class sizes and dedicated teachers ensure individual learning needs are met, helping each child reach their unique potential and excel.</p>
+        </div>
+      </div>
+      
+      <div class="col-lg-4 col-md-6" data-aos="fade-up" data-aos-delay="300">
+        <div class="modern-benefit-card">
+          <div class="benefit-icon-wrapper">
+            <i class="fas fa-cogs"></i>
+          </div>
+          <h5 class="fw-bold text-center mb-3" style="color: #0f172a;">Future-Ready Skills</h5>
+          <p class="text-center" style="color: #64748b;">Integrating critical thinking, problem-solving, digital literacy (coding), and practical vocational training for real-world success and competitiveness.</p>
+        </div>
+      </div>
+      
+      <div class="col-lg-4 col-md-6" data-aos="fade-up" data-aos-delay="400">
+        <div class="modern-benefit-card">
+          <div class="benefit-icon-wrapper">
+            <i class="fas fa-book-quran"></i>
+          </div>
+          <h5 class="fw-bold text-center mb-3" style="color: #0f172a;">Islamic Foundation</h5>
+          <p class="text-center" style="color: #64748b;">Deep understanding of Quran, Sunnah, and Arabic language, building strong moral character rooted in authentic Islamic values and teachings.</p>
+        </div>
+      </div>
+      
+      <div class="col-lg-4 col-md-6" data-aos="fade-up" data-aos-delay="500">
+        <div class="modern-benefit-card">
+          <div class="benefit-icon-wrapper">
+            <i class="fas fa-laptop-code"></i>
+          </div>
+          <h5 class="fw-bold text-center mb-3" style="color: #0f172a;">Tech Integration</h5>
+          <p class="text-center" style="color: #64748b;">State-of-the-art STEM and coding programs preparing students for the digital age with hands-on technology and innovation experiences.</p>
+        </div>
+      </div>
+      
+      <div class="col-lg-4 col-md-6" data-aos="fade-up" data-aos-delay="600">
+        <div class="modern-benefit-card">
+          <div class="benefit-icon-wrapper">
+            <i class="fas fa-users"></i>
+          </div>
+          <h5 class="fw-bold text-center mb-3" style="color: #0f172a;">Community Support</h5>
+          <p class="text-center" style="color: #64748b;">Supportive, collaborative community of educators, parents, and students working together for excellence and mutual growth.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Success Stories Section -->
+<section class="stories-section">
+  <div class="container">
+    <h2 class="text-center section-heading text-white" data-aos="fade-up">Real Stories, Real Success</h2>
+    <div class="row g-4">
+      <div class="col-lg-4 col-md-6" data-aos="fade-up" data-aos-delay="100">
+        <div class="story-card">
+          <img src="{% static 'images/mukhtar_enhanced.jpg' %}" alt="Success Story" class="story-img">
+          <h4 class="story-title">From Student to Tech Leader</h4>
+          <p class="story-text">Our coding program transformed my passion into a career. Now I'm leading tech initiatives at a major company in Lagos.</p>
+          <p class="story-quote">"LearnSwift gave me the skills and confidence to pursue my dreams."</p>
+        </div>
+      </div>
+      
+      <div class="col-lg-4 col-md-6" data-aos="fade-up" data-aos-delay="200">
+        <div class="story-card">
+          <img src="{% static 'images/fatima_enhanced.jpg' %}" alt="Success Story" class="story-img">
+          <h4 class="story-title">Academic Excellence with Values</h4>
+          <p class="story-text">The balanced approach to education helped me excel in university while maintaining my Islamic identity and values.</p>
+          <p class="story-quote">"I learned to be both successful and faithful."</p>
+        </div>
+      </div>
+      
+      <div class="col-lg-4 col-md-6" data-aos="fade-up" data-aos-delay="300">
+        <div class="story-card">
+          <img src="{% static 'images/sadiq_enhanced.jpg' %}" alt="Success Story" class="story-img">
+          <h4 class="story-title">Building Future Leaders</h4>
+          <p class="story-text">My child's transformation has been remarkable. The character development program built confidence and leadership skills.</p>
+          <p class="story-quote">"The best investment in our child's future."</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- Modern Testimonials Section -->
+<section class="py-5" style="background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);">
+  <div class="container">
+    <h2 class="text-center section-heading" data-aos="fade-up">What Our Community Says</h2>
+    
+    <div id="testimonialCarousel" class="carousel slide" data-bs-ride="carousel" data-bs-interval="7000">
+      <div class="carousel-indicators">
+        <button type="button" data-bs-target="#testimonialCarousel" data-bs-slide-to="0" class="active" aria-current="true" aria-label="Testimonial 1"></button>
+        <button type="button" data-bs-target="#testimonialCarousel" data-bs-slide-to="1" aria-label="Testimonial 2"></button>
+        <button type="button" data-bs-target="#testimonialCarousel" data-bs-slide-to="2" aria-label="Testimonial 3"></button>
+      </div>
+      
+      <div class="carousel-inner pb-5">
+        <div class="carousel-item active">
+          <div class="modern-testimonial mx-auto" style="max-width: 800px;" data-aos="fade-up">
+            <img src="{% static 'images/mukhtar_enhanced.jpg' %}" alt="Director Mukhtar" class="testimonial-avatar">
+            <p class="testimonial-text text-center">LearnSwift isn't just about academics; it's about building future leaders grounded in faith and equipped with relevant skills. Our integrated approach truly prepares students for life in the modern world while maintaining strong Islamic values.</p>
+            <div class="text-center">
+              <h6 class="testimonial-name">Director Mukhtar</h6>
+              <p class="testimonial-role">School Director & Founder</p>
+            </div>
+          </div>
+        </div>
+        
+        <div class="carousel-item">
+          <div class="modern-testimonial mx-auto" style="max-width: 800px;" data-aos="fade-up">
+            <img src="{% static 'images/fatima_enhanced.jpg' %}" alt="Mrs. Fatima" class="testimonial-avatar">
+            <p class="testimonial-text text-center">As a teacher here, I appreciate the focus on both knowledge and character. The supportive environment allows us to genuinely connect with and nurture each student. I've seen remarkable growth in confidence and abilities.</p>
+            <div class="text-center">
+              <h6 class="testimonial-name">Mrs. Fatima Ahmad</h6>
+              <p class="testimonial-role">Senior Teacher & Mentor</p>
+            </div>
+          </div>
+        </div>
+        
+        <div class="carousel-item">
+          <div class="modern-testimonial mx-auto" style="max-width: 800px;" data-aos="fade-up">
+            <img src="{% static 'images/sadiq_enhanced.jpg' %}" alt="Alhaji Sadiq" class="testimonial-avatar">
+            <p class="testimonial-text text-center">We chose LearnSwift for the strong Islamic values combined with modern education. We've seen tremendous growth in our child's confidence, knowledge, and character. The transparent communication keeps us involved. Highly recommended!</p>
+            <div class="text-center">
+              <h6 class="testimonial-name">Alhaji Sadiq Loko</h6>
+              <p class="testimonial-role">Parent & Community Leader</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <button class="carousel-control-prev" type="button" data-bs-target="#testimonialCarousel" data-bs-slide="prev">
+        <span class="carousel-control-prev-icon" aria-hidden="true"></span>
+        <span class="visually-hidden">Previous</span>
+      </button>
+      <button class="carousel-control-next" type="button" data-bs-target="#testimonialCarousel" data-bs-slide="next">
+        <span class="carousel-control-next-icon" aria-hidden="true"></span>
+        <span class="visually-hidden">Next</span>
+      </button>
+    </div>
+  </div>
+</section>
+
+<!-- Modern CTA Section -->
+<section id="contact-section" class="modern-cta-section" data-aos="fade-up">
+  <div class="container text-center position-relative" style="z-index: 2;">
+    <h2 class="cta-heading">Ready to Transform Your Child's Future?</h2>
+    <p class="cta-subheading">Join a thriving community dedicated to excellence in faith, academics, and life skills.</p>
+    <div class="d-flex flex-wrap gap-3 justify-content-center">
+      <button class="cta-button" data-bs-toggle="modal" data-bs-target="#contactModal">
+        <i class="bi bi-envelope-fill"></i>
+        Make an Enquiry
+      </button>
+      <a href="{% url 'register' %}" class="cta-button cta-button-outline">
+        <i class="bi bi-calendar-check"></i>
+        Schedule a Tour
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- Modern Footer -->
+<footer class="modern-footer">
+  <div class="container">
+    <div class="row g-4">
+      <div class="col-lg-4 col-md-6">
+        <div class="d-flex align-items-center mb-3">
+          <img src="{% static 'images/logo.jpg' %}" alt="LSA Logo" height="40" class="me-2">
+          <span class="footer-logo-text">LearnSwift Academia</span>
+        </div>
+        <p class="footer-description">Nurturing faith, intellect, and practical skills for balanced, successful lives grounded in Islamic values and modern excellence.</p>
+        <div class="mt-4">
+          <a href="#" class="social-icon" title="Facebook"><i class="fab fa-facebook-f"></i></a>
+          <a href="#" class="social-icon" title="Instagram"><i class="fab fa-instagram"></i></a>
+          <a href="#" class="social-icon" title="Twitter"><i class="fab fa-twitter"></i></a>
+          <a href="#" class="social-icon" title="LinkedIn"><i class="fab fa-linkedin-in"></i></a>
+        </div>
+      </div>
+      
+      <div class="col-lg-2 col-md-6">
+        <h5 class="text-white mb-3 fw-bold">Quick Links</h5>
+        <ul class="footer-link-list">
+          <li><a href="{% url 'home' %}"><i class="bi bi-chevron-right"></i> Home</a></li>
+          <li><a href="{% url 'about_us' %}"><i class="bi bi-chevron-right"></i> About Us</a></li>
+          <li><a href="{% url 'programs' %}"><i class="bi bi-chevron-right"></i> Programs</a></li>
+          <li><a href="{% url 'post_list' %}"><i class="bi bi-chevron-right"></i> Blog</a></li>
+        </ul>
+      </div>
+      
+      <div class="col-lg-3 col-md-6">
+        <h5 class="text-white mb-3 fw-bold">Resources</h5>
+        <ul class="footer-link-list">
+          <li><a href="{% url 'lsalms:academy_hub' %}"><i class="bi bi-chevron-right"></i> Online Academy</a></li>
+          <li><a href="{% url 'contact_us' %}"><i class="bi bi-chevron-right"></i> Contact</a></li>
+          <li><a href="#"><i class="bi bi-chevron-right"></i> Privacy Policy</a></li>
+          <li><a href="#"><i class="bi bi-chevron-right"></i> Terms of Service</a></li>
+        </ul>
+      </div>
+      
+      <div class="col-lg-3 col-md-6">
+        <h5 class="text-white mb-3 fw-bold">Contact Info</h5>
+        <ul class="footer-link-list">
+          <li><i class="bi bi-geo-alt-fill text-success me-2"></i>5 Bode Tobun St, Agege, Lagos</li>
+          <li><i class="bi bi-telephone-fill text-success me-2"></i><a href="tel:+2347034858160">+234 703 485 8160</a></li>
+          <li><i class="bi bi-envelope-fill text-success me-2"></i><a href="mailto:learnswift2020@gmail.com">learnswift2020@gmail.com</a></li>
+        </ul>
+      </div>
+    </div>
+    
+    <hr class="my-4" style="border-color: rgba(255, 255, 255, 0.1);">
+    
+    <div class="text-center">
+      <p class="mb-0" style="color: rgba(255, 255, 255, 0.7);">
+        © {% now "Y" %} LearnSwift Academia. All Rights Reserved. | Built with <span style="color: #84cc16;">❤</span> for Education
+      </p>
+    </div>
+  </div>
+</footer>
+
+<!-- Contact Modal -->
+<div class="modal fade" id="contactModal" tabindex="-1" aria-labelledby="contactModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-content" style="border-radius: 24px; border: none;">
+      <div class="modal-header" style="background: linear-gradient(135deg, #84cc16 0%, #22c55e 100%); border-radius: 24px 24px 0 0;">
+        <h5 class="modal-title text-white fw-bold" id="contactModalLabel">
+          <i class="bi bi-chat-dots-fill me-2"></i>Get in Touch with LearnSwift Academia
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body p-4">
+        <p class="lead mb-4">We'd love to hear from you! Choose your preferred way to connect:</p>
+        
+        <div class="row g-3">
+          <div class="col-md-6">
+            <div class="p-3 rounded" style="background: #f8fafc; border-left: 4px solid #84cc16;">
+              <i class="bi bi-envelope-fill text-success fs-3 mb-2 d-block"></i>
+              <h6 class="fw-bold">Email Us</h6>
+              <a href="mailto:learnswift2020@gmail.com" class="text-decoration-none">learnswift2020@gmail.com</a>
+            </div>
+          </div>
+          
+          <div class="col-md-6">
+            <div class="p-3 rounded" style="background: #f8fafc; border-left: 4px solid #22c55e;">
+              <i class="bi bi-telephone-fill text-success fs-3 mb-2 d-block"></i>
+              <h6 class="fw-bold">Call Us</h6>
+              <a href="tel:+2347034858160" class="text-decoration-none d-block">+234 703 485 8160</a>
+              <a href="tel:+2347062361134" class="text-decoration-none d-block">+234 706 236 1134</a>
+            </div>
+          </div>
+          
+          <div class="col-12">
+            <div class="p-3 rounded" style="background: #f8fafc; border-left: 4px solid #10b981;">
+              <i class="bi bi-geo-alt-fill text-success fs-3 mb-2 d-block"></i>
+              <h6 class="fw-bold">Visit Us</h6>
+              <p class="mb-0">5 Bode Tobun Street, off Oniwaya Road, Agege, Lagos, Nigeria</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+        <a href="{% url 'contact_us' %}" class="btn btn-success">
+          <i class="bi bi-send-fill me-2"></i>Visit Contact Page
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  // Animated Counter
+  function animateCounter(element) {
+    const target = parseInt(element.getAttribute('data-count'));
+    const duration = 2000;
+    const increment = target / (duration / 16);
+    let current = 0;
+    
+    const timer = setInterval(() => {
+      current += increment;
+      if (current >= target) {
+        element.textContent = target + (element.closest('.stat-card').querySelector('.stat-label').textContent.includes('%') ? '%' : '+');
+        clearInterval(timer);
+      } else {
+        element.textContent = Math.floor(current) + (element.closest('.stat-card').querySelector('.stat-label').textContent.includes('%') ? '%' : '+');
+      }
+    }, 16);
+  }
+  
+  // Trigger counter animation on scroll
+  const observerOptions = {
+    threshold: 0.5,
+    rootMargin: '0px 0px -100px 0px'
+  };
+  
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        const counters = entry.target.querySelectorAll('.stat-number');
+        counters.forEach(counter => {
+          if (counter.textContent === '0') {
+            animateCounter(counter);
+          }
+        });
+      }
+    });
+  }, observerOptions);
+  
+  const statsSection = document.querySelector('.stats-section');
+  if (statsSection) {
+    observer.observe(statsSection);
+  }
+  
+  // Parallax effect for hero
+  window.addEventListener('scroll', () => {
+    const scrolled = window.pageYOffset;
+    const parallax = document.querySelector('.modern-hero');
+    if (parallax) {
+      parallax.style.transform = `translateY(${scrolled * 0.5}px)`;
+    }
+  });
+  
+  // Enhanced card animations
+  document.querySelectorAll('.modern-benefit-card, .story-card').forEach(card => {
+    card.addEventListener('mouseenter', function(e) {
+      const rect = this.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      
+      this.style.setProperty('--mouse-x', `${x}px`);
+      this.style.setProperty('--mouse-y', `${y}px`);
+    });
+  });
+  
+  console.log('🎓 LearnSwift Academia - Modern Homepage Loaded Successfully!');
+</script>
+{% endblock %}

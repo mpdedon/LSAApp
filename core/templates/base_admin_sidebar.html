@@ -1,0 +1,789 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+
+    <title>{% block title %}LSA Admin{% endblock %}</title>
+    <meta name="description" content="LearnSwift Academia Admin Area"/>
+    <meta name="author" content="LearnSwift Academia" />
+    <link rel="canonical" href="{{ request.build_absolute_uri }}" />
+    <meta name="robots" content="noindex, nofollow"/> 
+
+    <!-- Favicon -->
+    <link rel="icon" href="{% static 'images/favicon.ico' %}" type="image/x-icon">
+    <link rel="apple-touch-icon" href="{% static 'images/apple-touch-icon.png' %}">
+
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-T3c6CoIi6uLrA9TneNEoa7RxnatzjcDSCmG1MXxSR1GAsXEV/Dwwykc2MPK8M2HN" crossorigin="anonymous">
+    <!-- Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <!-- Font Awesome -->
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css" rel="stylesheet" integrity="sha512-z3gLpd7yknf1YoNbCzqRKc4qyor8gaKU1qmn+CShxbuBusANI9QpRohGBreCFkKxLhei6S9CQXFEbbKuqLg0DA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&family=Poppins:wght@500;600;700&display=swap" rel="stylesheet">
+
+    <!-- Custom Admin CSS -->
+    <link rel="stylesheet" href="{% static 'css/custom-admin.css' %}">
+    
+    <style>
+        /* Admin Layout with Persistent Sidebar */
+        body {
+            font-family: 'Roboto', sans-serif;
+            overflow-x: hidden;
+        }
+
+        .admin-wrapper {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        /* Sidebar Styles */
+        .admin-sidebar {
+            width: 260px;
+            background: linear-gradient(180deg, #1a1d29 0%, #2d3748 100%);
+            color: #ffffff;
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100vh;
+            overflow-y: auto;
+            overflow-x: hidden;
+            z-index: 1040;
+            transition: transform 0.3s ease-in-out;
+            box-shadow: 4px 0 12px rgba(0,0,0,0.15);
+        }
+
+        .admin-sidebar::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .admin-sidebar::-webkit-scrollbar-track {
+            background: rgba(255,255,255,0.05);
+        }
+
+        .admin-sidebar::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.2);
+            border-radius: 3px;
+        }
+
+        .admin-sidebar::-webkit-scrollbar-thumb:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        /* Sidebar Header */
+        .sidebar-header {
+            padding: 1.5rem 1rem;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+            text-align: center;
+        }
+
+        .sidebar-header img {
+            height: 40px;
+            margin-bottom: 0.5rem;
+        }
+
+        .sidebar-header h5 {
+            margin: 0;
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #ffffff;
+        }
+
+        /* Sidebar Navigation */
+        .sidebar-nav {
+            padding: 1rem 0;
+        }
+
+        .nav-section {
+            margin-bottom: 0.5rem;
+        }
+
+        .nav-section-header {
+            padding: 0.75rem 1rem;
+            background: transparent;
+            border: none;
+            color: #ffffff;
+            width: 100%;
+            text-align: left;
+            font-weight: 500;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-radius: 0;
+        }
+
+        .nav-section-header:hover {
+            background: rgba(255,255,255,0.08);
+        }
+
+        .nav-section-header i.section-icon {
+            margin-right: 0.75rem;
+            font-size: 1.1rem;
+            width: 20px;
+            text-align: center;
+        }
+
+        .nav-section-header .chevron {
+            transition: transform 0.2s ease;
+            font-size: 0.75rem;
+            opacity: 0.7;
+        }
+
+        .nav-section-header[aria-expanded="true"] .chevron {
+            transform: rotate(180deg);
+        }
+
+        .nav-section-items {
+            background: rgba(0,0,0,0.15);
+        }
+
+        .nav-item-link {
+            display: flex;
+            align-items: center;
+            padding: 0.65rem 1rem 0.65rem 3rem;
+            color: rgba(255,255,255,0.85);
+            text-decoration: none;
+            font-size: 0.875rem;
+            transition: all 0.2s ease;
+            border-left: 3px solid transparent;
+        }
+
+        .nav-item-link:hover {
+            background: rgba(255,255,255,0.1);
+            color: #ffffff;
+            border-left-color: #667eea;
+        }
+
+        .nav-item-link.active {
+            background: rgba(102, 126, 234, 0.2);
+            color: #ffffff;
+            border-left-color: #667eea;
+            font-weight: 500;
+        }
+
+        .nav-item-link i {
+            margin-right: 0.75rem;
+            font-size: 0.9rem;
+            width: 16px;
+            text-align: center;
+            opacity: 0.8;
+        }
+
+        /* Nested items (like Blog Management) */
+        .nav-item-nested {
+            background: rgba(0,0,0,0.2);
+        }
+
+        .nav-item-nested .nav-item-link {
+            padding-left: 4rem;
+            font-size: 0.825rem;
+        }
+
+        /* Direct link items (Dashboard Home, Visit Main Site) */
+        .nav-direct-link {
+            display: flex;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            color: #ffffff;
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 0.95rem;
+            transition: all 0.2s ease;
+            margin: 0.25rem 0;
+            border-left: 3px solid transparent;
+        }
+
+        .nav-direct-link:hover {
+            background: rgba(255,255,255,0.08);
+            color: #ffffff;
+        }
+
+        .nav-direct-link.active {
+            background: rgba(102, 126, 234, 0.2);
+            border-left-color: #667eea;
+        }
+
+        .nav-direct-link i {
+            margin-right: 0.75rem;
+            font-size: 1.1rem;
+            width: 20px;
+            text-align: center;
+        }
+
+        .sidebar-divider {
+            height: 1px;
+            background: rgba(255,255,255,0.1);
+            margin: 1rem 0;
+        }
+
+        /* Main Content Area */
+        .admin-main-content {
+            flex: 1;
+            margin-left: 260px;
+            min-height: 100vh;
+            background: #f8f9fa;
+            transition: margin-left 0.3s ease-in-out;
+        }
+
+        /* Navbar */
+        .admin-navbar {
+            background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+            padding: 0.75rem 1.5rem;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+            border-bottom: 1px solid rgba(0,0,0,0.05);
+            position: sticky;
+            top: 0;
+            z-index: 1030;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 1.5rem;
+        }
+
+        .navbar-center {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            flex: 1;
+        }
+
+        .navbar-center .nav-link {
+            color: #495057;
+            text-decoration: none;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .navbar-center .nav-link:hover {
+            background: rgba(102, 126, 234, 0.1);
+            color: #667eea;
+        }
+
+        .navbar-center .dropdown-toggle {
+            background: transparent;
+            border: none;
+            color: #495057;
+            padding: 0.5rem 1rem;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+        }
+
+        .navbar-center .dropdown-toggle:hover {
+            background: rgba(102, 126, 234, 0.1);
+            color: #667eea;
+        }
+
+        .navbar-center .dropdown-menu {
+            border-radius: 8px;
+            border: 1px solid rgba(0,0,0,0.08);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+            min-width: 200px;
+        }
+
+        .navbar-center .dropdown-item {
+            padding: 0.6rem 1rem;
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+        }
+
+        .navbar-center .dropdown-item:hover {
+            background: rgba(102, 126, 234, 0.1);
+            color: #667eea;
+        }
+
+        .sidebar-toggle {
+            display: none;
+            background: transparent;
+            border: none;
+            font-size: 1.5rem;
+            color: #333;
+            cursor: pointer;
+            padding: 0.25rem 0.5rem;
+        }
+
+        .admin-navbar .navbar-right {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+        }
+
+        .admin-navbar .user-info {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: #333;
+        }
+
+        .admin-navbar .user-info i {
+            font-size: 1.5rem;
+        }
+
+        /* Content Container */
+        .content-container {
+            padding: 2rem;
+        }
+
+        /* Responsive Behavior */
+        @media (max-width: 991px) {
+            .admin-sidebar {
+                transform: translateX(-100%);
+            }
+
+            .admin-sidebar.show {
+                transform: translateX(0);
+            }
+
+            .admin-main-content {
+                margin-left: 0;
+            }
+
+            .sidebar-toggle {
+                display: block;
+            }
+
+            .sidebar-overlay {
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background: rgba(0,0,0,0.5);
+                z-index: 1035;
+            }
+
+            .sidebar-overlay.show {
+                display: block;
+            }
+
+            /* Hide navbar center text on smaller screens */
+            .navbar-center .nav-link span,
+            .navbar-center .dropdown-toggle span {
+                display: none;
+            }
+
+            .navbar-center {
+                gap: 0.25rem;
+            }
+
+            .navbar-center .nav-link,
+            .navbar-center .dropdown-toggle {
+                padding: 0.5rem;
+            }
+        }
+
+        /* Mobile Close Button */
+        .sidebar-close {
+            display: none;
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: transparent;
+            border: none;
+            color: #ffffff;
+            font-size: 1.5rem;
+            cursor: pointer;
+            z-index: 1050;
+        }
+
+        @media (max-width: 991px) {
+            .sidebar-close {
+                display: block;
+            }
+        }
+
+        /* Dropdown Menu Styling */
+        .dropdown-menu {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            border: none;
+            border-radius: 8px;
+        }
+
+        .dropdown-item {
+            padding: 0.5rem 1rem;
+            transition: background 0.2s ease;
+        }
+
+        .dropdown-item:hover {
+            background: #f8f9fa;
+        }
+    </style>
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+
+    <div class="admin-wrapper">
+        <!-- Sidebar -->
+        <aside class="admin-sidebar" id="adminSidebar">
+            <button class="sidebar-close" onclick="toggleSidebar()">
+                <i class="bi bi-x-lg"></i>
+            </button>
+
+            <!-- Sidebar Header -->
+            <div class="sidebar-header">
+                <img src="{% static 'images/logo.jpg' %}" alt="LSA Logo">
+                <h5>LSA Admin Panel</h5>
+            </div>
+
+            <!-- Sidebar Navigation -->
+            <nav class="sidebar-nav">
+                <!-- Dashboard Home -->
+                <a href="{% url 'school-setup' %}" class="nav-direct-link {% if request.resolver_match.url_name == 'school-setup' %}active{% endif %}">
+                    <i class="bi bi-speedometer2"></i>
+                    <span>Dashboard Home</span>
+                </a>
+
+                <div class="sidebar-divider"></div>
+
+                <!-- Users & Setup -->
+                <div class="nav-section">
+                    <button class="nav-section-header" type="button" data-bs-toggle="collapse" data-bs-target="#usersCollapse" aria-expanded="false">
+                        <span>
+                            <i class="bi bi-people section-icon"></i>
+                            Users & Setup
+                        </span>
+                        <i class="bi bi-chevron-down chevron"></i>
+                    </button>
+                    <div class="collapse nav-section-items" id="usersCollapse">
+                        <a href="{% url 'student_list' %}" class="nav-item-link {% if request.resolver_match.url_name == 'student_list' %}active{% endif %}">
+                            <i class="bi bi-person-badge"></i>Students
+                        </a>
+                        <a href="{% url 'teacher_list' %}" class="nav-item-link {% if request.resolver_match.url_name == 'teacher_list' %}active{% endif %}">
+                            <i class="bi bi-person-workspace"></i>Teachers
+                        </a>
+                        <a href="{% url 'guardian_list' %}" class="nav-item-link {% if request.resolver_match.url_name == 'guardian_list' %}active{% endif %}">
+                            <i class="bi bi-shield-check"></i>Guardians
+                        </a>
+                        <a href="{% url 'enrol_student' %}" class="nav-item-link {% if request.resolver_match.url_name == 'enrol_student' %}active{% endif %}">
+                            <i class="bi bi-person-plus"></i>Enroll Students
+                        </a>
+                        <a href="{% url 'user_account_list' %}" class="nav-item-link {% if request.resolver_match.url_name == 'user_account_list' or request.resolver_match.url_name == 'user_account_detail' or request.resolver_match.url_name == 'reset_user_password' %}active{% endif %}">
+                            <i class="bi bi-person-gear"></i>User Accounts
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Academic Structure -->
+                <div class="nav-section">
+                    <button class="nav-section-header" type="button" data-bs-toggle="collapse" data-bs-target="#academicCollapse" aria-expanded="false">
+                        <span>
+                            <i class="bi bi-diagram-3 section-icon"></i>
+                            Academic Structure
+                        </span>
+                        <i class="bi bi-chevron-down chevron"></i>
+                    </button>
+                    <div class="collapse nav-section-items" id="academicCollapse">
+                        <a href="{% url 'session_list' %}" class="nav-item-link {% if request.resolver_match.url_name == 'session_list' %}active{% endif %}">
+                            <i class="bi bi-calendar-range"></i>Sessions
+                        </a>
+                        <a href="{% url 'term_list' %}" class="nav-item-link {% if request.resolver_match.url_name == 'term_list' %}active{% endif %}">
+                            <i class="bi bi-calendar-event"></i>Terms
+                        </a>
+                        <a href="{% url 'class_list' %}" class="nav-item-link {% if request.resolver_match.url_name == 'class_list' %}active{% endif %}">
+                            <i class="bi bi-building"></i>Classes
+                        </a>
+                        <a href="{% url 'subject_list' %}" class="nav-item-link {% if request.resolver_match.url_name == 'subject_list' %}active{% endif %}">
+                            <i class="bi bi-book"></i>Subjects
+                        </a>
+                        <a href="{% url 'teacher_assignment_list' %}" class="nav-item-link {% if request.resolver_match.url_name == 'teacher_assignment_list' %}active{% endif %}">
+                            <i class="bi bi-person-check"></i>Assign Class Teachers
+                        </a>
+                        <a href="{% url 'subject_assignment_list' %}" class="nav-item-link {% if request.resolver_match.url_name == 'subject_assignment_list' %}active{% endif %}">
+                            <i class="bi bi-journal-text"></i>Assign Subject Teachers
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Financial Management -->
+                <div class="nav-section">
+                    <button class="nav-section-header" type="button" data-bs-toggle="collapse" data-bs-target="#financialCollapse" aria-expanded="false">
+                        <span>
+                            <i class="bi bi-cash-coin section-icon"></i>
+                            Financial Management
+                        </span>
+                        <i class="bi bi-chevron-down chevron"></i>
+                    </button>
+                    <div class="collapse nav-section-items" id="financialCollapse">
+                        <a href="{% url 'fee_assignment_list' %}" class="nav-item-link {% if request.resolver_match.url_name == 'fee_assignment_list' %}active{% endif %}">
+                            <i class="bi bi-tag"></i>Set Fees
+                        </a>
+                        <a href="{% url 'student_fee_record_list' %}" class="nav-item-link {% if request.resolver_match.url_name == 'student_fee_record_list' %}active{% endif %}">
+                            <i class="bi bi-percent"></i>Discounts/Waivers
+                        </a>
+                        <a href="{% url 'payment_list' %}" class="nav-item-link {% if request.resolver_match.url_name == 'payment_list' %}active{% endif %}">
+                            <i class="bi bi-credit-card"></i>Payments
+                        </a>
+                        <a href="{% url 'financial_record_list' %}" class="nav-item-link {% if request.resolver_match.url_name == 'financial_record_list' %}active{% endif %}">
+                            <i class="bi bi-file-earmark-bar-graph"></i>Financial Summaries
+                        </a>
+                        <a href="#" class="nav-item-link">
+                            <i class="bi bi-graph-up"></i>Financial Reports
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Assessments & Results -->
+                <div class="nav-section">
+                    <button class="nav-section-header" type="button" data-bs-toggle="collapse" data-bs-target="#assessmentsCollapse" aria-expanded="false">
+                        <span>
+                            <i class="bi bi-clipboard-check section-icon"></i>
+                            Assessments & Results
+                        </span>
+                        <i class="bi bi-chevron-down chevron"></i>
+                    </button>
+                    <div class="collapse nav-section-items" id="assessmentsCollapse">
+                        <a href="{% url 'admin_assessment_list' %}" class="nav-item-link {% if request.resolver_match.url_name == 'admin_assessment_list' %}active{% endif %}">
+                            <i class="bi bi-pencil-square"></i>Assessments (CA)
+                        </a>
+                        <a href="{% url 'admin_exam_list' %}" class="nav-item-link {% if request.resolver_match.url_name == 'admin_exam_list' %}active{% endif %}">
+                            <i class="bi bi-file-text"></i>Exams
+                        </a>
+                        <a href="#" class="nav-item-link">
+                            <i class="bi bi-check2-square"></i>Enter/Approve Results
+                        </a>
+                        <a href="{% url 'termly_broadsheets' %}" class="nav-item-link {% if request.resolver_match.url_name == 'termly_broadsheets' %}active{% endif %}">
+                            <i class="bi bi-table"></i>Termly Broadsheets
+                        </a>
+                        <a href="{% url 'sessional_broadsheets' %}" class="nav-item-link {% if request.resolver_match.url_name == 'sessional_broadsheets' %}active{% endif %}">
+                            <i class="bi bi-calendar-check"></i>Session Broadsheets
+                        </a>
+                        <a href="{% url 'admin_leaderboard_list' %}" class="nav-item-link {% if request.resolver_match.url_name == 'admin_leaderboard_list' %}active{% endif %}">
+                            <i class="bi bi-trophy"></i>Class Leaderboards
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Communication & System -->
+                <div class="nav-section">
+                    <button class="nav-section-header" type="button" data-bs-toggle="collapse" data-bs-target="#communicationCollapse" aria-expanded="false">
+                        <span>
+                            <i class="bi bi-megaphone section-icon"></i>
+                            Communication & System
+                        </span>
+                        <i class="bi bi-chevron-down chevron"></i>
+                    </button>
+                    <div class="collapse nav-section-items" id="communicationCollapse">
+                        <a href="{% url 'notification_list' %}" class="nav-item-link {% if request.resolver_match.url_name == 'notification_list' %}active{% endif %}">
+                            <i class="bi bi-bell"></i>Notifications
+                        </a>
+                        <a href="#" class="nav-item-link">
+                            <i class="bi bi-envelope"></i>Internal Messaging
+                        </a>
+                        
+                        <!-- Blog Management (Nested) -->
+                        <button class="nav-item-link" type="button" data-bs-toggle="collapse" data-bs-target="#blogCollapse" aria-expanded="false" style="border: none; background: transparent; width: 100%; text-align: left;">
+                            <i class="bi bi-newspaper"></i>Blog Management
+                            <i class="bi bi-chevron-down chevron ms-auto" style="font-size: 0.7rem;"></i>
+                        </button>
+                        <div class="collapse nav-item-nested" id="blogCollapse">
+                            <a href="{% url 'post_manage_list' %}" class="nav-item-link">
+                                <i class="bi bi-file-post"></i>Manage Posts
+                            </a>
+                            <a href="{% url 'manage_category_list' %}" class="nav-item-link">
+                                <i class="bi bi-folder"></i>Manage Categories
+                            </a>
+                            <a href="{% url 'manage_tag_list' %}" class="nav-item-link">
+                                <i class="bi bi-tags"></i>Manage Tags
+                            </a>
+                            <a href="{% url 'post_list' %}" target="_blank" class="nav-item-link">
+                                <i class="bi bi-globe"></i>View Public Blog
+                            </a>
+                        </div>
+
+                        <a href="#" class="nav-item-link">
+                            <i class="bi bi-gear"></i>System Settings
+                        </a>
+                        <a href="#" class="nav-item-link">
+                            <i class="bi bi-clock-history"></i>Activity Log
+                        </a>
+                    </div>
+                </div>
+
+                <!-- Learning Management System -->
+                <div class="nav-section">
+                    <button class="nav-section-header" type="button" data-bs-toggle="collapse" data-bs-target="#lmsCollapse" aria-expanded="false">
+                        <span>
+                            <i class="bi bi-mortarboard section-icon"></i>
+                            Learning Management
+                        </span>
+                        <i class="bi bi-chevron-down chevron"></i>
+                    </button>
+                    <div class="collapse nav-section-items" id="lmsCollapse">
+                        <a href="{% url 'lsalms:admin_lms_dashboard' %}" class="nav-item-link">
+                            <i class="bi bi-speedometer"></i>LMS Mission Control
+                        </a>
+                        <a href="{% url 'admin:lsalms_course_changelist' %}" class="nav-item-link">
+                            <i class="bi bi-book-half"></i>Manage Courses
+                        </a>
+                        <a href="{% url 'admin:lsalms_learningtrack_changelist' %}" class="nav-item-link">
+                            <i class="bi bi-signpost"></i>Learning Tracks
+                        </a>
+                    </div>
+                </div>
+            </nav>
+        </aside>
+
+        <!-- Overlay for mobile -->
+        <div class="sidebar-overlay" id="sidebarOverlay" onclick="toggleSidebar()"></div>
+
+        <!-- Main Content -->
+        <main class="admin-main-content">
+            <!-- Top Navbar -->
+            <div class="admin-navbar">
+                <button class="sidebar-toggle" onclick="toggleSidebar()">
+                    <i class="bi bi-list"></i>
+                </button>
+
+                <!-- Center Navigation -->
+                <div class="navbar-center">
+                    <a href="{% url 'home' %}" class="nav-link">
+                        <i class="bi bi-house-door"></i>
+                        <span>Home</span>
+                    </a>
+                    <div class="dropdown">
+                        <button class="dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-globe"></i>
+                            <span>Website</span>
+                            <i class="bi bi-chevron-down" style="font-size: 0.75rem;"></i>
+                        </button>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="{% url 'about_us' %}">
+                                <i class="bi bi-info-circle me-2"></i>About Us
+                            </a></li>
+                            <li><a class="dropdown-item" href="{% url 'programs' %}">
+                                <i class="bi bi-mortarboard-fill me-2"></i>Programs
+                            </a></li>
+                            <li><a class="dropdown-item" href="{% url 'lsalms:academy_hub' %}">
+                                <i class="bi bi-laptop me-2"></i>Online Academy
+                            </a></li>
+                            <li><a class="dropdown-item" href="{% url 'post_list' %}">
+                                <i class="bi bi-newspaper me-2"></i>Blog
+                            </a></li>
+                            <li><a class="dropdown-item" href="{% url 'contact_us' %}">
+                                <i class="bi bi-envelope-at me-2"></i>Contact
+                            </a></li>
+                        </ul>
+                    </div>
+                </div>
+
+                <div class="navbar-right">
+                    <!-- Notifications -->
+                    <div class="dropdown">
+                        <button class="btn btn-link text-dark position-relative" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-bell" style="font-size: 1.5rem;"></i>
+                            <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 0.65rem;">
+                                0
+                            </span>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end" style="min-width: 300px;">
+                            <li class="px-3 py-2 border-bottom">
+                                <h6 class="mb-0 fw-bold">Notifications</h6>
+                            </li>
+                            <li>
+                                <p class="dropdown-item text-muted text-center small py-3 mb-0">No new notifications.</p>
+                            </li>
+                        </ul>
+                    </div>
+
+                    <!-- User Menu -->
+                    <div class="dropdown">
+                        <button class="btn btn-link text-dark d-flex align-items-center gap-2" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="bi bi-person-circle"></i>
+                            <span>{{ request.user.username }}</span>
+                            <i class="bi bi-chevron-down" style="font-size: 0.8rem;"></i>
+                        </button>
+                        <ul class="dropdown-menu dropdown-menu-end">
+                            <li><a class="dropdown-item" href="{% url 'profile' %}"><i class="bi bi-person me-2"></i>My Profile</a></li>
+                            {% if request.user.is_superuser or request.user.role == 'admin' %}
+                            <li><a class="dropdown-item" href="{% url 'system_settings' %}"><i class="bi bi-gear me-2"></i>System Settings</a></li>
+                            {% endif %}
+                            <li><hr class="dropdown-divider"></li>
+                            <li>
+                                <form method="POST" action="{% url 'logout' %}" class="d-inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="dropdown-item text-danger">
+                                        <i class="bi bi-box-arrow-right me-2"></i>Logout
+                                    </button>
+                                </form>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Page Content -->
+            <div class="content-container">
+                <!-- Messages -->
+                {% if messages %}
+                    {% for message in messages %}
+                        <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+                            {{ message }}
+                            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                        </div>
+                    {% endfor %}
+                {% endif %}
+
+                {% block content %}
+                    <p>Welcome to the Admin Dashboard.</p>
+                {% endblock %}
+            </div>
+        </main>
+    </div>
+
+    <!-- Bootstrap Bundle with Popper -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" integrity="sha384-C6RzsynM9kWDrMNeT87bh95OGNyZPhcTNXj1NW7RuBCsyN/o0jlpcV8Qyq46cDfL" crossorigin="anonymous"></script>
+    
+    <!-- Sidebar Toggle Script -->
+    <script>
+        function toggleSidebar() {
+            const sidebar = document.getElementById('adminSidebar');
+            const overlay = document.getElementById('sidebarOverlay');
+            
+            sidebar.classList.toggle('show');
+            overlay.classList.toggle('show');
+        }
+
+        // Auto-expand active section on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            const activeLink = document.querySelector('.nav-item-link.active');
+            if (activeLink) {
+                const collapse = activeLink.closest('.collapse');
+                if (collapse) {
+                    new bootstrap.Collapse(collapse, { show: true });
+                }
+            }
+        });
+
+        // Close sidebar when clicking a link on mobile
+        const navLinks = document.querySelectorAll('.nav-item-link, .nav-direct-link');
+        navLinks.forEach(link => {
+            link.addEventListener('click', function() {
+                if (window.innerWidth < 992) {
+                    toggleSidebar();
+                }
+            });
+        });
+    </script>
+    
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

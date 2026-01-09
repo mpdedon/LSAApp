@@ -1,0 +1,139 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load crispy_forms_tags %} {# Optional, if using crispy-forms #}
+
+{% block title %}Contact Us | LearnSwift Academia{% endblock %}
+
+{% block meta_description %}
+Get in touch with LearnSwift Academia. Find our contact details, send us an inquiry, or visit our campus in Agege, Lagos. We're here to answer your questions.
+{% endblock %}
+
+{% block content %}
+<div class="container mt-5 mb-5">
+    <div class="row justify-content-center">
+        <div class="col-lg-10">
+
+            <div class="text-center mb-5">
+                <h1 class="display-5 fw-bold">Get In Touch</h1>
+                <p class="lead text-muted">We'd love to hear from you! Whether you have questions about our programs, admissions, or just want to learn more, please don't hesitate to reach out.</p>
+            </div>
+
+            {% if messages %}
+                {% for message in messages %}
+                    <div class="alert alert-{{ message.tags }} alert-dismissible fade show shadow-sm" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+
+            <div class="row g-4">
+                <!-- Contact Form Section -->
+                <div class="col-md-7">
+                    <div class="card shadow-sm">
+                        <div class="card-header bg-primary text-white">
+                            <h5 class="mb-0"><i class="fas fa-paper-plane me-2"></i>Send Us a Message</h5>
+                        </div>
+                        <div class="card-body p-4">
+                            <form method="post" novalidate>
+                                {% csrf_token %}
+
+                                {# Using crispy-forms for cleaner rendering #}
+                                {% if form.non_field_errors %}
+                                    <div class="alert alert-danger small py-2">
+                                        {{ form.non_field_errors }}
+                                    </div>
+                                {% endif %}
+                                {{ form|crispy }} {# Or use manual rendering below #}
+
+                                {# Manual Form Rendering (Alternative to crispy)
+                                <div class="row g-3">
+                                    <div class="col-md-6 mb-3">
+                                        <label for="{{ form.name.id_for_label }}" class="form-label">{{ form.name.label }}</label>
+                                        {{ form.name }}
+                                        {% if form.name.errors %}<div class="invalid-feedback d-block">{{ form.name.errors|join:", " }}</div>{% endif %}
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <label for="{{ form.email.id_for_label }}" class="form-label">{{ form.email.label }}</label>
+                                        {{ form.email }}
+                                        {% if form.email.errors %}<div class="invalid-feedback d-block">{{ form.email.errors|join:", " }}</div>{% endif %}
+                                    </div>
+                                    <div class="col-12 mb-3">
+                                        <label for="{{ form.phone_number.id_for_label }}" class="form-label">{{ form.phone_number.label }}</label>
+                                        {{ form.phone_number }}
+                                        {% if form.phone_number.errors %}<div class="invalid-feedback d-block">{{ form.phone_number.errors|join:", " }}</div>{% endif %}
+                                    </div>
+                                    <div class="col-12 mb-3">
+                                        <label for="{{ form.subject.id_for_label }}" class="form-label">{{ form.subject.label }}</label>
+                                        {{ form.subject }}
+                                        {% if form.subject.errors %}<div class="invalid-feedback d-block">{{ form.subject.errors|join:", " }}</div>{% endif %}
+                                    </div>
+                                    <div class="col-12 mb-3">
+                                        <label for="{{ form.message.id_for_label }}" class="form-label">{{ form.message.label }}</label>
+                                        {{ form.message }}
+                                        {% if form.message.errors %}<div class="invalid-feedback d-block">{{ form.message.errors|join:", " }}</div>{% endif %}
+                                    </div>
+                                </div>
+                                #}
+                                <div class="text-end mt-3">
+                                    <button type="submit" class="btn btn-primary btn-lg">
+                                        <i class="fas fa-paper-plane me-2"></i>Send Message
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Contact Details & Map Section -->
+                <div class="col-md-5">
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header bg-success text-white">
+                            <h5 class="mb-0"><i class="fas fa-address-book me-2"></i>Our Contact Details</h5>
+                        </div>
+                        <div class="card-body">
+                            <ul class="list-unstyled">
+                                <li class="mb-3">
+                                    <strong class="d-block text-muted"><i class="fas fa-map-marker-alt fa-fw me-2 text-success"></i>Address:</strong>
+                                    {{ school_address_line1 }}<br>
+                                    {{ school_address_line2 }}
+                                </li>
+                                <li class="mb-3">
+                                    <strong class="d-block text-muted"><i class="fas fa-phone-alt fa-fw me-2 text-success"></i>Phone:</strong>
+                                    <a href="tel:{{ school_phone_1 }}">{{ school_phone_1 }}</a><br>
+                                    <a href="tel:{{ school_phone_2 }}">{{ school_phone_2 }}</a>
+                                </li>
+                                <li class="mb-0">
+                                    <strong class="d-block text-muted"><i class="fas fa-envelope fa-fw me-2 text-success"></i>Email:</strong>
+                                    <a href="mailto:{{ school_email }}">{{ school_email }}</a>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    {# Optional: Google Map Embed #}
+                    <div class="card shadow-sm">
+                         <div class="card-header bg-info text-white">
+                            <h5 class="mb-0"><i class="fas fa-map-marked-alt me-2"></i>Find Us On The Map</h5>
+                        </div>
+                        <div class="card-body p-0">
+                            {# Replace with your actual Google Maps embed code #}
+                            {# Go to Google Maps, find your school, click "Share", then "Embed a map", copy HTML #}
+                            <iframe
+                                src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3963.151211149914!2d3.330900014771251!3d6.627500195207876!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x103b914ef9a90001%3A0xYOUR_PLACE_ID!2sYOUR_SCHOOL_NAME_ON_MAPS!5e0!3m2!1sen!2sng!4vDATE"
+                                width="100%"
+                                height="300"
+                                style="border:0;"
+                                allowfullscreen=""
+                                loading="lazy"
+                                referrerpolicy="no-referrer-when-downgrade">
+                            </iframe>
+                            {# Get your place ID and update the src URL for a more precise map link #}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

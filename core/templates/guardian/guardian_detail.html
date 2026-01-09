@@ -1,39 +1,410 @@
-<!-- guardian_detail.html -->
-
-{% extends "base.html" %}
+{% extends "base_admin_sidebar.html" %}
+{% load static %}
 
 {% block content %}
-<div class="container mt-4">
-    <h2 class="mb-4">Guardian Details</h2>
-    {% load static %}
-    <div class="card" style="width: 22rem; margin: 0 auto;">
-        <div class="card-header">
-            {% if guardian.profile_image %}
-                <img src="{{ guardian.profile_image.url }}" class="card-img-top" alt="{{ guardian.user.get_full_name }}" style="max-height: 300px; object-fit: cover;">
-            {% else %}
-                <img src="{% static 'images/default.jpg' %}" class="card-img-top" alt="Default Profile Image" style="max-height: 300px; object-fit: cover;">
-            {% endif %}
+<style>
+    /* Guardian Detail - Blue Theme */
+    .guardian-detail-header {
+        background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+        color: white;
+        padding: 2rem;
+        border-radius: 15px 15px 0 0;
+        margin: -1rem -1rem 0 -1rem;
+    }
+    
+    .guardian-profile-card {
+        background: white;
+        border-radius: 15px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.1);
+        overflow: hidden;
+        margin-bottom: 2rem;
+    }
+    
+    .guardian-profile-image {
+        width: 150px;
+        height: 150px;
+        border-radius: 50%;
+        border: 5px solid white;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        object-fit: cover;
+    }
+    
+    .guardian-detail-tabs {
+        background: white;
+        border-radius: 10px;
+        padding: 0.5rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+    
+    .guardian-detail-tabs .nav-link {
+        color: #6b7280;
+        font-weight: 500;
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        transition: all 0.3s ease;
+        border: none;
+    }
+    
+    .guardian-detail-tabs .nav-link:hover {
+        background-color: #f3f4f6;
+        color: #3b82f6;
+    }
+    
+    .guardian-detail-tabs .nav-link.active {
+        background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+        color: white;
+    }
+    
+    .guardian-info-card {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        margin-bottom: 1.5rem;
+    }
+    
+    .guardian-info-item {
+        display: flex;
+        padding: 1rem 0;
+        border-bottom: 1px solid #f3f4f6;
+    }
+    
+    .guardian-info-item:last-child {
+        border-bottom: none;
+    }
+    
+    .guardian-info-label {
+        flex: 0 0 180px;
+        color: #6b7280;
+        font-weight: 600;
+    }
+    
+    .guardian-info-value {
+        flex: 1;
+        color: #111827;
+    }
+    
+    .guardian-stat-box {
+        background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+        color: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        text-align: center;
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    }
+    
+    .guardian-stat-number {
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+    }
+    
+    .guardian-stat-label {
+        font-size: 0.875rem;
+        opacity: 0.9;
+    }
+    
+    .guardian-badge-large {
+        padding: 0.5rem 1rem;
+        border-radius: 20px;
+        font-weight: 600;
+        font-size: 0.875rem;
+    }
+    
+    .guardian-action-button {
+        background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+        color: white;
+        border: none;
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+    }
+    
+    .guardian-action-button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
+        color: white;
+    }
+    
+    .guardian-secondary-button {
+        background: white;
+        color: #3b82f6;
+        border: 2px solid #3b82f6;
+        padding: 0.75rem 1.5rem;
+        border-radius: 8px;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+    
+    .guardian-secondary-button:hover {
+        background: #3b82f6;
+        color: white;
+    }
+</style>
+
+<div class="container-fluid px-4 py-4">
+    <!-- Profile Header -->
+    <div class="guardian-profile-card">
+        <div class="guardian-detail-header">
+            <div class="row align-items-center">
+                <div class="col-md-auto text-center text-md-start mb-3 mb-md-0">
+                    {% if guardian.profile_image %}
+                        <img src="{{ guardian.profile_image.url }}" class="guardian-profile-image" alt="{{ guardian.user.get_full_name }}">
+                    {% else %}
+                        <div class="guardian-profile-image d-inline-flex align-items-center justify-content-center" 
+                             style="background: rgba(255,255,255,0.2); font-size: 3rem; font-weight: 700;">
+                            {{ guardian.user.first_name|slice:":1" }}{{ guardian.user.last_name|slice:":1" }}
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="col-md">
+                    <h2 class="mb-2">{{ guardian.user.get_full_name }}</h2>
+                    <p class="mb-2 opacity-75">
+                        <i class="bi bi-envelope me-2"></i>{{ guardian.user.email }}
+                        <span class="mx-3">|</span>
+                        <i class="bi bi-telephone me-2"></i>{{ guardian.contact|default:"No contact" }}
+                    </p>
+                    <div>
+                        <span class="guardian-badge-large {% if guardian.status == 'active' %}bg-success{% elif guardian.status == 'dormant' %}bg-warning{% else %}bg-secondary{% endif %}">
+                            {{ guardian.get_status_display }}
+                        </span>
+                    </div>
+                </div>
+                <div class="col-md-auto text-center text-md-end mt-3 mt-md-0">
+                    <div class="d-flex gap-2 flex-wrap justify-content-center justify-content-md-end">
+                        <a href="{% url 'guardian_update' guardian.user.id %}" class="btn guardian-action-button">
+                            <i class="bi bi-pencil me-2"></i>Edit
+                        </a>
+                        <a href="{% url 'guardian_list' %}" class="btn guardian-secondary-button">
+                            <i class="bi bi-arrow-left me-2"></i>Back
+                        </a>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="card-body">
-            <h5 class="card-title">{{ guardian.get_full_name }}</h5>
-            <p class="card-text">
-                <p><strong>Username:</strong> {{ guardian.user.username }}</p>
-                <p><strong>Email:</strong> {{ guardian.user.email }}</p>
-                <p><strong>Gender:</strong> {{ guardian.gender }}</p>
-                <p><strong>Contact:</strong> {{ guardian.contact }}</p>
-                <p><strong>Address:</strong> {{ guardian.address }}</p>
-                <p><strong>Students:</strong> {{ guardian.student_count }}</p>
-            </p>
+
+        <!-- Quick Stats -->
+        <div class="p-4">
+            <div class="row g-3">
+                <div class="col-md-3 col-6">
+                    <div class="guardian-stat-box">
+                        <div class="guardian-stat-number">{{ guardian.students.count }}</div>
+                        <div class="guardian-stat-label">Student(s)</div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-6">
+                    <div class="guardian-stat-box">
+                        <div class="guardian-stat-number">{{ guardian.messages_received.count }}</div>
+                        <div class="guardian-stat-label">Messages</div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-6">
+                    <div class="guardian-stat-box">
+                        <div class="guardian-stat-number">
+                            {% with total_fees=guardian.students.count %}
+                                {{ total_fees }}
+                            {% endwith %}
+                        </div>
+                        <div class="guardian-stat-label">Fee Records</div>
+                    </div>
+                </div>
+                <div class="col-md-3 col-6">
+                    <div class="guardian-stat-box">
+                        <div class="guardian-stat-number">
+                            {{ guardian.user.date_joined|timesince|truncatewords:1 }}
+                        </div>
+                        <div class="guardian-stat-label">Member Since</div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
-    <a href="{% url 'guardian_update' guardian.user.id %}" class="btn btn-warning">Edit</a>
-    <form action="{% url 'guardian_delete' guardian.user.id %}" method="POST" style="display:inline;">
-        {% csrf_token %}
-        <button type="submit" class="btn btn-danger" onclick="return confirm('Are you sure you want to delete this guardian?');">Delete</button>
-    </form>
-    <a href="{% url 'guardian_dashboard' %}" class="btn btn-secondary">Back to Dashboard</a>
-</div>
-<br>
+    <!-- Tabs -->
+    <div class="guardian-detail-tabs mb-4">
+        <ul class="nav nav-pills" id="guardian-tabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="overview-tab" data-bs-toggle="pill" data-bs-target="#overview" type="button">
+                    <i class="bi bi-person me-2"></i>Overview
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="students-tab" data-bs-toggle="pill" data-bs-target="#students" type="button">
+                    <i class="bi bi-people me-2"></i>Students/Wards
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="financial-tab" data-bs-toggle="pill" data-bs-target="#financial" type="button">
+                    <i class="bi bi-cash-coin me-2"></i>Financial
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="communications-tab" data-bs-toggle="pill" data-bs-target="#communications" type="button">
+                    <i class="bi bi-chat me-2"></i>Communications
+                </button>
+            </li>
+        </ul>
+    </div>
 
+    <!-- Tab Content -->
+    <div class="tab-content" id="guardian-tabs-content">
+        <!-- Overview Tab -->
+        <div class="tab-pane fade show active" id="overview" role="tabpanel">
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="guardian-info-card">
+                        <h5 class="mb-3">
+                            <i class="bi bi-person-badge me-2 text-primary"></i>
+                            Personal Information
+                        </h5>
+                        <div class="guardian-info-item">
+                            <div class="guardian-info-label">Full Name</div>
+                            <div class="guardian-info-value">{{ guardian.user.get_full_name }}</div>
+                        </div>
+                        <div class="guardian-info-item">
+                            <div class="guardian-info-label">Username</div>
+                            <div class="guardian-info-value">{{ guardian.user.username }}</div>
+                        </div>
+                        <div class="guardian-info-item">
+                            <div class="guardian-info-label">Gender</div>
+                            <div class="guardian-info-value">
+                                {% if guardian.gender == 'M' %}
+                                    <i class="bi bi-gender-male text-primary"></i> Male
+                                {% elif guardian.gender == 'F' %}
+                                    <i class="bi bi-gender-female text-danger"></i> Female
+                                {% else %}
+                                    Not specified
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="guardian-info-item">
+                            <div class="guardian-info-label">Email</div>
+                            <div class="guardian-info-value">{{ guardian.user.email }}</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="guardian-info-card">
+                        <h5 class="mb-3">
+                            <i class="bi bi-telephone me-2 text-primary"></i>
+                            Contact Information
+                        </h5>
+                        <div class="guardian-info-item">
+                            <div class="guardian-info-label">Phone Number</div>
+                            <div class="guardian-info-value">{{ guardian.contact|default:"Not provided" }}</div>
+                        </div>
+                        <div class="guardian-info-item">
+                            <div class="guardian-info-label">Address</div>
+                            <div class="guardian-info-value">{{ guardian.address|default:"Not provided" }}</div>
+                        </div>
+                    </div>
+
+                    <div class="guardian-info-card mt-3">
+                        <h5 class="mb-3">
+                            <i class="bi bi-info-circle me-2 text-primary"></i>
+                            Account Information
+                        </h5>
+                        <div class="guardian-info-item">
+                            <div class="guardian-info-label">Status</div>
+                            <div class="guardian-info-value">
+                                <span class="badge {% if guardian.status == 'active' %}bg-success{% elif guardian.status == 'dormant' %}bg-warning{% else %}bg-secondary{% endif %}">
+                                    {{ guardian.get_status_display }}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="guardian-info-item">
+                            <div class="guardian-info-label">Date Joined</div>
+                            <div class="guardian-info-value">{{ guardian.user.date_joined|date:"F d, Y" }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Students Tab -->
+        <div class="tab-pane fade" id="students" role="tabpanel">
+            <div class="guardian-info-card">
+                <h5 class="mb-4">
+                    <i class="bi bi-people me-2 text-primary"></i>
+                    Students/Wards
+                </h5>
+                {% if guardian.students.exists %}
+                <div class="row">
+                    {% for student in guardian.students.all %}
+                    <div class="col-md-6 mb-3">
+                        <div class="card border-primary">
+                            <div class="card-body">
+                                <div class="d-flex align-items-center">
+                                    {% if student.profile_image %}
+                                        <img src="{{ student.profile_image.url }}" class="rounded-circle me-3" width="60" height="60" alt="{{ student.user.get_full_name }}">
+                                    {% else %}
+                                        <div class="rounded-circle me-3 bg-primary text-white d-flex align-items-center justify-content-center" style="width: 60px; height: 60px; font-weight: 700;">
+                                            {{ student.user.first_name|slice:":1" }}{{ student.user.last_name|slice:":1" }}
+                                        </div>
+                                    {% endif %}
+                                    <div class="flex-grow-1">
+                                        <h6 class="mb-1">
+                                            <a href="{% url 'student_detail' student.user.id %}" class="text-decoration-none">
+                                                {{ student.user.get_full_name }}
+                                            </a>
+                                        </h6>
+                                        <small class="text-muted">{{ student.LSA_number }}</small><br>
+                                        <small class="text-muted">{{ student.current_class.name|default:"No class" }}</small>
+                                    </div>
+                                    <span class="badge {% if student.status == 'active' %}bg-success{% elif student.status == 'dormant' %}bg-warning{% else %}bg-secondary{% endif %}">
+                                        {{ student.get_status_display }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-muted text-center py-4">No students/wards assigned</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Financial Tab -->
+        <div class="tab-pane fade" id="financial" role="tabpanel">
+            <div class="guardian-info-card">
+                <h5 class="mb-4">
+                    <i class="bi bi-wallet2 me-2 text-primary"></i>
+                    Financial Records
+                </h5>
+                <p class="text-muted text-center py-4">Financial records for all wards will appear here</p>
+            </div>
+        </div>
+
+        <!-- Communications Tab -->
+        <div class="tab-pane fade" id="communications" role="tabpanel">
+            <div class="guardian-info-card">
+                <h5 class="mb-4">
+                    <i class="bi bi-chat me-2 text-primary"></i>
+                    Recent Messages
+                </h5>
+                {% if guardian.messages_received.exists %}
+                <div class="list-group">
+                    {% for message in guardian.messages_received.all|slice:":10" %}
+                    <div class="list-group-item">
+                        <div class="d-flex w-100 justify-content-between">
+                            <h6 class="mb-1">{{ message.title }}</h6>
+                            <small>{{ message.created_at|date:"M d, Y" }}</small>
+                        </div>
+                        <p class="mb-1 text-muted">From: {{ message.sender.get_full_name }}</p>
+                        <small>{{ message.content|truncatewords:20 }}</small>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="text-muted text-center py-4">No messages yet</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock %}

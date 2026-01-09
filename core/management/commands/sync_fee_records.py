@@ -6,7 +6,7 @@ class Command(BaseCommand):
     help = "Synchronize Student Fee Records for all students."
 
     def handle(self, *args, **kwargs):
-        students = Student.objects.filter(current_class__isnull=False)
+        students = Student.objects.filter(current_class__isnull=False, status='active')
         for student in students:
             fee_assignments = FeeAssignment.objects.filter(class_instance=student.current_class)
             for assignment in fee_assignments:

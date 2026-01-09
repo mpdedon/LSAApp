@@ -1,17 +1,44 @@
-<!-- term_confirm_delete.html -->
+﻿{% extends 'base_admin_sidebar.html' %}
 
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Confirm Delete Term</title>
-</head>
-<body>
-    <h1>Confirm Delete Term</h1>
-    <p>Are you sure you want to delete "{{ term.name }}"?</p>
-    <form method="post">
-        {% csrf_token %}
-        <button type="submit">Delete</button>
-    </form>
-</body>
-</html>
+{% block title %}Delete Term{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4 py-3">
+    <div class="card border-0 shadow-sm mb-4" style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);">
+        <div class="card-body py-3">
+            <h4 class="text-white mb-0"><i class="bi bi-exclamation-triangle me-2"></i>Delete Term</h4>
+        </div>
+    </div>
+
+    <div class="row justify-content-center">
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm">
+                <div class="card-body p-4">
+                    <div class="text-center mb-4">
+                        <i class="bi bi-trash3 display-1 text-danger"></i>
+                    </div>
+                    <h5 class="text-center mb-3">Confirm Deletion</h5>
+                    <p class="text-center text-muted mb-4">
+                        Are you sure you want to delete the term <strong>"{{ term.name }}"</strong> from <strong>{{ term.session.name }}</strong>?
+                    </p>
+                    <div class="alert alert-danger" role="alert">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                        <strong>Warning:</strong> This action cannot be undone. All assignments, results, and associated data for this term will be affected.
+                    </div>
+                    <form method="post">
+                        {% csrf_token %}
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-danger btn-lg">
+                                <i class="bi bi-trash3 me-2"></i>Yes, Delete Term
+                            </button>
+                            <a href="{% url 'term_list' %}" class="btn btn-outline-secondary btn-lg">
+                                <i class="bi bi-x-circle me-2"></i>Cancel
+                            </a>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

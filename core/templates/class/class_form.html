@@ -1,26 +1,40 @@
-{% extends 'base.html' %}
-
+{% extends 'base_admin_sidebar.html' %}
 {% load crispy_forms_tags %}
 
 {% block content %}
-<div class="container mt-5">
+<div class="container-fluid px-4 py-3">
     <div class="row justify-content-center">
-        <div class="col-lg-5">
-            <div class="card">
-                <div class="card-header text-center bg-info text-white">
-                    <h4>{{ form.instance.pk|yesno:"Edit Class,Add New Class" }}</h4>
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm">
+                <!-- Header with gradient -->
+                <div class="card-header text-white py-3" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+                    <h5 class="mb-0 fw-bold">
+                        <i class="bi bi-{% if form.instance.pk %}pencil-square{% else %}plus-circle{% endif %} me-2"></i>
+                        {{ form.instance.pk|yesno:"Edit Class,Add New Class" }}
+                    </h5>
                 </div>
-                <div class="card-body">
+
+                <div class="card-body p-4">
                     <form method="post">
                         {% csrf_token %}
                         
-                        {{ form.non_field_errors }}
+                        {% if form.non_field_errors %}
+                            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                                {{ form.non_field_errors }}
+                                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                            </div>
+                        {% endif %}
 
-                        <!-- Render all fields with crispy for simplicity -->
+                        <!-- Render all fields with crispy -->
                         {{ form|crispy }}
 
-                        <div class="d-flex justify-content-center mt-3">
+                        <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top">
+                            <a href="{% url 'class_list' %}" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left me-1"></i>Cancel
+                            </a>
                             <button type="submit" class="btn btn-primary">
+                                <i class="bi bi-{% if form.instance.pk %}check-circle{% else %}plus-circle{% endif %} me-1"></i>
                                 {{ form.instance.pk|yesno:"Update Class,Create Class" }}
                             </button>
                         </div>

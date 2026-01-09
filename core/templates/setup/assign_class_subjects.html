@@ -1,11 +1,147 @@
-{% extends 'base.html' %}
-{% load static %} {# Assuming you have a static tag for CSS/JS #}
-{% load add_class %} {# Your custom template tag #}
+{% extends 'base_admin_sidebar.html' %}
+{% load static %}
+{% load add_class %}
 
 {% block title %}Manage Subjects for {{ class_instance.name }}{% endblock %}
 
 {% block content %}
-<div class="container my-4">
+<div class="container-fluid px-4 py-3">
+    <!-- Header with Orange/Amber gradient -->
+    <div class="card border-0 shadow-sm mb-4" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
+        <div class="card-body py-3">
+            <div class="d-flex justify-content-between align-items-center">
+                <div>
+                    <h4 class="text-white mb-1"><i class="bi bi-layers me-2"></i>Manage Class Subjects</h4>
+                    <p class="text-white-50 mb-0 small">{{ class_instance.name }} - Assign and manage subjects</p>
+                </div>
+                <a href="{% url 'class_detail' class_instance.id %}" class="btn btn-light btn-sm">
+                    <i class="bi bi-arrow-left me-1"></i> Back to Class
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Assign/Update Subjects Section -->
+        <div class="col-lg-7">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header text-white py-3" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-plus-circle me-2"></i>Assign/Update Subjects</h6>
+                </div>
+                <div class="card-body p-4">
+                    <form method="post" action="{% url 'assign_class_subject' class_instance.id %}" novalidate>
+                        {% csrf_token %}
+
+                        {% if form.non_field_errors %}
+                            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                                <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                                {% for error in form.non_field_errors %}{{ error }}{% endfor %}
+                                <button type=\"button\" class=\"btn-close\" data-bs-dismiss=\"alert\"></button>
+                            </div>
+                        {% endif %}
+
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Session</label>
+                                {{ form.session|add_class:"form-select" }}
+                                {% if form.session.errors %}
+                                    <div class="text-danger small mt-1">{{ form.session.errors|striptags }}</div>
+                                {% endif %}
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label fw-bold">Term</label>
+                                {{ form.term|add_class:"form-select" }}
+                                {% if form.term.errors %}
+                                    <div class="text-danger small mt-1">{{ form.term.errors|striptags }}</div>
+                                {% endif %}
+                            </div>
+                        </div>
+
+                        <div class="mb-4">
+                            <label class="form-label fw-bold">Select Subjects:</label>
+                            <div class="row row-cols-2 row-cols-sm-3 g-2 border rounded p-3" style="background: linear-gradient(135deg, #fef3c7 0%, #fde68a 30%); max-height: 300px; overflow-y: auto;">
+                                {% for subject in form.subjects.field.queryset %}
+                                    <div class="col">
+                                        <div class="form-check">
+                                            <input
+                                                type="checkbox"
+                                                name="{{ form.subjects.name }}"
+                                                value="{{ subject.id }}"
+                                                id="subject-assign-{{ subject.id }}"
+                                                class="form-check-input"
+                                                {% if subject.id|stringformat:"s" in form.subjects.value or subject.id in form.subjects.initial %}checked{% endif %}
+                                            >
+                                            <label for="subject-assign-{{ subject.id }}" class="form-check-label small">
+                                                {{ subject.name }}
+                                            </label>
+                                        </div>
+                                    </div>
+                                {% empty %}
+                                    <div class="col-12 text-muted">No subjects available.</div>
+                                {% endfor %}
+                            </div>
+                            {% if form.subjects.errors %}
+                                <div class="text-danger small mt-1">{{ form.subjects.errors|striptags }}</div>
+                            {% endif %}
+                        </div>
+
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-warning text-white">
+                                <i class="bi bi-check-circle me-1"></i> Assign/Update Selected Subjects
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Remove Subjects Section -->
+        <div class="col-lg-5">
+            <div class="card border-0 shadow-sm h-100">
+                <div class="card-header bg-danger text-white py-3">
+                    <h6 class="mb-0 fw-bold"><i class="bi bi-trash me-2"></i>Remove Assigned Subjects</h6>
+                </div>
+                <div class="card-body p-4">
+                    <form method="post" action="{% url 'delete_class_subjects' class_instance.pk %}">
+                        {% csrf_token %}
+
+                        {% with current_assignments=existing_assignments %}
+                            {% if current_assignments %}
+                                <p class="small text-muted mb-3">Select assignments to remove:</p>
+                                <div style="max-height: 350px; overflow-y: auto;">
+                                    <div class="list-group">
+                                        {% for assignment in current_assignments %}
+                                        <label class="list-group-item d-flex align-items-center py-2" for="subject-remove-{{ assignment.id }}">
+                                            <input type="checkbox" name="subject_assignment_ids" value="{{ assignment.id }}" class="form-check-input me-2" id="subject-remove-{{ assignment.id }}">
+                                            <div class="flex-fill">
+                                                <div class="fw-bold small">{{ assignment.subject.name }}</div>
+                                                <div class="small text-muted">
+                                                    <span class="badge bg-secondary me-1">{{ assignment.session }}</span>
+                                                    <span class="badge bg-info text-dark">{{ assignment.term.name }}</span>
+                                                </div>
+                                            </div>
+                                        </label>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                <div class="d-grid mt-3">
+                                    <button type="submit" class="btn btn-danger" onclick="return confirm('Delete selected assignments? This cannot be undone.')">
+                                        <i class="bi bi-trash me-1"></i> Delete Selected
+                                    </button>
+                                </div>
+                            {% else %}
+                                <div class="alert alert-light text-center mb-0">
+                                    <i class="bi bi-inbox me-1"></i> No subjects currently assigned.
+                                </div>
+                            {% endif %}
+                        {% endwith %}
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
 
     {# Centered card with controlled width #}
     <div class="row justify-content-center">

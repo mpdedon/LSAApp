@@ -3,77 +3,431 @@
 {% extends 'base.html' %}
 {% load static humanize %}
 
-{% block title %}Online Academy{% endblock %}
+{% block title %}Online Academy - LearnSwift Academia{% endblock %}
 
 {% block content %}
-<div class="container py-5">
-    <div class="text-center mb-5">
-        <h1 class="display-4 fw-bold">Welcome to the Online Academy</h1>
-        <p class="lead text-muted col-lg-8 mx-auto">Expand your knowledge with our expert-led courses, available anytime, anywhere. Find your passion and start learning today.</p>
+<style>
+  :root {
+    --cyan: #06b6d4;
+    --purple: #8b5cf6;
+    --pink: #ec4899;
+    --emerald: #10b981;
+    --deep-navy: #0f172a;
+    --slate-900: #0f172a;
+    --slate-800: #1e293b;
+  }
+
+  /* Particles Background */
+  #particles-academy {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    background: linear-gradient(135deg, var(--deep-navy) 0%, #1a1a2e 100%);
+  }
+
+  .academy-content {
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Hero Section */
+  .academy-hero {
+    padding: 8rem 0 4rem;
+    position: relative;
+    z-index: 1;
+    margin-top: 0;
+    text-align: center;
+  }
+
+  .academy-hero h1 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 3.5rem;
+    font-weight: 800;
+    margin-bottom: 1.5rem;
+    background: linear-gradient(135deg, var(--cyan) 0%, var(--purple) 50%, var(--pink) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    animation: gradientShift 8s ease infinite;
+    background-size: 200% 200%;
+  }
+
+  @keyframes gradientShift {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+  }
+
+  .academy-hero p {
+    font-size: 1.25rem;
+    color: rgba(255, 255, 255, 0.8);
+    max-width: 700px;
+    margin: 0 auto 2rem;
+    line-height: 1.8;
+  }
+
+  /* Course Grid */
+  .courses-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 2rem;
+    padding: 2rem 0 4rem;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* Course Card */
+  .course-card-modern {
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+    overflow: hidden;
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+
+  .course-card-modern::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--cyan), var(--purple), var(--pink));
+    opacity: 0;
+    transition: opacity 0.4s ease;
+  }
+
+  .course-card-modern:hover {
+    transform: translateY(-8px);
+    border-color: rgba(6, 182, 212, 0.5);
+    box-shadow: 0 20px 60px rgba(6, 182, 212, 0.3);
+  }
+
+  .course-card-modern:hover::before {
+    opacity: 1;
+  }
+
+  .course-image-wrapper {
+    position: relative;
+    height: 220px;
+    overflow: hidden;
+  }
+
+  .course-image-wrapper img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.4s ease;
+  }
+
+  .course-card-modern:hover .course-image-wrapper img {
+    transform: scale(1.05);
+  }
+
+  .course-badge {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    background: linear-gradient(135deg, var(--emerald), var(--cyan));
+    color: white;
+    padding: 0.4rem 0.9rem;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    z-index: 2;
+    box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4);
+  }
+
+  .course-badge.paid {
+    background: linear-gradient(135deg, var(--purple), var(--pink));
+    box-shadow: 0 4px 15px rgba(139, 92, 246, 0.4);
+  }
+
+  .course-content {
+    padding: 1.5rem;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .course-content h3 {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: white;
+    margin-bottom: 0.8rem;
+    line-height: 1.3;
+  }
+
+  .course-description {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 0.95rem;
+    line-height: 1.6;
+    margin-bottom: 1.2rem;
+    flex-grow: 1;
+  }
+
+  .course-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: auto;
+    padding-top: 1rem;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .course-teacher {
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.6);
+  }
+
+  .course-teacher i {
+    color: var(--cyan);
+    margin-right: 0.3rem;
+  }
+
+  .course-cta {
+    padding: 1.2rem 1.5rem;
+    background: rgba(255, 255, 255, 0.03);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  .btn-course {
+    display: block;
+    width: 100%;
+    padding: 0.8rem 1.5rem;
+    background: linear-gradient(135deg, var(--cyan), var(--purple));
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-weight: 600;
+    text-align: center;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn-course::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    transition: left 0.5s ease;
+  }
+
+  .btn-course:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(6, 182, 212, 0.4);
+    color: white;
+  }
+
+  .btn-course:hover::before {
+    left: 100%;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 4rem 2rem;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 16px;
+  }
+
+  .empty-state i {
+    font-size: 4rem;
+    color: var(--cyan);
+    margin-bottom: 1.5rem;
+    opacity: 0.5;
+  }
+
+  .empty-state h3 {
+    color: white;
+    font-size: 1.5rem;
+    margin-bottom: 0.5rem;
+  }
+
+  .empty-state p {
+    color: rgba(255, 255, 255, 0.6);
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .academy-hero {
+      padding: 6rem 0 3rem;
+    }
+
+    .academy-hero h1 {
+      font-size: 2.5rem;
+    }
+
+    .academy-hero p {
+      font-size: 1.1rem;
+    }
+
+    .courses-grid {
+      grid-template-columns: 1fr;
+      gap: 1.5rem;
+    }
+  }
+</style>
+
+<!-- Particle Background -->
+<div id="particles-academy"></div>
+
+<div class="academy-content">
+  <!-- Hero Section -->
+  <section class="academy-hero main-content-below-navbar">
+    <div class="container">
+      <h1>Welcome to the Online Academy</h1>
+      <p>Expand your knowledge with expert-led courses, available anytime, anywhere. Embark on your learning journey today.</p>
+    </div>
+  </section>
+
+  <!-- Courses Grid -->
+  <div class="container">
+    <div class="courses-grid">
+      {% for course in courses %}
+        <div class="course-card-modern">
+          <div class="course-image-wrapper">
+            {% if course.image %}
+              <img src="{{ course.image.url }}" alt="{{ course.title }}" loading="lazy" onerror="this.src='https://via.placeholder.com/800x600/1a1a2e/06b6d4?text={{ course.title|urlencode }}'">
+            {% else %}
+              <img src="https://via.placeholder.com/800x600/1a1a2e/06b6d4?text={{ course.title|urlencode }}" alt="{{ course.title }}" loading="lazy">
+            {% endif %}
+            
+            {% if course.is_subscription_based %}
+              <div class="course-badge paid">
+                <i class="fas fa-crown"></i> Premium
+              </div>
+            {% else %}
+              <div class="course-badge">
+                <i class="fas fa-check-circle"></i> Free
+              </div>
+            {% endif %}
+          </div>
+
+          <div class="course-content">
+            <h3>{{ course.title }}</h3>
+            <p class="course-description">{{ course.description|truncatewords:25 }}</p>
+            
+            <div class="course-meta">
+              <span class="course-teacher">
+                <i class="fas fa-user-graduate"></i>
+                {{ course.teacher.get_full_name }}
+              </span>
+            </div>
+          </div>
+
+          <div class="course-cta">
+            <a href="{% url 'lsalms:academy_course_detail' slug=course.slug %}" class="btn-course">
+              Explore Course <i class="fas fa-arrow-right ms-1"></i>
+            </a>
+          </div>
+        </div>
+      {% empty %}
+        <div class="empty-state">
+          <i class="fas fa-graduation-cap"></i>
+          <h3>No Courses Available Yet</h3>
+          <p>Our academy is preparing amazing courses for you. Check back soon!</p>
+        </div>
+      {% endfor %}
     </div>
 
-    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
-        {% for course in courses %}
-        <div class="col">
-            <div class="card h-100 shadow-sm border-0 course-card">
-                {% if course.image %}
-                    <img src="{{ course.image.url }}" class="card-img-top" alt="{{ course.title }}" style="height: 200px; object-fit: cover;">
-                {% else %}
-                    {# Fallback if no image is uploaded #}
-                    <img src="https://source.unsplash.com/random/800x600?education,{{course.title|slugify}}" class="card-img-top" alt="Placeholder image for {{ course.title }}" style="height: 200px; object-fit: cover;">
-                {% endif %}              
-                <div class="card-body d-flex flex-column">
-                    <h5 class="card-title fw-bold">{{ course.title }}</h5>
-                    <p class="card-text small text-muted flex-grow-1">{{ course.description|truncatewords:20 }}</p>
-                    <div class="d-flex justify-content-between align-items-center">
-                        <span class="fw-bold fs-5 text-primary">
-                            {% if course.is_subscription_based and course.subscription_fee > 0 %}
-                                ₦{{ course.subscription_fee|intcomma }}
-                            {% else %}
-                                Free
-                            {% endif %}
-                        </span>
-                        <small class="text-muted">By {{ course.teacher.get_full_name }}</small>
-                    </div>
-                </div>
-                <div class="card-footer bg-white border-0 p-3">
-                    <a href="{% url 'lsalms:academy_course_detail' slug=course.slug %}" class="btn btn-primary w-100 stretched-link">View Course</a>
-                </div>
-            </div>
-        </div>
-        {% empty %}
-            <div class="col-12">
-                <div class="text-center p-5 bg-light rounded">
-                    <p class="mb-0">No online courses are available at this time. Please check back soon!</p>
-                </div>
-            </div>
-        {% endfor %}
     </div>
 
     <!-- Pagination -->
     {% if is_paginated %}
-    <nav class="mt-5" aria-label="Course navigation">
-        <ul class="pagination justify-content-center">
-            {% if page_obj.has_previous %}
-                <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}">Previous</a></li>
-            {% else %}
-                 <li class="page-item disabled"><span class="page-link">Previous</span></li>
-            {% endif %}
-            
-            <li class="page-item active" aria-current="page"><span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span></li>
+    <nav class="mt-4 mb-5" aria-label="Course navigation">
+      <ul class="pagination justify-content-center">
+        {% if page_obj.has_previous %}
+          <li class="page-item">
+            <a class="page-link" href="?page={{ page_obj.previous_page_number }}" style="background: rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.1); color: var(--cyan);">
+              <i class="fas fa-chevron-left me-1"></i> Previous
+            </a>
+          </li>
+        {% else %}
+          <li class="page-item disabled">
+            <span class="page-link" style="background: rgba(255, 255, 255, 0.02); border-color: rgba(255, 255, 255, 0.05); color: rgba(255, 255, 255, 0.3);">
+              <i class="fas fa-chevron-left me-1"></i> Previous
+            </span>
+          </li>
+        {% endif %}
+        
+        <li class="page-item active">
+          <span class="page-link" style="background: linear-gradient(135deg, var(--cyan), var(--purple)); border: none; color: white;">
+            Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+          </span>
+        </li>
 
-            {% if page_obj.has_next %}
-                <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}">Next</a></li>
-            {% else %}
-                <li class="page-item disabled"><span class="page-link">Next</span></li>
-            {% endif %}
-        </ul>
+        {% if page_obj.has_next %}
+          <li class="page-item">
+            <a class="page-link" href="?page={{ page_obj.next_page_number }}" style="background: rgba(255, 255, 255, 0.05); border-color: rgba(255, 255, 255, 0.1); color: var(--cyan);">
+              Next <i class="fas fa-chevron-right ms-1"></i>
+            </a>
+          </li>
+        {% else %}
+          <li class="page-item disabled">
+            <span class="page-link" style="background: rgba(255, 255, 255, 0.02); border-color: rgba(255, 255, 255, 0.05); color: rgba(255, 255, 255, 0.3);">
+              Next <i class="fas fa-chevron-right ms-1"></i>
+            </span>
+          </li>
+        {% endif %}
+      </ul>
     </nav>
     {% endif %}
+  </div>
 </div>
 
-<style>
-.course-card { transition: transform 0.2s ease, box-shadow 0.2s ease; }
-.course-card:hover { transform: translateY(-5px); box-shadow: 0 8px 30px rgba(0,0,0,0.1) !important; }
-</style>
+<script src="https://cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
+<script>
+  particlesJS('particles-academy', {
+    particles: {
+      number: { value: 80, density: { enable: true, value_area: 800 } },
+      color: { value: ['#06b6d4', '#8b5cf6', '#ec4899'] },
+      shape: { type: 'circle' },
+      opacity: { value: 0.5, random: true, anim: { enable: false } },
+      size: { value: 3, random: true, anim: { enable: false } },
+      line_linked: {
+        enable: true,
+        distance: 150,
+        color: '#8b5cf6',
+        opacity: 0.2,
+        width: 1
+      },
+      move: {
+        enable: true,
+        speed: 2,
+        direction: 'none',
+        random: true,
+        straight: false,
+        out_mode: 'out',
+        bounce: false
+      }
+    },
+    interactivity: {
+      detect_on: 'canvas',
+      events: {
+        onhover: { enable: true, mode: 'grab' },
+        onclick: { enable: false },
+        resize: true
+      },
+      modes: {
+        grab: { distance: 140, line_linked: { opacity: 0.5 } }
+      }
+    },
+    retina_detect: true
+  });
+</script>
 {% endblock %}

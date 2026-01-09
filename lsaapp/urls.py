@@ -25,6 +25,7 @@ from core.auth.views import RegisterView, GuardianRegisterView, TeacherRegisterV
 from core.auth.views import CustomLoginView, CustomLogoutView
 from core.auth.views import PasswordResetView, PasswordResetDoneView, PasswordResetConfirmView, PasswordResetCompleteView
 from core.auth.views import teacher_dashboard, student_dashboard, guardian_dashboard
+from core.profile.views import profile_view, change_password_view, system_settings_view, grading_system_view
 from core.views import custom_404, custom_500, custom_403, custom_400
 from core.views import home, send_test_email
 from core.views import AdminDashboardView, PromoteStudentView, programs, about, contact
@@ -62,6 +63,7 @@ from core.results.views import ResultCreateView, ResultListView, ResultUpdateVie
 from core.subject_assignment.views import SubjectAssignmentListView, SubjectAssignmentCreateView, SubjectAssignmentUpdateView, SubjectAssignmentDetailView, SubjectAssignmentDeleteView
 from core.blog.views import PostDetailView, PostListView, BlogSearchView
 from core.blog.sitemaps import PostSitemap, CategorySitemap
+from core.views_user_accounts import user_account_list, toggle_user_status, reset_user_password, change_user_role, bulk_user_action, user_account_detail
 
 
 sitemaps = {
@@ -82,13 +84,19 @@ urlpatterns = [
     path('register/', RegisterView.as_view(), name='register'),
     path('register/guardian/', GuardianRegisterView.as_view(), name='guardian_register'),
     path('register/teacher/', TeacherRegisterView.as_view(), name='teacher_register'),
-    path('login/', CustomLoginView.as_view(template_name='auth/login.html'), name='login'),
-    path('logout/', CustomLogoutView.as_view(template_name='auth/logout.html', next_page='home'), name='logout'),
+    path('auth/login/', CustomLoginView.as_view(template_name='auth/login.html'), name='login'),
+    path('auth/logout/', CustomLogoutView.as_view(template_name='auth/logout.html', next_page='home'), name='logout'),
     path('password_reset/', PasswordResetView.as_view(), name='password_reset'),
     path('password_reset/done/', PasswordResetDoneView.as_view(), name='password_reset_done'),
     path('reset/<uidb64>/<token>/', PasswordResetConfirmView.as_view(), name='password_reset_confirm'),
     path('reset/done/', PasswordResetCompleteView.as_view(), name='password_reset_complete'),
     path('send_test_email/', send_test_email, name='send_test_email'),
+    
+    # Profile & Settings URLs
+    path('profile/', profile_view, name='profile'),
+    path('profile/change-password/', change_password_view, name='change_password'),
+    path('settings/', system_settings_view, name='system_settings'),
+    path('settings/grading/', grading_system_view, name='grading_system'),
     
     # Blog URLS
     path('blog', PostListView.as_view(), name='post_list'),
@@ -117,6 +125,14 @@ urlpatterns = [
 
     # School Setup URLs
     path('setup/', AdminDashboardView.as_view(), name='school-setup'),
+
+    # User Account Management URLs
+    path('accounts/users/', user_account_list, name='user_account_list'),
+    path('accounts/users/<int:user_id>/', user_account_detail, name='user_account_detail'),
+    path('accounts/users/<int:user_id>/toggle-status/', toggle_user_status, name='toggle_user_status'),
+    path('accounts/users/<int:user_id>/reset-password/', reset_user_password, name='reset_user_password'),
+    path('accounts/users/<int:user_id>/change-role/', change_user_role, name='change_user_role'),
+    path('accounts/users/bulk-action/', bulk_user_action, name='bulk_user_action'),
 
     path('create/', CreateNotificationView.as_view(), name='create_notification'),
     path('list/', NotificationListView.as_view(), name='notification_list'),
@@ -225,7 +241,8 @@ urlpatterns = [
     path('classes/<int:pk>/update/', ClassUpdateView.as_view(), name='class_update'),
     path('classes/<int:pk>/', ClassDetailView.as_view(), name='class_detail'),
     path('classes/<int:pk>/delete/', ClassDeleteView.as_view(), name='class_delete'),
-    path('classes/<int:pk>/enrol/', EnrollStudentView.as_view(), name='enrol_student'),
+    # Enrollment moved to setup/enrol_student for consistency
+    # path('classes/<int:pk>/enrol/', EnrollStudentView.as_view(), name='enrol_student_class'),
     path('assign_class_subjects/<int:pk>/', AssignClassSubjectView.as_view(), name='assign_class_subject'),
     path('class_subjects', class_subjects, name='class_subjects'),
     path('class-subjects/rollover/', ClassSubjectRolloverView.as_view(), name='rollover_class_subjects'),
@@ -328,5 +345,5 @@ handler403 = 'core.views.custom_403'
 handler404 = 'core.views.custom_404'
 handler500 = 'core.views.custom_500'
 
-if settings.DEBUG:
-    urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+# Serve media files in all environments (production uses Nginx/WhiteNoise for static, but media needs Django)
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

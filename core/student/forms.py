@@ -40,7 +40,7 @@ class StudentRegistrationForm(UserCreationForm):
 
     def __init__(self, *args, **kwargs):
         self.is_update = kwargs.pop('is_update', False)
-        student_instance = kwargs.pop('student_instance', None)  # Extract student_instance if provided
+        self.student_instance = kwargs.pop('student_instance', None)  # Store student_instance
         super().__init__(*args, **kwargs)
 
         if self.is_update:
@@ -49,13 +49,13 @@ class StudentRegistrationForm(UserCreationForm):
             self.fields.pop('password2', None)
 
         # Populate initial data if a student instance is provided
-        if student_instance:
-            self.fields['date_of_birth'].initial = student_instance.date_of_birth
-            self.fields['gender'].initial = student_instance.gender
-            self.fields['profile_image'].initial = student_instance.profile_image
-            self.fields['student_guardian'].initial = student_instance.student_guardian
-            self.fields['relationship'].initial = student_instance.relationship
-            self.fields['current_class'].initial = student_instance.current_class
+        if self.student_instance:
+            self.fields['date_of_birth'].initial = self.student_instance.date_of_birth
+            self.fields['gender'].initial = self.student_instance.gender
+            self.fields['profile_image'].initial = self.student_instance.profile_image
+            self.fields['student_guardian'].initial = self.student_instance.student_guardian
+            self.fields['relationship'].initial = self.student_instance.relationship
+            self.fields['current_class'].initial = self.student_instance.current_class
 
 
     class Meta:
@@ -82,47 +82,65 @@ class StudentRegistrationForm(UserCreationForm):
 
     def clean_username(self):
         username = self.cleaned_data.get('username')
-        if username and CustomUser.objects.filter(username=username).exists():
-            raise ValidationError("A user with this username already exists.")
+        if username:
+            # Exclude the current user instance when updating
+            if self.instance and self.instance.pk:
+                if CustomUser.objects.filter(username=username).exclude(pk=self.instance.pk).exists():
+                    raise ValidationError("A user with this username already exists.")
+            else:
+                if CustomUser.objects.filter(username=username).exists():
+                    raise ValidationError("A user with this username already exists.")
         return username
 
     def clean_email(self):
         email = self.cleaned_data.get('email')
-        if email and CustomUser.objects.filter(email=email).exists():
-            raise ValidationError("A user with this email already exists.")
+        if email:
+            # Exclude the current user instance when updating
+            if self.instance and self.instance.pk:
+                if CustomUser.objects.filter(email=email).exclude(pk=self.instance.pk).exists():
+                    raise ValidationError("A user with this email already exists.")
+            else:
+                if CustomUser.objects.filter(email=email).exists():
+                    raise ValidationError("A user with this email already exists.")
         return email
 
     def save(self, commit=True):
-        user = super().save(commit=False)
-        if not self.is_update:
+        if self.is_update:
+            # For updates, just update the user instance directly
+            user = self.instance
+            user.username = self.cleaned_data['username']
+            user.email = self.cleaned_data['email']
+            user.first_name = self.cleaned_data['first_name']
+            user.last_name = self.cleaned_data['last_name']
+        else:
+            # For new users, use the parent's save method
+            user = super().save(commit=False)
             user.role = 'student'  # Assign the 'student' role only for new users
 
         if commit:
             user.save()
 
-        if hasattr(self, 'student_instance'):
+        if hasattr(self, 'student_instance') and self.student_instance:
             student = self.student_instance
             student.date_of_birth = self.cleaned_data['date_of_birth']
             student.gender = self.cleaned_data['gender']
             student.student_guardian = self.cleaned_data['student_guardian']
-            student.profile_image = self.cleaned_data['profile_image']
+            if self.cleaned_data.get('profile_image'):
+                student.profile_image = self.cleaned_data['profile_image']
             student.relationship = self.cleaned_data['relationship']
-            student.current_class = self.cleaned_data['current-class']
-
+            student.current_class = self.cleaned_data['current_class']
+            if commit:
+                student.save()
         else:
-
             student = Student.objects.create(
-            user=user,
-            date_of_birth=self.cleaned_data.get('date_of_birth'),  
-            gender=self.cleaned_data.get('gender'),
-            student_guardian=self.cleaned_data.get('student_guardian'),
-            profile_image=self.cleaned_data.get('profile_image'),
-            relationship=self.cleaned_data.get('relationship'),
-            current_class=self.cleaned_data.get('current_class')
-        )
-
-        if commit:
-            student.save()
+                user=user,
+                date_of_birth=self.cleaned_data.get('date_of_birth'),  
+                gender=self.cleaned_data.get('gender'),
+                student_guardian=self.cleaned_data.get('student_guardian'),
+                profile_image=self.cleaned_data.get('profile_image'),
+                relationship=self.cleaned_data.get('relationship'),
+                current_class=self.cleaned_data.get('current_class')
+            )
 
         return student
 

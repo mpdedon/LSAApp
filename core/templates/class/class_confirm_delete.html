@@ -1,18 +1,47 @@
-<!-- class_confirm_delete.html -->
-
-{% extends 'base.html' %}
+{% extends 'base_admin_sidebar.html' %}
+{% load static %}
 
 {% block content %}
-<div class="container mt-4">
-  <h2>Delete Class</h2>
-  <p>Are you sure you want to delete class "{{ class_instance.name }}"?</p>
-  <form method="post" action="{% url 'class_delete' pk=class_instance.pk %}">
-    {% csrf_token %}
-    <button type="submit" class="btn-btn-danger">Delete</button>
-    <a href="{% url 'class_detail' pk=class_instance.pk %}" class="btn btn-secondary">Cancel</a>
-  </form>
-  <br>
-  <a href="{% url 'class_list' %}" class="btn btn-secondary">Back to Classes</a>
+<div class="container-fluid px-4 py-3">
+    <div class="row justify-content-center">
+        <div class="col-lg-6">
+            <div class="card border-0 shadow-sm">
+                <!-- Header with gradient -->
+                <div class="card-header text-white py-3" style="background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);">
+                    <h5 class="mb-0 fw-bold">
+                        <i class="bi bi-exclamation-triangle me-2"></i>Confirm Delete Class
+                    </h5>
+                </div>
+
+                <div class="card-body p-4">
+                    <div class="alert alert-danger" role="alert">
+                        <i class="bi bi-exclamation-circle-fill me-2"></i>
+                        <strong>Warning!</strong> This action cannot be undone.
+                    </div>
+
+                    <div class="p-4 bg-light rounded mb-4">
+                        <p class="mb-2">You are about to delete the following class:</p>
+                        <h4 class="mb-1 text-danger">{{ class_instance.name }}</h4>
+                        <small class="text-muted">{{ class_instance.school_level }}</small>
+                        {% if class_instance.description %}
+                        <p class="text-muted mt-2 mb-0">{{ class_instance.description|truncatewords:20 }}</p>
+                        {% endif %}
+                    </div>
+
+                    <form method="post" action="{% url 'class_delete' pk=class_instance.pk %}">
+                        {% csrf_token %}
+                        <div class="d-flex justify-content-between align-items-center pt-3 border-top">
+                            <a href="{% url 'class_detail' pk=class_instance.pk %}" class="btn btn-outline-secondary">
+                                <i class="bi bi-arrow-left me-1"></i>Cancel
+                            </a>
+                            <button type="submit" class="btn btn-danger">
+                                <i class="bi bi-trash me-1"></i>Yes, Delete Class
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
-<br>
- {% endblock %}
+{% endblock %}

@@ -37,7 +37,7 @@ class SubjectUpdateView(View):
     def get(self, request, pk):
         subject = get_object_or_404(Subject, pk=pk)
         form = SubjectForm(instance=subject)
-        return render(request, self.template_name, {'form': form})
+        return render(request, self.template_name, {'form': form, 'is_update': True, 'subject': subject})
 
     def post(self, request, pk):
         subject = get_object_or_404(Subject, pk=pk)
@@ -45,7 +45,7 @@ class SubjectUpdateView(View):
         if form.is_valid():
             form.save()
             return redirect('subject_list')
-        return render(request, self.template_name, {'form': form})
+        return render(request, self.template_name, {'form': form, 'is_update': True, 'subject': subject})
 
 class SubjectDeleteView(View):
     template_name = 'subject/subject_confirm_delete.html'
