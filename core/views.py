@@ -415,16 +415,17 @@ class AdminDashboardView(AdminRequiredMixin, TemplateView):
                 }
                 
                 for score in students_with_results:
-                    if score >= 90:
-                        performance_ranges['Excellent (90-100)'] += 1
-                    elif score >= 80:
-                        performance_ranges['Very Good (80-89)'] += 1
-                    elif score >= 70:
-                        performance_ranges['Good (70-79)'] += 1
-                    elif score >= 60:
-                        performance_ranges['Average (60-69)'] += 1
-                    else:
-                        performance_ranges['Below Average (<60)'] += 1
+                    if score is not None:
+                        if score >= 80:
+                            performance_ranges['Excellent (80-100)'] += 1
+                        elif score >= 80:
+                            performance_ranges['Very Good (70-79)'] += 1
+                        elif score >= 70:
+                            performance_ranges['Good (60-69)'] += 1
+                        elif score >= 50:
+                            performance_ranges['Average (50-59)'] += 1
+                        else:
+                            performance_ranges['Below Average (<50)'] += 1
                 
                 performance_labels = list(performance_ranges.keys())
                 performance_data = list(performance_ranges.values())
