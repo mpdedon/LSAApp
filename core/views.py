@@ -1343,19 +1343,37 @@ class SubjectDeleteView(AdminRequiredMixin, DeleteView):
         return redirect('subject_list')
 
 # Student Enrollment
-def StudentClassEnrollmentView(request):
+def StudentClassEnrollmentView(request, entity_id=None):
+    """
+    Enrollment form. If `entity_id` is provided it may be either a Student id or a Class id.
+    The view will attempt to prefill the form appropriately:
+    - if a Student with that id exists -> prefill `student` field
+    - elif a Class with that id exists -> restrict students already enrolled and prefill `class_enrolled`
+    """
+    class_instance = None
+    initial = {}
+
+    if entity_id:
+        try:
+            from core.models import Student, Class
+            student_obj = Student.objects.filter(pk=entity_id).first()
+            if student_obj:
+                initial['student'] = student_obj.pk
+            else:
+                class_instance = Class.objects.filter(pk=entity_id).first()
+                if class_instance:
+                    initial['class_enrolled'] = class_instance.pk
+        except Exception:
+            class_instance = None
+
     if request.method == 'POST':
-        form = EnrollmentForm(request.POST)
+        form = EnrollmentForm(request.POST, class_instance=class_instance)
         if form.is_valid():
             student = form.cleaned_data['student']
             class_enrolled = form.cleaned_data['class_enrolled']
-            
             try:
-                # Enroll the student into the class
                 student.current_class = class_enrolled
                 student.save()
-                
-                # Add student to the class
                 class_enrolled.students.add(student)
                 messages.success(request, f"{student} successfully enrolled in {class_enrolled.name}!")
                 return redirect('student_list')
@@ -1364,8 +1382,8 @@ def StudentClassEnrollmentView(request):
         else:
             messages.error(request, "Invalid data submitted. Please correct the errors below.")
     else:
-        form = EnrollmentForm()
-    
+        form = EnrollmentForm(class_instance=class_instance, initial=initial)
+
     return render(request, 'setup/enrol_student.html', {'form': form})
 
 def StudentEnrollmentsView(request, student_id):

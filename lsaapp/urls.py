@@ -15,7 +15,7 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
-from django.urls import path, include
+from django.urls import path, include, re_path
 from django.conf import settings
 from django.conf.urls.static import static
 from django.conf.urls import handler404, handler500, handler403, handler400
@@ -157,7 +157,8 @@ urlpatterns = [
     path('messages/thread/<int:thread_id>/', message_thread, name='message_thread'),
 
     # Enrollment URLs
-    path('setup/enrol_student/', StudentClassEnrollmentView, name='enrol_student'),
+    # Allow optional numeric argument to prefill either a class or a student.
+    re_path(r'^setup/enrol_student(?:/(?P<entity_id>\d+)/)?$', StudentClassEnrollmentView, name='enrol_student'),
     path('student/<int:student_id>/unenroll/<int:class_id>/', unenroll_student, name='unenroll_student'),
     path('student/<int:student_id>/enrollments/', StudentEnrollmentsView, name='view_enrollments'),
     path('setup/promote_students', PromoteStudentView.as_view(), name='promote_students'),

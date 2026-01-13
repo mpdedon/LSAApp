@@ -99,12 +99,15 @@ DATABASE_URL = os.getenv('DATABASE_URL')
 
 if DATABASE_URL:
     # Production-like environment (Render, Heroku, etc.)
+    # Allow overriding whether SSL is required via environment variable for local debugging.
+    # Set DB_SSL_REQUIRE=False in local .env to avoid forcing SSL for local Postgres servers.
+    DB_SSL_REQUIRE = config('DB_SSL_REQUIRE', default=True, cast=bool)
     DATABASES = {
         'default': dj_database_url.config(
             default=DATABASE_URL,
             conn_max_age=600, # Enable connection pooling
             conn_health_checks=True,
-            ssl_require=True # Often required for cloud databases
+            ssl_require=DB_SSL_REQUIRE
         )
     }
 else:
