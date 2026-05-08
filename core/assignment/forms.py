@@ -10,9 +10,10 @@ class AssignmentForm(forms.ModelForm):
     )
     class Meta:
         model = Assignment
+        # 'teacher' and 'active' are set programmatically in the view
         fields = [
-            'term', 'teacher', 'title', 'description', 'subject', 
-            'class_assigned', 'due_date', 'duration', 'active',
+            'term', 'title', 'description', 'subject',
+            'class_assigned', 'due_date', 'duration',
             'result_field_mapping', 'shuffle_questions'
         ]
         widgets = {

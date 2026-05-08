@@ -1,11 +1,318 @@
 {% extends 'base.html' %}
+{% load crispy_forms_tags %}
+{% block title %}Edit Assignment: {{ assignment.title }}{% endblock %}
 {% block content %}
-    <div class="container">
-        <h2>Update Assignment</h2>
-        <form method="POST">
-            {% csrf_token %}
-            {{ form.as_p }}
-            <button type="submit" class="btn btn-primary">Update Assignment</button>
-        </form>
+<div class="container my-4" style="max-width:900px">
+
+  <!-- Breadcrumb -->
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb small">
+      <li class="breadcrumb-item"><a href="{% url assignment_dashboard_route %}">Dashboard</a></li>
+      <li class="breadcrumb-item"><a href="{% url assignment_list_route %}">Assignments</a></li>
+      <li class="breadcrumb-item active">Edit</li>
+    </ol>
+  </nav>
+
+  <div class="d-flex align-items-center justify-content-between mb-3">
+    <h4 class="mb-0 fw-bold">Edit Assignment</h4>
+    <span class="text-muted small">{{ assignment.title }}</span>
+  </div>
+
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }} alert-dismissible fade show">
+        {{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+
+  {% if form.errors %}
+  <div class="alert alert-danger alert-dismissible fade show">
+    <h6 class="alert-heading mb-1"><i class="fas fa-exclamation-triangle me-1"></i> Fix the errors below</h6>
+    {% for field in form %}{% if field.errors %}<div><strong>{{ field.label }}:</strong> {{ field.errors|striptags }}</div>{% endif %}{% endfor %}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+  {% endif %}
+
+  <form method="POST" novalidate id="update-form">
+    {% csrf_token %}
+
+    <!-- Details card -->
+    <div class="card shadow-sm border-0 mb-4">
+      <div class="card-header bg-secondary text-white rounded-top">
+        <i class="fas fa-info-circle me-2"></i>Assignment Details
+      </div>
+      <div class="card-body p-4">
+        <div class="row g-3">
+          <div class="col-12">{{ form.title|as_crispy_field }}</div>
+          <div class="col-md-6">{{ form.term|as_crispy_field }}</div>
+          <div class="col-md-6">{{ form.class_assigned|as_crispy_field }}</div>
+          <div class="col-md-6">{{ form.subject|as_crispy_field }}</div>
+          <div class="col-md-6">{{ form.due_date|as_crispy_field }}</div>
+          <div class="col-md-6">{{ form.duration|as_crispy_field }}</div>
+          <div class="col-md-6">{{ form.result_field_mapping|as_crispy_field }}</div>
+          <div class="col-12">{{ form.description|as_crispy_field }}</div>
+          <div class="col-12">
+            <div class="form-check">
+              {{ form.shuffle_questions }}
+              <label class="form-check-label ms-2" for="{{ form.shuffle_questions.id_for_label }}">Shuffle questions for each student</label>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
+
+    <!-- Existing questions card -->
+    <div class="card shadow-sm border-0 mb-4">
+      <div class="card-header bg-dark text-white rounded-top d-flex justify-content-between align-items-center">
+        <span><i class="fas fa-list-ol me-2"></i>Existing Questions</span>
+        <span class="badge bg-secondary">{{ questions|length }}</span>
+      </div>
+      <div class="card-body p-3">
+        {% if questions %}
+          {% for q in questions %}
+          <div class="card mb-2 border q-existing-card" id="existing-card-{{ q.id }}" style="border-left:3px solid #6c757d!important">
+            <div class="card-body p-3">
+              <div class="d-flex justify-content-between align-items-start">
+                <div class="flex-grow-1 me-2">
+                  <div class="d-flex align-items-center gap-2 mb-1">
+                    <span class="badge {% if q.question_type == 'SCQ' %}bg-info{% elif q.question_type == 'MCQ' %}bg-warning text-dark{% else %}bg-secondary{% endif %} small">
+                      {{ q.get_question_type_display }}
+                    </span>
+                    <span class="fw-semibold small">{{ q.question_text }}</span>
+                  </div>
+                  {% if q.question_type != 'ES' and q.options_list %}
+                  <div class="mt-1">
+                    {% for opt in q.options_list %}
+                    <span class="badge
+                      {% if opt == q.correct_answer %}bg-success{% else %}bg-light text-dark border{% endif %}
+                      me-1 mb-1" style="font-size:.75rem">{{ opt }}</span>
+                    {% endfor %}
+                  </div>
+                  {% endif %}
+                </div>
+                <div class="d-flex gap-1 flex-shrink-0">
+                  <!-- Delete toggle: adds delete_question_ID to form when confirmed -->
+                  <button type="button" class="btn btn-sm btn-outline-danger delete-existing-btn" data-qid="{{ q.id }}">
+                    <i class="fas fa-trash-alt"></i>
+                  </button>
+                  <!-- Hidden marker; only submitted if user clicks delete -->
+                </div>
+              </div>
+              <!-- Hidden delete sentinel — disabled until button is clicked -->
+              <input type="hidden" name="delete_question_{{ q.id }}" id="del-sentinel-{{ q.id }}" disabled value="1">
+              <div class="alert alert-warning py-1 px-2 small mt-2 d-none" id="del-warn-{{ q.id }}">
+                <i class="fas fa-exclamation-circle me-1"></i>Marked for deletion. <a href="#" class="alert-link undo-delete" data-qid="{{ q.id }}">Undo</a>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        {% else %}
+        <p class="text-muted small mb-0">No questions yet. Add some below.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- New questions card -->
+    <div class="card shadow-sm border-0 mb-4">
+      <div class="card-header bg-success text-white rounded-top d-flex justify-content-between align-items-center">
+        <span><i class="fas fa-plus-circle me-2"></i>Add New Questions</span>
+        <span class="badge bg-white text-success" id="new-q-badge">0 new</span>
+      </div>
+      <div class="card-body p-3">
+        <div id="new-questions-container"></div>
+        <div class="text-center my-2">
+          <button type="button" id="add-new-q-btn" class="btn btn-outline-success btn-sm">
+            <i class="fas fa-plus me-1"></i> Add Question
+          </button>
+        </div>
+        <div class="alert alert-light border small mb-0">
+          <i class="fas fa-lightbulb text-warning me-1"></i>
+          Type each option and press <kbd>Enter</kbd> or comma to add. For MCQ, tick all correct answers.
+        </div>
+      </div>
+    </div>
+
+    <!-- Submit -->
+    <div class="d-flex gap-2 justify-content-end mb-4">
+      <a href="{% url assignment_dashboard_route %}" class="btn btn-outline-secondary">
+        <i class="fas fa-times me-1"></i> Cancel
+      </a>
+      <button type="submit" class="btn btn-secondary px-4">
+        <i class="fas fa-save me-1"></i> Save Changes
+      </button>
+    </div>
+  </form>
+</div>
+
+<style>
+.q-existing-card.marked-delete { opacity:.5; border-left-color:#dc3545!important; }
+.chip-tag { display:inline-flex;align-items:center;gap:.3rem;padding:.25rem .6rem;border-radius:20px;font-size:.8rem; }
+.q-card { border-left:3px solid #dee2e6; }
+</style>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  var newQCount = 0;
+
+  // --- Delete / Undo existing questions ---
+  document.querySelectorAll('.delete-existing-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var qid = btn.dataset.qid;
+      markDelete(qid, true);
+    });
+  });
+  document.addEventListener('click', function (e) {
+    var a = e.target.closest('.undo-delete');
+    if (a) { e.preventDefault(); markDelete(a.dataset.qid, false); }
+  });
+  function markDelete(qid, del) {
+    var card     = document.getElementById('existing-card-' + qid);
+    var sentinel = document.getElementById('del-sentinel-' + qid);
+    var warn     = document.getElementById('del-warn-' + qid);
+    if (!card) return;
+    sentinel.disabled = !del;
+    warn.classList.toggle('d-none', !del);
+    card.classList.toggle('marked-delete', del);
+  }
+
+  // --- New question card factory ---
+  function createCard(n) {
+    return '<div class="card mb-3 q-card border" id="newqcard-' + n + '">' +
+      '<div class="card-body p-3">' +
+      '<div class="d-flex justify-content-between align-items-center mb-2">' +
+        '<span class="fw-semibold small text-success">New Question ' + n + '</span>' +
+        '<button type="button" class="btn btn-sm btn-outline-danger remove-new-q" data-qid="' + n + '"><i class="fas fa-trash-alt"></i></button>' +
+      '</div>' +
+      '<div class="row g-2 mb-2">' +
+        '<div class="col-md-4">' +
+          '<label class="form-label form-label-sm fw-semibold">Type</label>' +
+          '<select name="question_type_' + n + '" class="form-select form-select-sm new-q-type" data-qid="' + n + '">' +
+            '<option value="SCQ" selected>Single Choice</option>' +
+            '<option value="MCQ">Multiple Choice</option>' +
+            '<option value="ES">Essay</option>' +
+          '</select>' +
+        '</div>' +
+        '<div class="col-md-8">' +
+          '<label class="form-label form-label-sm fw-semibold">Question Text <span class="text-danger">*</span></label>' +
+          '<textarea name="question_text_' + n + '" class="form-control form-control-sm" rows="2" required></textarea>' +
+        '</div>' +
+      '</div>' +
+      '<div id="new-qchoice-' + n + '">' +
+        '<label class="form-label form-label-sm fw-semibold">Options <span class="text-muted fw-normal">(press Enter or comma)</span></label>' +
+        '<input type="text" class="form-control form-control-sm mb-1" id="new-qopts-txt-' + n + '" placeholder="e.g. Paris">' +
+        '<div id="new-qchips-' + n + '" class="mb-1"></div>' +
+        '<input type="hidden" name="options_' + n + '" id="new-qopts-hid-' + n + '" value="">' +
+        '<div class="row g-2">' +
+          '<div class="col-md-6" id="new-qscq-wrap-' + n + '">' +
+            '<label class="form-label form-label-sm fw-semibold">Correct Answer</label>' +
+            '<select id="new-qscq-sel-' + n + '" class="form-select form-select-sm"><option value="">-- add options first --</option></select>' +
+            '<input type="hidden" name="correct_answer_' + n + '" id="new-qans-hid-' + n + '" value="">' +
+          '</div>' +
+          '<div class="col-md-6 d-none" id="new-qmcq-wrap-' + n + '">' +
+            '<label class="form-label form-label-sm fw-semibold">Correct Answers (tick all)</label>' +
+            '<div id="new-qcb-' + n + '" class="border rounded p-2" style="max-height:110px;overflow-y:auto"><span class="text-muted small">Add options first</span></div>' +
+          '</div>' +
+        '</div>' +
+      '</div>' +
+      '<div id="new-qessay-' + n + '" class="d-none">' +
+        '<p class="text-muted small mt-2 mb-0">Essay: students write a free-form answer.</p>' +
+      '</div>' +
+      '</div></div>';
+  }
+
+  function attachChipUI(n) {
+    var opts = [];
+    var tin  = document.getElementById('new-qopts-txt-' + n);
+    var hid  = document.getElementById('new-qopts-hid-' + n);
+    var wrap = document.getElementById('new-qchips-' + n);
+    function render() {
+      wrap.innerHTML = opts.map(function (o, i) {
+        return '<span class="chip-tag bg-secondary text-white me-1 mb-1">' + o +
+               '<button type="button" class="btn-close btn-close-white ms-1" style="font-size:.5rem" data-idx="' + i + '"></button></span>';
+      }).join('');
+      hid.value = opts.join(',');
+      syncDropdowns(n, opts);
+    }
+    function addOpt(v) { v = v.trim(); if (v && !opts.includes(v)) { opts.push(v); render(); } }
+    tin.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addOpt(tin.value); tin.value = ''; }
+    });
+    tin.addEventListener('blur', function () { if (tin.value.trim()) { addOpt(tin.value); tin.value = ''; } });
+    wrap.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-idx]');
+      if (b) { opts.splice(parseInt(b.dataset.idx), 1); render(); }
+    });
+  }
+
+  function syncDropdowns(n, opts) {
+    var ansHid  = document.getElementById('new-qans-hid-'  + n);
+    var scqSel  = document.getElementById('new-qscq-sel-'  + n);
+    var cbWrap  = document.getElementById('new-qcb-'       + n);
+    var scqWrap = document.getElementById('new-qscq-wrap-' + n);
+    if (scqSel) {
+      var prev = scqSel.value;
+      scqSel.innerHTML = opts.length
+        ? opts.map(function (o) { return '<option value="' + o + '"' + (o === prev ? ' selected' : '') + '>' + o + '</option>'; }).join('')
+        : '<option value="">-- add options first --</option>';
+      if (!scqWrap.classList.contains('d-none') && ansHid) ansHid.value = scqSel.value;
+      scqSel.onchange = function () { if (ansHid) ansHid.value = scqSel.value; };
+    }
+    if (cbWrap) {
+      cbWrap.innerHTML = opts.length
+        ? opts.map(function (o) {
+            return '<label class="d-flex align-items-center gap-2 mb-1 small">' +
+                   '<input type="checkbox" class="new-q-mcq-cb" value="' + o + '" style="width:1rem;height:1rem"> ' + o + '</label>';
+          }).join('')
+        : '<span class="text-muted small">Add options first</span>';
+      cbWrap.querySelectorAll('.new-q-mcq-cb').forEach(function (cb) {
+        cb.addEventListener('change', function () {
+          if (ansHid) {
+            var checked = Array.from(cbWrap.querySelectorAll('.new-q-mcq-cb:checked')).map(function (c) { return c.value; });
+            ansHid.value = checked.join(',');
+          }
+        });
+      });
+    }
+  }
+
+  function toggleNewType(n) {
+    var sel     = document.querySelector('.new-q-type[data-qid="' + n + '"]');
+    var choice  = document.getElementById('new-qchoice-' + n);
+    var essay   = document.getElementById('new-qessay-'  + n);
+    var scqWrap = document.getElementById('new-qscq-wrap-' + n);
+    var mcqWrap = document.getElementById('new-qmcq-wrap-' + n);
+    var ansHid  = document.getElementById('new-qans-hid-'  + n);
+    if (!sel) return;
+    var t = sel.value;
+    if (t === 'ES') { choice.classList.add('d-none'); essay.classList.remove('d-none'); }
+    else            { choice.classList.remove('d-none'); essay.classList.add('d-none'); }
+    if (scqWrap && mcqWrap) {
+      if (t === 'MCQ') { scqWrap.classList.add('d-none'); mcqWrap.classList.remove('d-none'); if (ansHid) ansHid.value = ''; }
+      else             { scqWrap.classList.remove('d-none'); mcqWrap.classList.add('d-none'); var s = document.getElementById('new-qscq-sel-' + n); if (s && ansHid) ansHid.value = s.value; }
+    }
+  }
+
+  document.getElementById('add-new-q-btn').addEventListener('click', function () {
+    newQCount++;
+    var n = newQCount;
+    document.getElementById('new-questions-container').insertAdjacentHTML('beforeend', createCard(n));
+    attachChipUI(n);
+    toggleNewType(n);
+    var sel = document.querySelector('.new-q-type[data-qid="' + n + '"]');
+    if (sel) sel.addEventListener('change', function () { toggleNewType(n); });
+    refreshBadge();
+  });
+
+  document.getElementById('new-questions-container').addEventListener('click', function (e) {
+    var b = e.target.closest('.remove-new-q');
+    if (b) { var c = document.getElementById('newqcard-' + b.dataset.qid); if (c) c.remove(); refreshBadge(); }
+  });
+
+  function refreshBadge() {
+    var n = document.querySelectorAll('[id^="newqcard-"]').length;
+    document.getElementById('new-q-badge').textContent = n + ' new';
+  }
+});
+</script>
 {% endblock %}

@@ -1,38 +1,143 @@
 {% extends 'base.html' %}
+{% block title %}{% if request.user.is_superuser %}Assignments{% else %}My Assignments{% endif %}{% endblock %}
+
 {% block content %}
-    <div class="container">
-        <h2>Your Assignments</h2>
-        <a href="{% url 'create_assignment' %}" class="btn btn-success mb-3">Create New Assignment</a>
-        <table class="table table-striped">
-            <thead>
-                <tr>
-                    <th>Title</th>
-                    <th>Description</th>
-                    <th>Due Date</th>
-                    <th>Class</th>
-                    <th>Subject</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for assignment in assignments %}
-                <tr>
-                    <td>{{ assignment.title }}</td>
-                    <td>{{ assignment.description }}</td>
-                    <td>{{ assignment.due_date }}</td>
-                    <td>{{ assignment.class_assigned.name }}</td>
-                    <td>{{ assignment.subject.name }}</td>
-                    <td>
-                        <a href="{% url 'update_assignment' assignment.id %}" class="btn btn-info btn-sm">Edit</a>
-                        <a href="{% url 'delete_assignment' assignment.id %}" class="btn btn-danger btn-sm">Delete</a>
-                    </td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="6" class="text-center">No assignments found.</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+<div class="container mt-4 mb-5">
+
+  <!-- Header -->
+  <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom">
+    <div>
+      <nav aria-label="breadcrumb" class="mb-1">
+        <ol class="breadcrumb small mb-0">
+          <li class="breadcrumb-item"><a href="{% url assignment_dashboard_route %}">Dashboard</a></li>
+          <li class="breadcrumb-item active">Assignments</li>
+        </ol>
+      </nav>
+      <h2 class="mb-0">{% if request.user.is_superuser %}Assignments{% else %}My Assignments{% endif %}</h2>
     </div>
+    <a href="{% url assignment_route_prefix|add:'create_assignment' %}" class="btn btn-secondary">
+      <i class="fas fa-plus-circle me-1"></i> Create Assignment
+    </a>
+  </div>
+
+  <!-- Messages -->
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+
+  <!-- Assignments table card -->
+  <div class="card shadow-sm">
+    <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+      <span><i class="fas fa-list-alt me-2"></i>All Assignments</span>
+      <span class="badge bg-secondary">{{ assignments|length }} total</span>
+    </div>
+    <div class="card-body p-0">
+      {% if assignments %}
+      <div class="table-responsive">
+        <table class="table table-hover table-striped mb-0 align-middle">
+          <thead class="table-dark">
+            <tr>
+              <th scope="col">Title</th>
+              <th scope="col">Class / Subject</th>
+              <th scope="col" class="text-center">Due Date</th>
+              <th scope="col" class="text-center">Questions</th>
+              <th scope="col" class="text-center">Status</th>
+              <th scope="col" class="text-center">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for assignment in assignments %}
+            <tr>
+              <td>
+                <a href="{% url assignment_route_prefix|add:'assignment_detail' assignment.id %}" class="fw-medium text-dark text-decoration-none">
+                  {{ assignment.title }}
+                </a>
+                {% if assignment.has_expired %}
+                  <span class="badge bg-danger ms-1" style="font-size:.65rem">Expired</span>
+                {% endif %}
+              </td>
+              <td>
+                <span class="d-block">{{ assignment.class_assigned.name }}</span>
+                <small class="text-muted">{{ assignment.subject.name }}</small>
+              </td>
+              <td class="text-center">
+                <span class="{% if assignment.has_expired %}text-danger{% else %}text-success{% endif %}">
+                  {{ assignment.due_date|date:"d M, Y" }}
+                </span>
+                <small class="d-block text-muted">{{ assignment.due_date|date:"H:i" }}</small>
+              </td>
+              <td class="text-center">
+                <span class="fw-bold">{{ assignment.questions.count }}</span>
+                <small class="text-muted d-block">question(s)</small>
+              </td>
+              <td class="text-center">
+                {% if assignment.active %}
+                  <span class="badge bg-success">Active</span>
+                {% else %}
+                  <span class="badge bg-secondary">Inactive</span>
+                {% endif %}
+              </td>
+              <td class="text-center">
+                <div class="btn-group btn-group-sm" role="group">
+                  <a href="{% url assignment_route_prefix|add:'assignment_detail' assignment.id %}" class="btn btn-outline-info" title="View">
+                    <i class="fas fa-eye"></i>
+                  </a>
+                  <a href="{% url assignment_route_prefix|add:'update_assignment' assignment.id %}" class="btn btn-outline-warning" title="Edit">
+                    <i class="fas fa-edit"></i>
+                  </a>
+                  <a href="{% url 'assignment_submissions_list' assignment.id %}" class="btn btn-outline-secondary" title="Submissions">
+                    <i class="fas fa-tasks"></i>
+                  </a>
+                  <button type="button" class="btn btn-outline-danger"
+                          data-bs-toggle="modal" data-bs-target="#deleteModal{{ assignment.id }}" title="Delete">
+                    <i class="fas fa-trash-alt"></i>
+                  </button>
+                </div>
+
+                <!-- Delete confirmation modal -->
+                <div class="modal fade" id="deleteModal{{ assignment.id }}" tabindex="-1" aria-hidden="true">
+                  <div class="modal-dialog modal-sm">
+                    <div class="modal-content">
+                      <div class="modal-header bg-danger text-white py-2">
+                        <h6 class="modal-title mb-0">Delete Assignment</h6>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                      </div>
+                      <div class="modal-body small">
+                        Are you sure you want to delete <strong>{{ assignment.title }}</strong>?
+                        This will also remove all questions and student submissions.
+                      </div>
+                      <div class="modal-footer py-2">
+                        <button type="button" class="btn btn-sm btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <form method="POST" action="{% url assignment_route_prefix|add:'delete_assignment' assignment.id %}" class="d-inline">
+                          {% csrf_token %}
+                          <button type="submit" class="btn btn-sm btn-danger">Delete</button>
+                        </form>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="text-center text-muted py-5">
+        <i class="fas fa-inbox fa-3x mb-3 opacity-25"></i>
+        <p class="mb-1">No assignments yet.</p>
+        <a href="{% url assignment_route_prefix|add:'create_assignment' %}" class="btn btn-secondary btn-sm mt-2">
+          <i class="fas fa-plus me-1"></i> Create your first assignment
+        </a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+</div>
 {% endblock %}

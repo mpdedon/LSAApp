@@ -8,12 +8,6 @@ import json
 
 class AssessmentForm(forms.ModelForm):
 
-    questions = forms.ModelMultipleChoiceField(
-        queryset=OnlineQuestion.objects.all(),
-        widget=forms.CheckboxSelectMultiple,
-        required=False,
-    )
-
     due_date = forms.DateTimeField(
         widget=forms.DateTimeInput(attrs={'type': 'datetime-local', 'class': 'form-control'}, format='%Y-%m-%dT%H:%M'),
         input_formats=['%Y-%m-%dT%H:%M']
@@ -28,7 +22,7 @@ class AssessmentForm(forms.ModelForm):
         fields = [
             'title', 'short_description', 'class_assigned',
             'subject', 'term', 'due_date', 'duration',
-            'result_field_mapping', 'shuffle_questions'  
+            'result_field_mapping', 'shuffle_questions'
         ]
         widgets = {
             'title': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter the title of the assessment'}),
@@ -42,16 +36,15 @@ class AssessmentForm(forms.ModelForm):
             'shuffle_questions': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
 
-        def __init__(self, *args, **kwargs):
-            super().__init__(*args, **kwargs)
-            self.fields['term'].queryset = Term.objects.all() 
-            self.fields['is_online'].initial = True
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['term'].queryset = Term.objects.all()
 
-        def clean_due_date(self):
-            due_date = self.cleaned_data['due_date']
-            if due_date <= now():
-                raise forms.ValidationError("Due date must be in the future.")
-            return due_date
+    def clean_due_date(self):
+        due_date = self.cleaned_data.get('due_date')
+        if due_date and due_date <= now():
+            raise forms.ValidationError("Due date must be in the future.")
+        return due_date
             
 
 class OnlineQuestionForm(forms.ModelForm):
@@ -84,39 +77,42 @@ class OnlineQuestionForm(forms.ModelForm):
         return options
 
     def clean_correct_answer(self):
-        correct_answer_input = self.cleaned_data.get('correct_answer') # This is the string from the input field
+        correct_answer_input = self.cleaned_data.get('correct_answer')
         question_type = self.cleaned_data.get('question_type')
-        options = self.cleaned_data.get('options') # This should be the list of option strings
+        options = self.cleaned_data.get('options')
+
+        # Normalise to lowercase so validation is case-insensitive (matches grading logic)
+        if correct_answer_input:
+            correct_answer_input = correct_answer_input.strip().lower()
+        options_lower = [o.lower() for o in options] if options else []
 
         if question_type == 'SCQ':
             if not correct_answer_input:
                 raise forms.ValidationError("A correct answer is required for Single Choice Questions.")
-            if options and correct_answer_input not in options:
+            if options_lower and correct_answer_input not in options_lower:
                 raise forms.ValidationError("For Single Choice, the correct answer must be one of the provided options.")
-        
+
         elif question_type == 'MCQ':
             if not correct_answer_input:
                 raise forms.ValidationError("At least one correct answer is required for Multiple Choice Questions.")
 
-            if ',' in correct_answer_input:
-                individual_correct_answers = [ans.strip() for ans in correct_answer_input.split(',') if ans.strip()]
-            else:
-                individual_correct_answers = [ans.strip() for ans in correct_answer_input.split(' ') if ans.strip()]
+            sep = ',' if ',' in correct_answer_input else ' '
+            individual_correct_answers = [ans.strip() for ans in correct_answer_input.split(sep) if ans.strip()]
 
-            if not individual_correct_answers: # e.g., if input was just "," or " "
-                 raise forms.ValidationError("Please provide valid correct answer(s) for MCQ.")
+            if not individual_correct_answers:
+                raise forms.ValidationError("Please provide valid correct answer(s) for MCQ.")
 
-            if options: # Ensure options list is available for checking
+            if options_lower:
                 for ans_part in individual_correct_answers:
-                    if ans_part not in options:
+                    if ans_part not in options_lower:
                         raise forms.ValidationError(
-                            f"For Multiple Choice, the answer '{ans_part}' is not among the provided options. "
-                            f"All correct answers must be from the options list: {', '.join(options)}."
+                            f"The answer '{ans_part}' is not among the provided options. "
+                            f"Options: {', '.join(options)}."
                         )
-            else: # Should not happen if clean_options runs first and validates options presence
+            else:
                 raise forms.ValidationError("Options are missing for this MCQ, cannot validate correct answer.")
-            
-            return correct_answer_input # Return the validated (possibly multi-part) string
+
+            return correct_answer_input
 
         elif question_type == 'ES':
             # For Essay, correct_answer is optional (can be a model answer or rubric)

@@ -88,7 +88,7 @@
                     {% if user.is_superuser %}
                         <a href="{% url 'exam_submissions_list' submission.exam.id %}" class="btn btn-secondary me-2">Cancel</a>
                     {% else %}
-                        <a href="{% url 'teacher_exam_list' %}" class="btn btn-secondary me-2">Cancel</a>
+                        <a href="{% url 'teacher_dashboard' %}" class="btn btn-secondary me-2">Cancel</a>
                     {% endif %}
 
                     <button type="submit" class="btn btn-primary">

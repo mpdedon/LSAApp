@@ -744,13 +744,9 @@ def teacher_dashboard(request):
         return redirect('home')
     
     teacher = Teacher.objects.get(user=request.user)
-    
-    #guardians = set(student.student_guardian for student in students if student.student_guardian is not None)
-   
+
     now = timezone.now()
     active_term = Term.objects.filter(is_active=True).select_related('session').first()
-    # Calculate weeks in the term
-    weeks = active_term.get_term_weeks
     
     teacher_assigned_classes_qs = teacher.assigned_classes().order_by('name')
     form_teacher_classes_qs = teacher.current_classes().order_by('name')
@@ -784,7 +780,7 @@ def teacher_dashboard(request):
     for item in upcoming_tasks_qs: upcoming_tasks.append({'type': 'Assessment', 'obj': item})
     for item in upcoming_exams_qs: upcoming_tasks.append({'type': 'Exam', 'obj': item})
     upcoming_tasks.sort(key=lambda x: x['obj'].due_date)
-    uspcoming_tasks = upcoming_tasks[:5] 
+    upcoming_tasks = upcoming_tasks[:5]
 
     # --- Pending Submissions to Grade ---
     pending_assessment_subs = AssessmentSubmission.objects.filter(
@@ -849,45 +845,64 @@ def teacher_dashboard(request):
             students_by_class_dict[student.current_class].append(student)
 
     # --- CONTEXT FOR: Manage Tasks Tab ---
-    if not form_teacher_classes_qs.exists():
-        # Handle case where the teacher is not a form teacher of any class
-        all_current_assignments = Assignment.objects.none()
-        all_previous_assignments = Assignment.objects.none()
-        all_current_assessments = Assessment.objects.none()
-        all_previous_assessments = Assessment.objects.none()
-        all_current_exams = Exam.objects.none()
-        all_previous_exams = Exam.objects.none()
+    assignment_task_base_qs = Assignment.objects.filter(
+        Q(teacher=teacher) | Q(class_assigned__in=form_teacher_classes_qs)
+    ).distinct().select_related('class_assigned', 'subject', 'teacher__user')
+
+    assessment_task_base_qs = Assessment.objects.filter(
+        Q(created_by=request.user) | Q(class_assigned__in=form_teacher_classes_qs)
+    ).distinct().select_related('class_assigned', 'subject', 'created_by')
+
+    exam_task_base_qs = Exam.objects.filter(
+        Q(created_by=request.user) | Q(class_assigned__in=form_teacher_classes_qs)
+    ).distinct().select_related('class_assigned', 'subject', 'created_by')
+
+    if active_term:
+        all_current_assignments = assignment_task_base_qs.filter(term=active_term).annotate(
+            submission_count=Count('submissions', distinct=True)
+        ).order_by('-due_date')
+        all_previous_assignments = assignment_task_base_qs.exclude(term=active_term).annotate(
+            submission_count=Count('submissions', distinct=True)
+        ).order_by('-due_date')
+
+        all_current_assessments = assessment_task_base_qs.filter(term=active_term).annotate(
+            submission_count=Count('submissions_for_assessment', distinct=True)
+        ).order_by('-due_date')
+        all_previous_assessments = assessment_task_base_qs.exclude(term=active_term).annotate(
+            submission_count=Count('submissions_for_assessment', distinct=True)
+        ).order_by('-due_date')
+
+        all_current_exams = exam_task_base_qs.filter(term=active_term).annotate(
+            submission_count=Count('submissions_for_exam', distinct=True)
+        ).order_by('-due_date')
+        all_previous_exams = exam_task_base_qs.exclude(term=active_term).annotate(
+            submission_count=Count('submissions_for_exam', distinct=True)
+        ).order_by('-due_date')
     else:
-        # This retrieves ALL tasks for the form teacher's classes, regardless of creator.
-        
-        # 1. Get tasks for the CURRENT ACTIVE TERM
-        all_current_assignments = Assignment.objects.filter(
-            class_assigned__in=form_teacher_classes_qs,
-            term=active_term
-        ).select_related('class_assigned', 'subject').order_by('-due_date')
+        all_current_assignments = Assignment.objects.none()
+        all_previous_assignments = assignment_task_base_qs.annotate(
+            submission_count=Count('submissions', distinct=True)
+        ).order_by('-due_date')
+        all_current_assessments = Assessment.objects.none()
+        all_previous_assessments = assessment_task_base_qs.annotate(
+            submission_count=Count('submissions_for_assessment', distinct=True)
+        ).order_by('-due_date')
+        all_current_exams = Exam.objects.none()
+        all_previous_exams = exam_task_base_qs.annotate(
+            submission_count=Count('submissions_for_exam', distinct=True)
+        ).order_by('-due_date')
 
-        all_current_assessments = Assessment.objects.filter(
-            class_assigned__in=form_teacher_classes_qs,
-            term=active_term
-        ).select_related('class_assigned', 'subject').order_by('-due_date')
-
-        all_current_exams = Exam.objects.filter(
-            class_assigned__in=form_teacher_classes_qs,
-            term=active_term
-        ).select_related('class_assigned', 'subject').order_by('-due_date')
-
-        # 2. Get tasks from ALL PREVIOUS TERMS
-        all_previous_assignments = Assignment.objects.filter(
-            class_assigned__in=form_teacher_classes_qs
-        ).exclude(term=active_term).select_related('class_assigned', 'subject').order_by('-due_date')
-
-        all_previous_assessments = Assessment.objects.filter(
-            class_assigned__in=form_teacher_classes_qs
-        ).exclude(term=active_term).select_related('class_assigned', 'subject').order_by('-due_date')
-
-        all_previous_exams = Exam.objects.filter(
-            class_assigned__in=form_teacher_classes_qs
-        ).exclude(term=active_term).select_related('class_assigned', 'subject').order_by('-due_date')
+    pending_approval_count = all_current_assessments.filter(is_approved=False).count() + all_current_exams.filter(is_approved=False).count()
+    current_task_totals = {
+        'assignments': all_current_assignments.count(),
+        'assessments': all_current_assessments.count(),
+        'exams': all_current_exams.count(),
+    }
+    previous_task_totals = {
+        'assignments': all_previous_assignments.count(),
+        'assessments': all_previous_assessments.count(),
+        'exams': all_previous_exams.count(),
+    }
     
     # --- CONTEXT FOR: Leaderboard & Broadsheet Tabs ---
     form_teacher_term_ids = TeacherAssignment.objects.filter(teacher=teacher).values_list('term_id', flat=True)
@@ -933,6 +948,7 @@ def teacher_dashboard(request):
         'subject_count': subject_count,
         'upcoming_tasks': upcoming_tasks,
         'pending_submissions': all_pending_submissions[:5],
+        'pending_submissions_count': len(all_pending_submissions),
         'notifications': notifications,
         'form_teacher_classes_count': form_teacher_classes_qs.count(),
 
@@ -951,6 +967,9 @@ def teacher_dashboard(request):
         'all_previous_assessments': all_previous_assessments,
         'all_current_exams': all_current_exams,
         'all_previous_exams': all_previous_exams,
+        'current_task_totals': current_task_totals,
+        'previous_task_totals': previous_task_totals,
+        'pending_approval_count': pending_approval_count,
         
         # Broadsheets Tab
         'all_sessions': all_sessions, 

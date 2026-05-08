@@ -115,7 +115,11 @@
         </div>
 
         <div class="card-footer text-center">
+            {% if request.user.is_superuser %}
             <a href="{{ request.META.HTTP_REFERER|default:'admin_dashboard' }}" class="btn btn-secondary"><i class="fas fa-arrow-left me-1"></i> Back to Previous Page</a>
+            {% else %}
+            <a href="{% url 'teacher_dashboard' %}" class="btn btn-secondary"><i class="fas fa-arrow-left me-1"></i> Back to Dashboard</a>
+            {% endif %}
         </div>
     </div>
 </div>

@@ -1,246 +1,575 @@
 {% extends 'base.html' %}
-{% load crispy_forms_tags %} 
-
-{% block title %}Create New Assessment{% endblock %}
-
+{% load crispy_forms_tags %}
+{% block title %}Create Assessment{% endblock %}
 {% block content %}
-<div class="container my-4">
-    <div class="card shadow-sm">
-        <div class="card-header bg-primary text-white text-center">
-            <h2>Create New Assessment</h2>
+<div class="container my-4 wizard-shell wizard-shell-assessment" style="max-width:980px">
+
+  <!-- Breadcrumb -->
+  <nav aria-label="breadcrumb" class="mb-3">
+    <ol class="breadcrumb small">
+      <li class="breadcrumb-item"><a href="{% if request.user.is_superuser %}{% url 'school-setup' %}{% else %}{% url 'teacher_dashboard' %}{% endif %}">Dashboard</a></li>
+      <li class="breadcrumb-item"><a href="{% if request.user.is_superuser %}{% url 'admin_assessment_list' %}{% else %}{% url 'teacher_assessment_list' %}{% endif %}">Assessments</a></li>
+      <li class="breadcrumb-item active">Create Assessment</li>
+    </ol>
+  </nav>
+
+  <section class="wizard-hero mb-4">
+    <div class="wizard-hero-copy">
+      <span class="wizard-kicker">Assessment Studio</span>
+      <h1 class="wizard-title">Build a polished assessment flow</h1>
+      <p class="wizard-subtitle mb-0">Move from setup to questions to review in one clean drafting surface, with stronger visual hierarchy and clearer progress feedback.</p>
+    </div>
+    <div class="wizard-hero-side">
+      <div class="wizard-chip">
+        <i class="fas fa-layer-group"></i>
+        <span>3-step guided builder</span>
+      </div>
+      <div class="wizard-chip">
+        <i class="fas fa-user-shield"></i>
+        <span>Draft-first approval safe</span>
+      </div>
+    </div>
+  </section>
+
+
+  <!-- Step indicator -->
+  <div class="card shadow-sm mb-4 border-0 wizard-stepper-card">
+    <div class="card-body py-3 px-4">
+      <div class="d-flex justify-content-between align-items-center mb-2">
+        <span class="text-muted small fw-semibold">STEP <span id="step-label">1</span> OF 3</span>
+        <span id="step-title-label" class="fw-bold">Assessment Details</span>
+      </div>
+      <div class="progress mb-3" style="height:4px">
+        <div id="wizard-progress" class="progress-bar bg-primary" style="width:33%;transition:width .4s"></div>
+      </div>
+      <div class="d-flex gap-2">
+        <button type="button" class="btn btn-sm step-pill active-pill" id="pill-1" data-step="1">
+          <span class="step-num">1</span> Details
+        </button>
+        <span class="text-muted align-self-center">&rsaquo;</span>
+        <button type="button" class="btn btn-sm step-pill inactive-pill" id="pill-2" data-step="2">
+          <span class="step-num">2</span> Questions
+        </button>
+        <span class="text-muted align-self-center">&rsaquo;</span>
+        <button type="button" class="btn btn-sm step-pill inactive-pill" id="pill-3" data-step="3">
+          <span class="step-num">3</span> Review
+        </button>
+      </div>
+    </div>
+  </div>
+
+
+  {% if form.errors or question_errors %}
+  <div class="alert alert-danger alert-dismissible fade show">
+    <h6 class="alert-heading mb-1"><i class="fas fa-exclamation-triangle me-1"></i> Fix the errors below</h6>
+    {% for field in form %}{% if field.errors %}<div><strong>{{ field.label }}:</strong> {{ field.errors|striptags }}</div>{% endif %}{% endfor %}
+    {% for err in question_errors %}<div>{{ err }}</div>{% endfor %}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+  {% endif %}
+
+  <form method="POST" novalidate id="wizard-form">
+    {% csrf_token %}
+    <input type="hidden" name="deleted_question_ids" id="deleted_question_ids_input" value="">
+
+    <!-- STEP 1: Details -->
+    <div class="wizard-step" id="step-1">
+      <div class="card shadow-sm border-0 wizard-stage-card">
+        <div class="card-header bg-primary text-white rounded-top">
+          <i class="fas fa-info-circle me-2"></i>Assessment Details
         </div>
         <div class="card-body p-4">
-            {% if form.errors or question_errors %}
-                <div class="alert alert-danger" role="alert">
-                    <h4 class="alert-heading">Errors Found!</h4>
-                    <p>Please correct the errors below and try again.</p>
-                    <hr>
-                    {% if form.non_field_errors %}
-                        <p class="mb-0">{{ form.non_field_errors }}</p>
-                    {% endif %}
-                    {% for field in form %}
-                        {% if field.errors %}
-                            <p class="mb-0"><strong>{{ field.label }}:</strong> {{ field.errors|striptags }}</p>
-                        {% endif %}
-                    {% endfor %}
-                    {% if question_errors %}
-                        <p class="mt-2 mb-0"><strong>Question Errors:</strong></p>
-                        <ul>
-                            {% for error in question_errors %}
-                                <li>{{ error }}</li>
-                            {% endfor %}
-                        </ul>
-                    {% endif %}
-                </div>
-            {% endif %}
-
-            <form method="POST" novalidate>
-                {% csrf_token %}
-                
-                <div class="row">
-                    <div class="col-md-8 mb-3">
-                        {{ form.title|as_crispy_field }}
-                    </div>
-                    <div class="col-md-4 mb-3">
-                        {{ form.term|as_crispy_field }}
-                    </div>
-                </div>
-                <div class="mb-3">
-                    {{ form.short_description|as_crispy_field }}
-                </div>
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                        {{ form.class_assigned|as_crispy_field }}
-                    </div>
-                    <div class="col-md-6 mb-3">
-                        {{ form.subject|as_crispy_field }}
-                    </div>
-                </div>
-                <div class="row">
-                    <div class="col-md-6 mb-3">
-                         {{ form.due_date|as_crispy_field }}
-                    </div>
-                    <div class="form-group">
-                        <label for="{{ form.duration.id_for_label }}">Duration (in minutes)</label>
-                        {{ form.duration }}
-                        <small class="form-text text-muted">{{ form.duration.help_text }}</small>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="{{ form.result_field_mapping.id_for_label }}">Link to Term Result Sheet</label>
-                        {{ form.result_field_mapping }}
-                        <small class="form-text text-muted">{{ form.result_field_mapping.help_text }}</small>
-                        <small class="form-text text-muted mt-1">Selecting a result field will map this assessment's total score into that term result. The score is scaled to the target field's maximum (for example, continuous assessments are scaled to Max 10; exams are typically scaled to Max 40). Choose "None" to leave this assessment unmapped.</small>
-                    </div>
-
-                    <div class="form-check my-3">
-                        <label for="{{ form.shuffle_questions.id_for_label }}">Shuffle Questions</label>
-                        {{ form.shuffle_questions }}
-                        <label class="form-check-label" for="{{ form.shuffle_questions.id_for_label }}">
-                            {{ form.shuffle_questions.help_text }}
-                        </label>
-                    </div>
-                </div>
-
-                <hr class="my-4">
-                <h4 class="mb-3">Questions</h4>
-                <div id="questions-container">
-                    <!-- Dynamically added questions will appear here -->
-                </div>
-                <div class="text-center my-3">
-                    <button type="button" id="add-question-btn" class="btn btn-outline-success">
-                        <i class="fas fa-plus-circle me-1"></i> Add Question
-                    </button>
-                </div>
-                <hr class="my-4">
-                <div class="text-center">
-                    <button type="submit" class="btn btn-primary btn-lg">
-                        <i class="fas fa-save me-1"></i> Save Assessment
-                    </button>
-                    <a href="{{ request.META.HTTP_REFERER|default:'home' }}" class="btn btn-secondary btn-lg">Cancel</a>
-                </div>
-            </form>
+          
+        <div class="row g-3">
+          <div class="col-12">{{ form.title|as_crispy_field }}</div>
+          <div class="col-md-6">{{ form.term|as_crispy_field }}</div>
+          <div class="col-md-6">{{ form.class_assigned|as_crispy_field }}</div>
+          <div class="col-md-6">{{ form.subject|as_crispy_field }}</div>
+          <div class="col-md-6">{{ form.due_date|as_crispy_field }}</div>
+          <div class="col-md-6">{{ form.duration|as_crispy_field }}</div>
+          <div class="col-md-6">{{ form.result_field_mapping|as_crispy_field }}</div>
+          <div class="col-12">{{ form.short_description|as_crispy_field }}</div>
+          <div class="col-12">
+            <div class="form-check">
+              {{ form.shuffle_questions }}
+              <label class="form-check-label ms-2" for="{{ form.shuffle_questions.id_for_label }}">Shuffle questions for each student</label>
+            </div>
+          </div>
         </div>
+
+        </div>
+        <div class="card-footer bg-transparent d-flex justify-content-end border-top">
+          <button type="button" class="btn btn-primary" id="next-1">
+            Next: Add Questions &nbsp;<i class="fas fa-arrow-right"></i>
+          </button>
+        </div>
+      </div>
     </div>
+
+    <!-- STEP 2: Questions -->
+    <div class="wizard-step d-none" id="step-2">
+      <div class="card shadow-sm border-0 wizard-stage-card">
+        <div class="card-header bg-primary text-white rounded-top d-flex justify-content-between align-items-center">
+          <span><i class="fas fa-list-ol me-2"></i>Questions</span>
+          <span class="badge bg-white text-primary" id="q-count-badge">0 question(s)</span>
+        </div>
+        <div class="card-body p-3">
+          <div id="questions-container"></div>
+          <div class="text-center my-3">
+            <button type="button" id="add-question-btn" class="btn btn-outline-success">
+              <i class="fas fa-plus-circle me-1"></i> Add Question
+            </button>
+          </div>
+          <div class="alert alert-light border small mb-0">
+            <i class="fas fa-lightbulb text-warning me-1"></i>
+            <strong>Tips:</strong> Type each option and press <kbd>Enter</kbd> or comma to add it as a chip. For MCQ, tick all correct answers. Essay questions need no options.
+          </div>
+        </div>
+        <div class="card-footer bg-transparent d-flex justify-content-between border-top">
+          <button type="button" class="btn btn-outline-secondary" id="back-2">
+            <i class="fas fa-arrow-left me-1"></i> Back
+          </button>
+          <button type="button" class="btn btn-primary" id="next-2">
+            Next: Review &nbsp;<i class="fas fa-arrow-right"></i>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 3: Review -->
+    <div class="wizard-step d-none" id="step-3">
+      <div class="card shadow-sm border-0 wizard-stage-card">
+        <div class="card-header bg-success text-white rounded-top">
+          <i class="fas fa-check-circle me-2"></i>Review &amp; Submit
+        </div>
+        <div class="card-body p-4">
+          <h6 class="fw-bold text-muted mb-2 text-uppercase" style="font-size:.75rem;letter-spacing:.05em">Assessment Details</h6>
+          <dl class="row small bg-light rounded p-3 mb-4" id="review-details"></dl>
+          <h6 class="fw-bold text-muted mb-2 text-uppercase" style="font-size:.75rem;letter-spacing:.05em">
+            Questions (<span id="review-q-count">0</span>)
+          </h6>
+          <div id="review-questions" class="mb-3"></div>
+          
+          <div class="alert alert-warning py-2 small">
+            <i class="fas fa-info-circle me-1"></i>
+            After saving, this assessment will be a <strong>draft</strong>.
+            An admin must approve it before students can take it. You can add/edit questions from the update page.
+          </div>
+
+        </div>
+        <div class="card-footer bg-transparent d-flex justify-content-between border-top">
+          <button type="button" class="btn btn-outline-secondary" id="back-3">
+            <i class="fas fa-arrow-left me-1"></i> Back
+          </button>
+          <button type="submit" class="btn btn-success btn-lg px-5">
+            <i class="fas fa-save me-1"></i> Save Assessment
+          </button>
+        </div>
+      </div>
+    </div>
+
+  </form>
 </div>
+
+
+<style>
+.wizard-shell-assessment {
+  --wizard-accent: #0d6efd;
+  --wizard-accent-rgb: 13, 110, 253;
+  --wizard-ink: #183b74;
+}
+.wizard-shell {
+  position: relative;
+}
+.wizard-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.9fr) minmax(260px, 0.9fr);
+  gap: 1.25rem;
+  padding: 1.5rem 1.6rem;
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at top right, rgba(255,255,255,.24), transparent 28%),
+    linear-gradient(135deg, rgba(var(--wizard-accent-rgb), .98), var(--wizard-ink));
+  box-shadow: 0 22px 55px rgba(var(--wizard-accent-rgb), .22);
+  color: #fff;
+}
+.wizard-kicker {
+  display: inline-flex;
+  padding: .35rem .7rem;
+  border-radius: 999px;
+  background: rgba(255,255,255,.14);
+  border: 1px solid rgba(255,255,255,.18);
+  font-size: .78rem;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  margin-bottom: .9rem;
+}
+.wizard-title {
+  font-size: clamp(1.7rem, 3vw, 2.5rem);
+  line-height: 1.05;
+  font-weight: 800;
+  margin-bottom: .65rem;
+}
+.wizard-subtitle {
+  max-width: 42rem;
+  color: rgba(255,255,255,.82);
+}
+.wizard-hero-side {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: .85rem;
+}
+.wizard-chip {
+  display: flex;
+  align-items: center;
+  gap: .7rem;
+  padding: .95rem 1rem;
+  border-radius: 18px;
+  background: rgba(255,255,255,.12);
+  border: 1px solid rgba(255,255,255,.16);
+}
+.wizard-stepper-card,
+.wizard-stage-card {
+  border-radius: 24px;
+  overflow: hidden;
+  box-shadow: 0 18px 44px rgba(15, 23, 42, .08) !important;
+}
+.wizard-stepper-card .card-body,
+.wizard-stage-card .card-body,
+.wizard-stage-card .card-footer {
+  background: rgba(255,255,255,.98);
+}
+.wizard-stage-card .card-header {
+  background: linear-gradient(135deg, rgba(var(--wizard-accent-rgb), .95), var(--wizard-ink)) !important;
+  padding: 1rem 1.25rem;
+}
+.step-pill { border-radius:999px; font-size:.82rem; font-weight:700; padding:.45rem 1rem; border:2px solid transparent; transition:all .25s ease; }
+.active-pill { background:rgba(var(--wizard-accent-rgb),.12); border-color:rgba(var(--wizard-accent-rgb),.55); color:var(--wizard-accent); box-shadow:0 10px 24px rgba(var(--wizard-accent-rgb),.12); }
+.done-pill { background:#19875420; border-color:#198754; color:#146c43; }
+.inactive-pill { background:#f8fafc; border-color:#d8e1ec; color:#64748b; }
+.chip-tag { display:inline-flex; align-items:center; gap:.3rem; padding:.35rem .7rem; border-radius:999px; font-size:.82rem; box-shadow: inset 0 -1px 0 rgba(255,255,255,.18); }
+.q-card { border-left:4px solid rgba(var(--wizard-accent-rgb), .22); border-radius:18px; transition:transform .18s ease, border-color .18s ease, box-shadow .18s ease; box-shadow:0 10px 28px rgba(15, 23, 42, .05); }
+.q-card:hover { border-left-color:var(--wizard-accent); transform:translateY(-2px); box-shadow:0 16px 34px rgba(15, 23, 42, .08); }
+.wizard-shell .alert-light.border { border-radius: 18px; background: #f8fbff; }
+.wizard-shell .btn { border-radius: 999px; }
+.wizard-shell .form-control,
+.wizard-shell .form-select { border-radius: 14px; }
+.wizard-shell kbd { border-radius: 999px; padding: .2rem .55rem; }
+@media (max-width: 767.98px) {
+  .wizard-hero { grid-template-columns: 1fr; padding: 1.2rem; border-radius: 22px; }
+}
+</style>
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    let questionCount = 0; 
+  var currentStep = 1;
+  var questionCount = 0;
 
-    const createQuestionCardHTML = (qCount) => {
-        // The name prefixes here ('question_') match your _process_newly_added_questions view function
-        return `
-            <div class="card mb-3 shadow-sm question-card-dynamic" id="question-card-${qCount}">
-                <div class="card-body">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <h6 class="card-title mb-0">New Question ${qCount}</h6>
-                        <button type="button" class="btn btn-danger btn-sm remove-question-btn" data-question-id="${qCount}" aria-label="Remove Question ${qCount}">
-                            <i class="fas fa-trash"></i>
-                        </button>
-                    </div>
-                    <div class="row">
-                        <div class="col-md-12 mb-2">
-                            <label for="question_type_${qCount}" class="form-label form-label-sm">Type</label>
-                            <select name="question_type_${qCount}" id="question_type_${qCount}" class="form-select form-select-sm question-type-select" data-question-id="${qCount}">
-                                <option value="SCQ" selected>Single Choice (SCQ)</option>
-                                <option value="MCQ">Multiple Choice (MCQ)</option>
-                                <option value="ES">Essay (ES)</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="mb-2">
-                        <label for="question_text_${qCount}" class="form-label form-label-sm">Question Text</label>
-                        <textarea name="question_text_${qCount}" id="question_text_${qCount}" class="form-control form-control-sm" rows="2" required></textarea>
-                    </div>
-                    <div class="mb-2 options-container" id="options-container-${qCount}">
-                        <label for="question_options_${qCount}" class="form-label form-label-sm">Options (comma-separated)</label>
-                        <input type="text" name="question_options_${qCount}" id="question_options_${qCount}" class="form-control form-control-sm" placeholder="e.g., Option A, Option B">
-                    </div>
-                    <div class="mb-2 correct-answer-scq-mcq-container" id="correct-answer-scq-mcq-container-${qCount}">
-                        <label for="question_correct_answer_${qCount}" class="form-label form-label-sm">Correct Answer (SCQ/MCQ)</label>
-                        <input type="text" name="question_correct_answer_${qCount}" id="question_correct_answer_${qCount}" class="form-control form-control-sm" placeholder="One option for SCQ; comma-separated for MCQ">
-                    </div>
-                    
-                    <!-- Points field: visible input for UX + hidden field for submission -->
-                    <div class="mb-2 d-none points-container" id="points-container-${qCount}">
-                        <label for="question_points_vis_${qCount}" class="form-label form-label-sm">Points (for Essay)</label>
-                        <input type="number" name="question_points_vis_${qCount}" id="question_points_vis_${qCount}" class="form-control form-control-sm points-field" placeholder="e.g., 5" min="1">
-                        <input type="hidden" name="question_points_${qCount}" id="question_points_${qCount}_hidden" value="">
-                    </div>
-                </div>
+  var steps       = document.querySelectorAll('.wizard-step');
+  var stepPills   = document.querySelectorAll('.step-pill');
+  var progressBar = document.getElementById('wizard-progress');
+  var stepLabel   = document.getElementById('step-label');
+  var stepTitleEl = document.getElementById('step-title-label');
+  var qBadge      = document.getElementById('q-count-badge');
+
+  var TITLES = ['Assessment Details', 'Add Questions', 'Review &amp; Submit'];
+  var PCTS   = ['33%', '66%', '100%'];
+
+  function goToStep(n) {
+    steps.forEach(function (el, i) { el.classList.toggle('d-none', i + 1 !== n); });
+    stepPills.forEach(function (p, i) {
+      p.classList.remove('active-pill', 'done-pill', 'inactive-pill');
+      if (i + 1 < n)      p.classList.add('done-pill');
+      else if (i + 1 === n) p.classList.add('active-pill');
+      else                 p.classList.add('inactive-pill');
+    });
+    progressBar.style.width = PCTS[n - 1];
+    stepLabel.textContent = n;
+    stepTitleEl.textContent = TITLES[n - 1];
+    currentStep = n;
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // Breadcrumb pill navigation (back only)
+  stepPills.forEach(function (p) {
+    p.addEventListener('click', function () {
+      var t = parseInt(p.dataset.step);
+      if (t < currentStep) goToStep(t);
+    });
+  });
+
+  // Step 1 -> 2: client-side required validation
+  document.getElementById('next-1').addEventListener('click', function () {
+    var reqIds = ['id_title', 'id_term', 'id_class_assigned', 'id_subject', 'id_due_date'];
+    var ok = true;
+    reqIds.forEach(function (id) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      if (!el.value.trim()) { el.classList.add('is-invalid'); ok = false; }
+      else el.classList.remove('is-invalid');
+    });
+    if (ok) goToStep(2);
+  });
+
+  document.getElementById('back-2').addEventListener('click', function () { goToStep(1); });
+  document.getElementById('next-2').addEventListener('click', function () { buildReview(); goToStep(3); });
+  document.getElementById('back-3').addEventListener('click', function () { goToStep(2); });
+
+  // ---------- Question card ----------
+    function createCard(n) {
+    return `
+    <div class="card mb-3 q-card" id="qcard-${n}">
+      <div class="card-body p-3">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <span class="fw-semibold small text-secondary">Question ${n}</span>
+          <button type="button" class="btn btn-sm btn-outline-danger remove-q" data-qid="${n}">
+            <i class="fas fa-trash-alt"></i>
+          </button>
+        </div>
+        <div class="row g-2 mb-2">
+          <div class="col-md-4">
+            <label class="form-label form-label-sm fw-semibold">Type</label>
+            <select name="question_type_${n}" class="form-select form-select-sm q-type-sel" data-qid="${n}">
+              <option value="SCQ" selected>Single Choice</option>
+              <option value="MCQ">Multiple Choice</option>
+              <option value="ES">Essay</option>
+            </select>
+          </div>
+          <div class="col-md-8">
+            <label class="form-label form-label-sm fw-semibold">Question Text <span class="text-danger">*</span></label>
+            <textarea name="question_text_${n}" class="form-control form-control-sm q-text" rows="2" required></textarea>
+          </div>
+        </div>
+        <!-- SCQ/MCQ options -->
+        <div class="q-choice-wrap" id="qchoice-${n}">
+          <label class="form-label form-label-sm fw-semibold">
+            Options <span class="text-muted fw-normal">(press Enter or comma to add)</span>
+          </label>
+          <input type="text" class="form-control form-control-sm mb-1" id="qopts-txt-${n}" placeholder="e.g. Paris">
+          <div id="qchips-${n}" class="mb-2"></div>
+          <input type="hidden" name="question_options_${n}" id="qopts-hid-${n}" value="">
+          <!-- ONE answer hidden field: synced by both SCQ select and MCQ checkboxes -->
+          <input type="hidden" name="question_correct_answer_${n}" id="qans-hid-${n}" value="">
+          <div class="row g-2 mt-1">
+            <div class="col-md-6" id="qscq-wrap-${n}">
+              <label class="form-label form-label-sm fw-semibold">Correct Answer</label>
+              <select id="qscq-sel-${n}" class="form-select form-select-sm">
+                <option value="">-- add options first --</option>
+              </select>
             </div>
-        `;
-    };
+            <div class="col-md-6 d-none" id="qmcq-wrap-${n}">
+              <label class="form-label form-label-sm fw-semibold">Correct Answers (tick all)</label>
+              <div id="qcb-wrap-${n}" class="border rounded p-2" style="max-height:120px;overflow-y:auto">
+                <span class="text-muted small">Add options first</span>
+              </div>
+            </div>
+          </div>
+          
+        <div class="mt-2">
+          <label class="form-label form-label-sm text-muted">Points (blank = 1)</label>
+          <input type="number" name="question_points_${n}" class="form-control form-control-sm" min="1" placeholder="1" style="max-width:90px">
+        </div>
+        </div>
+        <!-- Essay -->
+        <div class="q-essay-wrap d-none" id="qessay-${n}">
+          <div class="mt-2">
+            <label class="form-label form-label-sm fw-semibold">Points <span class="text-danger">*</span></label>
+            <input type="number" name="question_points_${n}" class="form-control form-control-sm" min="1" placeholder="5" style="max-width:90px">
+          </div>
+          <p class="text-muted small mt-2 mb-0">Students will write a free-form answer.</p>
+        </div>
+      </div>
+    </div>`;
+  }
 
-    const toggleQuestionFieldsVisibility = (qId) => {
-        const typeSelect = document.getElementById(`question_type_${qId}`);
-        if (!typeSelect) return;
-        const selectedType = typeSelect.value;
 
-        const cardElement = document.getElementById(`question-card-${qId}`);
-        if (!cardElement) return;
+  function toggleType(qid) {
+    var sel = document.querySelector('.q-type-sel[data-qid="' + qid + '"]');
+    if (!sel) return;
+    var t = sel.value;
+    var ch = document.getElementById('qchoice-' + qid);
+    var es = document.getElementById('qessay-'  + qid);
+    if (t === 'ES') { ch.classList.add('d-none'); es.classList.remove('d-none'); }
+    else            { ch.classList.remove('d-none'); es.classList.add('d-none'); }
 
-        const optionsDiv = cardElement.querySelector('.options-container');
-        const correctAnswerDiv = cardElement.querySelector('.correct-answer-scq-mcq-container');
-        
-        // STEP 2: GET THE NEW POINTS FIELD ELEMENTS
-        const pointsDiv = cardElement.querySelector('.points-container');
-        const pointsInput = cardElement.querySelector('.points-field');
-        
-        if (selectedType === 'ES') {
-            // Hide SCQ/MCQ fields
-            optionsDiv.classList.add('d-none');
-            correctAnswerDiv.classList.add('d-none');
-            
-            // Show and enable Essay fields
-            pointsDiv.classList.remove('d-none');
-            pointsInput.disabled = false;
-
-        } else { // This handles SCQ or MCQ
-            // Show SCQ/MCQ fields
-            optionsDiv.classList.remove('d-none');
-            correctAnswerDiv.classList.remove('d-none');
-
-            // Hide and disable Essay fields
-            pointsDiv.classList.add('d-none');
-            pointsInput.disabled = true; // IMPORTANT: Disabled inputs are not sent with the form
-        }
-    };
-
-    document.getElementById('add-question-btn').addEventListener('click', () => {
-        questionCount++;
-        const questionsContainer = document.getElementById('questions-container');
-        // Note: The prefix here is 'question_' to match your Python view function _process_newly_added_questions
-        questionsContainer.insertAdjacentHTML('beforeend', createQuestionCardHTML(questionCount));
-        
-        toggleQuestionFieldsVisibility(questionCount);
-        
-        const newTypeSelect = document.getElementById(`question_type_${questionCount}`);
-        if (newTypeSelect) {
-            newTypeSelect.addEventListener('change', () => toggleQuestionFieldsVisibility(questionCount));
-        }
-    });
-
-    document.getElementById('questions-container').addEventListener('click', function(event) {
-        let targetButton = event.target.closest('.remove-question-btn');
-        if (targetButton) {
-            const qId = targetButton.getAttribute('data-question-id');
-            const cardToRemove = document.getElementById(`question-card-${qId}`);
-            if (cardToRemove) {
-                cardToRemove.remove();
-            }
-        }
-    });
-
-    // Hydration: if server provided posted_questions_json, rebuild the question cards
-    {% if posted_questions_json %}
-    try {
-        const posted = JSON.parse(`{{ posted_questions_json|escapejs }}`);
-        if (Array.isArray(posted)) {
-            posted.forEach(pq => {
-                document.getElementById('add-question-btn').click();
-                const idx = pq.index;
-                const typeEl = document.getElementById(`question_type_${idx}`);
-                const textEl = document.getElementById(`question_text_${idx}`);
-                const optionsEl = document.getElementById(`question_options_${idx}`);
-                const correctEl = document.getElementById(`question_correct_answer_${idx}`);
-                const visPoints = document.getElementById(`question_points_vis_${idx}`);
-                const hiddenPoints = document.getElementById(`question_points_${idx}_hidden`);
-
-                if (typeEl && pq.question_type) typeEl.value = pq.question_type;
-                if (textEl && pq.question_text) textEl.value = pq.question_text;
-                if (optionsEl && pq.options) optionsEl.value = pq.options.join(', ');
-                if (correctEl && pq.correct_answer) correctEl.value = pq.correct_answer;
-                if (visPoints && hiddenPoints) { visPoints.value = pq.points || ''; hiddenPoints.value = pq.points || ''; }
-
-                if (typeEl) { typeEl.dispatchEvent(new Event('change')); }
-            });
-        }
-    } catch (e) {
-        console.error('Failed to hydrate posted questions:', e);
+    var scqWrap = document.getElementById('qscq-wrap-' + qid);
+    var mcqWrap = document.getElementById('qmcq-wrap-' + qid);
+    var ansHid  = document.getElementById('qans-hid-'  + qid);
+    if (scqWrap && mcqWrap) {
+      if (t === 'MCQ') {
+        scqWrap.classList.add('d-none');
+        mcqWrap.classList.remove('d-none');
+        // Clear answer so MCQ checkboxes start fresh
+        if (ansHid) ansHid.value = '';
+        syncMCQ(qid);
+      } else {
+        scqWrap.classList.remove('d-none');
+        mcqWrap.classList.add('d-none');
+        // Sync answer from the SCQ select
+        var scqSel = document.getElementById('qscq-sel-' + qid);
+        if (ansHid && scqSel) ansHid.value = scqSel.value;
+      }
     }
-    {% endif %}
+  }
+
+  function buildChipUI(qid, initOpts) {
+    var opts = initOpts ? initOpts.slice() : [];
+    var tin  = document.getElementById('qopts-txt-' + qid);
+    var hid  = document.getElementById('qopts-hid-' + qid);
+    var wrap = document.getElementById('qchips-'    + qid);
+
+    function render() {
+      wrap.innerHTML = opts.map(function (o, i) {
+        return '<span class="chip-tag bg-primary text-white me-1 mb-1">' + o +
+               '<button type="button" class="btn-close btn-close-white ms-1" style="font-size:.5rem" data-idx="' + i + '"></button></span>';
+      }).join('');
+      hid.value = opts.join(',');
+      syncDropdowns(qid, opts);
+    }
+
+    function addOpt(v) {
+      v = v.trim();
+      if (v && !opts.includes(v)) { opts.push(v); render(); }
+    }
+
+    tin.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addOpt(tin.value); tin.value = ''; }
+    });
+    tin.addEventListener('blur', function () {
+      if (tin.value.trim()) { addOpt(tin.value); tin.value = ''; }
+    });
+    wrap.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-idx]');
+      if (b) { opts.splice(parseInt(b.dataset.idx), 1); render(); }
+    });
+    render();
+    return opts;
+  }
+
+  function syncDropdowns(qid, opts) {
+    var ansHid = document.getElementById('qans-hid-' + qid);
+    // SCQ select
+    var scqSel = document.getElementById('qscq-sel-' + qid);
+    if (scqSel) {
+      var prev = scqSel.value;
+      scqSel.innerHTML = opts.length
+        ? opts.map(function (o) { return '<option value="' + o + '"' + (o === prev ? ' selected' : '') + '>' + o + '</option>'; }).join('')
+        : '<option value="">-- add options first --</option>';
+      // Write current SCQ selection to shared hidden (if SCQ mode is active)
+      var scqWrap = document.getElementById('qscq-wrap-' + qid);
+      if (scqWrap && !scqWrap.classList.contains('d-none')) {
+        if (ansHid) ansHid.value = scqSel.value;
+      }
+      scqSel.addEventListener('change', function () {
+        if (ansHid) ansHid.value = scqSel.value;
+      });
+    }
+    // MCQ checkboxes
+    var cbWrap = document.getElementById('qcb-wrap-' + qid);
+    if (cbWrap) {
+      cbWrap.innerHTML = opts.length
+        ? opts.map(function (o) {
+            return '<label class="d-flex align-items-center gap-2 mb-1 small">' +
+                   '<input type="checkbox" class="q-mcq-cb" value="' + o + '" style="width:1rem;height:1rem"> ' + o + '</label>';
+          }).join('')
+        : '<span class="text-muted small">Add options first</span>';
+      cbWrap.querySelectorAll('.q-mcq-cb').forEach(function (cb) {
+        cb.addEventListener('change', function () { syncMCQ(qid); });
+      });
+    }
+  }
+
+  function syncMCQ(qid) {
+    var cbWrap = document.getElementById('qcb-wrap-' + qid);
+    var ansHid = document.getElementById('qans-hid-' + qid);
+    if (!cbWrap || !ansHid) return;
+    var checked = Array.from(cbWrap.querySelectorAll('.q-mcq-cb:checked')).map(function (c) { return c.value; });
+    ansHid.value = checked.join(',');
+  }
+
+  document.getElementById('add-question-btn').addEventListener('click', function () {
+    questionCount++;
+    var n = questionCount;
+    document.getElementById('questions-container').insertAdjacentHTML('beforeend', createCard(n));
+    buildChipUI(n);
+    toggleType(n);
+    var sel = document.querySelector('.q-type-sel[data-qid="' + n + '"]');
+    if (sel) sel.addEventListener('change', function () { toggleType(n); });
+    refreshBadge();
+  });
+
+  document.getElementById('questions-container').addEventListener('click', function (e) {
+    var b = e.target.closest('.remove-q');
+    if (b) { var c = document.getElementById('qcard-' + b.dataset.qid); if (c) c.remove(); refreshBadge(); }
+  });
+
+  function refreshBadge() {
+    var n = document.querySelectorAll('[id^="qcard-"]').length;
+    qBadge.textContent = n + ' question(s)';
+  }
+
+  // ---------- Build review ----------
+  function buildReview() {
+    var G = function (id) { var e = document.getElementById(id); return e ? e.value : ''; };
+    var T = function (id) {
+      var e = document.getElementById(id);
+      return (e && e.options && e.selectedIndex >= 0) ? e.options[e.selectedIndex].text : G(id);
+    };
+    var rows = [
+      ['Title',   G('id_title')],
+      ['Class',   T('id_class_assigned')],
+      ['Subject', T('id_subject')],
+      ['Term',    T('id_term')],
+      ['Due Date', G('id_due_date').replace('T', ' ')],
+      ['Duration', G('id_duration') ? G('id_duration') + ' min' : '-'],
+    ];
+    document.getElementById('review-details').innerHTML = rows.map(function (r) {
+      return '<dt class="col-sm-4 text-muted">' + r[0] + '</dt>' +
+             '<dd class="col-sm-8">' + (r[1] || '<em class="text-muted">-</em>') + '</dd>';
+    }).join('');
+
+    var cards = document.querySelectorAll('[id^="qcard-"]');
+    document.getElementById('review-q-count').textContent = cards.length;
+    document.getElementById('review-questions').innerHTML = !cards.length
+      ? '<p class="text-muted small">No questions added.</p>'
+      : Array.from(cards).map(function (card, i) {
+          var qid  = card.id.replace('qcard-', '');
+          var type = (card.querySelector('.q-type-sel') || {}).value || '';
+          var text = (card.querySelector('.q-text')    || {}).value || '';
+          var opts = (document.getElementById('qopts-hid-' + qid) || {}).value || '';
+          var ans  = (document.getElementById('qans-hid-' + qid) || {}).value || '';
+          var bcls = { SCQ: 'bg-info', MCQ: 'bg-warning text-dark', ES: 'bg-secondary' }[type] || 'bg-light';
+          return '<div class="p-2 mb-2 border rounded">' +
+            '<div class="d-flex gap-2 align-items-start">' +
+            '<span class="badge ' + bcls + '" style="min-width:2.8rem;font-size:.7rem">' + type + '</span>' +
+            '<span class="fw-semibold small">' + (i + 1) + '. ' + (text || '(no text)') + '</span></div>' +
+            (opts ? '<div class="text-muted small mt-1">Options: ' + opts + '</div>' : '') +
+            (ans  ? '<div class="text-muted small">Answer: <strong>' + ans + '</strong></div>' : '') +
+            '</div>';
+        }).join('');
+  }
+
+  {% if posted_questions_json %}
+  try {
+    var posted = JSON.parse('{{ posted_questions_json|escapejs }}');
+    if (Array.isArray(posted)) {
+      posted.forEach(function (pq) {
+        document.getElementById('add-question-btn').click();
+        var qid = pq.index;
+        var typeEl = document.querySelector('.q-type-sel[data-qid="' + qid + '"]');
+        var textEl = document.querySelector('textarea[name="question_text_' + qid + '"]');
+        if (typeEl && pq.question_type) { typeEl.value = pq.question_type; typeEl.dispatchEvent(new Event('change')); }
+        if (textEl && pq.question_text)  textEl.value  = pq.question_text;
+        if (pq.options && pq.options.length) buildChipUI(qid, pq.options);
+        var ansHid = document.getElementById('qans-hid-' + qid);
+        if (ansHid && pq.correct_answer) ansHid.value = pq.correct_answer;
+      });
+      goToStep(2);
+    }
+  } catch (e) { console.error('Hydration failed', e); }
+  {% endif %}
 });
 </script>
+
 {% endblock %}

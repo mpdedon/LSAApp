@@ -6,7 +6,7 @@ from django.views import View
 from django.contrib import messages
 from django.contrib.auth import login
 from django.contrib.auth.decorators import login_required, user_passes_test
-from django.contrib.auth.mixins import UserPassesTestMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.core.paginator import Paginator
 from django.utils import timezone
 from django.db import models
@@ -19,7 +19,7 @@ from collections import defaultdict
 from core.teacher.forms import TeacherRegistrationForm, MessageForm, ReplyForm
 from core.models import CustomUser, Teacher, Student, Guardian, Class, Subject, Attendance, Assessment, Exam
 from core.models import Assignment, Question, AssignmentSubmission, AssessmentSubmission, ExamSubmission, AcademicAlert
-from core.models import Session, Term, Message, SubjectResult, Result
+from core.models import Session, Term, Message, SubjectAssignment, SubjectResult, Result
 from core.subject_result.form import SubjectResultForm
 from core.forms import NonAcademicSkillsForm
 from core.assignment.forms import AssignmentForm, QuestionForm
@@ -77,6 +77,116 @@ def _user_can_edit_created_object(user, obj):
             pass
 
     return False
+
+
+def _get_teacher_profile(user):
+    if not user or not getattr(user, 'is_authenticated', False):
+        return None
+    return Teacher.objects.filter(user=user).first()
+
+
+def _assignment_list_route_name(user):
+    return 'admin_assignment_list' if getattr(user, 'is_superuser', False) else 'assignment_list'
+
+
+def _assignment_dashboard_route_name(user):
+    return 'school-setup' if getattr(user, 'is_superuser', False) else 'teacher_dashboard'
+
+
+def _assignment_route_prefix(user):
+    return 'admin_' if getattr(user, 'is_superuser', False) else ''
+
+
+def _serialize_posted_assignment_questions(post_data):
+    import re as _re
+
+    type_key_pattern = _re.compile(r'^question_type_(\d+)$')
+    question_numbers = sorted(
+        int(match.group(1))
+        for key in post_data
+        for match in [type_key_pattern.match(key)]
+        if match
+    )
+
+    posted_questions = []
+    for question_number in question_numbers:
+        options = post_data.get(
+            f'question_options_{question_number}',
+            post_data.get(f'options_{question_number}', ''),
+        )
+        correct_answer = post_data.get(
+            f'question_correct_answer_{question_number}',
+            post_data.get(f'correct_answer_{question_number}', ''),
+        ).strip()
+        posted_questions.append({
+            'index': question_number,
+            'question_type': post_data.get(f'question_type_{question_number}', 'SCQ'),
+            'question_text': post_data.get(f'question_text_{question_number}', '').strip(),
+            'options': [opt.strip() for opt in options.split(',') if opt.strip()],
+            'correct_answer': correct_answer,
+        })
+    return posted_questions
+
+
+def _assignment_scope_for_user(user):
+    teacher = _get_teacher_profile(user)
+    if getattr(user, 'is_superuser', False):
+        return teacher, Class.objects.all(), Subject.objects.all()
+    if teacher is None:
+        raise Http404("Teacher profile not found.")
+    return teacher, teacher.assigned_classes(), teacher.assigned_subjects()
+
+
+def _resolve_assignment_teacher(user, class_assigned, subject, term, existing_teacher=None):
+    teacher = _get_teacher_profile(user)
+    if teacher is not None:
+        return teacher
+
+    if existing_teacher is not None:
+        return existing_teacher
+
+    session = getattr(term, 'session', None)
+    subject_assignment = SubjectAssignment.objects.filter(
+        class_assigned=class_assigned,
+        subject=subject,
+        term=term,
+        session=session,
+    ).select_related('teacher__user').first()
+    if subject_assignment and subject_assignment.teacher:
+        return subject_assignment.teacher
+
+    if class_assigned and hasattr(class_assigned, 'form_teacher'):
+        return class_assigned.form_teacher(session=session, term=term)
+
+    return None
+
+
+def _user_can_manage_assignment(user, assignment):
+    if not user or not assignment:
+        return False
+    if getattr(user, 'is_superuser', False):
+        return True
+
+    teacher = _get_teacher_profile(user)
+    if teacher is None:
+        return False
+    if assignment.teacher_id == teacher.pk:
+        return True
+
+    class_obj = getattr(assignment, 'class_assigned', None)
+    if class_obj and hasattr(class_obj, 'form_teacher'):
+        session = getattr(getattr(assignment, 'term', None), 'session', None)
+        form_teacher = class_obj.form_teacher(session=session, term=getattr(assignment, 'term', None))
+        if form_teacher and form_teacher.pk == teacher.pk:
+            return True
+
+    return False
+
+
+def _populate_assignment_form_scope(form, classes, subjects):
+    form.fields['class_assigned'].queryset = classes
+    form.fields['subject'].queryset = subjects
+    return form
 # Teacher Views
 
 class AdminRequiredMixin(UserPassesTestMixin):
@@ -213,16 +323,32 @@ class TeacherCreateView(View):
             return redirect('teacher_list')
         return render(request, self.template_name, {'form': form})
 
-class TeacherUpdateView(View):
+class TeacherUpdateView(LoginRequiredMixin, View):
     template_name = 'teacher/teacher_form.html'
 
-    def get(self, request, pk, *args, **kwargs):
+    def dispatch(self, request, pk, *args, **kwargs):
         teacher = get_object_or_404(Teacher, pk=pk)
+
+        if request.user == teacher.user and getattr(request.user, 'role', None) == 'teacher' and not request.user.is_superuser:
+            messages.info(request, "Use your profile page to update your account details.")
+            return redirect('profile')
+
+        if not (request.user.is_superuser or getattr(request.user, 'role', None) == 'admin'):
+            messages.error(request, "You are not authorized to access the teacher admin editor.")
+            if getattr(request.user, 'role', None) == 'teacher':
+                return redirect('teacher_dashboard')
+            return redirect('home')
+
+        self.teacher_obj = teacher
+        return super().dispatch(request, pk, *args, **kwargs)
+
+    def get(self, request, pk, *args, **kwargs):
+        teacher = getattr(self, 'teacher_obj', None) or get_object_or_404(Teacher, pk=pk)
         form = TeacherRegistrationForm(instance=teacher.user, teacher_instance=teacher, is_update=True)
         return render(request, self.template_name, {'form': form, 'is_update': True, 'teacher': teacher})
 
     def post(self, request, pk, *args, **kwargs):
-        teacher = get_object_or_404(Teacher, pk=pk)
+        teacher = getattr(self, 'teacher_obj', None) or get_object_or_404(Teacher, pk=pk)
         form = TeacherRegistrationForm(request.POST, request.FILES, instance=teacher.user, teacher_instance=teacher, is_update=True)
         
         if form.is_valid():
@@ -940,93 +1066,115 @@ def performance_chart_view(request, student_id):
 
 @login_required
 def create_assignment(request):
-    # Ensure the logged-in user is a teacher
-    teacher = get_object_or_404(Teacher, user=request.user)
-
-    # Retrieve classes and subjects assigned to the teacher
-    assigned_classes = teacher.assigned_classes()
-    subjects = teacher.assigned_subjects()
+    teacher, assigned_classes, subjects = _assignment_scope_for_user(request.user)
 
     if request.method == 'POST':
         form = AssignmentForm(request.POST)
-        
-        # Limit choices to teacher's assigned classes and subjects
-        form.fields['class_assigned'].queryset = assigned_classes
-        form.fields['subject'].queryset = subjects
+
+        _populate_assignment_form_scope(form, assigned_classes, subjects)
 
         if form.is_valid():
-            # Save the assignment
             assignment = form.save(commit=False)
-            assignment.teacher = teacher
-            assignment.created_at = timezone.now()
-            assignment.updated_at = timezone.now()
-            assignment.save()
-
-            # Process each question from POST data
-            question_number = 1
-            errors = []
-            while f'question_type_{question_number}' in request.POST:
-                question_type = request.POST.get(f'question_type_{question_number}')
-                question_text = request.POST.get(f'question_text_{question_number}')
-                options = request.POST.get(f'options_{question_number}', '')
-                correct_answer = request.POST.get(f'correct_answer_{question_number}')
-
-                options_list = [opt.strip() for opt in options.split(',') if opt.strip()]
-                question_data = {
-                    'question_type': question_type,
-                    'question_text': question_text,
-                    'options': json.dumps(options_list) if options_list else '',
-                    'correct_answer': correct_answer
-                }
-
-                question_form = QuestionForm(question_data)
-                if question_form.is_valid():
-                    if question_type in ['SCQ', 'MCQ']:
-                        # Ensure options are provided for SCQ/MCQ
-                        if not options_list:
-                            errors.append(f"Error in Question {question_number}: Options must be provided for SCQ/MCQ.")
-                        else:
-                            # Create SCQ/MCQ question
-                            Question.objects.create(
-                                assignment=assignment,
-                                question_type=question_type,
-                                question_text=question_text,
-                                options=json.dumps(options_list),
-                                correct_answer=correct_answer
-                            )
-                    elif question_type == 'ES':
-                        # Create Essay question (options and correct_answer are ignored)
-                        Question.objects.create(
-                            assignment=assignment,
-                            question_type=question_type,
-                            question_text=question_text
-                        )
-                else:
-                    errors.append(f"Error in Question {question_number}: {question_form.errors}")
-
-                question_number += 1
-
-            # Handle errors or redirect on success
-            if not errors:
-
-                return redirect('teacher_dashboard')
-            
+            resolved_teacher = _resolve_assignment_teacher(
+                request.user,
+                assignment.class_assigned,
+                assignment.subject,
+                assignment.term,
+                existing_teacher=teacher,
+            )
+            if resolved_teacher is None:
+                form.add_error(None, "Unable to determine the responsible teacher for this assignment. Assign the subject to a teacher or set a form teacher first.")
             else:
+                import re as _re
+
+                errors = []
+                type_key_pattern = _re.compile(r'^question_type_(\d+)$')
+                question_numbers = sorted(
+                    int(m.group(1))
+                    for key in request.POST
+                    for m in [type_key_pattern.match(key)]
+                    if m
+                )
+
+                with transaction.atomic():
+                    assignment.teacher = resolved_teacher
+                    assignment.created_at = timezone.now()
+                    assignment.updated_at = timezone.now()
+                    assignment.save()
+
+                    for question_number in question_numbers:
+                        question_type = request.POST.get(f'question_type_{question_number}')
+                        question_text = request.POST.get(f'question_text_{question_number}', '').strip()
+                        options = request.POST.get(
+                            f'question_options_{question_number}',
+                            request.POST.get(f'options_{question_number}', ''),
+                        )
+                        correct_answer = request.POST.get(
+                            f'question_correct_answer_{question_number}',
+                            request.POST.get(f'correct_answer_{question_number}', ''),
+                        ).strip()
+
+                        if not question_text:
+                            continue
+
+                        options_list = [opt.strip() for opt in options.split(',') if opt.strip()]
+                        question_data = {
+                            'question_type': question_type,
+                            'question_text': question_text,
+                            'options': options_list,
+                            'correct_answer': correct_answer or None,
+                        }
+
+                        question_form = QuestionForm(question_data)
+                        if question_form.is_valid():
+                            if question_type in ['SCQ', 'MCQ']:
+                                if not options_list:
+                                    errors.append(f"Error in Question {question_number}: Options must be provided for SCQ/MCQ.")
+                                else:
+                                    Question.objects.create(
+                                        assignment=assignment,
+                                        question_type=question_type,
+                                        question_text=question_text,
+                                        options=options_list,
+                                        correct_answer=correct_answer,
+                                    )
+                            elif question_type == 'ES':
+                                Question.objects.create(
+                                    assignment=assignment,
+                                    question_type=question_type,
+                                    question_text=question_text,
+                                )
+                        else:
+                            errors.append(f"Error in Question {question_number}: {question_form.errors}")
+
+                    if errors:
+                        transaction.set_rollback(True)
+                    else:
+                        messages.success(request, f"Assignment '{assignment.title}' created successfully.")
+                        return redirect(_assignment_dashboard_route_name(request.user))
+
                 return render(request, 'assignment/create_assignment.html', {
                     'form': form,
                     'errors': errors,
+                    'question_errors': errors,
+                    'posted_questions_json': json.dumps(_serialize_posted_assignment_questions(request.POST)),
+                    'assignment_route_prefix': _assignment_route_prefix(request.user),
+                    'assignment_list_route': _assignment_list_route_name(request.user),
+                    'assignment_dashboard_route': _assignment_dashboard_route_name(request.user),
                 })
         else:
             print("Form Errors:", form.errors)
 
     else:
         form = AssignmentForm()
-        # Limit the dropdown options for classes and subjects
-        form.fields['class_assigned'].queryset = assigned_classes
-        form.fields['subject'].queryset = subjects
+        _populate_assignment_form_scope(form, assigned_classes, subjects)
 
     return render(request, 'assignment/create_assignment.html', {
         'form': form,
+        'posted_questions_json': json.dumps(_serialize_posted_assignment_questions(request.POST)) if request.method == 'POST' else '',
+        'assignment_route_prefix': _assignment_route_prefix(request.user),
+        'assignment_list_route': _assignment_list_route_name(request.user),
+        'assignment_dashboard_route': _assignment_dashboard_route_name(request.user),
     })
 
 @login_required
@@ -1047,9 +1195,31 @@ def add_question(request, assignment_id):
 @login_required
 def assignment_detail(request, assignment_id):
     assignment = get_object_or_404(Assignment, id=assignment_id)
-    
-    # No need to manually set `options_list` since it's handled by the @property
-    return render(request, 'assignment/assignment_detail.html', {'assignment': assignment})
+
+    if not _user_can_manage_assignment(request.user, assignment):
+        messages.error(request, "You are not authorized to view this assignment.")
+        return redirect(_assignment_dashboard_route_name(request.user))
+
+    processed_questions = []
+    for question in assignment.questions.all().order_by('id'):
+        correct_answers = []
+        if question.correct_answer:
+            correct_answers = [answer.strip() for answer in question.correct_answer.split(',') if answer.strip()]
+
+        processed_questions.append({
+            'instance': question,
+            'options': question.options_list,
+            'correct_answers': correct_answers,
+        })
+
+    template_name = 'setup/admin_assignment_detail.html' if request.user.is_superuser else 'assignment/assignment_detail.html'
+    return render(request, template_name, {
+        'assignment': assignment,
+        'processed_questions': processed_questions,
+        'assignment_route_prefix': _assignment_route_prefix(request.user),
+        'assignment_list_route': _assignment_list_route_name(request.user),
+        'assignment_dashboard_route': _assignment_dashboard_route_name(request.user),
+    })
 
 @login_required
 def grade_assignment(request, submission_id):
@@ -1145,30 +1315,119 @@ def assignment_submissions_list(request, assignment_id):
 
 @login_required
 def assignment_list(request):
-    assignments = Assignment.objects.filter(teacher=request.user.teacher)
-    return render(request, 'assignment/assignment_list.html', {'assignments': assignments})
+    if request.user.is_superuser:
+        assignments = Assignment.objects.select_related('class_assigned', 'subject', 'teacher__user').all()
+    else:
+        teacher = get_object_or_404(Teacher, user=request.user)
+        assignments = Assignment.objects.select_related('class_assigned', 'subject', 'teacher__user').filter(teacher=teacher)
+    template_name = 'setup/admin_assignment_list.html' if request.user.is_superuser else 'assignment/assignment_list.html'
+    return render(request, template_name, {
+        'assignments': assignments,
+        'assignment_route_prefix': _assignment_route_prefix(request.user),
+        'assignment_list_route': _assignment_list_route_name(request.user),
+        'assignment_dashboard_route': _assignment_dashboard_route_name(request.user),
+    })
 
 
 @login_required
 def update_assignment(request, assignment_id):
     assignment = get_object_or_404(Assignment, pk=assignment_id)
+    if not _user_can_manage_assignment(request.user, assignment):
+        messages.error(request, "You are not authorized to edit this assignment.")
+        return redirect(_assignment_dashboard_route_name(request.user))
+
+    teacher, assigned_classes, subjects = _assignment_scope_for_user(request.user)
+
+    questions = assignment.questions.all().order_by('id')
+
     if request.method == "POST":
         form = AssignmentForm(request.POST, instance=assignment)
+        _populate_assignment_form_scope(form, assigned_classes, subjects)
         if form.is_valid():
-            form.save()
-            return redirect('teacher_dashboard')
+            updated_assignment = form.save(commit=False)
+            resolved_teacher = _resolve_assignment_teacher(
+                request.user,
+                updated_assignment.class_assigned,
+                updated_assignment.subject,
+                updated_assignment.term,
+                existing_teacher=assignment.teacher or teacher,
+            )
+            if resolved_teacher is None:
+                form.add_error(None, "Unable to determine the responsible teacher for this assignment. Assign the subject to a teacher or set a form teacher first.")
+            else:
+                updated_assignment.teacher = resolved_teacher
+                updated_assignment.updated_at = timezone.now()
+                updated_assignment.save()
+
+                import re as _re
+                delete_pattern = _re.compile(r'^delete_question_(\d+)$')
+                ids_to_delete = [
+                    int(m.group(1))
+                    for key in request.POST
+                    for m in [delete_pattern.match(key)]
+                    if m
+                ]
+                if ids_to_delete:
+                    assignment.questions.filter(id__in=ids_to_delete).delete()
+
+                type_pattern = _re.compile(r'^question_type_(\d+)$')
+                new_numbers = sorted(
+                    int(m.group(1))
+                    for key in request.POST
+                    for m in [type_pattern.match(key)]
+                    if m
+                )
+                for n in new_numbers:
+                    q_type = request.POST.get(f'question_type_{n}')
+                    q_text = request.POST.get(f'question_text_{n}', '').strip()
+                    opts_raw = request.POST.get(
+                        f'question_options_{n}',
+                        request.POST.get(f'options_{n}', ''),
+                    )
+                    correct = request.POST.get(
+                        f'question_correct_answer_{n}',
+                        request.POST.get(f'correct_answer_{n}', ''),
+                    ).strip()
+                    if not q_text:
+                        continue
+                    opts_list = [o.strip() for o in opts_raw.split(',') if o.strip()]
+                    Question.objects.create(
+                        assignment=assignment,
+                        question_type=q_type,
+                        question_text=q_text,
+                        options=opts_list if opts_list else None,
+                        correct_answer=correct or None,
+                    )
+
+                messages.success(request, "Assignment updated successfully.")
+                return redirect(_assignment_dashboard_route_name(request.user))
     else:
         form = AssignmentForm(instance=assignment)
-    return render(request, 'assignment/update_assignment.html', {'form': form, 'assignment': assignment})
+        _populate_assignment_form_scope(form, assigned_classes, subjects)
+
+    questions = assignment.questions.all().order_by('id')
+    return render(request, 'assignment/update_assignment.html', {
+        'form': form,
+        'assignment': assignment,
+        'questions': questions,
+        'assignment_route_prefix': _assignment_route_prefix(request.user),
+        'assignment_list_route': _assignment_list_route_name(request.user),
+        'assignment_dashboard_route': _assignment_dashboard_route_name(request.user),
+    })
 
 
 @login_required
 def delete_assignment(request, assignment_id):
     assignment = get_object_or_404(Assignment, id=assignment_id)
+
+    if not _user_can_manage_assignment(request.user, assignment):
+        messages.error(request, "You are not authorized to delete this assignment.")
+        return redirect(_assignment_dashboard_route_name(request.user))
     
     if request.method == 'POST':
         assignment.delete()
-        return redirect('teacher_dashboard')
+        messages.success(request, f"Assignment '{assignment.title}' deleted.")
+        return redirect(_assignment_dashboard_route_name(request.user))
     
     return render(request, 'assignment/delete_assignment.html', {'assignment': assignment})
 
@@ -1209,24 +1468,32 @@ def view_na_result(request, student_id, term_id):
 # --- Helper: Process NEW Questions (for Create and Update) ---
 def _process_newly_added_questions(request, assessment, question_name_prefix='new_question_'):
     """Process newly added questions from the POST payload.
+    Uses key-scanning instead of a sequential while-loop so that numbering gaps
+    caused by JS card deletions don't silently drop later questions.
     Returns a tuple: (posted_questions_data, errors)
-    - posted_questions_data: list of dicts {index, question_type, question_text, options, correct_answer, points}
+    - posted_questions_data: list of dicts for client-side hydration on error
     - errors: list of error strings
     """
+    import re as _re
     errors = []
     posted_questions = []
-    question_number = 1
     questions_successfully_added = 0
 
-    while True:
+    # Collect all question numbers present in POST (gap-safe)
+    type_key_pattern = _re.compile(rf'^{_re.escape(question_name_prefix)}type_(\d+)$')
+    question_numbers = sorted(
+        int(m.group(1))
+        for key in request.POST
+        for m in [type_key_pattern.match(key)]
+        if m
+    )
+
+    for question_number in question_numbers:
         q_type_key = f'{question_name_prefix}type_{question_number}'
         q_text_key = f'{question_name_prefix}text_{question_number}'
         q_options_key = f'{question_name_prefix}options_{question_number}'
         q_correct_key = f'{question_name_prefix}correct_answer_{question_number}'
         q_points_key = f'{question_name_prefix}points_{question_number}'
-
-        if q_type_key not in request.POST and q_text_key not in request.POST:
-            break
 
         question_type = request.POST.get(q_type_key)
         question_text = request.POST.get(q_text_key, '').strip()
@@ -1246,12 +1513,10 @@ def _process_newly_added_questions(request, assessment, question_name_prefix='ne
         })
 
         if not question_text and not question_type:
-            question_number += 1
-            continue
+            continue  # skip completely empty cards
         if not question_text:
             if question_type:
                 errors.append(f"Error in New Question {question_number}: Text is empty.")
-            question_number += 1
             continue
 
         form_data = {
@@ -1259,33 +1524,30 @@ def _process_newly_added_questions(request, assessment, question_name_prefix='ne
             'question_text': question_text,
             'options': options_list,
             'correct_answer': correct_answer_str if correct_answer_str else None,
-            'points': points_str if points_str else None
+            'points': points_str if points_str else None,
         }
 
         question_form = OnlineQuestionForm(form_data)
         if question_form.is_valid():
             try:
                 new_question = question_form.save()
-                # Only add to assessment/exam if provided assessment has been saved
                 try:
                     assessment.questions.add(new_question)
                 except Exception:
-                    # If assessment isn't persisted (transactional rollback scenario), just keep posted data
-                    pass
+                    pass  # assessment may not be persisted yet (atomic rollback scenario)
                 questions_successfully_added += 1
             except Exception as e:
                 errors.append(f"Error saving new question {question_number}: {str(e)}")
         else:
             for field, field_errors in question_form.errors.items():
-                errors.append(f"New Question {question_number} ({field.replace('_',' ').title()}): {', '.join(field_errors)}")
+                errors.append(f"New Question {question_number} ({field.replace('_', ' ').title()}): {', '.join(field_errors)}")
 
-        question_number += 1
-
-    if questions_successfully_added == 0 and f'{question_name_prefix}type_1' in request.POST:
+    if questions_successfully_added == 0 and question_numbers:
         if not errors:
             errors.append("Attempted to add new questions, but none were valid or saved.")
 
     return posted_questions, errors
+
 
 # --- Create Assessment View ---
 @login_required
@@ -1309,35 +1571,25 @@ def create_assessment(request):
         form.fields['subject'].queryset = assigned_subjects_qs
 
         if form.is_valid():
-            posted_questions = []
-            question_processing_errors = []
-            try:
-                with transaction.atomic():
-                    assessment = form.save(commit=False)
-                    assessment.created_by = user
-                    if user.is_superuser: # Superusers can auto-approve
-                        assessment.is_approved = True
-                    assessment.save()
+            # Save the assessment header FIRST so teachers never lose their work.
+            # Question errors will redirect to the update page rather than discarding everything.
+            assessment = form.save(commit=False)
+            assessment.created_by = user
+            if user.is_superuser:
+                assessment.is_approved = True
+            assessment.save()
 
-                    posted_questions, question_processing_errors = _process_newly_added_questions(request, assessment, question_name_prefix='question_')
-                    if question_processing_errors:
-                        # Force a rollback
-                        raise ValueError('Question processing errors')
+            posted_questions, question_processing_errors = _process_newly_added_questions(request, assessment, question_name_prefix='question_')
 
-                # If we get here, transaction committed and no question errors
-                messages.success(request, f"Assessment '{assessment.title}' created successfully.")
-                return redirect('school-setup' if user.is_superuser else 'teacher_dashboard')
-            except Exception:
-                # Render the form with posted question data and errors (no half-saved objects due to atomic rollback)
-                form_with_initial_data = AssessmentForm(request.POST) # Re-bind to show original data
-                form_with_initial_data.fields['class_assigned'].queryset = assigned_classes_qs
-                form_with_initial_data.fields['subject'].queryset = assigned_subjects_qs
-                messages.error(request, "Assessment not created. Please correct the question errors.")
-                return render(request, 'assessment/create_assessment.html', {
-                    'form': form_with_initial_data,
-                    'question_errors': question_processing_errors,
-                    'posted_questions_json': json.dumps(posted_questions),
-                })
+            if question_processing_errors:
+                # Header is saved as a draft; redirect teacher to fix questions on the update page
+                for err in question_processing_errors:
+                    messages.warning(request, err)
+                messages.info(request, "Assessment draft saved. Please fix the question errors below.")
+                return redirect('update_assessment', assessment_id=assessment.pk)
+
+            messages.success(request, f"Assessment '{assessment.title}' created successfully.")
+            return redirect('school-setup' if user.is_superuser else 'teacher_assessment_list')
         else: # AssessmentForm is invalid
             form.fields['class_assigned'].queryset = assigned_classes_qs # Re-set for template
             form.fields['subject'].queryset = assigned_subjects_qs
@@ -1406,8 +1658,13 @@ def update_assessment(request, assessment_id):
             deleted_ids_str = request.POST.get('deleted_question_ids', '')
             if deleted_ids_str:
                 deleted_ids = [int(id_str) for id_str in deleted_ids_str.split(',') if id_str.isdigit()]
-                assessment.questions.remove(*deleted_ids) 
-                OnlineQuestion.objects.filter(id__in=deleted_ids, assessments=None).delete()
+                assessment.questions.remove(*deleted_ids)
+                # Only hard-delete when no assessment OR exam still references the question
+                OnlineQuestion.objects.filter(
+                    id__in=deleted_ids,
+                    assessments__isnull=True,
+                    exams__isnull=True,
+                ).delete()
 
             posted_new_questions, new_question_errors = _process_newly_added_questions(request, assessment, question_name_prefix='new_question_')
             all_errors.extend(new_question_errors)
@@ -1468,6 +1725,11 @@ def teacher_assessment_list(request):
         is_graded=True
     ).values('assessment').annotate(count=Count('pk')).values('count')
 
+    total_students_subquery = Student.objects.filter(
+        current_class=OuterRef('class_assigned'),
+        status='active',
+    ).values('current_class').annotate(count=Count('pk')).values('count')
+
     # This query now fetches assessments that meet EITHER condition:
     # 1. The assessment was created by the logged-in teacher.
     # 2. The assessment is assigned to a class where the teacher is the form teacher.
@@ -1479,7 +1741,8 @@ def teacher_assessment_list(request):
     ).annotate(
         total_possible_score=Sum('questions__points'),
         submission_count=Subquery(total_submissions_subquery, output_field=IntegerField()),
-        submission_count_graded=Subquery(graded_submissions_subquery, output_field=IntegerField())
+        submission_count_graded=Subquery(graded_submissions_subquery, output_field=IntegerField()),
+        total_students_in_class=Subquery(total_students_subquery, output_field=IntegerField()),
     ).order_by('-created_at')
 
     pending_submissions_to_grade = AssessmentSubmission.objects.filter(
@@ -1493,6 +1756,7 @@ def teacher_assessment_list(request):
     context = {
         'assessments': assessments_for_teacher,
         'pending_submissions_to_grade': pending_submissions_to_grade,
+        'pending_essay_submissions': pending_submissions_to_grade,
         'page_title': "Manage Assessments", 
     }
     return render(request, 'assessment/teacher_assessment_list.html', context)
@@ -1697,32 +1961,24 @@ def create_exam(request):
         form.fields['subject'].queryset = assigned_subjects_qs
 
         if form.is_valid():
-            posted_questions = []
-            question_processing_errors = []
-            try:
-                with transaction.atomic():
-                    exam = form.save(commit=False)
-                    exam.created_by = user
-                    if user.is_superuser: # Superusers can auto-approve
-                        exam.is_approved = True
-                    exam.save()
+            # Save the exam header FIRST so teachers never lose their work.
+            exam = form.save(commit=False)
+            exam.created_by = user
+            if user.is_superuser:
+                exam.is_approved = True
+            exam.save()
 
-                    posted_questions, question_processing_errors = _process_newly_added_questions(request, exam, question_name_prefix='question_')
-                    if question_processing_errors:
-                        raise ValueError('Question processing errors')
+            posted_questions, question_processing_errors = _process_newly_added_questions(request, exam, question_name_prefix='question_')
 
-                messages.success(request, f"Exam '{exam.title}' created successfully.")
-                return redirect('school-setup' if user.is_superuser else 'teacher_dashboard')
-            except Exception:
-                form_with_initial_data = ExamForm(request.POST) # Re-bind to show original data
-                form_with_initial_data.fields['class_assigned'].queryset = assigned_classes_qs
-                form_with_initial_data.fields['subject'].queryset = assigned_subjects_qs
-                messages.error(request, "Exam not created. Please correct the question errors.")
-                return render(request, 'exam/create_exam.html', {
-                    'form': form_with_initial_data,
-                    'question_errors': question_processing_errors,
-                    'posted_questions_json': json.dumps(posted_questions),
-                })
+            if question_processing_errors:
+                # Header is saved as a draft; redirect teacher to fix questions on the update page
+                for err in question_processing_errors:
+                    messages.warning(request, err)
+                messages.info(request, "Exam draft saved. Please fix the question errors below.")
+                return redirect('update_exam', exam_id=exam.pk)
+
+            messages.success(request, f"Exam '{exam.title}' created successfully.")
+            return redirect('school-setup' if user.is_superuser else 'teacher_dashboard')
         else: # ExamForm is invalid
             form.fields['class_assigned'].queryset = assigned_classes_qs # Re-set for template
             form.fields['subject'].queryset = assigned_subjects_qs
@@ -1790,11 +2046,16 @@ def update_exam(request, exam_id):
                             all_errors.append(f"Existing Question ID {q_id} ({field.replace('_',' ').title()}): {', '.join(field_errors)}")
             
             # 2. Remove Questions (if a mechanism exists to mark them for deletion)
-            deleted_ids_str = request.POST.get('deleted_question_ids', '') # e.g., "12,15,20"
+            deleted_ids_str = request.POST.get('deleted_question_ids', '')  # e.g., "12,15,20"
             if deleted_ids_str:
                 deleted_ids = [int(id_str) for id_str in deleted_ids_str.split(',') if id_str.isdigit()]
-                exam.questions.remove(*deleted_ids) 
-                OnlineQuestion.objects.filter(id__in=deleted_ids, exams=None).delete() # Optional: delete orphaned questions
+                exam.questions.remove(*deleted_ids)
+                # Only hard-delete when no assessment OR exam still references the question
+                OnlineQuestion.objects.filter(
+                    id__in=deleted_ids,
+                    assessments__isnull=True,
+                    exams__isnull=True,
+                ).delete()
 
             # 3. Add Newly Added Questions (uses 'new_question_' prefix)
             posted_new_questions, new_question_errors = _process_newly_added_questions(request, exam, question_name_prefix='new_question_')
@@ -1802,7 +2063,9 @@ def update_exam(request, exam_id):
 
             if not all_errors:
                 messages.success(request, "Exam updated successfully.")
-                return redirect('view_exam', exam_id=exam.id)
+                if user.is_superuser:
+                    return redirect('admin_view_exam', exam_id=exam.id)
+                return redirect('teacher_dashboard')
             else:
                 messages.error(request, "Errors occurred. Please review.")
         # If form is invalid or errors occurred, re-render with context
@@ -1851,6 +2114,11 @@ def teacher_exam_list(request):
         is_graded=True
     ).values('exam').annotate(count=Count('pk')).values('count')
 
+    total_students_subquery = Student.objects.filter(
+        current_class=OuterRef('class_assigned'),
+        status='active',
+    ).values('current_class').annotate(count=Count('pk')).values('count')
+
     # This query now fetches exams that meet EITHER condition:
     # 1. The exam was created by the logged-in teacher.
     # 2. The exam is assigned to a class where the teacher is the form teacher.
@@ -1862,7 +2130,8 @@ def teacher_exam_list(request):
     ).annotate(
         total_possible_score=Sum('questions__points'),
         submission_count=Subquery(total_submissions_subquery, output_field=IntegerField()),
-        submission_count_graded=Subquery(graded_submissions_subquery, output_field=IntegerField())
+        submission_count_graded=Subquery(graded_submissions_subquery, output_field=IntegerField()),
+        total_students_in_class=Subquery(total_students_subquery, output_field=IntegerField()),
     ).order_by('-created_at')
 
     pending_submissions_to_grade = ExamSubmission.objects.filter(
@@ -1876,6 +2145,7 @@ def teacher_exam_list(request):
     context = {
         'exams': exams_for_teacher,
         'pending_submissions_to_grade': pending_submissions_to_grade,
+        'pending_essay_submissions': pending_submissions_to_grade,
         'page_title': "Manage Exams", 
     }
     return render(request, 'exam/teacher_exam_list.html', context)
@@ -2040,7 +2310,7 @@ def grade_essay_exam(request, submission_id):
                 if request.user.is_superuser:
                     return redirect('exam_submissions_list', exam_id=exam.id)
                 else:
-                    return redirect('teacher_exam_list')
+                    return redirect('teacher_dashboard')
 
         except (InvalidOperation, ValueError):
             messages.error(request, "Invalid score entered. Please enter a valid number.")

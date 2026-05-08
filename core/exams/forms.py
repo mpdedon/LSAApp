@@ -7,12 +7,6 @@ import json
 
 
 class ExamForm(forms.ModelForm):
-    questions = forms.ModelMultipleChoiceField(
-        queryset=OnlineQuestion.objects.all(),
-        widget=forms.CheckboxSelectMultiple,
-        required=False,
-    )
-
     due_date = forms.DateTimeField(
         widget=forms.DateTimeInput(attrs={'type': 'datetime-local', 'class': 'form-control'}, format='%Y-%m-%dT%H:%M'),
         input_formats=['%Y-%m-%dT%H:%M']
@@ -24,8 +18,8 @@ class ExamForm(forms.ModelForm):
 
     class Meta:
         model = Exam
-        fields = ['term', 'subject', 'title', 'short_description', 'class_assigned', 
-                  'due_date', 'duration', 'questions', 'result_field_mapping', 'shuffle_questions']
+        fields = ['term', 'subject', 'title', 'short_description', 'class_assigned',
+                  'due_date', 'duration', 'result_field_mapping', 'shuffle_questions']
         widgets = {
             'title': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Enter the title of the exam'}),
             'short_description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Provide a brief description'}),
@@ -35,19 +29,17 @@ class ExamForm(forms.ModelForm):
             'due_date': forms.DateTimeInput(attrs={'type': 'datetime-local'}),
             'duration': forms.NumberInput(attrs={'placeholder': 'Duration in minutes'}),
             'shuffle_questions': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-
         }
 
-        def __init__(self, *args, **kwargs):
-            super().__init__(*args, **kwargs)
-            # Limit term choices to active terms
-            self.fields['term'].queryset = Term.objects.filter(is_active=True)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['term'].queryset = Term.objects.all()
 
-        def clean_due_date(self):
-            due_date = self.cleaned_data['due_date']
-            if due_date <= now():
-                raise forms.ValidationError("Due date must be in the future.")
-            return due_date
+    def clean_due_date(self):
+        due_date = self.cleaned_data.get('due_date')
+        if due_date and due_date <= now():
+            raise forms.ValidationError("Due date must be in the future.")
+        return due_date
             
 class OnlineQuestionForm(forms.ModelForm):
     class Meta:
@@ -80,15 +72,20 @@ class OnlineQuestionForm(forms.ModelForm):
     def clean_correct_answer(self):
         correct_answer = self.cleaned_data.get('correct_answer')
         question_type = self.cleaned_data.get('question_type')
-        options = self.cleaned_data.get('options') 
+        options = self.cleaned_data.get('options')
+
+        # Normalise to lowercase — grading already compares case-insensitively
+        if correct_answer:
+            correct_answer = correct_answer.strip().lower()
+        options_lower = [o.lower() for o in options] if options else []
 
         if question_type in ['SCQ', 'MCQ']:
             if not correct_answer:
                 raise forms.ValidationError("A correct answer is required for SCQ/MCQ questions.")
-            if options and correct_answer not in options:
+            if options_lower and correct_answer not in options_lower:
                 raise forms.ValidationError("The correct answer must be one of the provided options.")
         elif question_type == 'ES':
-            pass 
+            pass
         return correct_answer
 
     def __init__(self, *args, **kwargs):

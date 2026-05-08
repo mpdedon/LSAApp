@@ -9,6 +9,7 @@ from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth.forms import PasswordChangeForm
 from django.db import transaction
 from django.http import Http404
+from django.urls import NoReverseMatch, reverse
 
 from core.models import CustomUser, Student, Teacher, Guardian
 from core.system_settings import SystemSettings
@@ -16,6 +17,13 @@ from .forms import (
     StudentProfileForm, TeacherProfileForm, GuardianProfileForm,
     UserProfileForm, SystemSettingsForm
 )
+
+
+def _safe_reverse(route_name, fallback='/'):
+    try:
+        return reverse(route_name)
+    except NoReverseMatch:
+        return fallback
 
 
 @login_required
@@ -94,10 +102,37 @@ def profile_view(request):
         else:
             messages.error(request, "Please correct the errors below.")
     
+    page_title = "My Profile"
+    page_subtitle = "Manage your personal information and account settings."
+    base_template = 'base.html'
+    cancel_url = _safe_reverse('home')
+
+    if user.is_superuser or user.role == 'admin':
+        page_title = "Admin Profile"
+        page_subtitle = "Manage your administrator account and system-facing contact details."
+        base_template = 'base_admin_sidebar.html'
+        cancel_url = _safe_reverse('school-setup', cancel_url)
+    elif user.role == 'teacher':
+        page_title = "Teacher Profile"
+        page_subtitle = "Update the details students and administrators rely on across your teaching workspace."
+        cancel_url = _safe_reverse('teacher_dashboard', cancel_url)
+    elif user.role == 'student':
+        page_title = "Student Profile"
+        page_subtitle = "Keep your academic account details accurate and up to date."
+        cancel_url = _safe_reverse('student_dashboard', cancel_url)
+    elif user.role == 'guardian':
+        page_title = "Guardian Profile"
+        page_subtitle = "Manage the contact information connected to your ward accounts."
+        cancel_url = _safe_reverse('guardian_dashboard', cancel_url)
+
     context = {
         'user': user,
         'profile': profile_instance,
         'profile_form': profile_form,
+        'base_template': base_template,
+        'cancel_url': cancel_url,
+        'page_title': page_title,
+        'page_subtitle': page_subtitle,
     }
     
     return render(request, 'profile/profile.html', context)

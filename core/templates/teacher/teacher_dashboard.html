@@ -7,34 +7,227 @@
 <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
 <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css" rel="stylesheet">
 <style>
-    body { background-color: #f4f7fc; }
-    .dashboard-header { background: linear-gradient(135deg, #0d6efd 0%, #0056b3 100%); color: white; padding: 2rem; border-radius: 0.75rem; margin-bottom: 2rem; box-shadow: 0 8px 16px rgba(0, 86, 179, 0.2); }
+    body { background: linear-gradient(180deg, #edf3fb 0%, #f7fafc 44%, #f3f6fa 100%); }
+    .dashboard-header {
+        --header-ice: rgba(191, 219, 254, .22);
+        --header-mist: rgba(255,255,255,.12);
+        --header-deep: #0f172a;
+        --header-ink: #172554;
+        position: relative;
+        overflow: hidden;
+        color: white;
+        padding: 2.15rem;
+        border-radius: 1.55rem;
+        margin-bottom: 2rem;
+        border: 1px solid rgba(255,255,255,.14);
+        background:
+            linear-gradient(120deg, rgba(255,255,255,.07) 0%, rgba(255,255,255,0) 30%),
+            radial-gradient(circle at 14% 18%, rgba(125, 211, 252, .18), transparent 24%),
+            radial-gradient(circle at 84% 20%, rgba(45, 212, 191, .16), transparent 26%),
+            radial-gradient(circle at 78% 82%, rgba(244, 114, 182, .10), transparent 24%),
+            linear-gradient(135deg, #0f172a 0%, #172554 28%, #0f4c81 62%, #0b6e74 100%);
+        box-shadow: 0 28px 70px rgba(15, 23, 42, .22);
+        isolation: isolate;
+    }
+    .dashboard-header::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background:
+            linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px),
+            linear-gradient(rgba(255,255,255,.04) 1px, transparent 1px);
+        background-size: 36px 36px;
+        mask-image: linear-gradient(135deg, rgba(0,0,0,.65), transparent 72%);
+        opacity: .18;
+        pointer-events: none;
+        z-index: 0;
+    }
+    .dashboard-header::after {
+        content: '';
+        position: absolute;
+        right: -7rem;
+        bottom: -7rem;
+        width: 22rem;
+        height: 22rem;
+        border-radius: 999px;
+        background: radial-gradient(circle, rgba(255,255,255,.16) 0%, rgba(255,255,255,.02) 62%, transparent 74%);
+        filter: blur(10px);
+        pointer-events: none;
+        z-index: 0;
+    }
+    .dashboard-header .dashboard-header-main::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        border-radius: 1.2rem;
+        border: 1px solid rgba(255,255,255,.06);
+        background: linear-gradient(180deg, rgba(255,255,255,.03), rgba(255,255,255,0));
+        pointer-events: none;
+        z-index: -1;
+    }
     .profile-img-header { width: 80px; height: 80px; object-fit: cover; border: 3px solid rgba(255, 255, 255, 0.8); }
-    .dashboard-header h2 { font-weight: 700; text-shadow: 1px 1px 2px rgba(0,0,0,0.1); }
-    .dashboard-header p { color: rgba(255, 255, 255, 0.85); }
-    .nav-pills .nav-link { color: #495057; font-weight: 500; padding: 0.75rem 1.25rem; border-radius: 0.5rem; transition: all 0.2s ease-in-out; }
+    .dashboard-header h2 {
+        font-weight: 800;
+        letter-spacing: -.035em;
+        font-size: clamp(1.9rem, 3vw, 2.7rem);
+        text-shadow: 0 2px 12px rgba(0,0,0,.12);
+    }
+    .dashboard-header p {
+        color: rgba(226, 232, 240, .9);
+        max-width: 48rem;
+        font-size: 1rem;
+    }
+    .dashboard-header-main {
+        position: relative;
+        z-index: 1;
+        width: 100%;
+        padding: .15rem;
+    }
+    .dashboard-header-topline {
+        display: inline-flex;
+        align-items: center;
+        gap: .6rem;
+        border: 1px solid rgba(255,255,255,.14);
+        background: linear-gradient(135deg, rgba(255,255,255,.12), rgba(255,255,255,.05));
+        border-radius: 999px;
+        padding: .42rem .88rem;
+        font-size: .76rem;
+        font-weight: 700;
+        letter-spacing: .09em;
+        text-transform: uppercase;
+        margin-bottom: 1.1rem;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 8px 18px rgba(15, 23, 42, .08);
+        color: rgba(248, 250, 252, .95);
+    }
+    .dashboard-hero-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .75rem; margin-top: 1.5rem; }
+    .dashboard-hero-stat {
+        position: relative;
+        background: linear-gradient(180deg, rgba(15, 23, 42, .22), rgba(15, 23, 42, .10));
+        border: 1px solid rgba(191, 219, 254, .16);
+        border-radius: 1rem;
+        padding: 1rem 1.05rem;
+        backdrop-filter: blur(12px);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.05);
+    }
+    .dashboard-hero-stat::before {
+        content: '';
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: 3px;
+        border-radius: 999px;
+        background: linear-gradient(180deg, #7dd3fc, #2dd4bf);
+        opacity: .95;
+    }
+    .dashboard-hero-stat .value { font-size: 1.5rem; font-weight: 800; line-height: 1; letter-spacing: -.03em; }
+    .dashboard-hero-stat .label { font-size: .8rem; color: rgba(226, 232, 240, .76); margin-top: .38rem; }
+    .header-actions-grid { display:grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap:.8rem; margin-top: 1.35rem; }
+    .header-action-card {
+        display:flex;
+        align-items:center;
+        gap:.85rem;
+        padding: 1rem 1.05rem;
+        border-radius: 1.05rem;
+        text-decoration:none;
+        color:#fff;
+        background: linear-gradient(180deg, rgba(15, 23, 42, .24), rgba(15, 23, 42, .12));
+        border:1px solid rgba(191, 219, 254, .14);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 12px 26px rgba(5, 19, 43, .10);
+        transition: transform .18s ease, background .18s ease, box-shadow .18s ease, border-color .18s ease;
+    }
+    .header-action-card:hover {
+        color:#fff;
+        transform: translateY(-3px);
+        background: linear-gradient(180deg, rgba(30, 41, 59, .34), rgba(15, 23, 42, .16));
+        border-color: rgba(125, 211, 252, .26);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.07), 0 18px 34px rgba(8, 30, 63, .18);
+    }
+    .header-action-icon {
+        width: 2.7rem;
+        height: 2.7rem;
+        border-radius: 1rem;
+        display:grid;
+        place-items:center;
+        background: linear-gradient(135deg, rgba(125, 211, 252, .28), rgba(255,255,255,.08));
+        font-size: 1.05rem;
+        flex-shrink: 0;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.08);
+        color: #f8fafc;
+    }
+    .header-action-text { min-width: 0; }
+    .header-action-title { display:block; font-weight: 700; line-height: 1.1; letter-spacing: -.015em; }
+    .header-action-subtitle { display:block; font-size: .75rem; color: rgba(226, 232, 240, .72); margin-top: .22rem; }
+    .nav-pills .nav-link { color: #495057; font-weight: 600; padding: 0.85rem 1.1rem; border-radius: 0.85rem; transition: all 0.2s ease-in-out; }
     .nav-pills .nav-link.active, .nav-pills .show>.nav-link { color: #fff; background-color: #0d6efd; box-shadow: 0 4px 12px rgba(13, 110, 253, 0.4); }
     .nav-pills .nav-link:hover:not(.active) { background-color: #e9ecef; }
-    .tab-content { background-color: #ffffff; border: none; padding: 2rem; border-radius: 0.75rem; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.05); }
-    .widget-title { font-weight: 600; color: #343a40; margin-bottom: 1.5rem; border-bottom: 2px solid #e9ecef; padding-bottom: 0.75rem; }
+    .tab-content { background-color: #ffffff; border: none; padding: 2rem; border-radius: 1rem; box-shadow: 0 14px 32px rgba(31, 42, 68, 0.08); }
+    .widget-title { font-weight: 700; color: #24324a; margin-bottom: 1.25rem; border-bottom: 2px solid #e9eef7; padding-bottom: 0.85rem; }
+    @media (max-width: 991.98px) {
+        .dashboard-hero-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .header-actions-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 575.98px) {
+        .dashboard-hero-grid { grid-template-columns: 1fr; }
+        .header-actions-grid { grid-template-columns: 1fr; }
+        .tab-content { padding: 1.2rem; }
+    }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="container-fluid py-4 main-content-below-navbar">
-    <div class="dashboard-header d-flex flex-column flex-md-row align-items-center">
+    <div class="dashboard-header d-flex flex-column align-items-stretch">
         {#{% if teacher.profile_image %}#}
         {#   <img src="{{ teacher.profile_image.url }}" class="rounded-circle me-md-4 mb-3 mb-md-0 profile-img-header" alt="Profile Photo">#}
         {#{% else %}#}
         {#     <img src="{% static 'images/default.jpg' %}" class="rounded-circle me-md-4 mb-3 mb-md-0 profile-img-header" alt="Default Profile Photo">#}
         {#{% endif %}#}
-        <div class="text-center text-md-start">
+        <div class="dashboard-header-main text-center text-md-start">
+            <div class="dashboard-header-topline">
+                <i class="bi bi-stars"></i>
+                <span>Teacher Command Center</span>
+            </div>
             <h2 class="h3 mb-1">Welcome, {{ teacher.user.first_name|default:teacher.user.username }}!</h2>
-            <p class="mb-0">Your central hub for managing your classes and academic tasks.</p>
-        </div>
-        <div class="ms-md-auto mt-3 mt-md-0">
-            <a href="{% url 'teacher_update' teacher.user.pk %}" class="btn btn-light me-2"><i class="bi bi-person-fill-gear me-1"></i> Edit Profile</a>
-            <a href="{% url 'create_assignment' %}" class="btn btn-light"><i class="bi bi-journal-plus me-1"></i> New Assignment</a>
+            <p class="mb-0">Track what needs grading, what is due next, and every task tied to your classes from one workspace.</p>
+            <div class="dashboard-hero-grid text-start">
+                <div class="dashboard-hero-stat">
+                    <div class="value">{{ current_task_totals.assignments|add:current_task_totals.assessments|add:current_task_totals.exams }}</div>
+                    <div class="label">Active-term tasks</div>
+                </div>
+                <div class="dashboard-hero-stat">
+                    <div class="value">{{ pending_submissions_count }}</div>
+                    <div class="label">Essay submissions to grade</div>
+                </div>
+                <div class="dashboard-hero-stat">
+                    <div class="value">{{ upcoming_tasks|length }}</div>
+                    <div class="label">Upcoming deadlines</div>
+                </div>
+                <div class="dashboard-hero-stat">
+                    <div class="value">{{ pending_approval_count }}</div>
+                    <div class="label">Pending approvals</div>
+                </div>
+            </div>
+            <div class="header-actions-grid text-start">
+                <a href="{% url 'profile' %}" class="header-action-card">
+                    <span class="header-action-icon"><i class="bi bi-person-fill-gear"></i></span>
+                    <span class="header-action-text"><span class="header-action-title">Edit Profile</span><span class="header-action-subtitle">Update your teacher account safely</span></span>
+                </a>
+                <a href="{% url 'create_assignment' %}" class="header-action-card">
+                    <span class="header-action-icon"><i class="bi bi-journal-plus"></i></span>
+                    <span class="header-action-text"><span class="header-action-title">New Assignment</span><span class="header-action-subtitle">Create classroom coursework</span></span>
+                </a>
+                <a href="{% url 'create_assessment' %}" class="header-action-card">
+                    <span class="header-action-icon"><i class="bi bi-ui-checks-grid"></i></span>
+                    <span class="header-action-text"><span class="header-action-title">New Assessment</span><span class="header-action-subtitle">Draft a graded checkpoint</span></span>
+                </a>
+                <a href="{% url 'create_exam' %}" class="header-action-card">
+                    <span class="header-action-icon"><i class="bi bi-file-earmark-text"></i></span>
+                    <span class="header-action-text"><span class="header-action-title">New Exam</span><span class="header-action-subtitle">Prepare a formal test flow</span></span>
+                </a>
+                <a href="{% url 'lsalms:course_create' %}" class="header-action-card">
+                    <span class="header-action-icon"><i class="bi bi-mortarboard-fill"></i></span>
+                    <span class="header-action-text"><span class="header-action-title">New Course</span><span class="header-action-subtitle">Launch an LMS learning space</span></span>
+                </a>
+            </div>
         </div>
     </div>
     
@@ -46,13 +239,13 @@
 
     <div class="nav-pills-container bg-white p-3 rounded-3 shadow-sm mb-4">
         <ul class="nav nav-pills nav-fill" id="teacherDashboardTabs" role="tablist">
-            <li class="nav-item" role="presentation"><button class="nav-link active" data-bs-toggle="pill" data-bs-target="#overview-panel" type="button"><i class="bi bi-grid-1x2-fill me-2"></i>Overview</button></li>
-            <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#class-management-panel" type="button"><i class="bi bi-pencil-square me-2"></i>Class & Grade Entry</button></li>
-            <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#communication-panel" type="button"><i class="bi bi-people-fill me-2"></i>Communication</button></li>           
-            <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#assignments-panel" type="button"><i class="bi bi-journal-check me-2"></i>Manage Tasks</button></li>
-            <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#leaderboard-panel" type="button"><i class="bi bi-trophy-fill me-2"></i>Leaderboard</button></li>
-            <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#broadsheets-panel" type="button"><i class="bi bi-table me-2"></i>Broadsheets</button></li>
-            <li class="nav-item" role="presentation"><button class="nav-link" data-bs-toggle="pill" data-bs-target="#lms-panel" type="button"><i class="bi bi-mortarboard-fill me-2"></i>LMS</button></li>
+            <li class="nav-item" role="presentation"><button id="overview-tab" class="nav-link active" data-bs-toggle="pill" data-bs-target="#overview-panel" type="button"><i class="bi bi-grid-1x2-fill me-2"></i>Overview</button></li>
+            <li class="nav-item" role="presentation"><button id="class-management-tab" class="nav-link" data-bs-toggle="pill" data-bs-target="#class-management-panel" type="button"><i class="bi bi-pencil-square me-2"></i>Class & Grade Entry</button></li>
+            <li class="nav-item" role="presentation"><button id="communication-tab" class="nav-link" data-bs-toggle="pill" data-bs-target="#communication-panel" type="button"><i class="bi bi-people-fill me-2"></i>Communication</button></li>
+            <li class="nav-item" role="presentation"><button id="tasks-tab" class="nav-link" data-bs-toggle="pill" data-bs-target="#assignments-panel" type="button"><i class="bi bi-journal-check me-2"></i>Manage Tasks</button></li>
+            <li class="nav-item" role="presentation"><button id="leaderboard-tab" class="nav-link" data-bs-toggle="pill" data-bs-target="#leaderboard-panel" type="button"><i class="bi bi-trophy-fill me-2"></i>Leaderboard</button></li>
+            <li class="nav-item" role="presentation"><button id="broadsheets-tab" class="nav-link" data-bs-toggle="pill" data-bs-target="#broadsheets-panel" type="button"><i class="bi bi-table me-2"></i>Broadsheets</button></li>
+            <li class="nav-item" role="presentation"><button id="lms-tab" class="nav-link" data-bs-toggle="pill" data-bs-target="#lms-panel" type="button"><i class="bi bi-mortarboard-fill me-2"></i>LMS</button></li>
         </ul>
     </div>
 
@@ -66,4 +259,14 @@
         <div class="tab-pane fade" id="lms-panel" role="tabpanel">{% include 'teacher/partials/dashboard_lms.html' %}</div>
     </div>
 </div>
+
+<script>
+function showTeacherTab(tabId) {
+    var tabButton = document.getElementById(tabId);
+    if (tabButton) {
+        bootstrap.Tab.getOrCreateInstance(tabButton).show();
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+}
+</script>
 {% endblock %}

@@ -1,0 +1,71 @@
+{% extends 'base_admin_sidebar.html' %}
+
+{% block title %}Assessment Details{% endblock %}
+
+{% block content %}
+<div class="container my-4 main-content-below-navbar">
+    <div class="d-flex justify-content-between align-items-start mb-4">
+        <div>
+            <a href="{% url 'admin_assessment_list' %}" class="btn btn-link px-0 text-decoration-none"><i class="fas fa-arrow-left me-1"></i>Back to Assessments</a>
+            <h2 class="mb-1">{{ assessment.title }}</h2>
+            <p class="text-muted mb-0">{{ assessment.class_assigned.name }} · {{ assessment.subject.name }}</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'admin_update_assessment' assessment.id %}" class="btn btn-primary"><i class="fas fa-edit me-1"></i>Edit</a>
+            <form method="POST" action="{% url 'admin_delete_assessment' assessment.id %}">{% csrf_token %}<button type="submit" class="btn btn-outline-danger"><i class="fas fa-trash-alt me-1"></i>Delete</button></form>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <div class="col-lg-4">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-body">
+                    <h5 class="card-title">Overview</h5>
+                    <dl class="row small mb-0">
+                        <dt class="col-5">Created By</dt><dd class="col-7">{{ assessment.created_by.get_full_name|default:assessment.created_by.username|default:"System" }}</dd>
+                        <dt class="col-5">Term</dt><dd class="col-7">{{ assessment.term }}</dd>
+                        <dt class="col-5">Due Date</dt><dd class="col-7">{{ assessment.due_date|date:"d M Y, H:i"|default:"Not set" }}</dd>
+                        <dt class="col-5">Duration</dt><dd class="col-7">{{ assessment.duration|default:"-" }} min</dd>
+                        <dt class="col-5">Marks</dt><dd class="col-7">{{ assessment.get_total_marks }}</dd>
+                        <dt class="col-5">Status</dt><dd class="col-7">{% if assessment.is_approved %}<span class="badge bg-success">Approved</span>{% else %}<span class="badge bg-warning text-dark">Pending</span>{% endif %}</dd>
+                    </dl>
+                    {% if assessment.short_description %}
+                    <hr>
+                    <p class="mb-0">{{ assessment.short_description }}</p>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-8">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-dark text-white d-flex justify-content-between align-items-center">
+                    <span>Questions</span>
+                    <span class="badge bg-secondary">{{ questions|length }}</span>
+                </div>
+                <div class="card-body">
+                    {% for question in questions %}
+                    <div class="border rounded p-3 mb-3">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="badge {% if question.question_type == 'SCQ' %}bg-info{% elif question.question_type == 'MCQ' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">{{ question.get_question_type_display }}</span>
+                            <span class="text-muted small">{{ question.points|default:1 }} pt(s)</span>
+                        </div>
+                        <p class="fw-semibold mb-2">{{ question.question_text }}</p>
+                        {% if question.question_type != 'ES' %}
+                            <div class="d-flex flex-wrap gap-2">
+                                {% for option in question.options_list %}
+                                <span class="badge {% if option == question.correct_answer %}bg-success{% else %}bg-light text-dark border{% endif %}">{{ option }}</span>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <p class="text-muted small mb-0">Essay response question.</p>
+                        {% endif %}
+                    </div>
+                    {% empty %}
+                    <p class="text-muted mb-0">No questions added yet.</p>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

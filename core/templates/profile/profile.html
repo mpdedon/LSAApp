@@ -1,7 +1,7 @@
-{% extends 'base_admin_sidebar.html' %}
+{% extends base_template|default:'base.html' %}
 {% load static %}
 
-{% block title %}My Profile - LSA Admin{% endblock %}
+{% block title %}{{ page_title|default:'My Profile' }} - LSA{% endblock %}
 
 {% block content %}
 <div class="container-fluid">
@@ -12,9 +12,155 @@
                 <div class="card-body" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 0.5rem;">
                     <div class="d-flex align-items-center text-white">
                         <i class="bi bi-person-circle" style="font-size: 2.5rem; margin-right: 1rem;"></i>
+                        <style>
+                            body {
+                                background: linear-gradient(180deg, #eef4ff 0%, #f7faff 44%, #f4f7fb 100%);
+                            }
+                            .profile-shell {
+                                max-width: 1180px;
+                            }
+                            .profile-hero {
+                                position: relative;
+                                overflow: hidden;
+                                border-radius: 1.5rem;
+                                padding: 1.7rem;
+                                background:
+                                    radial-gradient(circle at top right, rgba(255,255,255,.18), transparent 28%),
+                                    linear-gradient(135deg, #0f5fd7 0%, #2563eb 42%, #143980 100%);
+                                color: #fff;
+                                box-shadow: 0 24px 60px rgba(22, 62, 146, .18);
+                            }
+                            .profile-hero::before {
+                                content: '';
+                                position: absolute;
+                                right: -3rem;
+                                bottom: -4rem;
+                                width: 16rem;
+                                height: 16rem;
+                                border-radius: 999px;
+                                background: rgba(255,255,255,.08);
+                            }
+                            .profile-kicker {
+                                display: inline-flex;
+                                align-items: center;
+                                gap: .45rem;
+                                padding: .38rem .82rem;
+                                border-radius: 999px;
+                                background: rgba(255,255,255,.12);
+                                border: 1px solid rgba(255,255,255,.16);
+                                text-transform: uppercase;
+                                letter-spacing: .08em;
+                                font-size: .75rem;
+                                font-weight: 700;
+                            }
+                            .profile-hero h1 {
+                                font-size: clamp(1.7rem, 3vw, 2.45rem);
+                                font-weight: 800;
+                                margin: .85rem 0 .45rem;
+                            }
+                            .profile-hero p {
+                                max-width: 42rem;
+                                color: rgba(255,255,255,.82);
+                                margin-bottom: 0;
+                            }
+                            .profile-panel,
+                            .profile-summary {
+                                border: 0;
+                                border-radius: 1.35rem;
+                                box-shadow: 0 18px 44px rgba(15, 23, 42, .08);
+                            }
+                            .profile-avatar-frame {
+                                width: 150px;
+                                height: 150px;
+                                border-radius: 999px;
+                                margin: 0 auto;
+                                display: grid;
+                                place-items: center;
+                                background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+                                border: 5px solid rgba(37, 99, 235, .14);
+                            }
+                            .profile-avatar-frame img {
+                                width: 100%;
+                                height: 100%;
+                                object-fit: cover;
+                                border-radius: 999px;
+                            }
+                            .profile-avatar-frame .bi-person-fill {
+                                color: #2563eb;
+                            }
+                            .profile-badge {
+                                display: inline-flex;
+                                align-items: center;
+                                padding: .42rem .8rem;
+                                border-radius: 999px;
+                                background: #e0ecff;
+                                color: #184387;
+                                font-weight: 700;
+                            }
+                            .profile-stat {
+                                padding: .8rem .95rem;
+                                border-radius: 1rem;
+                                background: #f8fbff;
+                                border: 1px solid #e6eefb;
+                                text-align: left;
+                            }
+                            .profile-stat-label {
+                                display: block;
+                                font-size: .74rem;
+                                font-weight: 700;
+                                text-transform: uppercase;
+                                letter-spacing: .06em;
+                                color: #6b7a90;
+                                margin-bottom: .2rem;
+                            }
+                            .profile-stat-value {
+                                color: #12213a;
+                                font-weight: 700;
+                            }
+                            .profile-form-card .card-header {
+                                background: transparent;
+                                border-bottom: 1px solid #edf2fb;
+                                padding: 1.35rem 1.5rem 1rem;
+                            }
+                            .profile-form-card .card-body {
+                                padding: 1.5rem;
+                            }
+                            .profile-form-card label.form-label {
+                                font-weight: 700;
+                                color: #344256;
+                            }
+                            .profile-form-card .form-control,
+                            .profile-form-card .form-select {
+                                min-height: 48px;
+                                border-radius: .9rem;
+                                border-color: #d7e1f1;
+                                box-shadow: none;
+                            }
+                            .profile-form-card textarea.form-control {
+                                min-height: 120px;
+                            }
+                            .profile-form-card .form-control:focus,
+                            .profile-form-card .form-select:focus {
+                                border-color: #2563eb;
+                                box-shadow: 0 0 0 .2rem rgba(37, 99, 235, .12);
+                            }
+                            .profile-actions {
+                                border-top: 1px solid #edf2fb;
+                                margin-top: 1.6rem;
+                                padding-top: 1.2rem;
+                            }
+                            @media (max-width: 767.98px) {
+                                .profile-hero,
+                                .profile-form-card .card-body,
+                                .profile-form-card .card-header {
+                                    padding-left: 1.1rem;
+                                    padding-right: 1.1rem;
+                                }
+                            }
+                        </style>
                         <div>
-                            <h2 class="mb-1">My Profile</h2>
-                            <p class="mb-0 opacity-75">Manage your personal information and settings</p>
+                            <h2 class="mb-1">{{ page_title|default:'My Profile' }}</h2>
+                            <p class="mb-0 opacity-75">{{ page_subtitle|default:'Manage your personal information and settings.' }}</p>
                         </div>
                     </div>
                 </div>
@@ -195,7 +341,7 @@
                                         <button type="submit" class="btn btn-primary px-4">
                                             <i class="bi bi-check2-circle me-2"></i>Save Changes
                                         </button>
-                                        <a href="{% url 'school-setup' %}" class="btn btn-outline-secondary ms-2">
+                                        <a href="{{ cancel_url|default:'/' }}" class="btn btn-outline-secondary ms-2">
                                             <i class="bi bi-x-circle me-2"></i>Cancel
                                         </a>
                                     </div>

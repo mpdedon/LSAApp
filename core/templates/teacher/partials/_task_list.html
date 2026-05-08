@@ -1,29 +1,75 @@
+<style>
+.task-action-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    align-self: flex-start;
+}
+
+.task-action-btn {
+    min-width: 7.25rem;
+    justify-content: center;
+    border-radius: 999px;
+    padding: 0.45rem 0.85rem;
+    font-weight: 600;
+}
+
+.task-action-btn i {
+    font-size: 0.9rem;
+}
+
+@media (max-width: 575.98px) {
+    .task-action-btn {
+        min-width: calc(50% - 0.25rem);
+    }
+}
+</style>
+
 {% if tasks %}
-<div class="list-group">
+<div class="row g-3">
     {% for task in tasks %}
-    <div class="list-group-item">
-        <div class="d-flex w-100 justify-content-between">
-            <h6 class="mb-1">{{ task.title }}</h6>
-            <div class="btn-group btn-group-sm">
+    <div class="col-12">
+    <div class="card border-0 shadow-sm h-100">
+        <div class="card-body">
+            <div class="d-flex flex-column flex-lg-row justify-content-between gap-3 mb-3">
+                <div>
+                    <div class="d-flex flex-wrap align-items-center gap-2 mb-2">
+                        <span class="badge {% if task_type == 'Assignment' %}text-bg-primary{% elif task_type == 'Assessment' %}text-bg-info{% else %}text-bg-danger{% endif %}">{{ task_type }}</span>
+                        {% if task_type == 'Assignment' and task.teacher.user == request.user %}
+                        <span class="badge text-bg-light border">Mine</span>
+                        {% elif task_type != 'Assignment' and task.created_by == request.user %}
+                        <span class="badge text-bg-light border">Mine</span>
+                        {% endif %}
+                        {% if task_type == 'Assignment' and task.has_expired %}
+                        <span class="badge text-bg-danger">Expired</span>
+                        {% endif %}
+                    </div>
+                    <h5 class="mb-1">{{ task.title }}</h5>
+                    <p class="mb-2 text-muted small">{{ task.class_assigned.name }} · {{ task.subject.name }} · Due {{ task.due_date|date:"d M, Y \a\t H:i" }}</p>
+                    <div class="small text-muted">
+                        {% if task_type == 'Assignment' %}
+                            Owner: {{ task.teacher.user.get_full_name|default:task.teacher.user.username }}
+                        {% else %}
+                            Owner: {{ task.created_by.get_full_name|default:task.created_by.username|default:"System" }}
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="task-action-bar">
                 {% if task_type == 'Assignment' %}
-                    <a href="{% url 'assignment_submissions_list' task.id %}" class="btn btn-outline-success" title="View Submissions"><i class="bi bi-people-fill"></i></a>
+                    <a href="{% url 'assignment_submissions_list' task.id %}" class="btn btn-outline-success btn-sm d-inline-flex align-items-center gap-2 task-action-btn" title="View Submissions"><i class="bi bi-people-fill"></i><span>Submissions</span></a>
                 {% elif task_type == 'Assessment' %}
-                    <a href="{% url 'assessment_submissions_list' task.id %}" class="btn btn-outline-success" title="View Submissions"><i class="bi bi-people-fill"></i></a>
+                    <a href="{% url 'assessment_submissions_list' task.id %}" class="btn btn-outline-success btn-sm d-inline-flex align-items-center gap-2 task-action-btn" title="View Submissions"><i class="bi bi-people-fill"></i><span>Submissions</span></a>
                 {% elif task_type == 'Exam' %}
-                    <a href="{% url 'exam_submissions_list' task.id %}" class="btn btn-outline-success" title="View Submissions"><i class="bi bi-people-fill"></i></a>
+                    <a href="{% url 'exam_submissions_list' task.id %}" class="btn btn-outline-success btn-sm d-inline-flex align-items-center gap-2 task-action-btn" title="View Submissions"><i class="bi bi-people-fill"></i><span>Submissions</span></a>
                 {% endif %}                
-                <a href="{% url view_url task.id %}" class="btn btn-outline-info" title="View Details"><i class="bi bi-eye"></i></a>
-                <a href="{% url update_url task.id %}" class="btn btn-outline-primary" title="Edit"><i class="bi bi-pencil-fill"></i></a>
-                <button type="button" class="btn btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteTaskModal{{ task_type }}{{ task.id }}" title="Delete"><i class="bi bi-trash-fill"></i></button>
+                <a href="{% url view_url task.id %}" class="btn btn-outline-info btn-sm d-inline-flex align-items-center gap-2 task-action-btn" title="View Details"><i class="bi bi-eye"></i><span>Open</span></a>
+                <a href="{% url update_url task.id %}" class="btn btn-outline-primary btn-sm d-inline-flex align-items-center gap-2 task-action-btn" title="Edit"><i class="bi bi-pencil-fill"></i><span>Edit</span></a>
+                <button type="button" class="btn btn-outline-danger btn-sm d-inline-flex align-items-center gap-2 task-action-btn" data-bs-toggle="modal" data-bs-target="#deleteTaskModal{{ task_type }}{{ task.id }}" title="Delete"><i class="bi bi-trash-fill"></i><span>Delete</span></button>
+                </div>
             </div>
-        </div>
-        
-        <p class="mb-1 small text-muted">
-            For {{ task.class_assigned.name }} - {{ task.subject.name }} | Due: {{ task.due_date|date:"d M, Y P" }}
-        </p>
-        
-        <div class="d-flex justify-content-between align-items-center">
-            <div>
+
+            <div class="d-flex flex-wrap justify-content-between gap-3 align-items-center border-top pt-3">
+                <div class="d-flex flex-wrap gap-2 align-items-center">
                 {% if task_type == 'Assignment' %}
                     <span class="badge {% if task.active %}bg-success{% else %}bg-secondary{% endif %}">
                         {% if task.active %}Active{% else %}Inactive{% endif %}
@@ -33,20 +79,42 @@
                         {% if task.is_approved %}Approved{% else %}Pending Approval{% endif %}
                     </span>
                 {% endif %}
-            </div>
-            <div class="small text-muted">
-                <i class="bi bi-person-check-fill me-1"></i> 
-                {{ task.submission_count|default:0 }} Submissions
+                {% if task.description %}
+                    <span class="small text-muted">{{ task.description|truncatechars:90 }}</span>
+                {% elif task.short_description %}
+                    <span class="small text-muted">{{ task.short_description|truncatechars:90 }}</span>
+                {% endif %}
+                </div>
+                <div class="small text-muted">
+                    <i class="bi bi-person-check-fill me-1"></i>{{ task.submission_count|default:0 }} submission{{ task.submission_count|default:0|pluralize }}
+                </div>
             </div>
         </div>
     </div>
+    </div>
     
-    <!-- Delete Modal -->
     <div class="modal fade" id="deleteTaskModal{{ task_type }}{{ task.id }}" tabindex="-1">
-        <!-- ... modal content ... -->
+        <div class="modal-dialog modal-dialog-centered modal-sm">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Delete {{ task_type }}</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    Delete <strong>{{ task.title }}</strong>? This action cannot be undone.
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <form method="POST" action="{% url delete_url task.id %}">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                    </form>
+                </div>
+            </div>
+        </div>
     </div>
     {% endfor %}
 </div>
 {% else %}
-<div class="alert alert-light text-center">No {{ task_type|lower }}s found for this term.</div>
+<div class="alert alert-light border text-center mb-0">No {{ task_type|lower }}s found in this section.</div>
 {% endif %}

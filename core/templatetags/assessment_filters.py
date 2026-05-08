@@ -1,4 +1,3 @@
-# your_app/templatetags/assessment_filters.py
 from django import template
 
 register = template.Library()
@@ -14,10 +13,6 @@ def percentage_of(value, total):
         return round((value / total) * 100)
     except (ValueError, TypeError):
         return 0
-    
-from django import template
-
-register = template.Library()
 
 @register.filter
 def get_item(dictionary, key):

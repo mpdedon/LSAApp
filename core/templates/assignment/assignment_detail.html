@@ -1,40 +1,181 @@
-<!-- assignments/assignment_detail.html -->
 {% extends 'base.html' %}
 
 {% block content %}
-<div class="card my-5">
-    <div class="card-header">
-        <h3>{{ assignment.title }}</h3>
+<style>
+    .assignment-reader-shell {
+        max-width: 1040px;
+        margin: 2.5rem auto 4rem;
+        padding: 0 1rem;
+    }
+
+    .assignment-reader {
+        background: linear-gradient(180deg, #ffffff 0%, #fbfcfe 100%);
+        border: 1px solid #d9e2ec;
+        border-radius: 28px;
+        box-shadow: 0 24px 70px rgba(15, 23, 42, 0.08);
+        overflow: hidden;
+    }
+
+    .assignment-reader-header {
+        padding: 2rem;
+        border-bottom: 1px solid #e9eef5;
+        background: linear-gradient(135deg, #0f172a 0%, #1e3a5f 100%);
+        color: #f8fafc;
+    }
+
+    .assignment-reader-meta {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+        gap: 1rem;
+        margin-top: 1.5rem;
+    }
+
+    .assignment-reader-meta-card {
+        background: rgba(255, 255, 255, 0.08);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 18px;
+        padding: 0.95rem 1rem;
+    }
+
+    .assignment-reader-body {
+        padding: 2rem;
+    }
+
+    .assignment-question {
+        border: 1px solid #dce6f2;
+        border-radius: 22px;
+        padding: 1.4rem;
+        background: #ffffff;
+        box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9);
+    }
+
+    .assignment-question + .assignment-question {
+        margin-top: 1.25rem;
+    }
+
+    .assignment-option {
+        border: 1px solid #d9e2ec;
+        border-radius: 16px;
+        padding: 0.85rem 1rem;
+        background: #f8fafc;
+    }
+
+    .assignment-option.is-correct {
+        border-color: #198754;
+        background: #ecfdf3;
+    }
+
+    .assignment-essay-note {
+        border: 1px dashed #cbd5e1;
+        border-radius: 16px;
+        padding: 1rem;
+        background: #f8fafc;
+        color: #475569;
+    }
+
+    @media (max-width: 767.98px) {
+        .assignment-reader-header,
+        .assignment-reader-body {
+            padding: 1.25rem;
+        }
+    }
+</style>
+
+<div class="assignment-reader-shell">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-3">
+        <a href="{% url assignment_dashboard_route %}" class="btn btn-outline-secondary rounded-pill px-4">
+            <i class="fas fa-arrow-left me-2"></i>Back to Dashboard
+        </a>
+        <div class="d-flex gap-2 flex-wrap">
+            <a href="{% url 'update_assignment' assignment.id %}" class="btn btn-primary rounded-pill px-4">
+                <i class="fas fa-pen me-2"></i>Edit Assignment
+            </a>
+        </div>
     </div>
-    <div class="card-body">
-        <p><strong>Description:</strong> {{ assignment.description }}</p>
-        <p><strong>Class:</strong> {{ assignment.class_assigned.name }}</p>
-        <p><strong>Subject:</strong> {{ assignment.subject.name }}</p>
-        <p><strong>Due Date:</strong> {{ assignment.due_date }}</p>
-        
-        <h4>Questions</h4>
-        <ul class="list-group">
-            {% for question in assignment.questions.all %}
-                <li class="list-group-item">
-                    <strong>{{ question.question_text }}</strong>
-                    <br>
-                    <em>Type: {{ question.get_question_type_display }}</em>
-                    {% if question.options_list %}
-                        <ul>
-                            {% for option in question.options_list %}
-                                <li>{{ option }}</li>
-                            {% endfor %}
-                        </ul>
-                    {% else %}
-                        <p><em>No options provided for this question.</em></p>
-                    {% endif %}
-                </li>
+
+    <article class="assignment-reader">
+        <header class="assignment-reader-header">
+            <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+                <span class="badge rounded-pill text-bg-light text-dark">Assignment</span>
+                {% if assignment.active %}
+                <span class="badge rounded-pill bg-success-subtle text-success border border-success-subtle">Active</span>
+                {% else %}
+                <span class="badge rounded-pill bg-secondary-subtle text-secondary border border-secondary-subtle">Inactive</span>
+                {% endif %}
+            </div>
+            <h1 class="h2 mb-2">{{ assignment.title }}</h1>
+            {% if assignment.description %}
+            <p class="mb-0 text-white-50" style="max-width: 52rem;">{{ assignment.description }}</p>
+            {% endif %}
+
+            <div class="assignment-reader-meta">
+                <div class="assignment-reader-meta-card">
+                    <div class="small text-white-50 text-uppercase">Class</div>
+                    <div class="fw-semibold">{{ assignment.class_assigned.name }}</div>
+                </div>
+                <div class="assignment-reader-meta-card">
+                    <div class="small text-white-50 text-uppercase">Subject</div>
+                    <div class="fw-semibold">{{ assignment.subject.name }}</div>
+                </div>
+                <div class="assignment-reader-meta-card">
+                    <div class="small text-white-50 text-uppercase">Due Date</div>
+                    <div class="fw-semibold">{{ assignment.due_date|date:"d M Y, H:i" }}</div>
+                </div>
+                <div class="assignment-reader-meta-card">
+                    <div class="small text-white-50 text-uppercase">Questions</div>
+                    <div class="fw-semibold">{{ assignment.questions.count }}</div>
+                </div>
+            </div>
+        </header>
+
+        <div class="assignment-reader-body">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+                <div>
+                    <h2 class="h4 mb-1">Question Set</h2>
+                    <p class="text-muted mb-0">Preview the assignment exactly as a structured response sheet, with clear card margins and bordered sections.</p>
+                </div>
+            </div>
+
+            {% for question in processed_questions %}
+            <section class="assignment-question">
+                <div class="d-flex justify-content-between align-items-start gap-3 mb-3 flex-wrap">
+                    <div>
+                        <div class="small text-uppercase text-muted fw-semibold mb-2">Question {{ forloop.counter }}</div>
+                        <h3 class="h5 mb-0">{{ question.instance.question_text }}</h3>
+                    </div>
+                    <span class="badge {% if question.instance.question_type == 'SCQ' %}text-bg-info{% elif question.instance.question_type == 'MCQ' %}text-bg-warning{% else %}text-bg-secondary{% endif %} rounded-pill">
+                        {{ question.instance.get_question_type_display }}
+                    </span>
+                </div>
+
+                {% if question.options %}
+                <div class="row g-3">
+                    {% for option in question.options %}
+                    <div class="col-12">
+                        <div class="assignment-option {% if option in question.correct_answers %}is-correct{% endif %}">
+                            <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap">
+                                <span>{{ option }}</span>
+                                {% if option in question.correct_answers %}
+                                <span class="badge rounded-pill bg-success">Correct answer</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="assignment-essay-note">
+                    <div class="fw-semibold mb-1">Essay response</div>
+                    <div>This question expects a free-form written answer from the student.</div>
+                </div>
+                {% endif %}
+            </section>
             {% empty %}
-                <li class="list-group-item">No questions added yet.</li>
+            <div class="assignment-essay-note">
+                No questions have been added to this assignment yet.
+            </div>
             {% endfor %}
-        </ul>
-        
-        <a href="{% url 'teacher_dashboard' %}" class="btn btn-secondary mt-3">Back to Dashboard</a>
-    </div>
+        </div>
+    </article>
 </div>
 {% endblock %}

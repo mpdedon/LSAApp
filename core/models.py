@@ -840,11 +840,17 @@ class Question(models.Model):
     @property
     def options_list(self):
         """Returns options as a Python list."""
-        if self.options:
+        if not self.options:
+            return []
+        if isinstance(self.options, list):
+            return self.options
+        if isinstance(self.options, str):
             try:
-                return json.loads(self.options)
+                parsed_options = json.loads(self.options)
+                if isinstance(parsed_options, list):
+                    return parsed_options
             except json.JSONDecodeError:
-                return []
+                return [opt.strip() for opt in self.options.split(',') if opt.strip()]
         return []
      
     def __str__(self):
@@ -911,9 +917,11 @@ class OnlineQuestion(models.Model):
             return self.options
         elif self.options and isinstance(self.options, str):
             try:
-                return json.loads(self.options)
+                parsed_options = json.loads(self.options)
+                if isinstance(parsed_options, list):
+                    return parsed_options
             except json.JSONDecodeError:
-                return []
+                return [opt.strip() for opt in self.options.split(',') if opt.strip()]
         return []
 
     def is_option_correct(self, submitted_answer):

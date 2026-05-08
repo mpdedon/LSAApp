@@ -33,8 +33,8 @@ from core.views import CreateNotificationView, NotificationListView
 from core.views import SessionListView, SessionDetailView, SessionCreateView, SessionUpdateView, SessionDeleteView
 from core.views import TermListView, TermDetailView, TermCreateView, TermUpdateView, TermDeleteView, activate_term_view
 from core.views import promote_student, repeat_student, demote_student, mark_dormant_student, mark_left_student, mark_active, unenroll_student
-from core.views import create_assessment, admin_assessment_list, approve_assessment, pending_assessments, view_assessment, admin_delete_assessment, assessment_submissions_list, class_subjects
-from core.views import create_exam, admin_exam_list, approve_exam, pending_exams, view_exam, admin_delete_exam, exam_submissions_list
+from core.views import create_assessment as admin_create_assessment, update_assessment as admin_update_assessment_view, admin_assessment_list, approve_assessment, pending_assessments, view_assessment as admin_view_assessment_view, admin_delete_assessment, assessment_submissions_list, class_subjects
+from core.views import create_exam as admin_create_exam, update_exam as admin_update_exam_view, admin_exam_list, approve_exam, pending_exams, view_exam as admin_view_exam_view, admin_delete_exam, exam_submissions_list
 from core.views import broadsheets, termly_broadsheet, approve_termly_broadsheet, archive_termly_broadsheet, admin_leaderboard_view
 from core.views import sessional_broadsheets, admin_sessional_broadsheet, approve_sessional_broadsheet, archive_sessional_broadsheet
 from core.views import FeeAssignmentCreateView, FeeAssignmentListView, FeeAssignmentUpdateView, FeeAssignmentDetailView, FeeAssignmentDeleteView, StudentFeeRecordListView
@@ -46,14 +46,14 @@ from core.views import SubjectCreateView, SubjectListView, SubjectUpdateView, Su
 from core.views import PostCreateView, PostUpdateView, PostDeleteView, ManagePostListView
 from core.views import CategoryCreateView, CategoryUpdateView, ManageCategoryListView, TagCreateView, TagUpdateView, ManageTagListView
 from core.student.views import StudentListView, StudentCreateView, StudentUpdateView, StudentDetailView, StudentDeleteView, BulkUpdateStudentsView, export_students, student_reports
-from core.student.views import submit_assignment, start_assignment, take_assignment, autosubmit_beacon_assignment
-from core.student.views import submit_assessment, start_assessment, take_assessment, autosubmit_beacon_assessment
-from core.student.views import submit_exam, start_exam, take_exam, autosubmit_beacon_exam
+from core.student.views import submit_assignment as student_submit_assignment, start_assignment, take_assignment, autosubmit_beacon_assignment
+from core.student.views import submit_assessment as student_submit_assessment, start_assessment, take_assessment, autosubmit_beacon_assessment
+from core.student.views import submit_exam as student_submit_exam, start_exam, take_exam, autosubmit_beacon_exam
 from core.teacher.views import TeacherListView, TeacherCreateView, TeacherUpdateView, TeacherDetailView, TeacherDeleteView, TeacherBulkActionView, export_teachers, teacher_reports
 from core.teacher.views import input_scores, broadsheet, sessional_broadsheet, mark_attendance, attendance_log, update_result, view_na_result, grade_essay_questions
 from core.teacher.views import create_assignment, add_question, grade_assignment, assignment_submissions_list, update_assignment, delete_assignment, assignment_detail, assignment_list
-from core.teacher.views import create_assessment, teacher_assessment_list, view_assessment, update_assessment, delete_assessment, grade_essay_assessment
-from core.teacher.views import create_exam, teacher_exam_list, view_exam, update_exam, delete_exam, grade_essay_exam
+from core.teacher.views import create_assessment as teacher_create_assessment, teacher_assessment_list, view_assessment as teacher_view_assessment, update_assessment as teacher_update_assessment, delete_assessment, grade_essay_assessment
+from core.teacher.views import create_exam as teacher_create_exam, teacher_exam_list, view_exam as teacher_view_exam, update_exam as teacher_update_exam, delete_exam, grade_essay_exam
 from core.guardian.views import GuardianListView, GuardianCreateView, GuardianUpdateView, GuardianDetailView, GuardianDeleteView, GuardianBulkActionView
 from core.guardian.views import financial_record_detail, view_termly_result, view_sessional_result, export_guardians, guardian_reports
 from core.guardian.views import submit_assignment, submit_assessment, submit_exam
@@ -283,47 +283,58 @@ urlpatterns = [
 
     # Assignment URLs
     path('assignments/create/', create_assignment, name='create_assignment'),
+    path('admin-assignments/create/', create_assignment, name='admin_create_assignment'),
     path('assignments/<int:assignment_id>/questions/add/', add_question, name='add_question'),
     path('assignments/', assignment_list, name='assignment_list'),
+    path('admin-assignments/', assignment_list, name='admin_assignment_list'),
     path('assignments/<int:assignment_id>/', assignment_detail, name='assignment_detail'),
+    path('admin-assignments/<int:assignment_id>/', assignment_detail, name='admin_assignment_detail'),
     path('assignments/<int:assignment_id>/delete/', delete_assignment, name='delete_assignment'),
+    path('admin-assignments/<int:assignment_id>/delete/', delete_assignment, name='admin_delete_assignment'),
     path('submissions/<int:submission_id>/grade/', grade_assignment, name='grade_assignment'),
     path('submissions/<int:submission_id>/grade/', grade_essay_questions, name='grade_essay_questions'),
     path('assignment/<int:assignment_id>/submissions/', assignment_submissions_list, name='assignment_submissions_list'),
     path('assignments/<int:assignment_id>/edit/', update_assignment, name='update_assignment'),
+    path('admin-assignments/<int:assignment_id>/edit/', update_assignment, name='admin_update_assignment'),
     path('assignments/<int:assignment_id>/delete/', delete_assignment, name='delete_assignment'),
     path('assignment/<int:submission_id>/', view_assignment_result, name='view_assignment_result'),
     path('assignment/<int:assignment_id>/start/', start_assignment, name='start_assignment'),
     path('assignment/submission/<int:submission_id>/take/', take_assignment, name='take_assignment'),
-    path('assignment/submission/<int:submission_id>/submit/', submit_assignment, name='submit_assignment'),
+    path('assignment/submission/<int:submission_id>/submit/', student_submit_assignment, name='submit_assignment'),
     path('assignment/submission/<int:submission_id>/autosubmit-beacon/', autosubmit_beacon_assignment, name='autosubmit_beacon'),
 
     # Assessment URLs
-    path('assessments-create/', create_assessment, name='create_assessment'),
+    path('assessments-create/', teacher_create_assessment, name='create_assessment'),
+    path('admin-assessments/create/', admin_create_assessment, name='admin_create_assessment'),
     path('assessment/approve/<int:assessment_id>/', approve_assessment, name='approve_assessment'),
     path('assessment/pending-assessments/', pending_assessments, name='pending_assessments'),
     path('assessment/teacher-list/', teacher_assessment_list, name='teacher_assessment_list'),
     path('admin-assessment-list/', admin_assessment_list, name='admin_assessment_list'),
-    path('assessment/<int:assessment_id>/', view_assessment, name='view_assessment'),
-    path('assessment/update/<int:assessment_id>/', update_assessment, name='update_assessment'),
+    path('assessment/<int:assessment_id>/', teacher_view_assessment, name='view_assessment'),
+    path('admin-assessment/<int:assessment_id>/', admin_view_assessment_view, name='admin_view_assessment'),
+    path('assessment/update/<int:assessment_id>/', teacher_update_assessment, name='update_assessment'),
+    path('admin-assessment/update/<int:assessment_id>/', admin_update_assessment_view, name='admin_update_assessment'),
     path('admin-delete/<int:assessment_id>/', admin_delete_assessment, name='admin_delete_assessment'),
     path('assessment/delete/<int:assessment_id>/', delete_assessment, name='delete_assessment'),
     path('assessment/<int:assessment_id>/start/', start_assessment, name='start_assessment'),
     path('submission/<int:submission_id>/take/', take_assessment, name='take_assessment'), 
-    path('assessment/submission/<int:submission_id>/submit/', submit_assessment, name='submit_assessment'),
+    path('assessment/submission/<int:submission_id>/submit/', student_submit_assessment, name='submit_assessment'),
     path('assessment/<int:assessment_id>/submissions/', assessment_submissions_list, name='assessment_submissions_list'),
     path('submission/<int:submission_id>/autosubmit-beacon/', autosubmit_beacon_assessment, name='autosubmit_beacon'),
     path('grade-essay-assessment/<int:submission_id>/', grade_essay_assessment, name='grade_essay_assessment'),
     path('assessment/<int:submission_id>/result/', view_assessment_result, name='view_assessment_result'),
 
     # Exam URLs
-    path('exams-create/', create_exam, name='create_exam'),
+    path('exams-create/', teacher_create_exam, name='create_exam'),
+    path('admin-exams/create/', admin_create_exam, name='admin_create_exam'),
     path('exam/approve/<int:exam_id>/', approve_exam, name='approve_exam'),
     path('exam/pending-exams/', pending_exams, name='pending_exams'),
     path('exam/teacher-list/', teacher_exam_list, name='teacher_exam_list'),
     path('admin-exam-list/', admin_exam_list, name='admin_exam_list'),
-    path('exam/<int:exam_id>/', view_exam, name='view_exam'),
-    path('exam/update/<int:exam_id>/', update_exam, name='update_exam'),
+    path('exam/<int:exam_id>/', teacher_view_exam, name='view_exam'),
+    path('admin-exam/<int:exam_id>/', admin_view_exam_view, name='admin_view_exam'),
+    path('exam/update/<int:exam_id>/', teacher_update_exam, name='update_exam'),
+    path('admin-exam/update/<int:exam_id>/', admin_update_exam_view, name='admin_update_exam'),
     path('admin-delete/<int:exam_id>/', admin_delete_exam, name='admin_delete_exam'),
     path('exam/delete/<int:exam_id>/', delete_exam, name='delete_exam'),
     path('exam/<int:exam_id>/submissions/', exam_submissions_list, name='exam_submissions_list'),
@@ -331,7 +342,7 @@ urlpatterns = [
     path('exam/<int:submission_id>/result', view_exam_result, name='view_exam_result'),
     path('exam/<int:exam_id>/start/', start_exam, name='start_exam'),
     path('exam/submission/<int:submission_id>/take/', take_exam, name='take_exam'),
-    path('exam/submission/<int:submission_id>/submit/', submit_exam, name='submit_exam'),
+    path('exam/submission/<int:submission_id>/submit/', student_submit_exam, name='submit_exam'),
     path('exam/submission/<int:submission_id>/autosubmit-beacon/', autosubmit_beacon_exam, name='exam_autosubmit_beacon'),
     
     # --- Retake Admin/Teacher URL ---

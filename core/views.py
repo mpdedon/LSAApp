@@ -2933,19 +2933,31 @@ def send_test_email(request):
 
 # --- Helper: Process NEW Questions (for Create and Update) ---
 def _process_newly_added_questions(request, assessment, question_name_prefix='new_question_'):
+    """
+    Processes newly added question fields from a POST request.
+    Scans ALL matching POST keys instead of iterating sequentially so deleted
+    cards (which leave numbering gaps in the JS) don't cause later questions
+    to be silently dropped.
+    """
+    import re
     errors = []
-    question_number = 1
     questions_successfully_added = 0
 
-    while True:
+    # Collect all question numbers present in POST (gap-safe)
+    type_key_pattern = re.compile(rf'^{re.escape(question_name_prefix)}type_(\d+)$')
+    question_numbers = sorted(
+        int(m.group(1))
+        for key in request.POST
+        for m in [type_key_pattern.match(key)]
+        if m
+    )
+
+    for question_number in question_numbers:
         q_type_key = f'{question_name_prefix}type_{question_number}'
         q_text_key = f'{question_name_prefix}text_{question_number}'
         q_options_key = f'{question_name_prefix}options_{question_number}'
         q_correct_key = f'{question_name_prefix}correct_answer_{question_number}'
         q_points_key = f'{question_name_prefix}points_{question_number}'
-
-        if q_type_key not in request.POST and q_text_key not in request.POST : # Check if any primary field for this new question number exists
-            break
 
         question_type = request.POST.get(q_type_key)
         question_text = request.POST.get(q_text_key, '').strip()
@@ -2953,24 +2965,23 @@ def _process_newly_added_questions(request, assessment, question_name_prefix='ne
         correct_answer_str = request.POST.get(q_correct_key, '').strip()
         points_str = request.POST.get(q_points_key)
 
-        if not question_text and not question_type: # Skip if completely empty entry from JS
-             question_number += 1
-             continue
-        if not question_text: # Error if type present but no text
-            if question_type: errors.append(f"Error in New Question {question_number}: Text is empty.")
-            question_number += 1
+        if not question_text and not question_type:
+            continue  # skip completely empty cards added by JS
+        if not question_text:
+            if question_type:
+                errors.append(f"Error in New Question {question_number}: Text is empty.")
             continue
 
         options_list = [opt.strip() for opt in options_str.split(',') if opt.strip()]
-        
+
         form_data = {
             'question_type': question_type,
             'question_text': question_text,
             'options': options_list,
             'correct_answer': correct_answer_str if correct_answer_str else None,
-            'points': points_str if points_str else None
+            'points': points_str if points_str else None,
         }
-        
+
         question_form = OnlineQuestionForm(form_data)
         if question_form.is_valid():
             try:
@@ -2981,12 +2992,13 @@ def _process_newly_added_questions(request, assessment, question_name_prefix='ne
                 errors.append(f"Error saving new question {question_number}: {str(e)}")
         else:
             for field, field_errors in question_form.errors.items():
-                errors.append(f"New Question {question_number} ({field.replace('_',' ').title()}): {', '.join(field_errors)}")
-        
-        question_number += 1
-    
-    if questions_successfully_added == 0 and f'{question_name_prefix}type_1' in request.POST:
-        if not errors: errors.append("Attempted to add new questions, but none were valid or saved.")
+                errors.append(
+                    f"New Question {question_number} ({field.replace('_', ' ').title()}): {', '.join(field_errors)}"
+                )
+
+    if questions_successfully_added == 0 and question_numbers:
+        if not errors:
+            errors.append("Attempted to add new questions, but none were valid or saved.")
     return errors
 
 
@@ -3069,26 +3081,27 @@ def create_assessment(request):
         if form.is_valid():
             assessment = form.save(commit=False)
             assessment.created_by = user
-            if user.is_superuser: # Superusers can auto-approve
+            if user.is_superuser:  # Superusers can auto-approve
                 assessment.is_approved = True
-            assessment.save() # Save assessment to get an ID before adding M2M questions
+            assessment.save()  # Save to get PK before adding M2M questions
 
-            # Use the specific function for new questions from 'create' form (prefix 'question_')
+            # Process newly added questions (prefix 'question_' matches create-form JS)
             question_processing_errors = _process_newly_added_questions(request, assessment, question_name_prefix='question_')
-            
+
             if not question_processing_errors:
                 messages.success(request, f"Assessment '{assessment.title}' created successfully.")
                 return redirect('admin_dashboard' if user.is_superuser else 'teacher_dashboard')
             else:
-                assessment.delete() # Rollback assessment creation if questions had critical errors
-                form_with_initial_data = AssessmentForm(request.POST) # Re-bind to show original data
-                form_with_initial_data.fields['class_assigned'].queryset = assigned_classes_qs
-                form_with_initial_data.fields['subject'].queryset = assigned_subjects_qs
-                messages.error(request, "Assessment not created. Please correct the question errors.")
-                return render(request, 'assessment/create_assessment.html', {
-                    'form': form_with_initial_data,
-                    'question_errors': question_processing_errors,
-                })
+                # Assessment header is saved as a draft; redirect to update page so the teacher
+                # can fix only the broken questions without losing their other work.
+                for err in question_processing_errors:
+                    messages.error(request, err)
+                messages.warning(
+                    request,
+                    "The assessment was saved as a draft but some questions had errors (shown above). "
+                    "Please fix them here and save again."
+                )
+                return redirect('admin_update_assessment' if user.is_superuser else 'update_assessment', assessment_id=assessment.id)
         else: # AssessmentForm is invalid
             form.fields['class_assigned'].queryset = assigned_classes_qs # Re-set for template
             form.fields['subject'].queryset = assigned_subjects_qs
@@ -3136,6 +3149,7 @@ def update_assessment(request, assessment_id):
             updated_assessment.save()
 
             all_errors = []
+            deleted_ids_str = request.POST.get('deleted_question_ids', '')
 
             # --- FIX 3: THE SMARTER EXISTING QUESTION PROCESSING LOOP ---
             for q_instance in assessment.questions.all():
@@ -3160,11 +3174,15 @@ def update_assessment(request, assessment_id):
                             all_errors.append(f"Existing Question ID {q_id} ({field.replace('_',' ').title()}): {', '.join(field_errors)}")
             
             # --- Logic for Deleted and New Questions (remains the same) ---
-            deleted_ids_str = request.POST.get('deleted_question_ids', '')
             if deleted_ids_str:
                 deleted_ids = [int(id_str) for id_str in deleted_ids_str.split(',') if id_str.isdigit()]
-                assessment.questions.remove(*deleted_ids) 
-                OnlineQuestion.objects.filter(id__in=deleted_ids, assessments=None).delete()
+                assessment.questions.remove(*deleted_ids)
+                # Only hard-delete a question when it is no longer referenced by any assessment OR exam
+                OnlineQuestion.objects.filter(
+                    id__in=deleted_ids,
+                    assessments__isnull=True,
+                    exams__isnull=True,
+                ).delete()
 
             new_question_errors = _process_newly_added_questions(request, assessment, question_name_prefix='new_question_')
             all_errors.extend(new_question_errors)
@@ -3172,7 +3190,7 @@ def update_assessment(request, assessment_id):
             # --- Redirect or Re-render Logic (remains the same) ---
             if not all_errors:
                 messages.success(request, "Assessment updated successfully.")
-                return redirect('view_assessment', assessment_id=assessment.id)
+                return redirect('admin_view_assessment' if user.is_superuser else 'view_assessment', assessment_id=assessment.id)
             else:
                 messages.error(request, "Errors occurred while processing questions. Please review.")
         
@@ -3201,6 +3219,12 @@ def update_assessment(request, assessment_id):
 def approve_assessment(request, assessment_id):
     assessment = get_object_or_404(Assessment, id=assessment_id)
     if request.method == 'POST':
+        if assessment.questions.count() == 0:
+            messages.error(
+                request,
+                f"Cannot approve '{assessment.title}': it has no questions. Add at least one question first."
+            )
+            return redirect('admin_view_assessment', assessment_id=assessment.id)
         if not assessment.is_approved:
             assessment.is_approved = True
             assessment.approved_by = request.user
@@ -3208,7 +3232,7 @@ def approve_assessment(request, assessment_id):
             messages.success(request, f"Assessment '{assessment.title}' approved and students notified.")
         else:
             messages.info(request, f"Assessment '{assessment.title}' was already approved.")
-        return redirect('school-setup') 
+        return redirect('school-setup')
     return render(request, 'assessment/approve_assessment_confirm.html', {'assessment': assessment})
 
 
@@ -3222,7 +3246,7 @@ def admin_assessment_list(request):
     
     pending_assessment_count = Assessment.objects.filter(is_approved=False).count()
     
-    return render(request, 'assessment/admin_assessment_list.html', {
+    return render(request, 'setup/admin_assessment_list.html', {
         'assessments': assessments_qs,
         'pending_assessment_count': pending_assessment_count
     })
@@ -3246,7 +3270,7 @@ def view_assessment(request, assessment_id):
         'assessment': assessment,
         'questions': questions,
     }
-    return render(request, 'assessment/assessment_detail.html', context)
+    return render(request, 'setup/admin_assessment_detail.html', context)
 
 # views.py
 @login_required
@@ -3304,10 +3328,11 @@ def assessment_submissions_list(request, assessment_id):
     return render(request, 'assessment/assessment_submissions_list.html', context)
 
 
+@login_required
 def grade_essay_assessment_view(request, submission_id):
     submission = get_object_or_404(AssessmentSubmission, id=submission_id)
     assessment = submission.assessment
-    user = request.user # Get the current user
+    user = request.user  # Get the current user
 
     # Authorization
     if not (user.is_superuser or assessment.created_by == user):
@@ -3322,11 +3347,12 @@ def grade_essay_assessment_view(request, submission_id):
     for q_obj in assessment.questions.all().order_by('id'):
         raw_ans = submission.answers.get(str(q_obj.id)) if isinstance(submission.answers, dict) else None
         student_answer_display = ", ".join(raw_ans) if isinstance(raw_ans, list) else raw_ans
-        
+
         is_correct_auto = None
+        q_points = q_obj.points or 1  # default to 1 if points not set
         if q_obj.question_type in ['SCQ', 'MCQ']:
-            max_possible_auto_score += 1 # Assuming 1 point per question
-            # Simplified check for display; actual grading happened on submission
+            max_possible_auto_score += q_points
+            # Display-side correctness check (actual grading happened on submission)
             if q_obj.question_type == 'SCQ' and student_answer_display == q_obj.correct_answer:
                 is_correct_auto = True
             elif q_obj.question_type == 'MCQ':
@@ -3337,7 +3363,7 @@ def grade_essay_assessment_view(request, submission_id):
                 elif correct_mcq_set:
                     is_correct_auto = False
         elif q_obj.question_type == 'ES':
-            max_possible_manual_score += 1 
+            max_possible_manual_score += q_points
 
         all_questions_data.append({
             'question': q_obj,
@@ -3419,26 +3445,26 @@ def create_exam(request):
         if form.is_valid():
             exam = form.save(commit=False)
             exam.created_by = user
-            if user.is_superuser: 
+            if user.is_superuser:
                 exam.is_approved = True
-            exam.save() 
+            exam.save()
 
             # Use the specific function for new questions from 'create' form (prefix 'question_')
             question_processing_errors = _process_newly_added_questions(request, exam, question_name_prefix='question_')
-            
+
             if not question_processing_errors:
                 messages.success(request, f"Exam '{exam.title}' created successfully.")
                 return redirect('admin_dashboard' if user.is_superuser else 'teacher_dashboard')
             else:
-                exam.delete() 
-                form_with_initial_data = ExamForm(request.POST) 
-                form_with_initial_data.fields['class_assigned'].queryset = assigned_classes_qs
-                form_with_initial_data.fields['subject'].queryset = assigned_subjects_qs
-                messages.error(request, "Exam not created. Please correct the question errors.")
-                return render(request, 'exam/create_exam.html', {
-                    'form': form_with_initial_data,
-                    'question_errors': question_processing_errors,
-                })
+                # Exam header saved as draft; redirect to update so teacher fixes only broken questions.
+                for err in question_processing_errors:
+                    messages.error(request, err)
+                messages.warning(
+                    request,
+                    "The exam was saved as a draft but some questions had errors (shown above). "
+                    "Please fix them here and save again."
+                )
+                return redirect('admin_update_exam' if user.is_superuser else 'update_exam', exam_id=exam.id)
         else: 
             form.fields['class_assigned'].queryset = assigned_classes_qs # Re-set for template
             form.fields['subject'].queryset = assigned_subjects_qs
@@ -3505,11 +3531,16 @@ def update_exam(request, exam_id):
                             all_errors.append(f"Existing Question ID {q_id} ({field.replace('_',' ').title()}): {', '.join(field_errors)}")
             
             # 2. Remove Questions (if a mechanism exists to mark them for deletion)
-            deleted_ids_str = request.POST.get('deleted_question_ids', '') # e.g., "12,15,20"
+            deleted_ids_str = request.POST.get('deleted_question_ids', '')  # e.g., "12,15,20"
             if deleted_ids_str:
                 deleted_ids = [int(id_str) for id_str in deleted_ids_str.split(',') if id_str.isdigit()]
-                exam.questions.remove(*deleted_ids) 
-                OnlineQuestion.objects.filter(id__in=deleted_ids, exams=None).delete() # Optional: delete orphaned questions
+                exam.questions.remove(*deleted_ids)
+                # Only hard-delete a question when it is no longer referenced by any assessment OR exam
+                OnlineQuestion.objects.filter(
+                    id__in=deleted_ids,
+                    assessments__isnull=True,
+                    exams__isnull=True,
+                ).delete()
 
             # 3. Add Newly Added Questions (uses 'new_question_' prefix)
             new_question_errors = _process_newly_added_questions(request, exam, question_name_prefix='new_question_')
@@ -3517,7 +3548,7 @@ def update_exam(request, exam_id):
 
             if not all_errors:
                 messages.success(request, "Exam updated successfully.")
-                return redirect('view_exam', exam_id=exam.id)
+                return redirect('admin_view_exam' if user.is_superuser else 'view_exam', exam_id=exam.id)
             else:
                 messages.error(request, "Errors occurred. Please review.")
         # If form is invalid or errors occurred, re-render with context
@@ -3545,6 +3576,12 @@ def update_exam(request, exam_id):
 def approve_exam(request, exam_id):
     exam = get_object_or_404(Exam, id=exam_id)
     if request.method == 'POST':
+        if exam.questions.count() == 0:
+            messages.error(
+                request,
+                f"Cannot approve '{exam.title}': it has no questions. Add at least one question first."
+            )
+            return redirect('admin_view_exam', exam_id=exam.id)
         if not exam.is_approved:
             exam.is_approved = True
             exam.approved_by = request.user
@@ -3552,7 +3589,7 @@ def approve_exam(request, exam_id):
             messages.success(request, f"Exam '{exam.title}' approved and students notified.")
         else:
             messages.info(request, f"Exam '{exam.title}' was already approved.")
-        return redirect('school-setup') 
+        return redirect('school-setup')
     return render(request, 'exam/approve_exam_confirm.html', {'exam': exam})
 
 
@@ -3566,7 +3603,7 @@ def admin_exam_list(request):
     
     pending_exam_count = Exam.objects.filter(is_approved=False).count()
     
-    return render(request, 'exam/admin_exam_list.html', {
+    return render(request, 'setup/admin_exam_list.html', {
         'exams': exams_qs,
         'pending_exam_count': pending_exam_count,
     })
@@ -3589,7 +3626,7 @@ def view_exam(request, exam_id):
         'exam': exam,
         'questions': questions,
     }
-    return render(request, 'exam/exam_detail.html', context)
+    return render(request, 'setup/admin_exam_detail.html', context)
 
 # views.py
 @login_required
@@ -3647,10 +3684,11 @@ def exam_submissions_list(request, exam_id):
     return render(request, 'exam/exam_submissions_list.html', context)
 
 
+@login_required
 def grade_essay_exam_view(request, submission_id):
     submission = get_object_or_404(ExamSubmission, id=submission_id)
     exam = submission.exam
-    user = request.user 
+    user = request.user
 
     # Authorization
     if not (user.is_superuser or exam.created_by == user):
@@ -3665,11 +3703,12 @@ def grade_essay_exam_view(request, submission_id):
     for q_obj in exam.questions.all().order_by('id'):
         raw_ans = submission.answers.get(str(q_obj.id)) if isinstance(submission.answers, dict) else None
         student_answer_display = ", ".join(raw_ans) if isinstance(raw_ans, list) else raw_ans
-        
+
         is_correct_auto = None
+        q_points = q_obj.points or 1  # default to 1 if points not set
         if q_obj.question_type in ['SCQ', 'MCQ']:
-            max_possible_auto_score += 1 # Assuming 1 point per question
-            # Simplified check for display; actual grading happened on submission
+            max_possible_auto_score += q_points
+            # Display-side correctness check (actual grading happened on submission)
             if q_obj.question_type == 'SCQ' and student_answer_display == q_obj.correct_answer:
                 is_correct_auto = True
             elif q_obj.question_type == 'MCQ':
@@ -3680,7 +3719,7 @@ def grade_essay_exam_view(request, submission_id):
                 elif correct_mcq_set:
                     is_correct_auto = False
         elif q_obj.question_type == 'ES':
-            max_possible_manual_score += 1 # Example: 1 point per essay, or define points per question
+            max_possible_manual_score += q_points
 
         all_questions_data.append({
             'question': q_obj,
