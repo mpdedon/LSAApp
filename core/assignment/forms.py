@@ -31,6 +31,23 @@ class QuestionForm(forms.ModelForm):
         model = Question
         fields = ['question_type', 'question_text', 'options', 'correct_answer']
 
+    @staticmethod
+    def _normalise_options(options):
+        if not options:
+            return []
+        return [str(option).strip() for option in options if str(option).strip()]
+
+    @staticmethod
+    def _normalise_answers(correct_answer):
+        if not correct_answer:
+            return []
+        return [answer.strip() for answer in str(correct_answer).split(',') if answer.strip()]
+
+    @staticmethod
+    def _match_answer_labels(options, answers):
+        option_lookup = {option.lower(): option for option in options}
+        return [option_lookup.get(answer.lower(), answer) for answer in answers]
+
     def clean(self):
         cleaned_data = super().clean()
         question_type = cleaned_data.get("question_type")
@@ -40,12 +57,29 @@ class QuestionForm(forms.ModelForm):
             raise forms.ValidationError("Question text is required.")
 
         if question_type in ['SCQ', 'MCQ']:
-            options = cleaned_data.get("options")
+            options = self._normalise_options(cleaned_data.get("options"))
             correct_answer = cleaned_data.get("correct_answer")
             if not options:
                 raise forms.ValidationError("Options must be provided for SCQ/MCQ.")
             if not correct_answer:
                 raise forms.ValidationError("Correct answer is required for SCQ/MCQ.")
+
+            options_lookup = {option.lower() for option in options}
+            answers = self._normalise_answers(correct_answer)
+            if question_type == 'SCQ':
+                if len(answers) != 1:
+                    raise forms.ValidationError("Single Choice questions must have exactly one correct answer.")
+            elif not answers:
+                raise forms.ValidationError("Multiple Choice questions must have at least one correct answer.")
+
+            invalid_answers = [answer for answer in answers if answer.lower() not in options_lookup]
+            if invalid_answers:
+                raise forms.ValidationError("Correct answers must be selected from the provided options.")
+
+            answers = self._match_answer_labels(options, answers)
+
+            cleaned_data['options'] = options
+            cleaned_data['correct_answer'] = ','.join(answers)
         elif question_type == 'ES':
             # No additional validation for essay
             cleaned_data['options'] = None

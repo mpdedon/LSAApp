@@ -5,12 +5,13 @@ from datetime import timedelta, date
 
 from core.models import (
     CustomUser, Teacher, Class, Subject, Session, Term,
-    Assessment, Exam, OnlineQuestion, AssessmentSubmission, ExamSubmission,
+    Assignment, Assessment, Exam, OnlineQuestion, Question, AssessmentSubmission, ExamSubmission,
     ClassSubjectAssignment, TeacherAssignment, SubjectAssignment,
     Student, Guardian,
 )
+from core.assignment.forms import QuestionForm as AssignmentQuestionForm
 from core.assessment.forms import AssessmentForm, OnlineQuestionForm as AssessmentQuestionForm
-from core.exams.forms import ExamForm
+from core.exams.forms import ExamForm, OnlineQuestionForm as ExamQuestionForm
 
 
 # ---------------------------------------------------------------------------
@@ -258,6 +259,41 @@ class FormValidationFixTests(TestCase):
         data['due_date'] = (timezone.now() - timedelta(hours=1)).strftime('%Y-%m-%dT%H:%M')
         form = AssessmentForm(data=data)
         form.fields['class_assigned'].queryset = Class.objects.filter(pk=self.school_class.pk)
+
+    def test_exam_question_form_accepts_multiple_mcq_answers_from_options(self):
+        form = ExamQuestionForm(data={
+            'question_type': 'MCQ',
+            'question_text': 'Pick two',
+            'options': ['A', 'B', 'C'],
+            'correct_answer': 'A, C',
+            'points': 2,
+        })
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data['correct_answer'], 'a,c')
+
+    def test_exam_question_form_rejects_mcq_answers_outside_options(self):
+        form = ExamQuestionForm(data={
+            'question_type': 'MCQ',
+            'question_text': 'Pick two',
+            'options': ['A', 'B', 'C'],
+            'correct_answer': 'A, D',
+            'points': 2,
+        })
+
+        self.assertFalse(form.is_valid())
+        self.assertIn('correct_answer', form.errors)
+
+    def test_assignment_question_form_rejects_scq_answer_outside_options(self):
+        form = AssignmentQuestionForm(data={
+            'question_type': 'SCQ',
+            'question_text': 'Pick one',
+            'options': ['A', 'B'],
+            'correct_answer': 'C',
+        })
+
+        self.assertFalse(form.is_valid())
+        self.assertIn('__all__', form.errors)
         form.fields['subject'].queryset = Subject.objects.filter(pk=self.subject.pk)
         self.assertFalse(form.is_valid())
         self.assertIn('due_date', form.errors)
@@ -530,3 +566,120 @@ class OrphanQuestionDeletionTests(BaseAssessmentTestCase):
             OnlineQuestion.objects.filter(pk=q.pk).exists(),
             "Orphan question (no exam or assessment links) must be hard-deleted",
         )
+
+
+class AssignmentEditFlowTests(BaseAssessmentTestCase):
+
+    def test_update_assignment_edits_existing_question(self):
+        self.client.force_login(self.teacher_user)
+        assignment = Assignment.objects.create(
+            title='Editable Assignment',
+            description='Original description',
+            term=self.term,
+            subject=self.subject,
+            class_assigned=self.school_class,
+            teacher=self.teacher,
+            due_date=timezone.now() + timedelta(days=2),
+            duration=20,
+        )
+        question = Question.objects.create(
+            assignment=assignment,
+            question_type='MCQ',
+            question_text='Pick the starter answers',
+            options=['A', 'B', 'C'],
+            correct_answer='A,C',
+        )
+
+        response = self.client.post(
+            reverse('update_assignment', kwargs={'assignment_id': assignment.pk}),
+            {
+                'title': assignment.title,
+                'description': assignment.description,
+                'class_assigned': str(self.school_class.pk),
+                'subject': str(self.subject.pk),
+                'term': str(self.term.pk),
+                'due_date': (timezone.now() + timedelta(days=3)).strftime('%Y-%m-%dT%H:%M'),
+                'duration': '25',
+                'question_%s_type' % question.pk: 'MCQ',
+                'question_%s_text' % question.pk: 'Pick the updated answers',
+                'question_%s_options' % question.pk: 'A,B,C,D',
+                'question_%s_correct_answer' % question.pk: 'B,D',
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        question.refresh_from_db()
+        self.assertEqual(question.question_text, 'Pick the updated answers')
+        self.assertEqual(question.options, ['A', 'B', 'C', 'D'])
+        self.assertEqual(question.correct_answer, 'B,D')
+
+
+class EditScopeRegressionTests(BaseAssessmentTestCase):
+
+    def setUp(self):
+        super().setUp()
+        self.client.force_login(self.teacher_user)
+
+    def _clear_teacher_scope(self):
+        SubjectAssignment.objects.filter(teacher=self.teacher).delete()
+        TeacherAssignment.objects.filter(teacher=self.teacher).delete()
+
+    def test_assignment_update_keeps_current_subject_and_class_in_scope(self):
+        assignment = Assignment.objects.create(
+            title='Scoped Assignment',
+            description='desc',
+            term=self.term,
+            subject=self.subject,
+            class_assigned=self.school_class,
+            teacher=self.teacher,
+            due_date=timezone.now() + timedelta(days=1),
+            duration=15,
+        )
+        self._clear_teacher_scope()
+
+        response = self.client.get(reverse('update_assignment', kwargs={'assignment_id': assignment.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        form = response.context['form']
+        self.assertTrue(form.fields['subject'].queryset.filter(pk=self.subject.pk).exists())
+        self.assertTrue(form.fields['class_assigned'].queryset.filter(pk=self.school_class.pk).exists())
+
+    def test_assessment_update_keeps_current_subject_and_class_in_scope(self):
+        assessment = Assessment.objects.create(
+            title='Scoped Assessment',
+            short_description='desc',
+            term=self.term,
+            subject=self.subject,
+            class_assigned=self.school_class,
+            created_by=self.teacher_user,
+            due_date=timezone.now() + timedelta(days=1),
+            duration=20,
+        )
+        self._clear_teacher_scope()
+
+        response = self.client.get(reverse('update_assessment', kwargs={'assessment_id': assessment.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        form = response.context['form']
+        self.assertTrue(form.fields['subject'].queryset.filter(pk=self.subject.pk).exists())
+        self.assertTrue(form.fields['class_assigned'].queryset.filter(pk=self.school_class.pk).exists())
+
+    def test_exam_update_keeps_current_subject_and_class_in_scope(self):
+        exam = Exam.objects.create(
+            title='Scoped Exam',
+            short_description='desc',
+            term=self.term,
+            subject=self.subject,
+            class_assigned=self.school_class,
+            created_by=self.teacher_user,
+            due_date=timezone.now() + timedelta(days=1),
+            duration=25,
+        )
+        self._clear_teacher_scope()
+
+        response = self.client.get(reverse('update_exam', kwargs={'exam_id': exam.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        form = response.context['form']
+        self.assertTrue(form.fields['subject'].queryset.filter(pk=self.subject.pk).exists())
+        self.assertTrue(form.fields['class_assigned'].queryset.filter(pk=self.school_class.pk).exists())

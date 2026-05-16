@@ -108,7 +108,7 @@
                     {% if q.question_type != 'ES' and q.options_list %}
                     <div>
                       {% for opt in q.options_list %}
-                      <span class="badge me-1 mb-1 {% if opt == q.correct_answer %}bg-success{% else %}bg-light text-dark border{% endif %}" style="font-size:.73rem">{{ opt }}</span>
+                      <span class="badge me-1 mb-1 {% if opt in q.correct_answer_list %}bg-success{% else %}bg-light text-dark border{% endif %}" style="font-size:.73rem">{{ opt }}</span>
                       {% endfor %}
                     </div>
                     {% endif %}
@@ -167,7 +167,7 @@
                       <label class="form-label form-label-sm fw-semibold">Correct Answer</label>
                       <select id="ex-scq-sel-{{ q.id }}" class="form-select form-select-sm">
                         {% for opt in q.options_list %}
-                        <option value="{{ opt }}" {% if opt == q.correct_answer %}selected{% endif %}>{{ opt }}</option>
+                        <option value="{{ opt }}" {% if opt in q.correct_answer_list %}selected{% endif %}>{{ opt }}</option>
                         {% endfor %}
                       </select>
                     </div>
@@ -178,14 +178,14 @@
                     <div id="ex-mcq-cb-{{ q.id }}" class="border rounded p-2" style="max-height:100px;overflow-y:auto">
                       {% for opt in q.options_list %}
                       <label class="d-flex align-items-center gap-2 mb-1 small">
-                        <input type="checkbox" class="ex-mcq-cb" data-qid="{{ q.id }}" value="{{ opt }}" style="width:1rem;height:1rem"
-                               {% if opt in q.correct_answer %}checked{% endif %}>
+                           <input type="checkbox" class="ex-mcq-cb" data-qid="{{ q.id }}" value="{{ opt }}" style="width:1rem;height:1rem"
+                             {% if opt in q.correct_answer_list %}checked{% endif %}>
                         {{ opt }}
                       </label>
                       {% endfor %}
                     </div>
-                    <input type="hidden" name="question_{{ q.id }}_correct_answer" id="ex-ans-hid-{{ q.id }}"
-                           value="{{ q.correct_answer }}">
+                          <input type="hidden" name="question_{{ q.id }}_correct_answer" id="ex-ans-hid-{{ q.id }}"
+                            value="{{ q.correct_answer_list|join:',' }}">
                   </div>
                 </div>
                 <!-- Essay section -->

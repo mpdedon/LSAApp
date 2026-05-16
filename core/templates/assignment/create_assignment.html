@@ -305,6 +305,13 @@
   .wizard-hero {
     grid-template-columns: 1fr;
   }
+  .wizard-stage-card .card-footer {
+    flex-direction: column;
+    gap: .75rem;
+  }
+  .wizard-stage-card .card-footer .btn {
+    width: 100%;
+  }
 }
 </style>
 
@@ -366,6 +373,32 @@ document.addEventListener('DOMContentLoaded', function () {
   document.getElementById('next-2').addEventListener('click', function () { buildReview(); goToStep(3); });
   document.getElementById('back-3').addEventListener('click', function () { goToStep(2); });
 
+  var chipStates = {};
+
+  function parseValueList(value) {
+    return String(value || '').split(',').map(function (item) {
+      return item.trim();
+    }).filter(Boolean);
+  }
+
+  function uniqueValues(values) {
+    return values.filter(function (value, index) {
+      return values.indexOf(value) === index;
+    });
+  }
+
+  function readCurrentOptions(qid) {
+    var input = document.getElementById('qopts-hid-' + qid);
+    return uniqueValues(parseValueList(input ? input.value : ''));
+  }
+
+  function getValidAnswers(opts, rawValue) {
+    var validOptions = uniqueValues(opts || []);
+    return uniqueValues(parseValueList(rawValue)).filter(function (answer) {
+      return validOptions.includes(answer);
+    });
+  }
+
   function createCard(n) {
     return `
     <div class="card mb-3 q-card" id="qcard-${n}">
@@ -400,13 +433,13 @@ document.addEventListener('DOMContentLoaded', function () {
           <input type="hidden" name="question_options_${n}" id="qopts-hid-${n}" value="">
           <input type="hidden" name="question_correct_answer_${n}" id="qans-hid-${n}" value="">
           <div class="row g-2 mt-1">
-            <div class="col-md-6" id="qscq-wrap-${n}">
+            <div class="col-12 col-lg-6" id="qscq-wrap-${n}">
               <label class="form-label form-label-sm fw-semibold">Correct Answer</label>
               <select id="qscq-sel-${n}" class="form-select form-select-sm">
                 <option value="">-- add options first --</option>
               </select>
             </div>
-            <div class="col-md-6 d-none" id="qmcq-wrap-${n}">
+            <div class="col-12 col-lg-6 d-none" id="qmcq-wrap-${n}">
               <label class="form-label form-label-sm fw-semibold">Correct Answers (tick all)</label>
               <div id="qcb-wrap-${n}" class="border rounded p-2" style="max-height:120px;overflow-y:auto">
                 <span class="text-muted small">Add options first</span>
@@ -440,24 +473,30 @@ document.addEventListener('DOMContentLoaded', function () {
 
     choiceWrap.classList.remove('d-none');
     essayWrap.classList.add('d-none');
-    if (type === 'MCQ') {
-      scqWrap.classList.add('d-none');
-      mcqWrap.classList.remove('d-none');
-      if (ansHid) ansHid.value = '';
-      syncMCQ(qid);
-    } else {
-      scqWrap.classList.remove('d-none');
-      mcqWrap.classList.add('d-none');
-      var scqSel = document.getElementById('qscq-sel-' + qid);
-      if (ansHid && scqSel) ansHid.value = scqSel.value;
-    }
+    scqWrap.classList.toggle('d-none', type === 'MCQ');
+    mcqWrap.classList.toggle('d-none', type !== 'MCQ');
+    syncDropdowns(qid, readCurrentOptions(qid));
   }
 
   function buildChipUI(qid, initOpts) {
-    var opts = initOpts ? initOpts.slice() : [];
+    if (chipStates[qid]) {
+      if (Array.isArray(initOpts)) {
+        chipStates[qid].setOptions(initOpts);
+      }
+      return chipStates[qid].getOptions();
+    }
+
+    var opts = [];
     var textInput = document.getElementById('qopts-txt-' + qid);
     var hiddenInput = document.getElementById('qopts-hid-' + qid);
     var wrap = document.getElementById('qchips-' + qid);
+
+    function setOptions(values) {
+      opts = uniqueValues((values || []).map(function (value) {
+        return String(value).trim();
+      }).filter(Boolean));
+      render();
+    }
 
     function render() {
       wrap.innerHTML = opts.map(function (optionText, index) {
@@ -499,25 +538,31 @@ document.addEventListener('DOMContentLoaded', function () {
       }
     });
 
-    render();
+    chipStates[qid] = {
+      setOptions: setOptions,
+      getOptions: function () { return opts.slice(); }
+    };
+    setOptions(Array.isArray(initOpts) ? initOpts : []);
+    return chipStates[qid].getOptions();
   }
 
   function syncDropdowns(qid, opts) {
     var ansHid = document.getElementById('qans-hid-' + qid);
+    var validAnswers = getValidAnswers(opts, ansHid ? ansHid.value : '');
     var scqSel = document.getElementById('qscq-sel-' + qid);
     if (scqSel) {
-      var previousValue = scqSel.value;
+      var selectedValue = validAnswers.length === 1 ? validAnswers[0] : '';
       scqSel.innerHTML = opts.length
-        ? opts.map(function (optionText) {
-            return '<option value="' + optionText + '"' + (optionText === previousValue ? ' selected' : '') + '>' + optionText + '</option>';
+        ? '<option value="">-- select correct answer --</option>' + opts.map(function (optionText) {
+            return '<option value="' + optionText + '"' + (optionText === selectedValue ? ' selected' : '') + '>' + optionText + '</option>';
           }).join('')
         : '<option value="">-- add options first --</option>';
       if (!document.getElementById('qscq-wrap-' + qid).classList.contains('d-none') && ansHid) {
         ansHid.value = scqSel.value;
       }
-      scqSel.addEventListener('change', function () {
+      scqSel.onchange = function () {
         if (ansHid) ansHid.value = scqSel.value;
-      });
+      };
     }
 
     var cbWrap = document.getElementById('qcb-wrap-' + qid);
@@ -525,12 +570,15 @@ document.addEventListener('DOMContentLoaded', function () {
       cbWrap.innerHTML = opts.length
         ? opts.map(function (optionText) {
             return '<label class="d-flex align-items-center gap-2 mb-1 small">' +
-                   '<input type="checkbox" class="q-mcq-cb" value="' + optionText + '" style="width:1rem;height:1rem"> ' + optionText + '</label>';
+                   '<input type="checkbox" class="q-mcq-cb" value="' + optionText + '" style="width:1rem;height:1rem"' + (validAnswers.includes(optionText) ? ' checked' : '') + '> ' + optionText + '</label>';
           }).join('')
         : '<span class="text-muted small">Add options first</span>';
       cbWrap.querySelectorAll('.q-mcq-cb').forEach(function (checkbox) {
         checkbox.addEventListener('change', function () { syncMCQ(qid); });
       });
+      if (!document.getElementById('qmcq-wrap-' + qid).classList.contains('d-none') && ansHid) {
+        ansHid.value = validAnswers.join(',');
+      }
     }
   }
 
@@ -624,29 +672,15 @@ document.addEventListener('DOMContentLoaded', function () {
         var qid = question.index;
         var typeEl = document.querySelector('.q-type-sel[data-qid="' + qid + '"]');
         var textEl = document.querySelector('textarea[name="question_text_' + qid + '"]');
+        var ansHid = document.getElementById('qans-hid-' + qid);
         if (typeEl && question.question_type) {
           typeEl.value = question.question_type;
           typeEl.dispatchEvent(new Event('change'));
         }
         if (textEl && question.question_text) textEl.value = question.question_text;
-        if (question.options && question.options.length) buildChipUI(qid, question.options);
-        var ansHid = document.getElementById('qans-hid-' + qid);
         if (ansHid && question.correct_answer) ansHid.value = question.correct_answer;
-        if (question.question_type === 'SCQ') {
-          var scqSel = document.getElementById('qscq-sel-' + qid);
-          if (scqSel && question.correct_answer) scqSel.value = question.correct_answer;
-        }
-        if (question.question_type === 'MCQ' && question.correct_answer) {
-          var selectedAnswers = question.correct_answer.split(',').map(function (value) {
-            return value.trim();
-          }).filter(Boolean);
-          var mcqWrap = document.getElementById('qcb-wrap-' + qid);
-          if (mcqWrap) {
-            mcqWrap.querySelectorAll('.q-mcq-cb').forEach(function (checkbox) {
-              checkbox.checked = selectedAnswers.includes(checkbox.value);
-            });
-          }
-        }
+        buildChipUI(qid, Array.isArray(question.options) ? question.options : []);
+        syncDropdowns(qid, readCurrentOptions(qid));
       });
       refreshBadge();
       goToStep(2);

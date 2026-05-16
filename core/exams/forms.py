@@ -74,16 +74,29 @@ class OnlineQuestionForm(forms.ModelForm):
         question_type = self.cleaned_data.get('question_type')
         options = self.cleaned_data.get('options')
 
-        # Normalise to lowercase — grading already compares case-insensitively
-        if correct_answer:
-            correct_answer = correct_answer.strip().lower()
-        options_lower = [o.lower() for o in options] if options else []
+        answers = [answer.strip().lower() for answer in str(correct_answer).split(',') if answer.strip()] if correct_answer else []
+        option_lookup = {
+            str(option).strip().lower(): str(option).strip()
+            for option in (options or [])
+            if str(option).strip()
+        }
+        options_lower = list(option_lookup.keys())
 
-        if question_type in ['SCQ', 'MCQ']:
-            if not correct_answer:
-                raise forms.ValidationError("A correct answer is required for SCQ/MCQ questions.")
-            if options_lower and correct_answer not in options_lower:
+        if question_type == 'SCQ':
+            if len(answers) != 1:
+                raise forms.ValidationError("A single correct answer is required for SCQ questions.")
+            if options_lower and answers[0] not in options_lower:
                 raise forms.ValidationError("The correct answer must be one of the provided options.")
+            return option_lookup.get(answers[0], answers[0])
+
+        if question_type == 'MCQ':
+            if not answers:
+                raise forms.ValidationError("At least one correct answer is required for MCQ questions.")
+            if options_lower:
+                invalid_answers = [answer for answer in answers if answer not in options_lower]
+                if invalid_answers:
+                    raise forms.ValidationError("All correct answers must be selected from the provided options.")
+            return ','.join(option_lookup.get(answer, answer) for answer in answers)
         elif question_type == 'ES':
             pass
         return correct_answer

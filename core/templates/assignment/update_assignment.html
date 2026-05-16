@@ -2,9 +2,8 @@
 {% load crispy_forms_tags %}
 {% block title %}Edit Assignment: {{ assignment.title }}{% endblock %}
 {% block content %}
-<div class="container my-4" style="max-width:900px">
+<div class="container my-4 wizard-shell wizard-shell-assignment" style="max-width:1000px">
 
-  <!-- Breadcrumb -->
   <nav aria-label="breadcrumb" class="mb-3">
     <ol class="breadcrumb small">
       <li class="breadcrumb-item"><a href="{% url assignment_dashboard_route %}">Dashboard</a></li>
@@ -13,10 +12,17 @@
     </ol>
   </nav>
 
-  <div class="d-flex align-items-center justify-content-between mb-3">
-    <h4 class="mb-0 fw-bold">Edit Assignment</h4>
-    <span class="text-muted small">{{ assignment.title }}</span>
-  </div>
+  <section class="wizard-hero mb-4">
+    <div class="wizard-hero-copy">
+      <span class="wizard-kicker">Assignment Studio</span>
+      <h1 class="wizard-title">Refine {{ assignment.title }}</h1>
+      <p class="wizard-subtitle mb-0">Update the task setup, revise existing questions, and keep new additions stable without dropping teacher input when validation fails.</p>
+    </div>
+    <div class="wizard-hero-side">
+      <div class="wizard-chip"><i class="fas fa-pen-ruler"></i><span>Existing questions stay editable</span></div>
+      <div class="wizard-chip"><i class="fas fa-mobile-alt"></i><span>Cleaner mobile editing flow</span></div>
+    </div>
+  </section>
 
   {% if messages %}
     {% for message in messages %}
@@ -26,20 +32,21 @@
     {% endfor %}
   {% endif %}
 
-  {% if form.errors %}
+  {% if form.errors or processing_errors %}
   <div class="alert alert-danger alert-dismissible fade show">
     <h6 class="alert-heading mb-1"><i class="fas fa-exclamation-triangle me-1"></i> Fix the errors below</h6>
     {% for field in form %}{% if field.errors %}<div><strong>{{ field.label }}:</strong> {{ field.errors|striptags }}</div>{% endif %}{% endfor %}
+    {% for err in processing_errors %}<div>{{ err }}</div>{% endfor %}
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
   </div>
   {% endif %}
 
   <form method="POST" novalidate id="update-form">
     {% csrf_token %}
+    <input type="hidden" name="deleted_question_ids" id="deleted-q-ids" value="">
 
-    <!-- Details card -->
-    <div class="card shadow-sm border-0 mb-4">
-      <div class="card-header bg-secondary text-white rounded-top">
+    <div class="card shadow-sm border-0 mb-4 wizard-stage-card">
+      <div class="card-header bg-primary text-white rounded-top">
         <i class="fas fa-info-circle me-2"></i>Assignment Details
       </div>
       <div class="card-body p-4">
@@ -55,15 +62,16 @@
           <div class="col-12">
             <div class="form-check">
               {{ form.shuffle_questions }}
-              <label class="form-check-label ms-2" for="{{ form.shuffle_questions.id_for_label }}">Shuffle questions for each student</label>
+              <label class="form-check-label ms-2" for="{{ form.shuffle_questions.id_for_label }}">
+                Shuffle questions for each student
+              </label>
             </div>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Existing questions card -->
-    <div class="card shadow-sm border-0 mb-4">
+    <div class="card shadow-sm border-0 mb-4 wizard-stage-card">
       <div class="card-header bg-dark text-white rounded-top d-flex justify-content-between align-items-center">
         <span><i class="fas fa-list-ol me-2"></i>Existing Questions</span>
         <span class="badge bg-secondary">{{ questions|length }}</span>
@@ -71,50 +79,104 @@
       <div class="card-body p-3">
         {% if questions %}
           {% for q in questions %}
-          <div class="card mb-2 border q-existing-card" id="existing-card-{{ q.id }}" style="border-left:3px solid #6c757d!important">
+          <div class="card mb-3 border" id="existing-card-{{ q.id }}" style="border-left:3px solid #dee2e6">
             <div class="card-body p-3">
-              <div class="d-flex justify-content-between align-items-start">
-                <div class="flex-grow-1 me-2">
-                  <div class="d-flex align-items-center gap-2 mb-1">
-                    <span class="badge {% if q.question_type == 'SCQ' %}bg-info{% elif q.question_type == 'MCQ' %}bg-warning text-dark{% else %}bg-secondary{% endif %} small">
-                      {{ q.get_question_type_display }}
-                    </span>
-                    <span class="fw-semibold small">{{ q.question_text }}</span>
+              <div id="view-{{ q.id }}">
+                <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+                  <div class="flex-grow-1 me-2">
+                    <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
+                      <span class="badge {% if q.question_type == 'SCQ' %}bg-info{% elif q.question_type == 'MCQ' %}bg-warning text-dark{% else %}bg-secondary{% endif %}">{{ q.get_question_type_display }}</span>
+                      <span class="text-muted small">Question {{ forloop.counter }}</span>
+                    </div>
+                    <p class="fw-semibold small mb-1">{{ q.question_text }}</p>
+                    {% if q.question_type != 'ES' and q.options_list %}
+                    <div>
+                      {% for opt in q.options_list %}
+                      <span class="badge me-1 mb-1 {% if opt in q.correct_answer_list %}bg-success{% else %}bg-light text-dark border{% endif %}" style="font-size:.73rem">{{ opt }}</span>
+                      {% endfor %}
+                    </div>
+                    {% endif %}
                   </div>
-                  {% if q.question_type != 'ES' and q.options_list %}
-                  <div class="mt-1">
-                    {% for opt in q.options_list %}
-                    <span class="badge
-                      {% if opt == q.correct_answer %}bg-success{% else %}bg-light text-dark border{% endif %}
-                      me-1 mb-1" style="font-size:.75rem">{{ opt }}</span>
-                    {% endfor %}
+                  <div class="d-flex gap-1 flex-shrink-0">
+                    <button type="button" class="btn btn-sm btn-outline-primary toggle-edit-btn" data-qid="{{ q.id }}" title="Edit">
+                      <i class="fas fa-edit"></i>
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-danger mark-del-btn" data-qid="{{ q.id }}" title="Remove">
+                      <i class="fas fa-trash-alt"></i>
+                    </button>
                   </div>
-                  {% endif %}
                 </div>
-                <div class="d-flex gap-1 flex-shrink-0">
-                  <!-- Delete toggle: adds delete_question_ID to form when confirmed -->
-                  <button type="button" class="btn btn-sm btn-outline-danger delete-existing-btn" data-qid="{{ q.id }}">
-                    <i class="fas fa-trash-alt"></i>
-                  </button>
-                  <!-- Hidden marker; only submitted if user clicks delete -->
+                <div class="d-none alert alert-warning py-1 px-2 small mt-2" id="del-warn-{{ q.id }}">
+                  <i class="fas fa-exclamation-circle me-1"></i>Marked for deletion.
+                  <a href="#" class="alert-link undo-del" data-qid="{{ q.id }}">Undo</a>
                 </div>
               </div>
-              <!-- Hidden delete sentinel — disabled until button is clicked -->
-              <input type="hidden" name="delete_question_{{ q.id }}" id="del-sentinel-{{ q.id }}" disabled value="1">
-              <div class="alert alert-warning py-1 px-2 small mt-2 d-none" id="del-warn-{{ q.id }}">
-                <i class="fas fa-exclamation-circle me-1"></i>Marked for deletion. <a href="#" class="alert-link undo-delete" data-qid="{{ q.id }}">Undo</a>
+
+              <div class="d-none" id="edit-{{ q.id }}">
+                <div class="row g-2 mb-2">
+                  <div class="col-md-3">
+                    <label class="form-label form-label-sm fw-semibold">Type</label>
+                    <select name="question_{{ q.id }}_type" class="form-select form-select-sm ex-type-sel" data-qid="{{ q.id }}">
+                      <option value="SCQ" {% if q.question_type == 'SCQ' %}selected{% endif %}>Single Choice</option>
+                      <option value="MCQ" {% if q.question_type == 'MCQ' %}selected{% endif %}>Multiple Choice</option>
+                      <option value="ES" {% if q.question_type == 'ES' %}selected{% endif %}>Essay</option>
+                    </select>
+                  </div>
+                  <div class="col-md-9">
+                    <label class="form-label form-label-sm fw-semibold">Question Text</label>
+                    <textarea name="question_{{ q.id }}_text" class="form-control form-control-sm" rows="2">{{ q.question_text }}</textarea>
+                  </div>
+                </div>
+
+                <div id="ex-choice-{{ q.id }}" {% if q.question_type == 'ES' %}class="d-none"{% endif %}>
+                  <label class="form-label form-label-sm fw-semibold">Options <span class="text-muted fw-normal">(press Enter or comma)</span></label>
+                  <input type="text" class="form-control form-control-sm mb-1" id="ex-opts-txt-{{ q.id }}" placeholder="Type an option...">
+                  <div id="ex-chips-{{ q.id }}" class="mb-2"></div>
+                  <input type="hidden" name="question_{{ q.id }}_options" id="ex-opts-hid-{{ q.id }}" value="{{ q.options_list|join:',' }}">
+                  <div class="row g-2" id="ex-scq-row-{{ q.id }}" {% if q.question_type == 'MCQ' %}style="display:none!important"{% endif %}>
+                    <div class="col-md-6">
+                      <label class="form-label form-label-sm fw-semibold">Correct Answer</label>
+                      <select id="ex-scq-sel-{{ q.id }}" class="form-select form-select-sm">
+                        {% for opt in q.options_list %}
+                        <option value="{{ opt }}" {% if opt in q.correct_answer_list %}selected{% endif %}>{{ opt }}</option>
+                        {% endfor %}
+                      </select>
+                    </div>
+                  </div>
+                  <div id="ex-mcq-row-{{ q.id }}" {% if q.question_type != 'MCQ' %}class="d-none"{% endif %}>
+                    <label class="form-label form-label-sm fw-semibold">Correct Answers (tick all)</label>
+                    <div id="ex-mcq-cb-{{ q.id }}" class="border rounded p-2" style="max-height:100px;overflow-y:auto">
+                      {% for opt in q.options_list %}
+                      <label class="d-flex align-items-center gap-2 mb-1 small">
+                        <input type="checkbox" class="ex-mcq-cb" data-qid="{{ q.id }}" value="{{ opt }}" style="width:1rem;height:1rem" {% if opt in q.correct_answer_list %}checked{% endif %}>
+                        {{ opt }}
+                      </label>
+                      {% endfor %}
+                    </div>
+                  </div>
+                  <input type="hidden" name="question_{{ q.id }}_correct_answer" id="ex-ans-hid-{{ q.id }}" value="{{ q.correct_answer_list|join:',' }}">
+                </div>
+
+                <div id="ex-essay-{{ q.id }}" {% if q.question_type != 'ES' %}class="d-none"{% endif %}>
+                  <p class="text-muted small mb-0">Essay questions do not require options or an answer key.</p>
+                </div>
+
+                <div class="d-flex gap-2 mt-2">
+                  <button type="button" class="btn btn-sm btn-outline-secondary collapse-edit-btn" data-qid="{{ q.id }}">
+                    <i class="fas fa-chevron-up me-1"></i> Collapse
+                  </button>
+                </div>
               </div>
             </div>
           </div>
           {% endfor %}
         {% else %}
-        <p class="text-muted small mb-0">No questions yet. Add some below.</p>
+        <p class="text-muted small mb-0">No questions yet.</p>
         {% endif %}
       </div>
     </div>
 
-    <!-- New questions card -->
-    <div class="card shadow-sm border-0 mb-4">
+    <div class="card shadow-sm border-0 mb-4 wizard-stage-card">
       <div class="card-header bg-success text-white rounded-top d-flex justify-content-between align-items-center">
         <span><i class="fas fa-plus-circle me-2"></i>Add New Questions</span>
         <span class="badge bg-white text-success" id="new-q-badge">0 new</span>
@@ -128,17 +190,16 @@
         </div>
         <div class="alert alert-light border small mb-0">
           <i class="fas fa-lightbulb text-warning me-1"></i>
-          Type each option and press <kbd>Enter</kbd> or comma to add. For MCQ, tick all correct answers.
+          Type options and press <kbd>Enter</kbd> or comma to add chips. For MCQ, tick all correct answers.
         </div>
       </div>
     </div>
 
-    <!-- Submit -->
-    <div class="d-flex gap-2 justify-content-end mb-4">
-      <a href="{% url assignment_dashboard_route %}" class="btn btn-outline-secondary">
+    <div class="d-flex gap-2 justify-content-end mb-4 flex-wrap">
+      <a href="{% url assignment_list_route %}" class="btn btn-outline-secondary">
         <i class="fas fa-times me-1"></i> Cancel
       </a>
-      <button type="submit" class="btn btn-secondary px-4">
+      <button type="submit" class="btn btn-primary px-4">
         <i class="fas fa-save me-1"></i> Save Changes
       </button>
     </div>
@@ -146,173 +207,468 @@
 </div>
 
 <style>
-.q-existing-card.marked-delete { opacity:.5; border-left-color:#dc3545!important; }
-.chip-tag { display:inline-flex;align-items:center;gap:.3rem;padding:.25rem .6rem;border-radius:20px;font-size:.8rem; }
-.q-card { border-left:3px solid #dee2e6; }
+.wizard-shell-assignment {
+  --wizard-accent: #2563eb;
+  --wizard-accent-rgb: 37, 99, 235;
+  --wizard-ink: #153a82;
+}
+.wizard-hero {
+  display:grid;
+  grid-template-columns:minmax(0,1.8fr) minmax(260px,.9fr);
+  gap:1.25rem;
+  padding:1.5rem 1.6rem;
+  border-radius:28px;
+  background:radial-gradient(circle at top right, rgba(255,255,255,.24), transparent 28%), linear-gradient(135deg, rgba(var(--wizard-accent-rgb), .98), var(--wizard-ink));
+  box-shadow:0 22px 55px rgba(var(--wizard-accent-rgb), .22);
+  color:#fff;
+}
+.wizard-kicker { display:inline-flex; padding:.35rem .7rem; border-radius:999px; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.18); font-size:.78rem; text-transform:uppercase; letter-spacing:.08em; margin-bottom:.9rem; }
+.wizard-title { font-size:clamp(1.7rem,3vw,2.4rem); line-height:1.05; font-weight:800; margin-bottom:.65rem; }
+.wizard-subtitle { max-width:42rem; color:rgba(255,255,255,.82); }
+.wizard-hero-side { display:flex; flex-direction:column; justify-content:center; gap:.85rem; }
+.wizard-chip { display:flex; align-items:center; gap:.7rem; padding:.95rem 1rem; border-radius:18px; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.16); }
+.wizard-stage-card { border-radius:24px; overflow:hidden; box-shadow:0 18px 44px rgba(15, 23, 42, .08) !important; }
+.wizard-stage-card .card-header { background:linear-gradient(135deg, rgba(var(--wizard-accent-rgb), .95), var(--wizard-ink)) !important; padding:1rem 1.25rem; }
+.wizard-stage-card .card-body,
+.wizard-stage-card .card-footer { background:#fff; }
+.chip-tag { display:inline-flex;align-items:center;gap:.3rem;padding:.35rem .7rem;border-radius:999px;font-size:.82rem; }
+.marked-delete { opacity:.45; border-left-color:#dc3545!important; }
+.wizard-shell .card.border { border-radius:18px; box-shadow:0 10px 28px rgba(15,23,42,.05); }
+.wizard-shell .btn { border-radius:999px; }
+.wizard-shell .form-control,
+.wizard-shell .form-select { border-radius:14px; }
+.wizard-shell .alert-light.border { border-radius:18px; background:#f8fbff; }
+@media (max-width: 767.98px) {
+  .wizard-hero { grid-template-columns:1fr; padding:1.2rem; border-radius:22px; }
+}
 </style>
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+  var deletedIds = [];
   var newQCount = 0;
+  var newStates = {};
+  var initializedChips = {};
 
-  // --- Delete / Undo existing questions ---
-  document.querySelectorAll('.delete-existing-btn').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      var qid = btn.dataset.qid;
-      markDelete(qid, true);
-    });
-  });
-  document.addEventListener('click', function (e) {
-    var a = e.target.closest('.undo-delete');
-    if (a) { e.preventDefault(); markDelete(a.dataset.qid, false); }
-  });
-  function markDelete(qid, del) {
-    var card     = document.getElementById('existing-card-' + qid);
-    var sentinel = document.getElementById('del-sentinel-' + qid);
-    var warn     = document.getElementById('del-warn-' + qid);
-    if (!card) return;
-    sentinel.disabled = !del;
-    warn.classList.toggle('d-none', !del);
-    card.classList.toggle('marked-delete', del);
+  function parseList(value) {
+    return String(value || '').split(',').map(function (item) {
+      return item.trim();
+    }).filter(Boolean);
   }
 
-  // --- New question card factory ---
-  function createCard(n) {
-    return '<div class="card mb-3 q-card border" id="newqcard-' + n + '">' +
+  function uniqueList(values) {
+    return values.filter(function (value, index) {
+      return values.indexOf(value) === index;
+    });
+  }
+
+  document.querySelectorAll('.toggle-edit-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var qid = btn.dataset.qid;
+      document.getElementById('view-' + qid).classList.add('d-none');
+      document.getElementById('edit-' + qid).classList.remove('d-none');
+      initExistingChips(qid);
+      initExistingTypeSel(qid);
+      attachExistingMCQSync(qid);
+    });
+  });
+
+  document.querySelectorAll('.collapse-edit-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var qid = btn.dataset.qid;
+      document.getElementById('view-' + qid).classList.remove('d-none');
+      document.getElementById('edit-' + qid).classList.add('d-none');
+    });
+  });
+
+  document.querySelectorAll('.mark-del-btn').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      setDeletion(btn.dataset.qid, true);
+    });
+  });
+
+  document.addEventListener('click', function (event) {
+    var undo = event.target.closest('.undo-del');
+    if (undo) {
+      event.preventDefault();
+      setDeletion(undo.dataset.qid, false);
+    }
+  });
+
+  function setDeletion(qid, shouldDelete) {
+    var card = document.getElementById('existing-card-' + qid);
+    var warn = document.getElementById('del-warn-' + qid);
+    if (!card || !warn) return;
+    card.classList.toggle('marked-delete', shouldDelete);
+    warn.classList.toggle('d-none', !shouldDelete);
+    if (shouldDelete) {
+      if (!deletedIds.includes(qid)) deletedIds.push(qid);
+    } else {
+      deletedIds = deletedIds.filter(function (item) { return item !== qid; });
+    }
+    document.getElementById('deleted-q-ids').value = deletedIds.join(',');
+  }
+
+  function syncExistingDropdowns(qid, opts) {
+    var answerHid = document.getElementById('ex-ans-hid-' + qid);
+    var scqSel = document.getElementById('ex-scq-sel-' + qid);
+    var scqRow = document.getElementById('ex-scq-row-' + qid);
+    var mcqWrap = document.getElementById('ex-mcq-cb-' + qid);
+    if (scqSel) {
+      var previous = scqSel.value;
+      scqSel.innerHTML = opts.length
+        ? opts.map(function (opt) {
+            return '<option value="' + opt + '"' + (opt === previous ? ' selected' : '') + '>' + opt + '</option>';
+          }).join('')
+        : '<option value="">-- add options first --</option>';
+      if (scqRow && scqRow.style.display !== 'none' && answerHid) {
+        answerHid.value = scqSel.value;
+      }
+      scqSel.onchange = function () {
+        if (answerHid) answerHid.value = scqSel.value;
+      };
+    }
+    if (mcqWrap) {
+      var checkedVals = uniqueList(parseList(answerHid ? answerHid.value : ''));
+      mcqWrap.innerHTML = opts.length
+        ? opts.map(function (opt) {
+            return '<label class="d-flex align-items-center gap-2 mb-1 small"><input type="checkbox" class="ex-mcq-cb" data-qid="' + qid + '" value="' + opt + '" style="width:1rem;height:1rem"' + (checkedVals.includes(opt) ? ' checked' : '') + '>' + opt + '</label>';
+          }).join('')
+        : '<span class="text-muted small">Add options first</span>';
+      attachExistingMCQSync(qid);
+    }
+  }
+
+  function initExistingChips(qid) {
+    if (initializedChips[qid]) {
+      syncExistingDropdowns(qid, parseList(document.getElementById('ex-opts-hid-' + qid).value));
+      return;
+    }
+    initializedChips[qid] = true;
+    var tin = document.getElementById('ex-opts-txt-' + qid);
+    var hid = document.getElementById('ex-opts-hid-' + qid);
+    var wrap = document.getElementById('ex-chips-' + qid);
+    if (!tin || !hid || !wrap) return;
+    var opts = uniqueList(parseList(hid.value));
+
+    function render() {
+      wrap.innerHTML = opts.map(function (opt, index) {
+        return '<span class="chip-tag bg-secondary text-white me-1 mb-1" data-opt="' + opt + '">' + opt + '<button type="button" class="btn-close btn-close-white ms-1" style="font-size:.5rem" data-idx="' + index + '"></button></span>';
+      }).join('');
+      hid.value = opts.join(',');
+      syncExistingDropdowns(qid, opts);
+    }
+
+    function addOpt(value) {
+      value = value.trim();
+      if (value && !opts.includes(value)) {
+        opts.push(value);
+        render();
+      }
+    }
+
+    tin.addEventListener('keydown', function (event) {
+      if (event.key === 'Enter' || event.key === ',') {
+        event.preventDefault();
+        addOpt(tin.value);
+        tin.value = '';
+      }
+    });
+    tin.addEventListener('blur', function () {
+      if (tin.value.trim()) {
+        addOpt(tin.value);
+        tin.value = '';
+      }
+    });
+    wrap.addEventListener('click', function (event) {
+      var button = event.target.closest('[data-idx]');
+      if (button) {
+        opts.splice(parseInt(button.dataset.idx, 10), 1);
+        render();
+      }
+    });
+
+    render();
+  }
+
+  function attachExistingMCQSync(qid) {
+    var box = document.getElementById('ex-mcq-cb-' + qid);
+    var hid = document.getElementById('ex-ans-hid-' + qid);
+    if (!box || !hid) return;
+    box.querySelectorAll('.ex-mcq-cb').forEach(function (checkbox) {
+      checkbox.addEventListener('change', function () {
+        hid.value = Array.from(box.querySelectorAll('.ex-mcq-cb:checked')).map(function (item) {
+          return item.value;
+        }).join(',');
+      });
+    });
+  }
+
+  function initExistingTypeSel(qid) {
+    var sel = document.querySelector('.ex-type-sel[data-qid="' + qid + '"]');
+    if (!sel) return;
+
+    function apply(type) {
+      var choice = document.getElementById('ex-choice-' + qid);
+      var essay = document.getElementById('ex-essay-' + qid);
+      var scqRow = document.getElementById('ex-scq-row-' + qid);
+      var mcqRow = document.getElementById('ex-mcq-row-' + qid);
+      var answerHid = document.getElementById('ex-ans-hid-' + qid);
+      if (type === 'ES') {
+        choice.classList.add('d-none');
+        essay.classList.remove('d-none');
+      } else {
+        choice.classList.remove('d-none');
+        essay.classList.add('d-none');
+      }
+
+      if (type === 'MCQ') {
+        scqRow.style.display = 'none';
+        mcqRow.classList.remove('d-none');
+        attachExistingMCQSync(qid);
+      } else {
+        scqRow.style.display = '';
+        mcqRow.classList.add('d-none');
+        var scqSel = document.getElementById('ex-scq-sel-' + qid);
+        if (scqSel && answerHid) answerHid.value = scqSel.value;
+      }
+
+      if (type === 'ES' && answerHid) {
+        answerHid.value = '';
+      }
+    }
+
+    apply(sel.value);
+    sel.addEventListener('change', function () {
+      apply(sel.value);
+    });
+  }
+
+  function createNewCard(n) {
+    return '<div class="card mb-3 border" id="newqcard-' + n + '" style="border-left:3px solid #198754">' +
       '<div class="card-body p-3">' +
       '<div class="d-flex justify-content-between align-items-center mb-2">' +
-        '<span class="fw-semibold small text-success">New Question ' + n + '</span>' +
-        '<button type="button" class="btn btn-sm btn-outline-danger remove-new-q" data-qid="' + n + '"><i class="fas fa-trash-alt"></i></button>' +
+      '<span class="fw-semibold small text-success">New Question ' + n + '</span>' +
+      '<button type="button" class="btn btn-sm btn-outline-danger remove-new-q" data-qid="' + n + '"><i class="fas fa-trash-alt"></i></button>' +
       '</div>' +
       '<div class="row g-2 mb-2">' +
-        '<div class="col-md-4">' +
-          '<label class="form-label form-label-sm fw-semibold">Type</label>' +
-          '<select name="question_type_' + n + '" class="form-select form-select-sm new-q-type" data-qid="' + n + '">' +
-            '<option value="SCQ" selected>Single Choice</option>' +
-            '<option value="MCQ">Multiple Choice</option>' +
-            '<option value="ES">Essay</option>' +
-          '</select>' +
-        '</div>' +
-        '<div class="col-md-8">' +
-          '<label class="form-label form-label-sm fw-semibold">Question Text <span class="text-danger">*</span></label>' +
-          '<textarea name="question_text_' + n + '" class="form-control form-control-sm" rows="2" required></textarea>' +
-        '</div>' +
+      '<div class="col-md-3">' +
+      '<label class="form-label form-label-sm fw-semibold">Type</label>' +
+      '<select name="question_type_' + n + '" class="form-select form-select-sm new-q-type" data-qid="' + n + '">' +
+      '<option value="SCQ" selected>Single Choice</option>' +
+      '<option value="MCQ">Multiple Choice</option>' +
+      '<option value="ES">Essay</option>' +
+      '</select>' +
+      '</div>' +
+      '<div class="col-md-9">' +
+      '<label class="form-label form-label-sm fw-semibold">Question Text <span class="text-danger">*</span></label>' +
+      '<textarea name="question_text_' + n + '" class="form-control form-control-sm" rows="2" required></textarea>' +
+      '</div>' +
       '</div>' +
       '<div id="new-qchoice-' + n + '">' +
-        '<label class="form-label form-label-sm fw-semibold">Options <span class="text-muted fw-normal">(press Enter or comma)</span></label>' +
-        '<input type="text" class="form-control form-control-sm mb-1" id="new-qopts-txt-' + n + '" placeholder="e.g. Paris">' +
-        '<div id="new-qchips-' + n + '" class="mb-1"></div>' +
-        '<input type="hidden" name="options_' + n + '" id="new-qopts-hid-' + n + '" value="">' +
-        '<div class="row g-2">' +
-          '<div class="col-md-6" id="new-qscq-wrap-' + n + '">' +
-            '<label class="form-label form-label-sm fw-semibold">Correct Answer</label>' +
-            '<select id="new-qscq-sel-' + n + '" class="form-select form-select-sm"><option value="">-- add options first --</option></select>' +
-            '<input type="hidden" name="correct_answer_' + n + '" id="new-qans-hid-' + n + '" value="">' +
-          '</div>' +
-          '<div class="col-md-6 d-none" id="new-qmcq-wrap-' + n + '">' +
-            '<label class="form-label form-label-sm fw-semibold">Correct Answers (tick all)</label>' +
-            '<div id="new-qcb-' + n + '" class="border rounded p-2" style="max-height:110px;overflow-y:auto"><span class="text-muted small">Add options first</span></div>' +
-          '</div>' +
-        '</div>' +
+      '<label class="form-label form-label-sm fw-semibold">Options</label>' +
+      '<input type="text" class="form-control form-control-sm mb-1" id="new-qopts-txt-' + n + '" placeholder="e.g. Paris">' +
+      '<div id="new-qchips-' + n + '" class="mb-1"></div>' +
+      '<input type="hidden" name="options_' + n + '" id="new-qopts-hid-' + n + '" value="">' +
+      '<input type="hidden" name="correct_answer_' + n + '" id="new-qans-hid-' + n + '" value="">' +
+      '<div class="row g-2">' +
+      '<div class="col-md-6" id="new-qscq-wrap-' + n + '">' +
+      '<label class="form-label form-label-sm fw-semibold">Correct Answer</label>' +
+      '<select id="new-qscq-sel-' + n + '" class="form-select form-select-sm"><option value="">-- add options first --</option></select>' +
+      '</div>' +
+      '<div class="col-md-6 d-none" id="new-qmcq-wrap-' + n + '">' +
+      '<label class="form-label form-label-sm fw-semibold">Correct Answers (tick all)</label>' +
+      '<div id="new-qcb-' + n + '" class="border rounded p-2" style="max-height:100px;overflow-y:auto"><span class="text-muted small">Add options first</span></div>' +
+      '</div>' +
+      '</div>' +
       '</div>' +
       '<div id="new-qessay-' + n + '" class="d-none">' +
-        '<p class="text-muted small mt-2 mb-0">Essay: students write a free-form answer.</p>' +
+      '<p class="text-muted small mt-2 mb-0">Essay questions do not require options or an answer key.</p>' +
       '</div>' +
       '</div></div>';
   }
 
-  function attachChipUI(n) {
-    var opts = [];
-    var tin  = document.getElementById('new-qopts-txt-' + n);
-    var hid  = document.getElementById('new-qopts-hid-' + n);
-    var wrap = document.getElementById('new-qchips-' + n);
-    function render() {
-      wrap.innerHTML = opts.map(function (o, i) {
-        return '<span class="chip-tag bg-secondary text-white me-1 mb-1">' + o +
-               '<button type="button" class="btn-close btn-close-white ms-1" style="font-size:.5rem" data-idx="' + i + '"></button></span>';
-      }).join('');
-      hid.value = opts.join(',');
-      syncDropdowns(n, opts);
-    }
-    function addOpt(v) { v = v.trim(); if (v && !opts.includes(v)) { opts.push(v); render(); } }
-    tin.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); addOpt(tin.value); tin.value = ''; }
-    });
-    tin.addEventListener('blur', function () { if (tin.value.trim()) { addOpt(tin.value); tin.value = ''; } });
-    wrap.addEventListener('click', function (e) {
-      var b = e.target.closest('[data-idx]');
-      if (b) { opts.splice(parseInt(b.dataset.idx), 1); render(); }
-    });
-  }
-
-  function syncDropdowns(n, opts) {
-    var ansHid  = document.getElementById('new-qans-hid-'  + n);
-    var scqSel  = document.getElementById('new-qscq-sel-'  + n);
-    var cbWrap  = document.getElementById('new-qcb-'       + n);
+  function syncNewDropdowns(n) {
+    var state = newStates[n];
+    if (!state) return;
+    var opts = state.options;
+    var ansHid = document.getElementById('new-qans-hid-' + n);
+    var scqSel = document.getElementById('new-qscq-sel-' + n);
+    var cbWrap = document.getElementById('new-qcb-' + n);
     var scqWrap = document.getElementById('new-qscq-wrap-' + n);
     if (scqSel) {
-      var prev = scqSel.value;
+      var previous = scqSel.value;
       scqSel.innerHTML = opts.length
-        ? opts.map(function (o) { return '<option value="' + o + '"' + (o === prev ? ' selected' : '') + '>' + o + '</option>'; }).join('')
+        ? opts.map(function (opt) { return '<option value="' + opt + '"' + (opt === previous ? ' selected' : '') + '>' + opt + '</option>'; }).join('')
         : '<option value="">-- add options first --</option>';
       if (!scqWrap.classList.contains('d-none') && ansHid) ansHid.value = scqSel.value;
-      scqSel.onchange = function () { if (ansHid) ansHid.value = scqSel.value; };
+      scqSel.onchange = function () {
+        if (ansHid) ansHid.value = scqSel.value;
+      };
     }
     if (cbWrap) {
+      var checked = uniqueList(parseList(ansHid ? ansHid.value : '')).filter(function (value) {
+        return opts.includes(value);
+      });
       cbWrap.innerHTML = opts.length
-        ? opts.map(function (o) {
-            return '<label class="d-flex align-items-center gap-2 mb-1 small">' +
-                   '<input type="checkbox" class="new-q-mcq-cb" value="' + o + '" style="width:1rem;height:1rem"> ' + o + '</label>';
+        ? opts.map(function (opt) {
+            return '<label class="d-flex align-items-center gap-2 mb-1 small"><input type="checkbox" class="new-q-mcq-cb" value="' + opt + '" style="width:1rem;height:1rem"' + (checked.includes(opt) ? ' checked' : '') + '> ' + opt + '</label>';
           }).join('')
         : '<span class="text-muted small">Add options first</span>';
-      cbWrap.querySelectorAll('.new-q-mcq-cb').forEach(function (cb) {
-        cb.addEventListener('change', function () {
+      cbWrap.querySelectorAll('.new-q-mcq-cb').forEach(function (checkbox) {
+        checkbox.addEventListener('change', function () {
           if (ansHid) {
-            var checked = Array.from(cbWrap.querySelectorAll('.new-q-mcq-cb:checked')).map(function (c) { return c.value; });
-            ansHid.value = checked.join(',');
+            ansHid.value = Array.from(cbWrap.querySelectorAll('.new-q-mcq-cb:checked')).map(function (item) {
+              return item.value;
+            }).join(',');
           }
         });
       });
     }
   }
 
+  function renderNewChips(n) {
+    var state = newStates[n];
+    var wrap = document.getElementById('new-qchips-' + n);
+    var hid = document.getElementById('new-qopts-hid-' + n);
+    if (!state || !wrap || !hid) return;
+    wrap.innerHTML = state.options.map(function (opt, index) {
+      return '<span class="chip-tag bg-secondary text-white me-1 mb-1">' + opt + '<button type="button" class="btn-close btn-close-white ms-1" style="font-size:.5rem" data-idx="' + index + '"></button></span>';
+    }).join('');
+    hid.value = state.options.join(',');
+    syncNewDropdowns(n);
+  }
+
+  function seedNewOptions(n, options) {
+    if (!newStates[n]) return;
+    newStates[n].options = uniqueList(options || []);
+    renderNewChips(n);
+  }
+
+  function attachNewChipUI(n) {
+    newStates[n] = { options: [] };
+    var tin = document.getElementById('new-qopts-txt-' + n);
+    var wrap = document.getElementById('new-qchips-' + n);
+    if (!tin || !wrap) return;
+
+    function addOpt(value) {
+      value = value.trim();
+      if (value && !newStates[n].options.includes(value)) {
+        newStates[n].options.push(value);
+        renderNewChips(n);
+      }
+    }
+
+    tin.addEventListener('keydown', function (event) {
+      if (event.key === 'Enter' || event.key === ',') {
+        event.preventDefault();
+        addOpt(tin.value);
+        tin.value = '';
+      }
+    });
+    tin.addEventListener('blur', function () {
+      if (tin.value.trim()) {
+        addOpt(tin.value);
+        tin.value = '';
+      }
+    });
+    wrap.addEventListener('click', function (event) {
+      var button = event.target.closest('[data-idx]');
+      if (button) {
+        newStates[n].options.splice(parseInt(button.dataset.idx, 10), 1);
+        renderNewChips(n);
+      }
+    });
+  }
+
   function toggleNewType(n) {
-    var sel     = document.querySelector('.new-q-type[data-qid="' + n + '"]');
-    var choice  = document.getElementById('new-qchoice-' + n);
-    var essay   = document.getElementById('new-qessay-'  + n);
+    var sel = document.querySelector('.new-q-type[data-qid="' + n + '"]');
+    var choice = document.getElementById('new-qchoice-' + n);
+    var essay = document.getElementById('new-qessay-' + n);
     var scqWrap = document.getElementById('new-qscq-wrap-' + n);
     var mcqWrap = document.getElementById('new-qmcq-wrap-' + n);
-    var ansHid  = document.getElementById('new-qans-hid-'  + n);
+    var ansHid = document.getElementById('new-qans-hid-' + n);
     if (!sel) return;
-    var t = sel.value;
-    if (t === 'ES') { choice.classList.add('d-none'); essay.classList.remove('d-none'); }
-    else            { choice.classList.remove('d-none'); essay.classList.add('d-none'); }
-    if (scqWrap && mcqWrap) {
-      if (t === 'MCQ') { scqWrap.classList.add('d-none'); mcqWrap.classList.remove('d-none'); if (ansHid) ansHid.value = ''; }
-      else             { scqWrap.classList.remove('d-none'); mcqWrap.classList.add('d-none'); var s = document.getElementById('new-qscq-sel-' + n); if (s && ansHid) ansHid.value = s.value; }
+    if (sel.value === 'ES') {
+      choice.classList.add('d-none');
+      essay.classList.remove('d-none');
+    } else {
+      choice.classList.remove('d-none');
+      essay.classList.add('d-none');
     }
+    if (sel.value === 'MCQ') {
+      scqWrap.classList.add('d-none');
+      mcqWrap.classList.remove('d-none');
+      if (ansHid && !parseList(ansHid.value).length) ansHid.value = '';
+    } else {
+      scqWrap.classList.remove('d-none');
+      mcqWrap.classList.add('d-none');
+      var scqSel = document.getElementById('new-qscq-sel-' + n);
+      if (scqSel && ansHid) ansHid.value = scqSel.value;
+    }
+    if (sel.value === 'ES' && ansHid) {
+      ansHid.value = '';
+    }
+    syncNewDropdowns(n);
+  }
+
+  function refreshBadge() {
+    document.getElementById('new-q-badge').textContent = document.querySelectorAll('[id^="newqcard-"]').length + ' new';
   }
 
   document.getElementById('add-new-q-btn').addEventListener('click', function () {
-    newQCount++;
+    newQCount += 1;
     var n = newQCount;
-    document.getElementById('new-questions-container').insertAdjacentHTML('beforeend', createCard(n));
-    attachChipUI(n);
+    document.getElementById('new-questions-container').insertAdjacentHTML('beforeend', createNewCard(n));
+    attachNewChipUI(n);
     toggleNewType(n);
     var sel = document.querySelector('.new-q-type[data-qid="' + n + '"]');
-    if (sel) sel.addEventListener('change', function () { toggleNewType(n); });
+    if (sel) {
+      sel.addEventListener('change', function () {
+        toggleNewType(n);
+      });
+    }
     refreshBadge();
   });
 
-  document.getElementById('new-questions-container').addEventListener('click', function (e) {
-    var b = e.target.closest('.remove-new-q');
-    if (b) { var c = document.getElementById('newqcard-' + b.dataset.qid); if (c) c.remove(); refreshBadge(); }
+  document.getElementById('new-questions-container').addEventListener('click', function (event) {
+    var button = event.target.closest('.remove-new-q');
+    if (button) {
+      var card = document.getElementById('newqcard-' + button.dataset.qid);
+      if (card) card.remove();
+      delete newStates[button.dataset.qid];
+      refreshBadge();
+    }
   });
 
-  function refreshBadge() {
-    var n = document.querySelectorAll('[id^="newqcard-"]').length;
-    document.getElementById('new-q-badge').textContent = n + ' new';
+  try {
+    var posted = JSON.parse('{{ posted_questions_json|default:"[]"|escapejs }}');
+    if (Array.isArray(posted)) {
+      posted.forEach(function (question) {
+        document.getElementById('add-new-q-btn').click();
+        var n = question.index;
+        var typeEl = document.querySelector('.new-q-type[data-qid="' + n + '"]');
+        var textEl = document.querySelector('textarea[name="question_text_' + n + '"]');
+        var ansHid = document.getElementById('new-qans-hid-' + n);
+        if (typeEl && question.question_type) {
+          typeEl.value = question.question_type;
+        }
+        if (textEl) {
+          textEl.value = question.question_text || '';
+        }
+        seedNewOptions(n, question.options || []);
+        if (ansHid) {
+          ansHid.value = question.correct_answer || '';
+        }
+        toggleNewType(n);
+        syncNewDropdowns(n);
+      });
+    }
+  } catch (error) {
+    console.error('Hydration failed', error);
   }
+
+  refreshBadge();
 });
 </script>
 {% endblock %}

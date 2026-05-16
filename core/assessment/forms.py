@@ -81,16 +81,23 @@ class OnlineQuestionForm(forms.ModelForm):
         question_type = self.cleaned_data.get('question_type')
         options = self.cleaned_data.get('options')
 
+        option_lookup = {
+            str(option).strip().lower(): str(option).strip()
+            for option in (options or [])
+            if str(option).strip()
+        }
+
         # Normalise to lowercase so validation is case-insensitive (matches grading logic)
         if correct_answer_input:
             correct_answer_input = correct_answer_input.strip().lower()
-        options_lower = [o.lower() for o in options] if options else []
+        options_lower = list(option_lookup.keys())
 
         if question_type == 'SCQ':
             if not correct_answer_input:
                 raise forms.ValidationError("A correct answer is required for Single Choice Questions.")
             if options_lower and correct_answer_input not in options_lower:
                 raise forms.ValidationError("For Single Choice, the correct answer must be one of the provided options.")
+            return option_lookup.get(correct_answer_input, correct_answer_input)
 
         elif question_type == 'MCQ':
             if not correct_answer_input:
@@ -112,7 +119,7 @@ class OnlineQuestionForm(forms.ModelForm):
             else:
                 raise forms.ValidationError("Options are missing for this MCQ, cannot validate correct answer.")
 
-            return correct_answer_input
+            return ','.join(option_lookup.get(answer, answer) for answer in individual_correct_answers)
 
         elif question_type == 'ES':
             # For Essay, correct_answer is optional (can be a model answer or rubric)

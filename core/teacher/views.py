@@ -186,7 +186,113 @@ def _user_can_manage_assignment(user, assignment):
 def _populate_assignment_form_scope(form, classes, subjects):
     form.fields['class_assigned'].queryset = classes
     form.fields['subject'].queryset = subjects
+
+    instance = getattr(form, 'instance', None)
+    if getattr(instance, 'class_assigned_id', None):
+        class_queryset = form.fields['class_assigned'].queryset
+        if not class_queryset.filter(pk=instance.class_assigned_id).exists():
+            form.fields['class_assigned'].queryset = Class.objects.filter(
+                Q(pk=instance.class_assigned_id) | Q(pk__in=class_queryset.values('pk'))
+            ).distinct()
+
+    if getattr(instance, 'subject_id', None):
+        subject_queryset = form.fields['subject'].queryset
+        if not subject_queryset.filter(pk=instance.subject_id).exists():
+            form.fields['subject'].queryset = Subject.objects.filter(
+                Q(pk=instance.subject_id) | Q(pk__in=subject_queryset.values('pk'))
+            ).distinct()
+
     return form
+
+
+def _populate_scoped_model_form_choices(form, classes, subjects):
+    form.fields['class_assigned'].queryset = classes
+    form.fields['subject'].queryset = subjects
+
+    instance = getattr(form, 'instance', None)
+    if getattr(instance, 'class_assigned_id', None):
+        class_queryset = form.fields['class_assigned'].queryset
+        if not class_queryset.filter(pk=instance.class_assigned_id).exists():
+            form.fields['class_assigned'].queryset = Class.objects.filter(
+                Q(pk=instance.class_assigned_id) | Q(pk__in=class_queryset.values('pk'))
+            ).distinct()
+
+    if getattr(instance, 'subject_id', None):
+        subject_queryset = form.fields['subject'].queryset
+        if not subject_queryset.filter(pk=instance.subject_id).exists():
+            form.fields['subject'].queryset = Subject.objects.filter(
+                Q(pk=instance.subject_id) | Q(pk__in=subject_queryset.values('pk'))
+            ).distinct()
+
+    return form
+
+
+def _process_assignment_existing_questions(post_data, assignment):
+    errors = []
+
+    for question in assignment.questions.all().order_by('id'):
+        question_id = question.id
+        submitted_text = post_data.get(f'question_{question_id}_text')
+        submitted_type = post_data.get(f'question_{question_id}_type')
+        if submitted_text is None and submitted_type is None:
+            continue
+
+        options_raw = post_data.get(
+            f'question_{question_id}_options',
+            post_data.get(f'options_{question_id}', ''),
+        )
+        correct_answer = post_data.get(
+            f'question_{question_id}_correct_answer',
+            post_data.get(f'correct_answer_{question_id}', ''),
+        ).strip()
+
+        question_form = QuestionForm(
+            {
+                'question_type': submitted_type or question.question_type,
+                'question_text': (submitted_text or '').strip(),
+                'options': [opt.strip() for opt in options_raw.split(',') if opt.strip()],
+                'correct_answer': correct_answer or None,
+            },
+            instance=question,
+        )
+
+        if question_form.is_valid():
+            question_form.save()
+        else:
+            for field, field_errors in question_form.errors.items():
+                field_label = 'Question' if field == '__all__' else field.replace('_', ' ').title()
+                errors.append(f"Existing Question {question_id} ({field_label}): {', '.join(field_errors)}")
+
+    return errors
+
+
+def _process_new_assignment_questions(post_data, assignment):
+    posted_questions = _serialize_posted_assignment_questions(post_data)
+    errors = []
+
+    for question in posted_questions:
+        if not question['question_text']:
+            continue
+
+        question_form = QuestionForm(
+            {
+                'question_type': question['question_type'],
+                'question_text': question['question_text'],
+                'options': question['options'],
+                'correct_answer': question['correct_answer'] or None,
+            }
+        )
+
+        if question_form.is_valid():
+            new_question = question_form.save(commit=False)
+            new_question.assignment = assignment
+            new_question.save()
+        else:
+            for field, field_errors in question_form.errors.items():
+                field_label = 'Question' if field == '__all__' else field.replace('_', ' ').title()
+                errors.append(f"New Question {question['index']} ({field_label}): {', '.join(field_errors)}")
+
+    return posted_questions, errors
 # Teacher Views
 
 class AdminRequiredMixin(UserPassesTestMixin):
@@ -1359,48 +1465,46 @@ def update_assignment(request, assignment_id):
                 updated_assignment.updated_at = timezone.now()
                 updated_assignment.save()
 
+                processing_errors = []
+
                 import re as _re
                 delete_pattern = _re.compile(r'^delete_question_(\d+)$')
-                ids_to_delete = [
+                ids_to_delete = {
                     int(m.group(1))
                     for key in request.POST
                     for m in [delete_pattern.match(key)]
                     if m
-                ]
+                }
+                deleted_ids_str = request.POST.get('deleted_question_ids', '')
+                if deleted_ids_str:
+                    ids_to_delete.update(
+                        int(id_str)
+                        for id_str in deleted_ids_str.split(',')
+                        if id_str.isdigit()
+                    )
                 if ids_to_delete:
                     assignment.questions.filter(id__in=ids_to_delete).delete()
 
-                type_pattern = _re.compile(r'^question_type_(\d+)$')
-                new_numbers = sorted(
-                    int(m.group(1))
-                    for key in request.POST
-                    for m in [type_pattern.match(key)]
-                    if m
-                )
-                for n in new_numbers:
-                    q_type = request.POST.get(f'question_type_{n}')
-                    q_text = request.POST.get(f'question_text_{n}', '').strip()
-                    opts_raw = request.POST.get(
-                        f'question_options_{n}',
-                        request.POST.get(f'options_{n}', ''),
-                    )
-                    correct = request.POST.get(
-                        f'question_correct_answer_{n}',
-                        request.POST.get(f'correct_answer_{n}', ''),
-                    ).strip()
-                    if not q_text:
-                        continue
-                    opts_list = [o.strip() for o in opts_raw.split(',') if o.strip()]
-                    Question.objects.create(
-                        assignment=assignment,
-                        question_type=q_type,
-                        question_text=q_text,
-                        options=opts_list if opts_list else None,
-                        correct_answer=correct or None,
-                    )
+                processing_errors.extend(_process_assignment_existing_questions(request.POST, assignment))
+                posted_new_questions, new_question_errors = _process_new_assignment_questions(request.POST, assignment)
+                processing_errors.extend(new_question_errors)
 
-                messages.success(request, "Assignment updated successfully.")
-                return redirect(_assignment_dashboard_route_name(request.user))
+                if not processing_errors:
+                    messages.success(request, "Assignment updated successfully.")
+                    return redirect(_assignment_dashboard_route_name(request.user))
+
+                messages.error(request, "Errors occurred while processing questions. Please review and try again.")
+                questions = assignment.questions.all().order_by('id')
+                return render(request, 'assignment/update_assignment.html', {
+                    'form': form,
+                    'assignment': assignment,
+                    'questions': questions,
+                    'processing_errors': processing_errors,
+                    'posted_questions_json': json.dumps(posted_new_questions),
+                    'assignment_route_prefix': _assignment_route_prefix(request.user),
+                    'assignment_list_route': _assignment_list_route_name(request.user),
+                    'assignment_dashboard_route': _assignment_dashboard_route_name(request.user),
+                })
     else:
         form = AssignmentForm(instance=assignment)
         _populate_assignment_form_scope(form, assigned_classes, subjects)
@@ -1410,6 +1514,8 @@ def update_assignment(request, assignment_id):
         'form': form,
         'assignment': assignment,
         'questions': questions,
+        'processing_errors': [],
+        'posted_questions_json': json.dumps(_serialize_posted_assignment_questions(request.POST)) if request.method == 'POST' else '',
         'assignment_route_prefix': _assignment_route_prefix(request.user),
         'assignment_list_route': _assignment_list_route_name(request.user),
         'assignment_dashboard_route': _assignment_dashboard_route_name(request.user),
@@ -1622,8 +1728,7 @@ def update_assessment(request, assessment_id):
 
     if request.method == 'POST':
         form = AssessmentForm(request.POST, instance=assessment)
-        form.fields['class_assigned'].queryset = assigned_classes_qs
-        form.fields['subject'].queryset = assigned_subjects_qs
+        _populate_scoped_model_form_choices(form, assigned_classes_qs, assigned_subjects_qs)
 
         if form.is_valid():
             updated_assessment = form.save(commit=False)
@@ -1693,8 +1798,7 @@ def update_assessment(request, assessment_id):
 
     else: # GET request
         form = AssessmentForm(instance=assessment)
-        form.fields['class_assigned'].queryset = assigned_classes_qs
-        form.fields['subject'].queryset = assigned_subjects_qs
+        _populate_scoped_model_form_choices(form, assigned_classes_qs, assigned_subjects_qs)
         questions = assessment.questions.all().order_by('id')
         return render(request, 'assessment/update_assessment.html', {
             'form': form,
@@ -2010,8 +2114,7 @@ def update_exam(request, exam_id):
 
     if request.method == 'POST':
         form = ExamForm(request.POST, instance=exam)
-        form.fields['class_assigned'].queryset = assigned_classes_qs
-        form.fields['subject'].queryset = assigned_subjects_qs
+        _populate_scoped_model_form_choices(form, assigned_classes_qs, assigned_subjects_qs)
 
         if form.is_valid():
             updated_exam = form.save(commit=False)
@@ -2083,8 +2186,7 @@ def update_exam(request, exam_id):
 
     else: # GET request
         form = ExamForm(instance=exam)
-        form.fields['class_assigned'].queryset = assigned_classes_qs
-        form.fields['subject'].queryset = assigned_subjects_qs
+        _populate_scoped_model_form_choices(form, assigned_classes_qs, assigned_subjects_qs)
         questions = exam.questions.all().order_by('id')
         return render(request, 'exam/update_exam.html', {
             'form': form,

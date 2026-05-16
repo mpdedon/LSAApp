@@ -19,6 +19,41 @@ import json
 from core.system_settings import SystemSettings
 
 
+def _parse_choice_values(raw_value):
+    if not raw_value:
+        return []
+
+    if isinstance(raw_value, (list, tuple, set)):
+        candidates = raw_value
+    else:
+        text = str(raw_value).strip()
+        if not text:
+            return []
+        candidates = text.split(',')
+
+    values = []
+    for candidate in candidates:
+        value = str(candidate).strip()
+        if value and value not in values:
+            values.append(value)
+    return values
+
+
+def _map_answers_to_option_labels(options, raw_answers):
+    option_lookup = {
+        str(option).strip().lower(): str(option).strip()
+        for option in (options or [])
+        if str(option).strip()
+    }
+
+    mapped_answers = []
+    for answer in _parse_choice_values(raw_answers):
+        display_value = option_lookup.get(answer.lower(), answer)
+        if display_value not in mapped_answers:
+            mapped_answers.append(display_value)
+    return mapped_answers
+
+
 # Create your models here.
 
 class Session(models.Model):
@@ -852,6 +887,9 @@ class Question(models.Model):
             except json.JSONDecodeError:
                 return [opt.strip() for opt in self.options.split(',') if opt.strip()]
         return []
+
+    def correct_answer_list(self):
+        return _map_answers_to_option_labels(self.options_list, self.correct_answer)
      
     def __str__(self):
         return self.question_text
@@ -923,6 +961,9 @@ class OnlineQuestion(models.Model):
             except json.JSONDecodeError:
                 return [opt.strip() for opt in self.options.split(',') if opt.strip()]
         return []
+
+    def correct_answer_list(self):
+        return _map_answers_to_option_labels(self.options_list(), self.correct_answer)
 
     def is_option_correct(self, submitted_answer):
         if not self.correct_answer or submitted_answer is None:
