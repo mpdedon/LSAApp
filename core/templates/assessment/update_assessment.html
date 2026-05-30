@@ -67,6 +67,7 @@
           <div class="col-12">{{ form.title|as_crispy_field }}</div>
           <div class="col-md-6">{{ form.term|as_crispy_field }}</div>
           <div class="col-md-6">{{ form.class_assigned|as_crispy_field }}</div>
+          {% if form.target_classes %}<div class="col-12">{{ form.target_classes|as_crispy_field }}</div>{% endif %}
           <div class="col-md-6">{{ form.subject|as_crispy_field }}</div>
           <div class="col-md-6">{{ form.due_date|as_crispy_field }}</div>
           <div class="col-md-6">{{ form.duration|as_crispy_field }}</div>
@@ -283,6 +284,16 @@
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   var deletedIds = [];
+
+  document.getElementById('update-form').addEventListener('keydown', function (event) {
+    if (
+      event.key === 'Enter' &&
+      event.target &&
+      /^(ex-opts-txt-|new-qopts-txt-)/.test(event.target.id || '')
+    ) {
+      event.preventDefault();
+    }
+  });
 
   // ---- Existing question: expand / collapse edit mode ----
   document.querySelectorAll('.toggle-edit-btn').forEach(function (btn) {

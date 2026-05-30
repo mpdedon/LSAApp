@@ -83,7 +83,7 @@
         <div class="row g-3">
           <div class="col-12">{{ form.title|as_crispy_field }}</div>
           <div class="col-md-6">{{ form.term|as_crispy_field }}</div>
-          <div class="col-md-6">{{ form.class_assigned|as_crispy_field }}</div>
+          <div class="col-md-6">{% if form.target_classes %}{{ form.target_classes|as_crispy_field }}{% else %}{{ form.class_assigned|as_crispy_field }}{% endif %}</div>
           <div class="col-md-6">{{ form.subject|as_crispy_field }}</div>
           <div class="col-md-6">{{ form.due_date|as_crispy_field }}</div>
           <div class="col-md-6">{{ form.duration|as_crispy_field }}</div>
@@ -259,12 +259,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
   // Step 1 -> 2: client-side required validation
   document.getElementById('next-1').addEventListener('click', function () {
-    var reqIds = ['id_title', 'id_term', 'id_class_assigned', 'id_subject', 'id_due_date'];
+    var classFieldId = document.getElementById('id_target_classes') ? 'id_target_classes' : 'id_class_assigned';
+    var reqIds = ['id_title', 'id_term', classFieldId, 'id_subject', 'id_due_date'];
     var ok = true;
     reqIds.forEach(function (id) {
       var el = document.getElementById(id);
       if (!el) return;
-      if (!el.value.trim()) { el.classList.add('is-invalid'); ok = false; }
+      var value = el.multiple ? Array.from(el.selectedOptions).map(function (option) { return option.value; }).filter(Boolean).join(',') : el.value;
+      if (!String(value || '').trim()) { el.classList.add('is-invalid'); ok = false; }
       else el.classList.remove('is-invalid');
     });
     if (ok) goToStep(2);
@@ -273,6 +275,11 @@ document.addEventListener('DOMContentLoaded', function () {
   document.getElementById('back-2').addEventListener('click', function () { goToStep(1); });
   document.getElementById('next-2').addEventListener('click', function () { buildReview(); goToStep(3); });
   document.getElementById('back-3').addEventListener('click', function () { goToStep(2); });
+  document.getElementById('wizard-form').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && e.target && /^qopts-txt-/.test(e.target.id || '')) {
+      e.preventDefault();
+    }
+  });
 
   // ---------- Question card ----------
     function createCard(n) {
@@ -476,7 +483,7 @@ document.addEventListener('DOMContentLoaded', function () {
     };
     var rows = [
       ['Title',   G('id_title')],
-      ['Class',   T('id_class_assigned')],
+      ['Class',   document.getElementById('id_target_classes') ? Array.from(document.getElementById('id_target_classes').selectedOptions).map(function (option) { return option.text; }).join(', ') : T('id_class_assigned')],
       ['Subject', T('id_subject')],
       ['Term',    T('id_term')],
       ['Due Date', G('id_due_date').replace('T', ' ')],

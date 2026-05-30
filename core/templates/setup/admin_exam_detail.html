@@ -53,7 +53,7 @@
                         {% if question.question_type != 'ES' %}
                             <div class="d-flex flex-wrap gap-2">
                                 {% for option in question.options_list %}
-                                <span class="badge {% if option == question.correct_answer %}bg-success{% else %}bg-light text-dark border{% endif %}">{{ option }}</span>
+                                <span class="badge {% if option in question.correct_answer_list %}bg-success{% else %}bg-light text-dark border{% endif %}">{{ option }}</span>
                                 {% endfor %}
                             </div>
                         {% else %}

@@ -3002,6 +3002,66 @@ def _process_newly_added_questions(request, assessment, question_name_prefix='ne
     return errors
 
 
+def _clone_online_question(question):
+    options = question.options_list() if callable(getattr(question, 'options_list', None)) else getattr(question, 'options_list', [])
+    return OnlineQuestion.objects.create(
+        question_type=question.question_type,
+        question_text=question.question_text,
+        options=options,
+        correct_answer=question.correct_answer,
+        points=question.points,
+    )
+
+
+def _replicate_online_task_to_classes(task, target_classes):
+    seen_class_ids = set()
+    normalized_classes = []
+    for class_obj in target_classes or []:
+        if not class_obj or class_obj.pk in seen_class_ids:
+            continue
+        seen_class_ids.add(class_obj.pk)
+        normalized_classes.append(class_obj)
+
+    source_questions = list(task.questions.all().order_by('id'))
+    clones = []
+
+    for class_obj in normalized_classes:
+        if class_obj.pk == task.class_assigned_id:
+            continue
+
+        clone = task.__class__.objects.create(
+            term=task.term,
+            subject=task.subject,
+            title=task.title,
+            short_description=task.short_description,
+            class_assigned=class_obj,
+            due_date=task.due_date,
+            duration=task.duration,
+            result_field_mapping=task.result_field_mapping,
+            is_approved=task.is_approved,
+            created_by=task.created_by,
+            approved_by=task.approved_by,
+            created_at=task.created_at,
+            updated_at=task.updated_at,
+            shuffle_questions=task.shuffle_questions,
+        )
+        for question in source_questions:
+            clone.questions.add(_clone_online_question(question))
+        clones.append(clone)
+
+    return clones
+
+
+def _configure_online_task_form(form, assigned_classes_qs, assigned_subjects_qs, *, allow_extra_classes=False):
+    form.fields['class_assigned'].queryset = assigned_classes_qs
+    form.fields['subject'].queryset = assigned_subjects_qs
+    if 'target_classes' in form.fields:
+        form.fields['target_classes'].queryset = assigned_classes_qs
+        if allow_extra_classes and getattr(form.instance, 'pk', None):
+            form.fields['target_classes'].initial = [form.instance.class_assigned_id]
+    return form
+
+
 @user_passes_test(lambda u: u.is_superuser or hasattr(u, 'teacher'))
 @login_required
 def grant_retake(request, item_type, item_id, student_id):
@@ -3074,42 +3134,57 @@ def create_assessment(request):
         return redirect('home') # Or an appropriate unauthorized page
 
     if request.method == 'POST':
-        form = AssessmentForm(request.POST)
+        form = AssessmentForm(request.POST, allow_multiple_classes=user.is_superuser)
         form.fields['class_assigned'].queryset = assigned_classes_qs
         form.fields['subject'].queryset = assigned_subjects_qs
+        if 'target_classes' in form.fields:
+            form.fields['target_classes'].queryset = assigned_classes_qs
 
         if form.is_valid():
-            assessment = form.save(commit=False)
-            assessment.created_by = user
-            if user.is_superuser:  # Superusers can auto-approve
-                assessment.is_approved = True
-            assessment.save()  # Save to get PK before adding M2M questions
+            with transaction.atomic():
+                assessment = form.save(commit=False)
+                assessment.created_by = user
+                assessment.save()  # Save to get PK before adding M2M questions
 
-            # Process newly added questions (prefix 'question_' matches create-form JS)
-            question_processing_errors = _process_newly_added_questions(request, assessment, question_name_prefix='question_')
+                # Process newly added questions (prefix 'question_' matches create-form JS)
+                question_processing_errors = _process_newly_added_questions(request, assessment, question_name_prefix='question_')
 
-            if not question_processing_errors:
-                messages.success(request, f"Assessment '{assessment.title}' created successfully.")
-                return redirect('admin_dashboard' if user.is_superuser else 'teacher_dashboard')
-            else:
-                # Assessment header is saved as a draft; redirect to update page so the teacher
-                # can fix only the broken questions without losing their other work.
-                for err in question_processing_errors:
-                    messages.error(request, err)
-                messages.warning(
-                    request,
-                    "The assessment was saved as a draft but some questions had errors (shown above). "
-                    "Please fix them here and save again."
-                )
-                return redirect('admin_update_assessment' if user.is_superuser else 'update_assessment', assessment_id=assessment.id)
+                if not question_processing_errors:
+                    clone_count = 0
+                    if user.is_superuser:
+                        clone_count = len(_replicate_online_task_to_classes(
+                            assessment,
+                            form.cleaned_data.get('target_classes', [assessment.class_assigned]),
+                        ))
+                    total_created = clone_count + 1
+                    if user.is_superuser and total_created > 1:
+                        messages.success(request, f"Assessment '{assessment.title}' created for {total_created} classes as separate class copies.")
+                    else:
+                        messages.success(request, f"Assessment '{assessment.title}' created successfully.")
+                    return redirect('school-setup' if user.is_superuser else 'teacher_dashboard')
+
+            # Assessment header is saved as a draft; redirect to update page so the teacher
+            # can fix only the broken questions without losing their other work.
+            for err in question_processing_errors:
+                messages.error(request, err)
+            messages.warning(
+                request,
+                "The assessment was saved as a draft but some questions had errors (shown above). "
+                "Please fix them here and save again."
+            )
+            return redirect('admin_update_assessment' if user.is_superuser else 'update_assessment', assessment_id=assessment.id)
         else: # AssessmentForm is invalid
             form.fields['class_assigned'].queryset = assigned_classes_qs # Re-set for template
             form.fields['subject'].queryset = assigned_subjects_qs
+            if 'target_classes' in form.fields:
+                form.fields['target_classes'].queryset = assigned_classes_qs
             return render(request, 'assessment/create_assessment.html', {'form': form})
     else: # GET request
-        form = AssessmentForm()
+        form = AssessmentForm(allow_multiple_classes=user.is_superuser)
         form.fields['class_assigned'].queryset = assigned_classes_qs
         form.fields['subject'].queryset = assigned_subjects_qs
+        if 'target_classes' in form.fields:
+            form.fields['target_classes'].queryset = assigned_classes_qs
         return render(request, 'assessment/create_assessment.html', {'form': form})
 
 # --- Update Assessment View ---
@@ -3139,9 +3214,14 @@ def update_assessment(request, assessment_id):
         assigned_subjects_qs = Subject.objects.all()
 
     if request.method == 'POST':
-        form = AssessmentForm(request.POST, instance=assessment)
-        form.fields['class_assigned'].queryset = assigned_classes_qs
-        form.fields['subject'].queryset = assigned_subjects_qs
+        form = AssessmentForm(
+            request.POST,
+            instance=assessment,
+            allow_multiple_classes=user.is_superuser,
+            target_classes_required=False,
+            hide_class_assigned_when_multi=False,
+        )
+        _configure_online_task_form(form, assigned_classes_qs, assigned_subjects_qs, allow_extra_classes=user.is_superuser)
 
         if form.is_valid():
             updated_assessment = form.save(commit=False)
@@ -3187,9 +3267,19 @@ def update_assessment(request, assessment_id):
             new_question_errors = _process_newly_added_questions(request, assessment, question_name_prefix='new_question_')
             all_errors.extend(new_question_errors)
 
+            added_class_count = 0
+            if user.is_superuser:
+                added_class_count = len(_replicate_online_task_to_classes(
+                    assessment,
+                    form.cleaned_data.get('target_classes'),
+                ))
+
             # --- Redirect or Re-render Logic (remains the same) ---
             if not all_errors:
-                messages.success(request, "Assessment updated successfully.")
+                if added_class_count:
+                    messages.success(request, f"Assessment updated successfully and copied to {added_class_count} additional class{'es' if added_class_count != 1 else ''}.")
+                else:
+                    messages.success(request, "Assessment updated successfully.")
                 return redirect('admin_view_assessment' if user.is_superuser else 'view_assessment', assessment_id=assessment.id)
             else:
                 messages.error(request, "Errors occurred while processing questions. Please review.")
@@ -3200,18 +3290,24 @@ def update_assessment(request, assessment_id):
             'form': form, 
             'assessment': assessment,
             'questions': current_questions,
-            'processing_errors': all_errors if 'all_errors' in locals() else [] 
+            'processing_errors': all_errors if 'all_errors' in locals() else [],
+            'can_edit': True,
         })
 
     else: # GET request
-        form = AssessmentForm(instance=assessment)
-        form.fields['class_assigned'].queryset = assigned_classes_qs
-        form.fields['subject'].queryset = assigned_subjects_qs
+        form = AssessmentForm(
+            instance=assessment,
+            allow_multiple_classes=user.is_superuser,
+            target_classes_required=False,
+            hide_class_assigned_when_multi=False,
+        )
+        _configure_online_task_form(form, assigned_classes_qs, assigned_subjects_qs, allow_extra_classes=user.is_superuser)
         questions = assessment.questions.all().order_by('id')
         return render(request, 'assessment/update_assessment.html', {
             'form': form,
             'assessment': assessment,
-            'questions': questions
+            'questions': questions,
+            'can_edit': True,
         })
 
 @login_required
@@ -3438,41 +3534,56 @@ def create_exam(request):
         return redirect('home') 
 
     if request.method == 'POST':
-        form = ExamForm(request.POST)
+        form = ExamForm(request.POST, allow_multiple_classes=user.is_superuser)
         form.fields['class_assigned'].queryset = assigned_classes_qs
         form.fields['subject'].queryset = assigned_subjects_qs
+        if 'target_classes' in form.fields:
+            form.fields['target_classes'].queryset = assigned_classes_qs
 
         if form.is_valid():
-            exam = form.save(commit=False)
-            exam.created_by = user
-            if user.is_superuser:
-                exam.is_approved = True
-            exam.save()
+            with transaction.atomic():
+                exam = form.save(commit=False)
+                exam.created_by = user
+                exam.save()
 
-            # Use the specific function for new questions from 'create' form (prefix 'question_')
-            question_processing_errors = _process_newly_added_questions(request, exam, question_name_prefix='question_')
+                # Use the specific function for new questions from 'create' form (prefix 'question_')
+                question_processing_errors = _process_newly_added_questions(request, exam, question_name_prefix='question_')
 
-            if not question_processing_errors:
-                messages.success(request, f"Exam '{exam.title}' created successfully.")
-                return redirect('admin_dashboard' if user.is_superuser else 'teacher_dashboard')
-            else:
-                # Exam header saved as draft; redirect to update so teacher fixes only broken questions.
-                for err in question_processing_errors:
-                    messages.error(request, err)
-                messages.warning(
-                    request,
-                    "The exam was saved as a draft but some questions had errors (shown above). "
-                    "Please fix them here and save again."
-                )
-                return redirect('admin_update_exam' if user.is_superuser else 'update_exam', exam_id=exam.id)
+                if not question_processing_errors:
+                    clone_count = 0
+                    if user.is_superuser:
+                        clone_count = len(_replicate_online_task_to_classes(
+                            exam,
+                            form.cleaned_data.get('target_classes', [exam.class_assigned]),
+                        ))
+                    total_created = clone_count + 1
+                    if user.is_superuser and total_created > 1:
+                        messages.success(request, f"Exam '{exam.title}' created for {total_created} classes as separate class copies.")
+                    else:
+                        messages.success(request, f"Exam '{exam.title}' created successfully.")
+                    return redirect('school-setup' if user.is_superuser else 'teacher_dashboard')
+
+            # Exam header saved as draft; redirect to update so teacher fixes only broken questions.
+            for err in question_processing_errors:
+                messages.error(request, err)
+            messages.warning(
+                request,
+                "The exam was saved as a draft but some questions had errors (shown above). "
+                "Please fix them here and save again."
+            )
+            return redirect('admin_update_exam' if user.is_superuser else 'update_exam', exam_id=exam.id)
         else: 
             form.fields['class_assigned'].queryset = assigned_classes_qs # Re-set for template
             form.fields['subject'].queryset = assigned_subjects_qs
+            if 'target_classes' in form.fields:
+                form.fields['target_classes'].queryset = assigned_classes_qs
             return render(request, 'exam/create_exam.html', {'form': form})
     else: # GET request
-        form = ExamForm()
+        form = ExamForm(allow_multiple_classes=user.is_superuser)
         form.fields['class_assigned'].queryset = assigned_classes_qs
         form.fields['subject'].queryset = assigned_subjects_qs
+        if 'target_classes' in form.fields:
+            form.fields['target_classes'].queryset = assigned_classes_qs
         return render(request, 'exam/create_exam.html', {'form': form})
 
 # --- Update Exam View ---
@@ -3495,15 +3606,17 @@ def update_exam(request, exam_id):
         assigned_subjects_qs = Subject.objects.all()
 
     if request.method == 'POST':
-        form = ExamForm(request.POST, instance=exam)
-        form.fields['class_assigned'].queryset = assigned_classes_qs
-        form.fields['subject'].queryset = assigned_subjects_qs
+        form = ExamForm(
+            request.POST,
+            instance=exam,
+            allow_multiple_classes=user.is_superuser,
+            target_classes_required=False,
+            hide_class_assigned_when_multi=False,
+        )
+        _configure_online_task_form(form, assigned_classes_qs, assigned_subjects_qs, allow_extra_classes=user.is_superuser)
 
         if form.is_valid():
             updated_exam = form.save(commit=False)
-            if user.is_superuser and not exam.is_approved: 
-                 updated_exam.is_approved = True
-                 updated_exam.approved_by = user
             updated_exam.updated_at = timezone.now()
             updated_exam.save()
 
@@ -3546,8 +3659,18 @@ def update_exam(request, exam_id):
             new_question_errors = _process_newly_added_questions(request, exam, question_name_prefix='new_question_')
             all_errors.extend(new_question_errors)
 
+            added_class_count = 0
+            if user.is_superuser:
+                added_class_count = len(_replicate_online_task_to_classes(
+                    exam,
+                    form.cleaned_data.get('target_classes'),
+                ))
+
             if not all_errors:
-                messages.success(request, "Exam updated successfully.")
+                if added_class_count:
+                    messages.success(request, f"Exam updated successfully and copied to {added_class_count} additional class{'es' if added_class_count != 1 else ''}.")
+                else:
+                    messages.success(request, "Exam updated successfully.")
                 return redirect('admin_view_exam' if user.is_superuser else 'view_exam', exam_id=exam.id)
             else:
                 messages.error(request, "Errors occurred. Please review.")
@@ -3557,18 +3680,24 @@ def update_exam(request, exam_id):
             'form': form, # This form instance will have its own errors
             'exam': exam,
             'questions': current_questions,
-            'processing_errors': all_errors if 'all_errors' in locals() and all_errors else [] 
+            'processing_errors': all_errors if 'all_errors' in locals() and all_errors else [],
+            'can_edit': True,
         })
 
     else: # GET request
-        form = ExamForm(instance=exam)
-        form.fields['class_assigned'].queryset = assigned_classes_qs
-        form.fields['subject'].queryset = assigned_subjects_qs
+        form = ExamForm(
+            instance=exam,
+            allow_multiple_classes=user.is_superuser,
+            target_classes_required=False,
+            hide_class_assigned_when_multi=False,
+        )
+        _configure_online_task_form(form, assigned_classes_qs, assigned_subjects_qs, allow_extra_classes=user.is_superuser)
         questions = exam.questions.all().order_by('id')
         return render(request, 'exam/update_exam.html', {
             'form': form,
             'exam': exam,
-            'questions': questions
+            'questions': questions,
+            'can_edit': True,
         })
 
 @login_required

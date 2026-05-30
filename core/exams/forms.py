@@ -1,7 +1,7 @@
 # forms.py
 
 from django import forms
-from core.models import Exam, OnlineQuestion, Term
+from core.models import Class, Exam, OnlineQuestion, Term
 from django.utils.timezone import now
 import json
 
@@ -32,8 +32,36 @@ class ExamForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
+        self.allow_multiple_classes = kwargs.pop('allow_multiple_classes', False)
+        self.target_classes_required = kwargs.pop('target_classes_required', True)
+        self.hide_class_assigned_when_multi = kwargs.pop('hide_class_assigned_when_multi', True)
         super().__init__(*args, **kwargs)
         self.fields['term'].queryset = Term.objects.all()
+        if self.allow_multiple_classes:
+            self.fields['target_classes'] = forms.ModelMultipleChoiceField(
+                queryset=Class.objects.none(),
+                widget=forms.SelectMultiple(attrs={'class': 'form-select', 'size': 6}),
+                required=self.target_classes_required,
+                label='Assign to classes' if self.hide_class_assigned_when_multi else 'Also add these classes',
+                help_text=(
+                    'Creates one exam copy per selected class so existing approval, submission, and scoring flows stay single-class.'
+                    if self.hide_class_assigned_when_multi else
+                    'Optional. Creates additional exam copies for the selected classes using the current edited content.'
+                ),
+            )
+            if self.hide_class_assigned_when_multi:
+                self.fields['class_assigned'].required = False
+                self.fields['class_assigned'].widget = forms.HiddenInput()
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if self.allow_multiple_classes:
+            target_classes = cleaned_data.get('target_classes')
+            if target_classes and self.hide_class_assigned_when_multi:
+                cleaned_data['class_assigned'] = target_classes[0]
+            elif self.target_classes_required:
+                self.add_error('target_classes', 'Select at least one class.')
+        return cleaned_data
 
     def clean_due_date(self):
         due_date = self.cleaned_data.get('due_date')

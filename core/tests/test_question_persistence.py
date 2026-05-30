@@ -1,6 +1,7 @@
 from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
+from django.contrib.messages import get_messages
 from datetime import timedelta, date
 
 from core.models import (
@@ -75,6 +76,7 @@ class BaseAssessmentTestCase(TestCase):
             is_active=True,
         )
         cls.school_class = Class.objects.create(name='JSS 1A', school_level='Junior')
+        cls.school_class_b = Class.objects.create(name='JSS 1B', school_level='Junior')
         cls.subject = Subject.objects.create(name='Mathematics', description='Maths')
 
         ClassSubjectAssignment.objects.create(
@@ -88,6 +90,10 @@ class BaseAssessmentTestCase(TestCase):
         SubjectAssignment.objects.create(
             class_assigned=cls.school_class, subject=cls.subject,
             session=cls.session, term=cls.term, teacher=cls.teacher,
+        )
+        ClassSubjectAssignment.objects.create(
+            class_assigned=cls.school_class_b, subject=cls.subject,
+            session=cls.session, term=cls.term,
         )
 
         # Student for submission tests
@@ -166,6 +172,55 @@ class NuclearRollbackFixTests(BaseAssessmentTestCase):
             reverse('update_exam', kwargs={'exam_id': exam.pk}),
         )
 
+    def test_admin_create_exam_stays_pending(self):
+        self.client.force_login(self.admin_user)
+        response = self.client.post(reverse('admin_create_exam'), {
+            'title': 'Admin Exam',
+            'short_description': 'desc',
+            'class_assigned': str(self.school_class.pk),
+            'target_classes': [str(self.school_class.pk)],
+            'subject': str(self.subject.pk),
+            'term': str(self.term.pk),
+            'due_date': (timezone.now() + timedelta(days=2)).strftime('%Y-%m-%dT%H:%M'),
+            'duration': '45',
+            'question_type_1': 'SCQ',
+            'question_text_1': 'Admin exam question',
+            'question_options_1': 'A, B',
+            'question_correct_answer_1': 'A',
+            'question_points_1': '1',
+        })
+
+        exam = Exam.objects.get(title='Admin Exam', class_assigned=self.school_class)
+        self.assertFalse(exam.is_approved)
+        self.assertRedirects(response, reverse('school-setup'))
+
+    def test_admin_create_exam_for_multiple_classes_clones_task(self):
+        self.client.force_login(self.admin_user)
+        response = self.client.post(reverse('admin_create_exam'), {
+            'title': 'Multi Class Exam',
+            'short_description': 'desc',
+            'class_assigned': str(self.school_class.pk),
+            'target_classes': [str(self.school_class.pk), str(self.school_class_b.pk)],
+            'subject': str(self.subject.pk),
+            'term': str(self.term.pk),
+            'due_date': (timezone.now() + timedelta(days=2)).strftime('%Y-%m-%dT%H:%M'),
+            'duration': '45',
+            'question_type_1': 'MCQ',
+            'question_text_1': 'Pick two answers',
+            'question_options_1': 'A, B, C',
+            'question_correct_answer_1': 'A, C',
+            'question_points_1': '2',
+        })
+
+        self.assertRedirects(response, reverse('school-setup'))
+        exams = Exam.objects.filter(title='Multi Class Exam').order_by('class_assigned__name')
+        self.assertEqual(exams.count(), 2)
+        self.assertEqual(list(exams.values_list('class_assigned__name', flat=True)), ['JSS 1A', 'JSS 1B'])
+        self.assertEqual([exam.questions.count() for exam in exams], [1, 1])
+        self.assertNotEqual(exams[0].questions.first().pk, exams[1].questions.first().pk)
+        messages = list(get_messages(response.wsgi_request))
+        self.assertTrue(any('created for 2 classes as separate class copies' in str(message) for message in messages))
+
     def test_create_assessment_with_valid_question_succeeds(self):
         self.client.force_login(self.teacher_user)
         url = reverse('create_assessment')
@@ -184,6 +239,55 @@ class NuclearRollbackFixTests(BaseAssessmentTestCase):
         # Teacher is redirected to dashboard (not update page)
         self.assertEqual(response.status_code, 302)
         self.assertNotIn('update_assessment', response['Location'])
+
+    def test_admin_create_assessment_stays_pending(self):
+        self.client.force_login(self.admin_user)
+        response = self.client.post(reverse('admin_create_assessment'), {
+            'title': 'Admin Assessment',
+            'short_description': 'desc',
+            'class_assigned': str(self.school_class.pk),
+            'target_classes': [str(self.school_class.pk)],
+            'subject': str(self.subject.pk),
+            'term': str(self.term.pk),
+            'due_date': (timezone.now() + timedelta(days=2)).strftime('%Y-%m-%dT%H:%M'),
+            'duration': '30',
+            'question_type_1': 'SCQ',
+            'question_text_1': 'Admin question',
+            'question_options_1': 'A, B',
+            'question_correct_answer_1': 'A',
+            'question_points_1': '1',
+        })
+
+        assessment = Assessment.objects.get(title='Admin Assessment', class_assigned=self.school_class)
+        self.assertFalse(assessment.is_approved)
+        self.assertRedirects(response, reverse('school-setup'))
+
+    def test_admin_create_assessment_for_multiple_classes_clones_task(self):
+        self.client.force_login(self.admin_user)
+        response = self.client.post(reverse('admin_create_assessment'), {
+            'title': 'Multi Class Assessment',
+            'short_description': 'desc',
+            'class_assigned': str(self.school_class.pk),
+            'target_classes': [str(self.school_class.pk), str(self.school_class_b.pk)],
+            'subject': str(self.subject.pk),
+            'term': str(self.term.pk),
+            'due_date': (timezone.now() + timedelta(days=2)).strftime('%Y-%m-%dT%H:%M'),
+            'duration': '30',
+            'question_type_1': 'MCQ',
+            'question_text_1': 'Pick two',
+            'question_options_1': 'A, B, C',
+            'question_correct_answer_1': 'A, C',
+            'question_points_1': '2',
+        })
+
+        self.assertRedirects(response, reverse('school-setup'))
+        assessments = Assessment.objects.filter(title='Multi Class Assessment').order_by('class_assigned__name')
+        self.assertEqual(assessments.count(), 2)
+        self.assertEqual(list(assessments.values_list('class_assigned__name', flat=True)), ['JSS 1A', 'JSS 1B'])
+        self.assertEqual([assessment.questions.count() for assessment in assessments], [1, 1])
+        self.assertNotEqual(assessments[0].questions.first().pk, assessments[1].questions.first().pk)
+        messages = list(get_messages(response.wsgi_request))
+        self.assertTrue(any('created for 2 classes as separate class copies' in str(message) for message in messages))
 
 
 # ===========================================================================
@@ -683,3 +787,167 @@ class EditScopeRegressionTests(BaseAssessmentTestCase):
         form = response.context['form']
         self.assertTrue(form.fields['subject'].queryset.filter(pk=self.subject.pk).exists())
         self.assertTrue(form.fields['class_assigned'].queryset.filter(pk=self.school_class.pk).exists())
+
+
+class AdminTaskEditPageTests(BaseAssessmentTestCase):
+
+    def test_admin_assessment_update_exposes_question_editor(self):
+        self.client.force_login(self.admin_user)
+        assessment = Assessment.objects.create(
+            title='Admin Editable Assessment',
+            short_description='desc',
+            term=self.term,
+            subject=self.subject,
+            class_assigned=self.school_class,
+            created_by=self.admin_user,
+            due_date=timezone.now() + timedelta(days=1),
+            duration=20,
+            is_approved=True,
+        )
+        question = OnlineQuestion.objects.create(
+            question_type='SCQ',
+            question_text='Editable assessment question',
+            options=['A', 'B'],
+            correct_answer='A',
+            points=1,
+        )
+        assessment.questions.add(question)
+
+        response = self.client.get(reverse('admin_update_assessment', kwargs={'assessment_id': assessment.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context['can_edit'])
+        self.assertIn('target_classes', response.context['form'].fields)
+        self.assertContains(response, 'name="question_%s_text"' % question.pk, html=False)
+        self.assertNotContains(response, 'Question editing is disabled for approved assessments.')
+
+    def test_admin_exam_update_exposes_question_editor(self):
+        self.client.force_login(self.admin_user)
+        exam = Exam.objects.create(
+            title='Admin Editable Exam',
+            short_description='desc',
+            term=self.term,
+            subject=self.subject,
+            class_assigned=self.school_class,
+            created_by=self.admin_user,
+            due_date=timezone.now() + timedelta(days=1),
+            duration=25,
+            is_approved=True,
+        )
+        question = OnlineQuestion.objects.create(
+            question_type='SCQ',
+            question_text='Editable exam question',
+            options=['A', 'B'],
+            correct_answer='A',
+            points=1,
+        )
+        exam.questions.add(question)
+
+        response = self.client.get(reverse('admin_update_exam', kwargs={'exam_id': exam.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context['can_edit'])
+        self.assertIn('target_classes', response.context['form'].fields)
+        self.assertContains(response, 'name="question_%s_text"' % question.pk, html=False)
+        self.assertNotContains(response, 'Question editing is disabled for approved exams.')
+
+    def test_admin_assessment_update_can_copy_to_additional_classes(self):
+        self.client.force_login(self.admin_user)
+        assessment = Assessment.objects.create(
+            title='Admin Copy Assessment',
+            short_description='desc',
+            term=self.term,
+            subject=self.subject,
+            class_assigned=self.school_class,
+            created_by=self.admin_user,
+            due_date=timezone.now() + timedelta(days=1),
+            duration=20,
+        )
+        question = OnlineQuestion.objects.create(
+            question_type='SCQ',
+            question_text='Original assessment question',
+            options=['A', 'B'],
+            correct_answer='A',
+            points=1,
+        )
+        assessment.questions.add(question)
+
+        response = self.client.post(
+            reverse('admin_update_assessment', kwargs={'assessment_id': assessment.pk}),
+            {
+                'title': 'Admin Copy Assessment Updated',
+                'short_description': 'updated desc',
+                'class_assigned': str(self.school_class.pk),
+                'target_classes': [str(self.school_class.pk), str(self.school_class_b.pk)],
+                'subject': str(self.subject.pk),
+                'term': str(self.term.pk),
+                'due_date': (timezone.now() + timedelta(days=2)).strftime('%Y-%m-%dT%H:%M'),
+                'duration': '30',
+                'question_%s_type' % question.pk: 'SCQ',
+                'question_%s_text' % question.pk: 'Updated assessment question',
+                'question_%s_options' % question.pk: 'A, B, C',
+                'question_%s_correct_answer' % question.pk: 'C',
+                'question_%s_points' % question.pk: '2',
+            },
+        )
+
+        self.assertRedirects(response, reverse('admin_view_assessment', kwargs={'assessment_id': assessment.pk}))
+        assessments = Assessment.objects.filter(title='Admin Copy Assessment Updated').order_by('class_assigned__name')
+        self.assertEqual(assessments.count(), 2)
+        self.assertEqual(list(assessments.values_list('class_assigned__name', flat=True)), ['JSS 1A', 'JSS 1B'])
+        for copied_assessment in assessments:
+            copied_question = copied_assessment.questions.get()
+            self.assertEqual(copied_question.question_text, 'Updated assessment question')
+            self.assertEqual(copied_question.correct_answer, 'C')
+        messages = list(get_messages(response.wsgi_request))
+        self.assertTrue(any('copied to 1 additional class' in str(message) for message in messages))
+
+    def test_admin_exam_update_can_copy_to_additional_classes(self):
+        self.client.force_login(self.admin_user)
+        exam = Exam.objects.create(
+            title='Admin Copy Exam',
+            short_description='desc',
+            term=self.term,
+            subject=self.subject,
+            class_assigned=self.school_class,
+            created_by=self.admin_user,
+            due_date=timezone.now() + timedelta(days=1),
+            duration=25,
+        )
+        question = OnlineQuestion.objects.create(
+            question_type='SCQ',
+            question_text='Original exam question',
+            options=['A', 'B'],
+            correct_answer='A',
+            points=1,
+        )
+        exam.questions.add(question)
+
+        response = self.client.post(
+            reverse('admin_update_exam', kwargs={'exam_id': exam.pk}),
+            {
+                'title': 'Admin Copy Exam Updated',
+                'short_description': 'updated desc',
+                'class_assigned': str(self.school_class.pk),
+                'target_classes': [str(self.school_class.pk), str(self.school_class_b.pk)],
+                'subject': str(self.subject.pk),
+                'term': str(self.term.pk),
+                'due_date': (timezone.now() + timedelta(days=2)).strftime('%Y-%m-%dT%H:%M'),
+                'duration': '35',
+                'question_%s_type' % question.pk: 'SCQ',
+                'question_%s_text' % question.pk: 'Updated exam question',
+                'question_%s_options' % question.pk: 'A, B, C',
+                'question_%s_correct_answer' % question.pk: 'C',
+            },
+        )
+
+        self.assertRedirects(response, reverse('admin_view_exam', kwargs={'exam_id': exam.pk}))
+        exams = Exam.objects.filter(title='Admin Copy Exam Updated').order_by('class_assigned__name')
+        self.assertEqual(exams.count(), 2)
+        self.assertEqual(list(exams.values_list('class_assigned__name', flat=True)), ['JSS 1A', 'JSS 1B'])
+        for copied_exam in exams:
+            copied_question = copied_exam.questions.get()
+            self.assertEqual(copied_question.question_text, 'Updated exam question')
+            self.assertEqual(copied_question.correct_answer, 'C')
+        messages = list(get_messages(response.wsgi_request))
+        self.assertTrue(any('copied to 1 additional class' in str(message) for message in messages))
