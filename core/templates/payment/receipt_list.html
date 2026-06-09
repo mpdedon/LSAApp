@@ -1,0 +1,161 @@
+{% extends 'base_admin_sidebar.html' %}
+{% load humanize %}
+
+{% block title %}Payment Receipts{% endblock %}
+
+{% block content %}
+<div class="container mt-4 mb-5 receipt-directory">
+    <div class="receipt-directory-hero mb-3 flex-wrap">
+        <div>
+            <div class="receipt-directory-kicker">Finance Archive</div>
+            <h2 class="mb-1">Payment Receipts</h2>
+            <p class="text-muted mb-0">Issued receipts, payment batches, and remaining balances for parent-facing finance operations.</p>
+        </div>
+        <a href="{% url 'payment_list' %}" class="btn btn-outline-secondary btn-sm">View Payments</a>
+    </div>
+    <form method="get" class="row g-2 align-items-end mb-4">
+        <div class="col-md-3">
+            <label class="form-label small mb-1">Session</label>
+            <select name="session_id" class="form-select form-select-sm">
+                <option value="">All Sessions</option>
+                {% for session in sessions %}
+                <option value="{{ session.id }}" {% if selected_session_id|stringformat:'s' == session.id|stringformat:'s' %}selected{% endif %}>{{ session.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label small mb-1">Term</label>
+            <select name="term_id" class="form-select form-select-sm">
+                <option value="">All Terms</option>
+                {% for term in terms %}
+                <option value="{{ term.id }}" {% if selected_term_id|stringformat:'s' == term.id|stringformat:'s' %}selected{% endif %}>{{ term.name }} ({{ term.session.name }})</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-auto">
+            <button type="submit" class="btn btn-primary btn-sm">Apply</button>
+        </div>
+    </form>
+    <div class="receipt-directory-shell shadow-sm">
+        <div class="table-responsive">
+            <table class="table receipt-directory-table align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Receipt</th>
+                            <th>Scope / Term</th>
+                            <th>Payer</th>
+                            <th>Fee / Batch</th>
+                            <th class="text-end">Balance</th>
+                            <th class="text-end">Total</th>
+                            <th class="text-center">Date</th>
+                            <th class="text-center">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for receipt in page_obj.object_list %}
+                        <tr>
+                            <td>
+                                <div class="fw-semibold">{{ receipt.receipt_number }}</div>
+                                <small class="text-muted">{{ receipt.reference_display }}</small>
+                                <div class="receipt-status-pill {% if receipt.total_balance_due > 0 %}receipt-status-pill-due{% else %}receipt-status-pill-paid{% endif %}">
+                                    {% if receipt.total_balance_due > 0 %}Balance Due{% else %}Fully Paid{% endif %}
+                                </div>
+                            </td>
+                            <td>
+                                <div>{{ receipt.get_scope_display }}</div>
+                                <small class="text-muted">{{ receipt.term.name }} • {{ receipt.term.session.name }}</small>
+                            </td>
+                            <td>
+                                <div>{{ receipt.payer_display }}</div>
+                                <small class="text-muted">{{ receipt.target_class_display }}</small>
+                            </td>
+                            <td>
+                                <div>{{ receipt.fee_category_display }}</div>
+                                <small class="text-muted">{{ receipt.batch_display }}</small>
+                            </td>
+                            <td class="text-end fw-semibold {% if receipt.total_balance_due > 0 %}text-danger{% else %}text-success{% endif %}">₦{{ receipt.total_balance_due|floatformat:2|intcomma }}</td>
+                            <td class="text-end fw-semibold">₦{{ receipt.total_amount|floatformat:2|intcomma }}</td>
+                            <td class="text-center">{{ receipt.payment_date|date:"d M Y" }}</td>
+                            <td class="text-center">
+                                <a href="{% url 'payment_receipt_detail' receipt.pk %}" class="btn btn-sm btn-outline-primary">View</a>
+                                <a href="{% url 'payment_receipt_download' receipt.pk %}" class="btn btn-sm btn-outline-secondary">Download</a>
+                                <a href="{% url 'payment_receipt_share' receipt.share_token %}" class="btn btn-sm btn-outline-info">Share</a>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="8" class="text-center text-muted py-4">No receipts have been generated yet.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+.receipt-directory-hero {
+    display: flex;
+    justify-content: space-between;
+    align-items: end;
+    gap: 1rem;
+}
+.receipt-directory-kicker {
+    font-size: 0.74rem;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: #9a3412;
+    font-weight: 700;
+    margin-bottom: 0.35rem;
+}
+.receipt-directory-shell {
+    background: linear-gradient(180deg, #fffefb 0%, #f8f3ea 100%);
+    border: 1px solid #e5dccd;
+    border-radius: 24px;
+    overflow: hidden;
+}
+.receipt-status-pill {
+    display: inline-block;
+    margin-top: 0.45rem;
+    padding: 0.24rem 0.55rem;
+    border-radius: 999px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+.receipt-status-pill-paid {
+    color: #166534;
+    background: #dcfce7;
+}
+.receipt-status-pill-due {
+    color: #92400e;
+    background: #fef3c7;
+}
+.receipt-directory-table thead th {
+    background: linear-gradient(180deg, #f7efe2 0%, #f3e4cf 100%);
+    color: #7c2d12;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-size: 0.72rem;
+    border-bottom: 1px solid #eadfce;
+}
+.receipt-directory-table td,
+.receipt-directory-table th {
+    padding: 1rem 0.95rem;
+    border-color: #efe7db;
+    vertical-align: middle;
+}
+.receipt-directory-table tbody tr:nth-child(even) {
+    background: rgba(255, 251, 245, 0.7);
+}
+@media (max-width: 768px) {
+    .receipt-directory-hero {
+        flex-direction: column;
+        align-items: start;
+    }
+}
+</style>
+{% endblock %}

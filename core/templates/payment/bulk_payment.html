@@ -1,0 +1,263 @@
+{% extends 'base_admin_sidebar.html' %}
+{% load humanize %}
+
+{% block title %}Bulk Payment Allocation{% endblock %}
+
+{% block content %}
+<div class="container mt-4 mb-5">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+            <h2 class="mb-1">Guardian and Bulk Payments</h2>
+            <p class="text-muted mb-0">Record one aggregate amount and split it into normal payment rows for each matching student financial record.</p>
+        </div>
+        <a href="{% url 'payment_list' %}" class="btn btn-outline-secondary">Back to Payments</a>
+    </div>
+
+    <form method="post" id="bulkPaymentForm" data-preview-url="{% url 'bulk_payment' %}">
+        {% csrf_token %}
+        <div class="row g-4">
+            <div class="col-lg-5">
+                <div class="card shadow-sm border-0">
+                    <div class="card-body">
+                        {% if form.non_field_errors %}
+                        <div class="alert alert-danger py-2">{% for error in form.non_field_errors %}{{ error }}<br>{% endfor %}</div>
+                        {% endif %}
+                        {% for field in form %}
+                        <div class="mb-3">
+                            <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {{ field }}
+                            {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+                            {% if field.errors %}<div class="invalid-feedback d-block">{{ field.errors|first }}</div>{% endif %}
+                        </div>
+                        {% endfor %}
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary">Create Split Payments</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-lg-7">
+                <div class="card shadow-sm border-0 h-100">
+                    <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="mb-0">Preview Candidates</h5>
+                        <span class="badge bg-light text-dark" id="previewTotalBadge">Total outstanding: ₦{{ preview_total|floatformat:2|intcomma }}</span>
+                    </div>
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <div class="rounded bg-light p-3 h-100">
+                                <div class="small text-muted">Matched Students</div>
+                                <div class="fs-4 fw-bold" id="previewCandidateCount">{{ preview_candidate_count|default:0 }}</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="rounded bg-light p-3 h-100">
+                                <div class="small text-muted">Allocated From Entered Amount</div>
+                                <div class="fs-4 fw-bold" id="previewAllocatedTotal">₦{{ preview_allocated_total|default:0|floatformat:2|intcomma }}</div>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="rounded bg-light p-3 h-100">
+                                <div class="small text-muted">Unallocated</div>
+                                <div class="fs-4 fw-bold" id="previewRemainingAmount">₦{{ preview_remaining_amount|default:0|floatformat:2|intcomma }}</div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Student</th>
+                                    <th>Class</th>
+                                    <th class="text-end">Discount</th>
+                                    <th class="text-end">Outstanding</th>
+                                    <th class="text-end">Allocation</th>
+                                    <th class="text-end">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="previewTableBody">
+                    {% if preview_records %}
+                                {% for record in preview_records %}
+                                <tr>
+                                    <td>{{ record.student_name }}</td>
+                                    <td>{{ record.class_name }}</td>
+                                    <td class="text-end text-success">₦{{ record.discount_amount|floatformat:2|intcomma }}</td>
+                                    <td class="text-end">₦{{ record.outstanding_balance|floatformat:2|intcomma }}</td>
+                                    <td class="text-end">
+                                        <input type="hidden" name="allocation_record_id" value="{{ record.financial_record_id }}">
+                                        <input type="number" name="allocation_amount" value="{{ record.suggested_allocation|floatformat:2 }}" step="0.01" min="0" class="form-control form-control-sm text-end allocation-input">
+                                    </td>
+                                    <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger remove-allocation-row">Remove</button></td>
+                                </tr>
+                                {% endfor %}
+                    {% else %}
+                                <tr id="previewEmptyState">
+                                    <td colspan="6" class="text-muted py-4">Select a guardian or class and term to automatically load matching students and balances.</td>
+                                </tr>
+                    {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </form>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+(function () {
+    const form = document.getElementById('bulkPaymentForm');
+    if (!form) {
+        return;
+    }
+
+    const previewUrl = form.dataset.previewUrl;
+    const scopeField = document.getElementById('id_scope');
+    const guardianField = document.getElementById('id_guardian');
+    const classField = document.getElementById('id_class_instance');
+    const termField = document.getElementById('id_term');
+    const amountField = document.getElementById('id_total_amount');
+    const allocationModeField = document.getElementById('id_allocation_mode');
+    const previewBody = document.getElementById('previewTableBody');
+    const previewTotalBadge = document.getElementById('previewTotalBadge');
+    const previewCandidateCount = document.getElementById('previewCandidateCount');
+    const previewAllocatedTotal = document.getElementById('previewAllocatedTotal');
+    const previewRemainingAmount = document.getElementById('previewRemainingAmount');
+    let lastSuggestedTotal = amountField && amountField.value ? amountField.value : '';
+
+    function formatCurrency(value) {
+        const amount = Number(value || 0);
+        return `₦${amount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    }
+
+    function syncScopeVisibility() {
+        const scope = scopeField ? scopeField.value : 'guardian';
+        const guardianWrapper = guardianField ? guardianField.closest('.mb-3') : null;
+        const classWrapper = classField ? classField.closest('.mb-3') : null;
+        if (guardianWrapper) {
+            guardianWrapper.style.display = scope === 'guardian' ? '' : 'none';
+        }
+        if (classWrapper) {
+            classWrapper.style.display = scope === 'class' ? '' : 'none';
+        }
+    }
+
+    function recalcManualTotals() {
+        const allocationInputs = Array.from(form.querySelectorAll('.allocation-input'));
+        const allocatedTotal = allocationInputs.reduce((sum, input) => sum + (Number(input.value || 0)), 0);
+        const requestedTotal = Number(amountField.value || 0);
+        previewAllocatedTotal.textContent = formatCurrency(allocatedTotal);
+        previewRemainingAmount.textContent = formatCurrency(Math.max(requestedTotal - allocatedTotal, 0));
+    }
+
+    function renderPreview(data) {
+        previewCandidateCount.textContent = data.candidate_count;
+        previewTotalBadge.textContent = `Total outstanding: ${formatCurrency(data.total_outstanding)}`;
+        previewAllocatedTotal.textContent = formatCurrency(data.allocated_total);
+        previewRemainingAmount.textContent = formatCurrency(data.remaining_amount);
+        previewBody.innerHTML = '';
+
+        if (!data.records.length) {
+            previewBody.innerHTML = '<tr id="previewEmptyState"><td colspan="6" class="text-muted py-4">No outstanding balances were found for this selection.</td></tr>';
+            return;
+        }
+
+        data.records.forEach((record) => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${record.student_name}</td>
+                <td>${record.class_name}</td>
+                <td class="text-end text-success">${formatCurrency(record.discount_amount)}</td>
+                <td class="text-end">${formatCurrency(record.outstanding_balance)}</td>
+                <td class="text-end">
+                    <input type="hidden" name="allocation_record_id" value="${record.financial_record_id}">
+                    <input type="number" name="allocation_amount" value="${record.suggested_allocation}" step="0.01" min="0" class="form-control form-control-sm text-end allocation-input">
+                </td>
+                <td class="text-end"><button type="button" class="btn btn-sm btn-outline-danger remove-allocation-row">Remove</button></td>
+            `;
+            previewBody.appendChild(row);
+        });
+
+        Array.from(form.querySelectorAll('.allocation-input')).forEach((input) => {
+            input.addEventListener('input', recalcManualTotals);
+        });
+        Array.from(form.querySelectorAll('.remove-allocation-row')).forEach((button) => {
+            button.addEventListener('click', () => {
+                button.closest('tr').remove();
+                if (!previewBody.children.length) {
+                    previewBody.innerHTML = '<tr id="previewEmptyState"><td colspan="6" class="text-muted py-4">No students remain in this allocation list.</td></tr>';
+                }
+                recalcManualTotals();
+            });
+        });
+        recalcManualTotals();
+    }
+
+    async function refreshPreview() {
+        syncScopeVisibility();
+        if (!termField || !termField.value) {
+            return;
+        }
+
+        const params = new URLSearchParams({
+            format: 'json',
+            scope: scopeField.value,
+            term: termField.value,
+            total_amount: amountField.value || '0.00',
+        });
+        if (guardianField && guardianField.value) {
+            params.set('guardian', guardianField.value);
+        }
+        if (classField && classField.value) {
+            params.set('class_instance', classField.value);
+        }
+
+        const response = await fetch(`${previewUrl}?${params.toString()}`, {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        });
+        if (!response.ok) {
+            return;
+        }
+
+        const data = await response.json();
+        const currentAmount = amountField.value || '';
+        if (!currentAmount || currentAmount === lastSuggestedTotal) {
+            amountField.value = data.total_outstanding;
+            lastSuggestedTotal = data.total_outstanding;
+            const refreshedParams = new URLSearchParams(params);
+            refreshedParams.set('total_amount', amountField.value || '0.00');
+            const secondResponse = await fetch(`${previewUrl}?${refreshedParams.toString()}`, {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+            });
+            if (secondResponse.ok) {
+                renderPreview(await secondResponse.json());
+                return;
+            }
+        }
+
+        renderPreview(data);
+    }
+
+    [scopeField, guardianField, classField, termField].forEach((field) => {
+        if (field) {
+            field.addEventListener('change', refreshPreview);
+        }
+    });
+    if (amountField) {
+        amountField.addEventListener('input', () => {
+            lastSuggestedTotal = amountField.value;
+            refreshPreview();
+        });
+    }
+    if (allocationModeField) {
+        allocationModeField.addEventListener('change', refreshPreview);
+    }
+
+    syncScopeVisibility();
+    refreshPreview();
+})();
+</script>
+{% endblock %}

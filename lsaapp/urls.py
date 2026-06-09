@@ -37,8 +37,8 @@ from core.views import create_assessment as admin_create_assessment, update_asse
 from core.views import create_exam as admin_create_exam, update_exam as admin_update_exam_view, admin_exam_list, approve_exam, pending_exams, view_exam as admin_view_exam_view, admin_delete_exam, exam_submissions_list
 from core.views import broadsheets, termly_broadsheet, approve_termly_broadsheet, archive_termly_broadsheet, admin_leaderboard_view
 from core.views import sessional_broadsheets, admin_sessional_broadsheet, approve_sessional_broadsheet, archive_sessional_broadsheet
-from core.views import FeeAssignmentCreateView, FeeAssignmentListView, FeeAssignmentUpdateView, FeeAssignmentDetailView, FeeAssignmentDeleteView, StudentFeeRecordListView
-from core.views import PaymentCreateView, PaymentListView, PaymentUpdateView, PaymentDetailView, PaymentDeleteView, FinancialRecordListView
+from core.views import FeeAssignmentCreateView, FeeAssignmentListView, FeeAssignmentUpdateView, FeeAssignmentDetailView, FeeAssignmentDeleteView, StudentFeeRecordListView, FeeAssignmentRolloverView
+from core.views import BulkPaymentView, PaymentCreateView, PaymentListView, PaymentUpdateView, PaymentDetailView, PaymentDeleteView, PaymentReceiptDetailView, PaymentReceiptDownloadView, PaymentReceiptListView, PaymentReceiptShareView, FinancialRecordListView
 from core.views import StudentClassEnrollmentView, StudentEnrollmentsView, message_inbox, grant_retake, message_thread, compose_message
 from core.views import AssignSubjectView, AssignTeacherView, AssignClassSubjectView, ClassSubjectRolloverView, DeleteClassSubjectAssigmentView
 from core.views import TeacherAssignmentListView, TeacherAssignmentRolloverView, TeacherAssignmentUpdateView, TeacherAssignmentDetailView, TeacherAssignmentDeleteView
@@ -262,6 +262,7 @@ urlpatterns = [
     path('fee_assignments/<int:pk>/update/', FeeAssignmentUpdateView.as_view(), name='update_fee_assignment'),
     path('fee_assignments/<int:pk>/', FeeAssignmentDetailView.as_view(), name='fee_assignment_detail'),
     path('fee_assignments/<int:pk>/delete/', FeeAssignmentDeleteView.as_view(), name='delete_fee_assignment'),
+    path('fee_assignments/rollover/', FeeAssignmentRolloverView.as_view(), name='rollover_fee_assignments'),
     path('student_fee_records/', StudentFeeRecordListView.as_view(), name='student_fee_record_list'),
 
     # Result URLs
@@ -275,9 +276,14 @@ urlpatterns = [
 
     # Payment URLs
     path('payments/', PaymentListView.as_view(), name='payment_list'),
+    path('payments/receipts/', PaymentReceiptListView.as_view(), name='payment_receipt_list'),
+    path('payments/bulk/', BulkPaymentView.as_view(), name='bulk_payment'),
     path('payments/create/', PaymentCreateView.as_view(), name='create_payment'),
     path('payments/update/<int:pk>/', PaymentUpdateView.as_view(), name='update_payment'),
     path('payments/<int:pk>/', PaymentDetailView.as_view(), name='payment_detail'),
+    path('payments/receipts/<int:pk>/', PaymentReceiptDetailView.as_view(), name='payment_receipt_detail'),
+    path('payments/receipts/<int:pk>/download/', PaymentReceiptDownloadView.as_view(), name='payment_receipt_download'),
+    path('payments/receipts/share/<uuid:share_token>/', PaymentReceiptShareView.as_view(), name='payment_receipt_share'),
     path('payments/delete/<int:pk>/', PaymentDeleteView.as_view(), name='delete_payment'),
     path('financial-records/', FinancialRecordListView.as_view(), name='financial_record_list'),
 

@@ -169,6 +169,49 @@ class FinancialModelTests(TestCase):
         self.assertEqual(fr.total_fee, Decimal('49000.00'))
         self.assertEqual(fr.outstanding_balance, Decimal('49000.00'))
 
+    def test_financial_record_aggregates_multiple_fee_records_for_same_term(self):
+        """Financial totals should aggregate every fee row attached to the same student and term."""
+        second_assignment = FeeAssignment.objects.create(
+            class_instance=self.class1,
+            term=Term.objects.create(
+                session=self.session,
+                name='Second Term',
+                start_date=date(2024, 5, 11),
+                end_date=date(2024, 8, 10),
+                is_active=False,
+            ),
+            amount=Decimal('20000.00'),
+        )
+        # Reuse the original term for the actual multi-row aggregation test.
+        second_assignment.term = self.term
+        second_assignment.save(update_fields=['term'])
+
+        StudentFeeRecord.objects.create(
+            student=self.student1,
+            term=self.term,
+            fee_assignment=self.fee_assignment,
+            amount=self.fee_assignment.amount,
+            discount=Decimal('5000.00'),
+            waiver=False,
+        )
+        StudentFeeRecord.objects.create(
+            student=self.student1,
+            term=self.term,
+            fee_assignment=second_assignment,
+            amount=Decimal('20000.00'),
+            discount=Decimal('2000.00'),
+            waiver=False,
+        )
+
+        fr = FinancialRecord.objects.get(student=self.student1, term=self.term)
+        self.assertEqual(fr.total_fee, Decimal('63000.00'))
+        self.assertEqual(fr.total_discount, Decimal('7000.00'))
+
+        Payment.objects.create(financial_record=fr, amount_paid=Decimal('13000.00'))
+        fr.refresh_from_db()
+        self.assertEqual(fr.total_paid, Decimal('13000.00'))
+        self.assertEqual(fr.outstanding_balance, Decimal('50000.00'))
+
     def test_payment_creation_updates_financial_record_via_signal(self):
         """Test FinancialRecord updates when Payment is created."""
         sfr = StudentFeeRecord.objects.create(

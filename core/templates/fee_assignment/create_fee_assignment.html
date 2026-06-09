@@ -1,16 +1,27 @@
 <!-- feeassignment_form.html -->
 
-{% extends 'base.html' %}
+{% extends 'base_admin_sidebar.html' %}
 
 {% load crispy_forms_tags %}
 
 {% block content %}
-<div class="container">
-    <h2>Create Fee Assignment</h2>
-    <form method="post">
-        {% csrf_token %}
-        {{ form|crispy }}
-        <button type="submit" class="btn btn-primary">Submit</button>
+<div class="container mt-4 mb-5">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="mb-0">Create Fee Assignment</h2>
+        <a href="{% url 'fee_assignment_list' %}" class="btn btn-outline-secondary">Back to Fees</a>
+    </div>
+    <div class="card shadow-sm border-0">
+        <div class="card-body">
+            <p class="text-muted">When you create a fee for a new term, active students in that class inherit the last term's discount and waiver settings unless you change them later.</p>
+            <form method="post">
+                {% csrf_token %}
+                {{ form|crispy }}
+                <div class="d-flex gap-2 mt-3">
+                    <button type="submit" class="btn btn-primary">Save Fee Assignment</button>
+                    <a href="{% url 'fee_assignment_list' %}" class="btn btn-outline-secondary">Cancel</a>
+                </div>
+            </form>
+        </div>
     </form>
 </div>
 {% endblock %}

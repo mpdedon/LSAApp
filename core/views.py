@@ -1,4 +1,5 @@
 import json
+from urllib.parse import quote
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.mixins import UserPassesTestMixin
 from django.contrib.auth.decorators import login_required, user_passes_test
@@ -14,13 +15,15 @@ from django.core.exceptions import ValidationError
 from django.http import HttpResponseBadRequest, JsonResponse, Http404
 from django.core.mail import send_mail, BadHeaderError
 from django.shortcuts import HttpResponse
+from django.template.loader import render_to_string
 from django.utils import timezone
 from django.core.exceptions import ObjectDoesNotExist
 from django.conf import settings
+from django.templatetags.static import static
 from decimal import Decimal, InvalidOperation
 from datetime import timedelta
 from core.models import Session, Term, CustomUser, Student, Teacher, Guardian, Notification
-from core.models import Class, Subject, FeeAssignment, Enrollment, Payment, Assignment, Assessment, Exam
+from core.models import Class, Subject, FeeAssignment, Enrollment, Payment, PaymentReceipt, Assignment, Assessment, Exam
 from core.models import SubjectAssignment, TeacherAssignment, ClassSubjectAssignment, Attendance
 from core.models import SubjectResult, Result, StudentFeeRecord, FinancialRecord, Message
 from core.models import OnlineQuestion, AssignmentSubmission, AssessmentSubmission, ExamSubmission, SessionalResult, CumulativeRecord
@@ -30,7 +33,7 @@ from core.session.forms import SessionForm
 from core.term.forms import TermForm
 from core.subject.forms import SubjectForm
 from core.fee_assignment.forms import FeeAssignmentForm
-from core.payment.forms import PaymentForm
+from core.payment.forms import BulkPaymentForm, PaymentForm
 from core.enrollment.forms import EnrollmentForm
 from core.subject_assignment.forms import SubjectAssignmentForm
 from core.teacher_assignment.forms import TeacherAssignmentForm
@@ -38,9 +41,113 @@ from core.assessment.forms import AssessmentForm, OnlineQuestionForm
 from core.exams.forms import ExamForm
 from core.models import Post, Category, Tag
 from core.blog.forms import PostForm, CategoryForm, TagForm
+from core.finance_services import (
+    allocate_bulk_payment,
+    build_bulk_payment_preview,
+    create_payment_receipt,
+    get_previous_term,
+    get_bulk_payment_candidates,
+    rollover_fee_assignments,
+    summarize_fee_rollover,
+    sync_student_fee_records_for_term,
+)
+from core.fee_assignment.forms import FeeAssignmentRolloverForm
+from core.system_settings import SystemSettings
 import logging
 
 logger = logging.getLogger(__name__)
+
+
+def _coerce_decimal(value):
+    try:
+        return Decimal(str(value or '0.00'))
+    except (InvalidOperation, TypeError, ValueError):
+        return Decimal('0.00')
+
+
+def _prepare_receipt_display(receipt):
+    payments = list(receipt.payments.all()) if hasattr(receipt, 'payments') else []
+    record_map = {
+        payment.financial_record_id: payment.financial_record
+        for payment in payments
+        if getattr(payment, 'financial_record', None)
+    }
+
+    normalized_items = []
+    total_balance_due = Decimal('0.00')
+    total_discount_amount = Decimal('0.00')
+    fee_categories = set()
+    class_names = set()
+
+    for item in receipt.line_items or []:
+        financial_record_id = item.get('financial_record_id')
+        record = record_map.get(financial_record_id)
+        class_name = item.get('class_name') or (
+            record.student.current_class.name
+            if record and getattr(record.student, 'current_class', None)
+            else 'Unassigned'
+        )
+        discount_amount = _coerce_decimal(item.get('discount_amount'))
+        outstanding_balance = item.get('outstanding_balance')
+        if outstanding_balance in (None, '') and record is not None:
+            outstanding_balance = record.outstanding_balance
+        outstanding_balance = _coerce_decimal(outstanding_balance)
+        fee_category = item.get('fee_category') or 'School Fees'
+
+        normalized_items.append({
+            **item,
+            'class_name': class_name,
+            'fee_category': fee_category,
+            'discount_amount': discount_amount,
+            'outstanding_balance': outstanding_balance,
+            'amount_paid': _coerce_decimal(item.get('amount_paid')),
+        })
+        total_balance_due += outstanding_balance
+        total_discount_amount += discount_amount
+        fee_categories.add(fee_category)
+        if class_name:
+            class_names.add(class_name)
+
+    if not normalized_items:
+        for payment in payments:
+            payment.financial_record.refresh_from_db(fields=['outstanding_balance', 'total_discount'])
+            class_name = payment.student.current_class.name if payment.student.current_class else 'Unassigned'
+            discount_amount = payment.financial_record.total_discount or Decimal('0.00')
+            outstanding_balance = payment.financial_record.outstanding_balance or Decimal('0.00')
+            normalized_items.append({
+                'payment_id': payment.pk,
+                'financial_record_id': payment.financial_record_id,
+                'student_id': payment.financial_record.student_id,
+                'student_name': payment.student.user.get_full_name(),
+                'class_name': class_name,
+                'fee_category': 'School Fees',
+                'discount_amount': discount_amount,
+                'outstanding_balance': outstanding_balance,
+                'amount_paid': payment.amount_paid,
+            })
+            total_balance_due += outstanding_balance
+            total_discount_amount += discount_amount
+            fee_categories.add('School Fees')
+            class_names.add(class_name)
+
+    receipt.display_line_items = normalized_items
+    receipt.reference_display = receipt.display_reference
+    receipt.batch_display = (receipt.batch_reference or '').strip() or receipt.reference_display
+    receipt.fee_category_display = ', '.join(sorted(fee_categories)) if fee_categories else 'School Fees'
+    receipt.target_class_display = receipt.class_label or (
+        'Multiple classes' if len(class_names) > 1 else next(iter(class_names), 'Not specified')
+    )
+    receipt.total_balance_due = total_balance_due
+    receipt.total_discount_amount = total_discount_amount
+    receipt.has_discount_column = any(item['discount_amount'] > Decimal('0.00') for item in normalized_items)
+    receipt.payer_display = (
+        receipt.guardian.user.get_full_name() if receipt.guardian and receipt.guardian.user.get_full_name()
+        else receipt.guardian.user.username if receipt.guardian and receipt.guardian.user
+        else receipt.student.user.get_full_name() if receipt.student and receipt.student.user.get_full_name()
+        else receipt.student.user.username if receipt.student and receipt.student.user
+        else 'N/A'
+    )
+    return receipt
 
 # Rollover Utility Functions
 def rollover_term_assignments(source_term, target_term, request):
@@ -2129,6 +2236,15 @@ class FeeAssignmentListView(AdminRequiredMixin, ListView):
     template_name = 'fee_assignment/fee_assignment_list.html'
     context_object_name = 'assignments'
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        active_term = Term.objects.filter(is_active=True).select_related('session').first()
+        previous_term = get_previous_term(active_term)
+        context['active_term'] = active_term
+        context['previous_term'] = previous_term
+        context['show_rollover_button'] = bool(active_term and previous_term)
+        return context
+
 
 class FeeAssignmentCreateView(AdminRequiredMixin, CreateView):
     model = FeeAssignment
@@ -2138,7 +2254,13 @@ class FeeAssignmentCreateView(AdminRequiredMixin, CreateView):
 
     def form_valid(self, form):
         response = super().form_valid(form)
-        self.object.assign_fees_to_students()  # Automatically assign to students in the class
+        sync_student_fee_records_for_term(
+            self.object.term,
+            source_term=get_previous_term(self.object.term),
+            class_ids=[self.object.class_instance_id],
+            carry_forward_adjustments=True,
+            active_only=True,
+        )
         messages.success(self.request, 'Fee assignment created successfully and assigned to students.')
         return response
 
@@ -2150,9 +2272,63 @@ class FeeAssignmentUpdateView(AdminRequiredMixin, UpdateView):
 
     def form_valid(self, form):
         response = super().form_valid(form)
-        self.object.assign_fees_to_students()  # Update assignments if necessary
+        sync_student_fee_records_for_term(
+            self.object.term,
+            source_term=get_previous_term(self.object.term),
+            class_ids=[self.object.class_instance_id],
+            carry_forward_adjustments=True,
+            active_only=True,
+        )
         messages.success(self.request, 'Fee assignment updated successfully.')
         return response
+
+
+class FeeAssignmentRolloverView(AdminRequiredMixin, FormView):
+    template_name = 'fee_assignment/fee_assignment_rollover.html'
+    form_class = FeeAssignmentRolloverForm
+    success_url = reverse_lazy('fee_assignment_list')
+
+    def get_initial_terms(self):
+        target_term = Term.objects.filter(is_active=True).select_related('session').first()
+        source_term = get_previous_term(target_term)
+        return source_term, target_term
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        source_term, target_term = self.get_initial_terms()
+        kwargs['source_term'] = source_term
+        kwargs['target_term'] = target_term
+        return kwargs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        form = context['form']
+        if form.is_bound and form.is_valid():
+            source_term = form.cleaned_data['source_term']
+            target_term = form.cleaned_data['target_term']
+        else:
+            source_term = form.fields['source_term'].initial
+            target_term = form.fields['target_term'].initial
+        if source_term and target_term:
+            context['preview'] = summarize_fee_rollover(source_term, target_term)
+        return context
+
+    def form_valid(self, form):
+        result = rollover_fee_assignments(
+            source_term=form.cleaned_data['source_term'],
+            target_term=form.cleaned_data['target_term'],
+            overwrite_existing_assignments=form.cleaned_data['overwrite_existing_assignments'],
+            carry_forward_adjustments=form.cleaned_data['carry_forward_adjustments'],
+        )
+        messages.success(
+            self.request,
+            (
+                f"Rollover completed: {result['created_assignments']} class fees created, "
+                f"{result['updated_assignments']} updated, {result['skipped_assignments']} unchanged. "
+                f"Student fee sync created {result['sync']['created']} records and updated {result['sync']['updated']}."
+            ),
+        )
+        return super().form_valid(form)
 
 class FeeAssignmentDetailView(DetailView):
     model = FeeAssignment
@@ -2202,158 +2378,12 @@ class StudentFeeRecordListView(AdminRequiredMixin, ListView):
         """
         if not active_term:
             return
-
-        term_assignments = FeeAssignment.objects.filter(term=active_term).select_related('class_instance')
-        if not term_assignments.exists():
-            return 
-
-        assignments_by_class_id = {fa.class_instance_id: fa for fa in term_assignments}
-
-        # Use Student PK ('id') for clarity and robustness
-        students_in_assigned_classes = Student.objects.filter(
-            current_class_id__in=assignments_by_class_id.keys(),
-            status='active' # Optional: Only sync for active students?
-        ).values_list('user_id', 'current_class_id') # Get Student PK
-
-        student_map = {s_id: c_id for s_id, c_id in students_in_assigned_classes}
-        if not student_map:
-            return # No students to process
-
-        # Fetch existing SFRs for these specific students and term
-        existing_records = StudentFeeRecord.objects.filter(
-            term=active_term,
-            student_id__in=student_map.keys()
-        ).select_related('fee_assignment') # Select related assignment for comparison
-
-        # Use Student PK for the map key
-        existing_map = {record.student_id: record for record in existing_records}
-        # Note: This assumes one fee record per student per term.
-
-        records_to_create_instances = []
-        records_to_update_pks = [] # Track PKs needing potential update via save()
-
-        for student_id, class_id in student_map.items():
-            # Find the relevant assignment for the student's class
-            assignment = assignments_by_class_id.get(class_id)
-            if not assignment: continue # Should not happen due to initial filter
-
-            record = existing_map.get(student_id) # Check if record exists using Student PK
-
-            if not record:
-                # --- Prepare NEW record instance ---
-                initial_amount = assignment.amount or Decimal('0.00')
-                initial_discount = Decimal('0.00')
-                initial_waiver = False
-
-                # Calculate net_fee directly
-                if initial_waiver:
-                    calculated_net_fee = Decimal('0.00')
-                else:
-                    applied_discount = min(initial_amount, initial_discount)
-                    calculated_net_fee = max(initial_amount - applied_discount, Decimal('0.00'))
-
-                records_to_create_instances.append(
-                    StudentFeeRecord(
-                        student_id=student_id,
-                        term=active_term,
-                        fee_assignment=assignment,
-                        amount=initial_amount,
-                        discount=initial_discount,
-                        waiver=initial_waiver,
-                        net_fee=calculated_net_fee # Assign pre-calculated value
-                    )
-                )
-            else:
-                # --- Check EXISTING record for updates ---
-                needs_save = False # Use save() to trigger signals if amount/assignment changes
-                if record.fee_assignment_id != assignment.id:
-                    record.fee_assignment = assignment
-                    needs_save = True
-                if record.amount != assignment.amount:
-                    record.amount = assignment.amount
-                    needs_save = True
-                # Note: Discount/Waiver are user-set, don't override them here.
-                # If amount changed, net_fee needs recalc *during save*.
-
-                if needs_save:
-                    # Don't use .update() here if signals are important for amount change
-                    # Instead, call save() on the individual instance later
-                    records_to_update_pks.append(record.pk)
-
-        # --- Perform Database Operations ---
-        created_records = []
-        if records_to_create_instances:
-            try:
-                created_records = StudentFeeRecord.objects.bulk_create(records_to_create_instances)
-                # messages.info(self.request, f"Created {len(created_records)} new fee records.") # Avoid messages in sync logic
-            except IntegrityError as e:
-                 # Handle potential unique constraint violations if sync runs concurrently (unlikely here)
-                 pass
-
-        # --- Update Existing Records Needing Save (Triggers Signals) ---
-        if records_to_update_pks:
-            records_needing_save = StudentFeeRecord.objects.filter(pk__in=records_to_update_pks)
-            updated_count = 0
-            for record in records_needing_save:
-                 # Refetch assignment just in case (might be overkill)
-                assignment = assignments_by_class_id.get(record.student.current_class_id)
-                if assignment: # Check if assignment still exists for the class
-                    record.fee_assignment = assignment
-                    record.amount = assignment.amount
-                    # The save method will calculate net_fee and trigger signals
-                    record.save()
-                    updated_count +=1
-            print(f"Sync: Updated {updated_count} existing StudentFeeRecords via save().")
-
-        # --- Manually Ensure FinancialRecord Consistency for BULK_CREATED records ---
-        if created_records:
-            print(f"Sync: Ensuring FinancialRecord consistency for {len(created_records)} bulk-created records.")
-            for record in created_records:
-                # Use get_or_create for FinancialRecord
-                fin_record, fr_created = FinancialRecord.objects.get_or_create(
-                    student_id=record.student_id,
-                    term=record.term
-                    # REMOVE 'defaults' dictionary completely here
-                )
-
-                # --- Explicitly set fields AFTER get_or_create ---
-                # This ensures fields are updated whether the FR was created or just fetched.
-                needs_fr_update = False
-                if fin_record.total_fee != record.net_fee:
-                    fin_record.total_fee = record.net_fee; needs_fr_update = True
-                if fin_record.total_discount != record.discount:
-                    fin_record.total_discount = record.discount; needs_fr_update = True
-                if fin_record.has_waiver != record.waiver: # Now check against the SFR waiver
-                    fin_record.has_waiver = record.waiver; needs_fr_update = True
-
-                # If newly created, total_paid should be 0 initially
-                if fr_created and fin_record.total_paid != Decimal('0.00'):
-                    fin_record.total_paid = Decimal('0.00')
-                    needs_fr_update = True
-                # Note: We don't recalculate total_paid from payments here;
-
-                # Always recalculate balance based on current values
-                new_outstanding = max(fin_record.total_fee - fin_record.total_paid, Decimal('0.00'))
-                if fin_record.outstanding_balance != new_outstanding:
-                    fin_record.outstanding_balance = new_outstanding
-                    needs_fr_update = True
-
-                # Always update archived status
-                term_is_inactive = not record.term.is_active
-                if fin_record.archived != term_is_inactive:
-                    fin_record.archived = term_is_inactive
-                    needs_fr_update = True
-
-                # Save only if necessary
-                if needs_fr_update:
-                    # Define all potentially updated fields
-                    update_fields_list = [
-                        'total_fee', 'total_discount',
-                        'total_paid', 'outstanding_balance', 'archived'
-                    ]
-                    fin_record.save(update_fields=update_fields_list)
-
-            print(f"Sync: FinancialRecord consistency check complete.")
+        sync_student_fee_records_for_term(
+            active_term,
+            source_term=get_previous_term(active_term),
+            carry_forward_adjustments=True,
+            active_only=True,
+        )
     def get_queryset(self):
         """Fetch and group records by class based on filters."""
         # Get term and class from query params
@@ -2656,6 +2686,137 @@ class PaymentListView(AdminRequiredMixin, ListView):
 
         return context
 
+
+class BulkPaymentView(AdminRequiredMixin, FormView):
+    template_name = 'payment/bulk_payment.html'
+    form_class = BulkPaymentForm
+    success_url = reverse_lazy('payment_list')
+
+    def get_initial(self):
+        initial = super().get_initial()
+        initial.setdefault('scope', self.request.GET.get('scope', 'guardian'))
+        initial.setdefault('allocation_mode', self.request.GET.get('allocation_mode', 'auto'))
+        return initial
+
+    def _resolve_preview_inputs(self, data):
+        scope = data.get('scope', 'guardian')
+        term = Term.objects.filter(pk=data.get('term')).first() if data.get('term') else Term.objects.filter(is_active=True).first()
+        guardian = Guardian.objects.filter(pk=data.get('guardian')).first() if data.get('guardian') else None
+        class_instance = Class.objects.filter(pk=data.get('class_instance')).first() if data.get('class_instance') else None
+        total_amount = data.get('total_amount') or None
+        return {
+            'scope': scope,
+            'term': term,
+            'guardian': guardian,
+            'class_instance': class_instance,
+            'total_amount': total_amount,
+        }
+
+    def _build_preview(self, data):
+        preview_inputs = self._resolve_preview_inputs(data)
+        if not preview_inputs['term']:
+            return {
+                'records': [],
+                'candidate_count': 0,
+                'requested_total': Decimal('0.00'),
+                'allocated_total': Decimal('0.00'),
+                'remaining_amount': Decimal('0.00'),
+                'total_outstanding': Decimal('0.00'),
+            }
+
+        return build_bulk_payment_preview(
+            preview_inputs['scope'],
+            preview_inputs['term'],
+            total_amount=preview_inputs['total_amount'],
+            guardian=preview_inputs['guardian'],
+            class_instance=preview_inputs['class_instance'],
+        )
+
+    def _serialize_preview(self, preview):
+        return {
+            'candidate_count': preview['candidate_count'],
+            'requested_total': f"{preview['requested_total']:.2f}",
+            'allocated_total': f"{preview['allocated_total']:.2f}",
+            'remaining_amount': f"{preview['remaining_amount']:.2f}",
+            'total_outstanding': f"{preview['total_outstanding']:.2f}",
+            'records': [
+                {
+                    'financial_record_id': entry['financial_record_id'],
+                    'student_name': entry['student_name'],
+                    'class_name': entry['class_name'],
+                    'discount_amount': f"{entry['discount_amount']:.2f}",
+                    'outstanding_balance': f"{entry['outstanding_balance']:.2f}",
+                    'suggested_allocation': f"{entry['suggested_allocation']:.2f}",
+                }
+                for entry in preview['records']
+            ],
+        }
+
+    def get(self, request, *args, **kwargs):
+        if request.GET.get('format') == 'json':
+            preview = self._build_preview(request.GET)
+            return JsonResponse(self._serialize_preview(preview))
+        return super().get(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        preview_source = self.request.POST if self.request.method == 'POST' else self.request.GET
+        preview = self._build_preview(preview_source)
+        context['preview_records'] = preview['records']
+        context['preview_total'] = preview['total_outstanding']
+        context['preview_allocated_total'] = preview['allocated_total']
+        context['preview_remaining_amount'] = preview['remaining_amount']
+        context['preview_candidate_count'] = preview['candidate_count']
+        return context
+
+    def form_valid(self, form):
+        manual_allocations = None
+        posted_record_ids = self.request.POST.getlist('allocation_record_id')
+        if posted_record_ids:
+            manual_allocations = list(zip(
+                posted_record_ids,
+                self.request.POST.getlist('allocation_amount'),
+            ))
+
+        try:
+            result = allocate_bulk_payment(
+                scope=form.cleaned_data['scope'],
+                term=form.cleaned_data['term'],
+                total_amount=form.cleaned_data['total_amount'],
+                payment_date=form.cleaned_data['payment_date'],
+                guardian=form.cleaned_data.get('guardian'),
+                class_instance=form.cleaned_data.get('class_instance'),
+                batch_reference=form.cleaned_data.get('batch_reference', ''),
+                manual_allocations=manual_allocations,
+            )
+        except ValueError as exc:
+            form.add_error(None, str(exc))
+            return self.form_invalid(form)
+
+        if not result['created_payments']:
+            form.add_error(None, 'No outstanding financial records matched this bulk payment selection.')
+            return self.form_invalid(form)
+
+        receipt = create_payment_receipt(
+            result['created_payments'],
+            created_by=self.request.user,
+            scope=form.cleaned_data['scope'],
+            guardian=form.cleaned_data.get('guardian'),
+            term=form.cleaned_data['term'],
+            batch_reference=form.cleaned_data.get('batch_reference', ''),
+            class_label=form.cleaned_data['class_instance'].name if form.cleaned_data.get('class_instance') else '',
+            preview=result['preview'],
+        )
+
+        messages.success(
+            self.request,
+            (
+                f"Created {len(result['created_payments'])} payment entries totaling ₦{result['allocated_total']:.2f}. "
+                f"Receipt: {receipt.receipt_number if receipt else 'not created'}"
+            ),
+        )
+        return super().form_valid(form)
+
 class PaymentCreateView(AdminRequiredMixin, CreateView):
     model = Payment
     form_class = PaymentForm
@@ -2699,9 +2860,20 @@ class PaymentCreateView(AdminRequiredMixin, CreateView):
             # Save the payment instance - this will trigger the post_save signal
             # The signal handler will update the financial_record
             payment.save()
+            receipt = create_payment_receipt(
+                [payment],
+                created_by=self.request.user,
+                scope='single',
+                guardian=getattr(student, 'student_guardian', None),
+                student=student,
+                term=term,
+                batch_reference=payment.batch_reference,
+            )
             # Ensure self.object is set so get_success_url can format properly
             self.object = payment
             messages.success(self.request, 'Payment recorded successfully.')
+            if receipt:
+                messages.info(self.request, f'Receipt {receipt.receipt_number} generated.')
             return redirect(self.get_success_url())
         except ValidationError as e:
             # Catch validation errors from Payment.clean()
@@ -2745,6 +2917,153 @@ class PaymentDetailView(AdminRequiredMixin, DetailView):
             'financial_record__student__user',
             'financial_record__term__session'
         )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['receipts'] = self.object.receipts.order_by('-issued_at')
+        return context
+
+
+class ReceiptAccessMixin(UserPassesTestMixin):
+    def test_func(self):
+        receipt = self.get_object()
+        user = self.request.user
+        if user.is_authenticated and user.is_superuser:
+            return True
+        guardian_profile = getattr(user, 'guardian', None)
+        return bool(guardian_profile and receipt.guardian_id == guardian_profile.pk)
+
+
+class ReceiptPresentationMixin:
+    def get_receipt_context(self, receipt, is_shared=False):
+        _prepare_receipt_display(receipt)
+        school_settings = SystemSettings.get_settings()
+        if school_settings.school_logo:
+            logo_url = school_settings.school_logo.url
+        else:
+            logo_url = static('images/logo.jpg')
+
+        logo_absolute_url = self.request.build_absolute_uri(logo_url)
+        share_url = self.request.build_absolute_uri(
+            reverse('payment_receipt_share', kwargs={'share_token': receipt.share_token})
+        )
+        share_message = (
+            f"Payment receipt {receipt.receipt_number} for {school_settings.school_name} "
+            f"totalling {school_settings.currency_symbol}{receipt.total_amount:.2f}: {share_url}"
+        )
+
+        return {
+            'base_template': 'base.html' if is_shared else 'base_admin_sidebar.html',
+            'is_shared': is_shared,
+            'school_settings': school_settings,
+            'school_logo_url': logo_url,
+            'school_logo_absolute_url': logo_absolute_url,
+            'receipt_share_url': share_url,
+            'whatsapp_share_url': f"https://wa.me/?text={quote(share_message)}",
+            'email_share_url': (
+                f"mailto:?subject={quote(f'{school_settings.school_name} receipt {receipt.receipt_number}')}&body={quote(share_message)}"
+            ),
+            'share_message': share_message,
+        }
+
+
+class PaymentReceiptListView(AdminRequiredMixin, ListView):
+    model = PaymentReceipt
+    template_name = 'payment/receipt_list.html'
+    context_object_name = 'receipts'
+    paginate_by = 50
+
+    def get_queryset(self):
+        qs = PaymentReceipt.objects.select_related(
+            'term__session',
+            'guardian__user',
+            'student__user',
+            'created_by',
+        ).prefetch_related('payments__financial_record__student__user').order_by('-term__start_date', '-payment_date', '-issued_at')
+        session_id = self.request.GET.get('session_id')
+        term_id = self.request.GET.get('term_id')
+        if term_id:
+            try:
+                qs = qs.filter(term_id=int(term_id))
+            except ValueError:
+                pass
+        elif session_id:
+            try:
+                qs = qs.filter(term__session_id=int(session_id))
+            except ValueError:
+                pass
+        return qs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        for receipt in context['page_obj'].object_list:
+            _prepare_receipt_display(receipt)
+        context['sessions'] = Session.objects.all().order_by('-start_date')
+        context['terms'] = Term.objects.select_related('session').order_by('-start_date')
+        context['selected_session_id'] = self.request.GET.get('session_id')
+        context['selected_term_id'] = self.request.GET.get('term_id')
+        return context
+
+
+class PaymentReceiptDetailView(ReceiptPresentationMixin, ReceiptAccessMixin, DetailView):
+    model = PaymentReceipt
+    template_name = 'payment/receipt_detail.html'
+    context_object_name = 'receipt'
+
+    def get_queryset(self):
+        return PaymentReceipt.objects.select_related(
+            'term__session',
+            'guardian__user',
+            'student__user',
+            'created_by',
+        ).prefetch_related('payments__financial_record__student__user')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update(self.get_receipt_context(self.object, is_shared=False))
+        return context
+
+
+class PaymentReceiptShareView(ReceiptPresentationMixin, DetailView):
+    model = PaymentReceipt
+    template_name = 'payment/receipt_detail.html'
+    context_object_name = 'receipt'
+    slug_field = 'share_token'
+    slug_url_kwarg = 'share_token'
+
+    def get_queryset(self):
+        return PaymentReceipt.objects.select_related(
+            'term__session',
+            'guardian__user',
+            'student__user',
+            'created_by',
+        ).prefetch_related('payments__financial_record__student__user')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update(self.get_receipt_context(self.object, is_shared=True))
+        return context
+
+
+class PaymentReceiptDownloadView(ReceiptPresentationMixin, ReceiptAccessMixin, DetailView):
+    model = PaymentReceipt
+
+    def get_queryset(self):
+        return PaymentReceipt.objects.select_related(
+            'term__session',
+            'guardian__user',
+            'student__user',
+            'created_by',
+        ).prefetch_related('payments__financial_record__student__user')
+
+    def get(self, request, *args, **kwargs):
+        receipt = self.get_object()
+        context = {'receipt': receipt, 'request': request}
+        context.update(self.get_receipt_context(receipt, is_shared=False))
+        content = render_to_string('payment/receipt_download.html', context)
+        response = HttpResponse(content, content_type='text/html; charset=utf-8')
+        response['Content-Disposition'] = f'attachment; filename="{receipt.receipt_number}.html"'
+        return response
 
 class PaymentDeleteView(AdminRequiredMixin, DeleteView):
     model = Payment

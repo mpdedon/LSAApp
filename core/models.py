@@ -14,6 +14,7 @@ from datetime import date, timedelta
 from decimal import Decimal
 from django_ckeditor_5.fields import CKEditor5Field
 import json
+import uuid
 
 # Import SystemSettings for global access
 from core.system_settings import SystemSettings
@@ -1617,12 +1618,31 @@ class FinancialRecord(models.Model):
             models.CheckConstraint(check=Q(total_paid__gte=0), name='financial_record_positive_total_paid'),
         ]
 
+    def fee_records_qs(self):
+        return StudentFeeRecord.objects.filter(student=self.student, term=self.term)
+
+    def fee_snapshot(self):
+        fee_totals = self.fee_records_qs().aggregate(
+            total_fee=Coalesce(Sum('net_fee'), Decimal('0.00')),
+            total_discount=Coalesce(Sum('discount'), Decimal('0.00')),
+            waived_count=Coalesce(Sum(models.Case(
+                models.When(waiver=True, then=1),
+                default=0,
+                output_field=models.IntegerField(),
+            )), 0),
+        )
+        return {
+            'total_fee': fee_totals['total_fee'] or Decimal('0.00'),
+            'total_discount': fee_totals['total_discount'] or Decimal('0.00'),
+            'has_waiver': bool(fee_totals['waived_count']),
+        }
+
     def update_record(self):
         """Calculates and updates fields based on related data. Called by signals."""
-        # 1. Get fee details
-        fee_record = StudentFeeRecord.objects.filter(student=self.student, term=self.term).first()
-        current_net_fee = fee_record.net_fee if fee_record else Decimal('0.00')
-        current_discount = fee_record.discount if fee_record else Decimal('0.00')
+        # 1. Get fee details across every fee component for the student and term.
+        fee_snapshot = self.fee_snapshot()
+        current_net_fee = fee_snapshot['total_fee']
+        current_discount = fee_snapshot['total_discount']
 
         # 2. Calculate total paid
         # Ensure pk exists before accessing reverse relation
@@ -1660,9 +1680,8 @@ class FinancialRecord(models.Model):
 
     @property
     def has_waiver(self):
-        """Check if the corresponding fee record has a waiver."""
-        fee_record = StudentFeeRecord.objects.filter(student=self.student, term=self.term).first()
-        return fee_record and fee_record.waiver
+        """Check if any fee component for the student and term has a waiver."""
+        return self.fee_snapshot()['has_waiver']
 
     @property
     def can_access_results(self):
@@ -1685,6 +1704,7 @@ class Payment(models.Model):
     financial_record = models.ForeignKey('FinancialRecord', related_name='payments', on_delete=models.CASCADE)
     amount_paid = models.DecimalField(max_digits=10, decimal_places=2)
     payment_date = models.DateField(default=timezone.now)
+    batch_reference = models.CharField(max_length=64, blank=True, default='', db_index=True)
 
     def clean(self):
         """ Add validation logic here, checked before save()."""
@@ -1692,26 +1712,20 @@ class Payment(models.Model):
         if not self.financial_record:
             raise ValidationError("Payment must be associated with a Financial Record.")
 
-        # Get net fee and waiver status from the related StudentFeeRecord via FinancialRecord
-        fee_record = StudentFeeRecord.objects.filter(
-            student=self.financial_record.student,
-            term=self.financial_record.term
-        ).first()
+        fee_snapshot = self.financial_record.fee_snapshot()
+        total_payable = fee_snapshot['total_fee']
 
-        if not fee_record:
+        if total_payable <= Decimal('0.00'):
             # This case should ideally be prevented by ensuring FinancialRecord/StudentFeeRecord exist first
             raise ValidationError(f"No fee record found for {self.financial_record.student} in {self.financial_record.term}.")
-
-        if fee_record.waiver and self.amount_paid > 0:
-             raise ValidationError("Payment not allowed for waived fees.")
 
         # Check for overpayment *considering other payments for the same record*
         # We need the state *before* this payment is saved if it's an update
         current_total_paid = self.financial_record.payments.exclude(pk=self.pk).aggregate(total=Sum('amount_paid'))['total'] or Decimal('0.00')
         prospective_total_paid = current_total_paid + self.amount_paid
 
-        if prospective_total_paid > fee_record.net_fee + Decimal('0.01'): # Add tolerance
-             raise ValidationError(f"Total payments (₦{prospective_total_paid:.2f}) would exceed net fee (₦{fee_record.net_fee:.2f}).")
+        if prospective_total_paid > total_payable + Decimal('0.01'): # Add tolerance
+             raise ValidationError(f"Total payments (₦{prospective_total_paid:.2f}) would exceed net fee (₦{total_payable:.2f}).")
 
     def save(self, *args, **kwargs):
         # Run validation before saving
@@ -1729,7 +1743,57 @@ class Payment(models.Model):
 
     def __str__(self):
         student_name = self.student.user.get_full_name() if hasattr(self.student, 'user') and self.student.user else f"Student {self.student.pk}"
-        return f"{student_name} - {self.term} - {self.amount_paid} on {self.payment_date}"
+        reference = f" [{self.batch_reference}]" if self.batch_reference else ''
+        return f"{student_name} - {self.term} - {self.amount_paid} on {self.payment_date}{reference}"
+
+
+class PaymentReceipt(models.Model):
+    SCOPE_CHOICES = [
+        ('single', 'Single Payment'),
+        ('guardian', 'Guardian Bulk Payment'),
+        ('class', 'Class Bulk Payment'),
+    ]
+
+    receipt_number = models.CharField(max_length=32, unique=True, db_index=True, blank=True)
+    share_token = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    term = models.ForeignKey('Term', on_delete=models.CASCADE, related_name='payment_receipts')
+    guardian = models.ForeignKey('Guardian', on_delete=models.SET_NULL, null=True, blank=True, related_name='payment_receipts')
+    student = models.ForeignKey('Student', on_delete=models.SET_NULL, null=True, blank=True, related_name='payment_receipts')
+    created_by = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name='issued_payment_receipts')
+    payments = models.ManyToManyField('Payment', related_name='receipts', blank=True)
+    scope = models.CharField(max_length=20, choices=SCOPE_CHOICES, default='single')
+    batch_reference = models.CharField(max_length=64, blank=True, default='', db_index=True)
+    class_label = models.CharField(max_length=120, blank=True, default='')
+    total_amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    payment_date = models.DateField(default=timezone.now)
+    issued_at = models.DateTimeField(auto_now_add=True)
+    line_items = models.JSONField(default=list, blank=True)
+
+    class Meta:
+        ordering = ['-payment_date', '-issued_at']
+
+    def save(self, *args, **kwargs):
+        if not self.receipt_number:
+            self.receipt_number = f"RCT-{timezone.now().strftime('%Y%m%d')}-{uuid.uuid4().hex[:6].upper()}"
+        super().save(*args, **kwargs)
+
+    @property
+    def display_reference(self):
+        reference = (self.batch_reference or '').strip()
+        if reference:
+            return reference
+
+        scope_code = {
+            'single': 'SGL',
+            'guardian': 'GRD',
+            'class': 'CLS',
+        }.get(self.scope, 'PAY')
+        date_part = (self.payment_date or timezone.localdate()).strftime('%Y%m%d')
+        suffix = (self.receipt_number or uuid.uuid4().hex[:6].upper())[-6:]
+        return f"{scope_code}-{date_part}-{suffix}"
+
+    def __str__(self):
+        return f"{self.receipt_number} - {self.term} - ₦{self.total_amount}"
     
 class Expense(models.Model):
     description = models.CharField(max_length=255)

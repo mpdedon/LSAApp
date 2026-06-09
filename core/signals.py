@@ -281,36 +281,8 @@ def update_financial_record_on_fee_change(sender, instance, created, **kwargs):
         }
     )
 
-    # --- Crucial Change ---
-    # If the FinancialRecord was just created, its pk might not be available yet
-    # for reverse lookups within the same transaction.
-    # We only need to update fields based on the StudentFeeRecord here.
-    # The total_paid calculation should happen ONLY when a Payment is involved.
-
-    should_save = False
-    if fin_record.total_fee != instance.net_fee:
-        fin_record.total_fee = instance.net_fee
-        should_save = True
-    if fin_record.total_discount != instance.discount:
-        fin_record.total_discount = instance.discount
-        should_save = True
-
-    # Recalculate outstanding balance based ONLY on fee and the *current* total_paid
-    # (Do not try to re-aggregate payments here)
-    new_outstanding = max(fin_record.total_fee - fin_record.total_paid, Decimal('0.00'))
-    if fin_record.outstanding_balance != new_outstanding:
-        fin_record.outstanding_balance = new_outstanding
-        should_save = True
-
-    # Also update archived status based on term (moved from update_record)
-    term_is_inactive = not instance.term.is_active
-    if fin_record.archived != term_is_inactive:
-        fin_record.archived = term_is_inactive
-        should_save = True
-
-    if should_save:
-        # Save only if necessary, avoid calling update_record recursively or before pk exists
-        fin_record.save(update_fields=['total_fee', 'total_discount', 'outstanding_balance', 'archived'])
+    fin_record.update_record()
+    fin_record.save(update_fields=['total_fee', 'total_discount', 'outstanding_balance', 'archived'])
 
 @receiver(post_save, sender=Payment)
 def update_financial_record_on_payment_save(sender, instance, created, **kwargs):

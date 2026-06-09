@@ -532,6 +532,9 @@
                         <a href="{% url 'payment_list' %}" class="nav-item-link {% if request.resolver_match.url_name == 'payment_list' %}active{% endif %}">
                             <i class="bi bi-credit-card"></i>Payments
                         </a>
+                        <a href="{% url 'payment_receipt_list' %}" class="nav-item-link {% if request.resolver_match.url_name == 'payment_receipt_list' %}active{% endif %}">
+                            <i class="bi bi-receipt"></i>Receipts
+                        </a>
                         <a href="{% url 'financial_record_list' %}" class="nav-item-link {% if request.resolver_match.url_name == 'financial_record_list' %}active{% endif %}">
                             <i class="bi bi-file-earmark-bar-graph"></i>Financial Summaries
                         </a>

@@ -1,13 +1,14 @@
 from django.test import TestCase, Client
 from django.urls import reverse
 from django.contrib.auth import get_user_model
+import json
 from decimal import Decimal
 from datetime import date, timedelta
 
 # Import ALL your relevant models and forms
 from core.models import (
     Student, Guardian, Class, Session, Term, FeeAssignment,
-    StudentFeeRecord, Payment, FinancialRecord
+    StudentFeeRecord, Payment, PaymentReceipt, FinancialRecord
 )
 from core.payment.forms import PaymentForm # Adjust import path
 
@@ -52,7 +53,9 @@ class FinancialViewTests(TestCase):
         cls.payment_list_url = reverse('payment_list')
         # URL name is 'create_payment' in project URLs
         cls.payment_create_url = reverse('create_payment')
+        cls.bulk_payment_url = reverse('bulk_payment')
         cls.fin_rec_list_url = reverse('financial_record_list')
+        cls.rollover_url = reverse('rollover_fee_assignments')
 
     def setUp(self):
         # Client for making requests
@@ -200,11 +203,77 @@ class FinancialViewTests(TestCase):
         payment = Payment.objects.first()
         self.assertEqual(payment.financial_record, fr)
         self.assertEqual(payment.amount_paid, Decimal('25000.00'))
+        self.assertEqual(PaymentReceipt.objects.count(), 1)
 
         # Check FinancialRecord update via signal
         fr.refresh_from_db()
         self.assertEqual(fr.total_paid, Decimal('25000.00'))
         self.assertEqual(fr.outstanding_balance, Decimal('25000.00')) # 50000 - 25000
+
+    def test_payment_receipt_detail_view_renders(self):
+        StudentFeeRecord.objects.create(student=self.student1, term=self.term, fee_assignment=self.fee_assignment, amount='50000')
+        fr = FinancialRecord.objects.get(student=self.student1, term=self.term)
+        payment = Payment.objects.create(financial_record=fr, amount_paid='25000.00', batch_reference='RCT-VIEW')
+        receipt = PaymentReceipt.objects.create(
+            term=self.term,
+            guardian=self.guardian,
+            student=self.student1,
+            created_by=self.admin_user,
+            scope='single',
+            batch_reference='RCT-VIEW',
+            total_amount=Decimal('25000.00'),
+            payment_date=date.today(),
+            line_items=[{
+                'payment_id': payment.pk,
+                'financial_record_id': fr.pk,
+                'student_id': self.student1.pk,
+                'student_name': self.student1.user.get_full_name(),
+                'class_name': self.class1.name,
+                'discount_amount': '0.00',
+                'amount_paid': '25000.00',
+            }],
+        )
+        receipt.payments.add(payment)
+
+        response = self.client.get(reverse('payment_receipt_detail', kwargs={'pk': receipt.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'payment/receipt_detail.html')
+        self.assertContains(response, receipt.receipt_number)
+        self.assertContains(response, 'Balance Due')
+        self.assertNotContains(response, '>Discount<', status_code=200)
+
+    def test_receipt_views_use_fallback_reference_when_batch_reference_blank(self):
+        StudentFeeRecord.objects.create(student=self.student1, term=self.term, fee_assignment=self.fee_assignment, amount='50000')
+        fr = FinancialRecord.objects.get(student=self.student1, term=self.term)
+        payment = Payment.objects.create(financial_record=fr, amount_paid='10000.00')
+        receipt = PaymentReceipt.objects.create(
+            term=self.term,
+            guardian=self.guardian,
+            student=self.student1,
+            created_by=self.admin_user,
+            scope='single',
+            batch_reference='',
+            total_amount=Decimal('10000.00'),
+            payment_date=date.today(),
+            line_items=[{
+                'payment_id': payment.pk,
+                'financial_record_id': fr.pk,
+                'student_id': self.student1.pk,
+                'student_name': self.student1.user.get_full_name(),
+                'class_name': self.class1.name,
+                'discount_amount': '0.00',
+                'outstanding_balance': '40000.00',
+                'amount_paid': '10000.00',
+            }],
+        )
+        receipt.payments.add(payment)
+
+        detail_response = self.client.get(reverse('payment_receipt_detail', kwargs={'pk': receipt.pk}))
+        list_response = self.client.get(reverse('payment_receipt_list'))
+
+        self.assertContains(detail_response, receipt.display_reference)
+        self.assertContains(list_response, receipt.display_reference)
 
     def test_payment_create_view_post_overpayment_invalid(self):
         """Test creating a payment that exceeds net fee."""
@@ -248,6 +317,159 @@ class FinancialViewTests(TestCase):
         self.assertEqual(fr.total_paid, Decimal('0.00'))
         self.assertEqual(fr.outstanding_balance, Decimal('50000.00'))
 
+    def test_bulk_payment_by_guardian_splits_across_active_wards(self):
+        StudentFeeRecord.objects.create(student=self.student1, term=self.term, fee_assignment=self.fee_assignment, amount='50000')
+        StudentFeeRecord.objects.create(student=self.student2, term=self.term, fee_assignment=self.fee_assignment, amount='50000')
+        response = self.client.post(self.bulk_payment_url, {
+            'scope': 'guardian',
+            'guardian': self.guardian.pk,
+            'class_instance': '',
+            'term': self.term.pk,
+            'allocation_mode': 'auto',
+            'total_amount': '60000.00',
+            'payment_date': date.today().isoformat(),
+            'batch_reference': 'GRP-001',
+        })
+
+        self.assertRedirects(response, self.payment_list_url)
+        self.assertEqual(Payment.objects.count(), 2)
+        fr1 = FinancialRecord.objects.get(student=self.student1, term=self.term)
+        fr2 = FinancialRecord.objects.get(student=self.student2, term=self.term)
+        fr1.refresh_from_db()
+        fr2.refresh_from_db()
+        self.assertEqual(fr1.total_paid + fr2.total_paid, Decimal('60000.00'))
+        self.assertEqual(fr1.outstanding_balance + fr2.outstanding_balance, Decimal('40000.00'))
+        self.assertEqual(set(Payment.objects.values_list('batch_reference', flat=True)), {'GRP-001'})
+        receipt = PaymentReceipt.objects.get()
+        self.assertEqual(receipt.guardian, self.guardian)
+        self.assertEqual(receipt.total_amount, Decimal('60000.00'))
+
+    def test_bulk_payment_by_class_targets_only_selected_class(self):
+        StudentFeeRecord.objects.create(student=self.student1, term=self.term, fee_assignment=self.fee_assignment, amount='50000')
+        StudentFeeRecord.objects.create(student=self.student2, term=self.term, fee_assignment=self.fee_assignment, amount='50000')
+        StudentFeeRecord.objects.create(student=self.student3, term=self.term, fee_assignment=self.fee_assignment2, amount='60000')
+        response = self.client.post(self.bulk_payment_url, {
+            'scope': 'class',
+            'guardian': '',
+            'class_instance': self.class1.pk,
+            'term': self.term.pk,
+            'allocation_mode': 'auto',
+            'total_amount': '70000.00',
+            'payment_date': date.today().isoformat(),
+            'batch_reference': 'CLS-001',
+        })
+
+        self.assertRedirects(response, self.payment_list_url)
+        fr1 = FinancialRecord.objects.get(student=self.student1, term=self.term)
+        fr2 = FinancialRecord.objects.get(student=self.student2, term=self.term)
+        fr3 = FinancialRecord.objects.get(student=self.student3, term=self.term)
+        fr1.refresh_from_db()
+        fr2.refresh_from_db()
+        fr3.refresh_from_db()
+        self.assertEqual(fr1.total_paid + fr2.total_paid, Decimal('70000.00'))
+        self.assertEqual(fr3.total_paid, Decimal('0.00'))
+        self.assertEqual(PaymentReceipt.objects.count(), 1)
+
+    def test_bulk_payment_preview_returns_guardian_students_and_total(self):
+        StudentFeeRecord.objects.create(student=self.student1, term=self.term, fee_assignment=self.fee_assignment, amount='50000')
+        StudentFeeRecord.objects.create(student=self.student2, term=self.term, fee_assignment=self.fee_assignment, amount='50000')
+        StudentFeeRecord.objects.create(student=self.student3, term=self.term, fee_assignment=self.fee_assignment2, amount='60000')
+
+        response = self.client.get(self.bulk_payment_url, {
+            'format': 'json',
+            'scope': 'guardian',
+            'guardian': self.guardian.pk,
+            'term': self.term.pk,
+        })
+
+        self.assertEqual(response.status_code, 200)
+        payload = json.loads(response.content)
+        self.assertEqual(payload['candidate_count'], 3)
+        self.assertEqual(Decimal(payload['total_outstanding']), Decimal('160000.00'))
+        self.assertEqual(Decimal(payload['records'][0]['discount_amount']), Decimal('0.00'))
+
+    def test_bulk_payment_preview_returns_class_students_and_total(self):
+        StudentFeeRecord.objects.create(student=self.student1, term=self.term, fee_assignment=self.fee_assignment, amount='50000')
+        StudentFeeRecord.objects.create(student=self.student2, term=self.term, fee_assignment=self.fee_assignment, amount='50000')
+        StudentFeeRecord.objects.create(student=self.student3, term=self.term, fee_assignment=self.fee_assignment2, amount='60000')
+
+        response = self.client.get(self.bulk_payment_url, {
+            'format': 'json',
+            'scope': 'class',
+            'class_instance': self.class1.pk,
+            'term': self.term.pk,
+        })
+
+        self.assertEqual(response.status_code, 200)
+        payload = json.loads(response.content)
+        self.assertEqual(payload['candidate_count'], 2)
+        self.assertEqual(Decimal(payload['total_outstanding']), Decimal('100000.00'))
+
+    def test_bulk_payment_manual_allocation_honors_entered_split(self):
+        StudentFeeRecord.objects.create(student=self.student1, term=self.term, fee_assignment=self.fee_assignment, amount='50000')
+        StudentFeeRecord.objects.create(student=self.student2, term=self.term, fee_assignment=self.fee_assignment, amount='50000')
+        fr1 = FinancialRecord.objects.get(student=self.student1, term=self.term)
+        fr2 = FinancialRecord.objects.get(student=self.student2, term=self.term)
+
+        response = self.client.post(self.bulk_payment_url, {
+            'scope': 'guardian',
+            'guardian': self.guardian.pk,
+            'class_instance': '',
+            'term': self.term.pk,
+            'allocation_mode': 'manual',
+            'total_amount': '40000.00',
+            'payment_date': date.today().isoformat(),
+            'batch_reference': 'MAN-001',
+            'allocation_record_id': [str(fr1.pk), str(fr2.pk)],
+            'allocation_amount': ['10000.00', '30000.00'],
+        })
+
+        self.assertRedirects(response, self.payment_list_url)
+        payments = list(Payment.objects.order_by('financial_record_id').values_list('amount_paid', 'batch_reference'))
+        self.assertEqual(payments, [(Decimal('10000.00'), 'MAN-001'), (Decimal('30000.00'), 'MAN-001')])
+
+    def test_bulk_payment_manual_allocation_allows_removed_student_and_partial_total(self):
+        StudentFeeRecord.objects.create(student=self.student1, term=self.term, fee_assignment=self.fee_assignment, amount='50000')
+        StudentFeeRecord.objects.create(student=self.student2, term=self.term, fee_assignment=self.fee_assignment, amount='50000')
+        fr1 = FinancialRecord.objects.get(student=self.student1, term=self.term)
+
+        response = self.client.post(self.bulk_payment_url, {
+            'scope': 'guardian',
+            'guardian': self.guardian.pk,
+            'class_instance': '',
+            'term': self.term.pk,
+            'allocation_mode': 'manual',
+            'total_amount': '50000.00',
+            'payment_date': date.today().isoformat(),
+            'batch_reference': 'MAN-REMOVE',
+            'allocation_record_id': [str(fr1.pk)],
+            'allocation_amount': ['30000.00'],
+        })
+
+        self.assertRedirects(response, self.payment_list_url)
+        self.assertEqual(list(Payment.objects.values_list('amount_paid', flat=True)), [Decimal('30000.00')])
+        fr1.refresh_from_db()
+        fr2 = FinancialRecord.objects.get(student=self.student2, term=self.term)
+        fr2.refresh_from_db()
+        self.assertEqual(fr1.outstanding_balance, Decimal('20000.00'))
+        self.assertEqual(fr2.outstanding_balance, Decimal('50000.00'))
+
+    def test_bulk_payment_preview_excludes_fully_waived_students(self):
+        StudentFeeRecord.objects.create(student=self.student1, term=self.term, fee_assignment=self.fee_assignment, amount='50000', waiver=True)
+        StudentFeeRecord.objects.create(student=self.student2, term=self.term, fee_assignment=self.fee_assignment, amount='50000', discount='5000')
+
+        response = self.client.get(self.bulk_payment_url, {
+            'format': 'json',
+            'scope': 'guardian',
+            'guardian': self.guardian.pk,
+            'term': self.term.pk,
+        })
+
+        payload = json.loads(response.content)
+        self.assertEqual(payload['candidate_count'], 1)
+        self.assertEqual(payload['records'][0]['student_name'], self.student2.user.get_full_name())
+        self.assertEqual(Decimal(payload['records'][0]['discount_amount']), Decimal('5000.00'))
+
 
     # --- FinancialRecordListView Tests ---
     def test_financial_record_list_view_get(self):
@@ -272,3 +494,60 @@ class FinancialViewTests(TestCase):
         self.assertEqual(response.context['total_paid'], Decimal('20000.00'))
         expected_outstanding = (Decimal('45000.00') - Decimal('20000.00')) + Decimal('50000.00') + Decimal('60000.00')
         self.assertEqual(response.context['total_outstanding_balance'], expected_outstanding)
+
+    def test_fee_rollover_copies_assignments_and_carries_active_student_adjustments(self):
+        previous_term = Term.objects.create(
+            session=self.session,
+            name='Second Term',
+            start_date=self.term.start_date - timedelta(days=120),
+            end_date=self.term.start_date - timedelta(days=31),
+            is_active=False,
+        )
+        previous_assignment = FeeAssignment.objects.create(
+            class_instance=self.class1,
+            term=previous_term,
+            amount=Decimal('42000.00'),
+        )
+        StudentFeeRecord.objects.create(
+            student=self.student1,
+            term=previous_term,
+            fee_assignment=previous_assignment,
+            amount=Decimal('42000.00'),
+            discount=Decimal('3500.00'),
+            waiver=True,
+        )
+        dormant_student_user = CustomUser.objects.create_user('dormant', 'dormant@e.com', 'pw', role='student', first_name='Dormant', last_name='Ward')
+        dormant_student = Student.objects.create(
+            user=dormant_student_user,
+            date_of_birth=date(2012, 5, 1),
+            gender='F',
+            current_class=self.class1,
+            student_guardian=self.guardian,
+            relationship='Daughter',
+            status='dormant',
+        )
+        StudentFeeRecord.objects.create(
+            student=dormant_student,
+            term=previous_term,
+            fee_assignment=previous_assignment,
+            amount=Decimal('42000.00'),
+            discount=Decimal('1000.00'),
+            waiver=False,
+        )
+
+        FeeAssignment.objects.filter(term=self.term, class_instance=self.class1).delete()
+
+        response = self.client.post(self.rollover_url, {
+            'source_term': previous_term.pk,
+            'target_term': self.term.pk,
+            'carry_forward_adjustments': 'on',
+        })
+
+        self.assertEqual(response.status_code, 302)
+        new_assignment = FeeAssignment.objects.get(term=self.term, class_instance=self.class1)
+        self.assertEqual(new_assignment.amount, Decimal('42000.00'))
+
+        active_record = StudentFeeRecord.objects.get(student=self.student1, term=self.term, fee_assignment=new_assignment)
+        self.assertEqual(active_record.discount, Decimal('3500.00'))
+        self.assertTrue(active_record.waiver)
+        self.assertFalse(StudentFeeRecord.objects.filter(student=dormant_student, term=self.term).exists())
