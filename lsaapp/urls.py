@@ -49,6 +49,7 @@ from core.student.views import StudentListView, StudentCreateView, StudentUpdate
 from core.student.views import submit_assignment as student_submit_assignment, start_assignment, take_assignment, autosubmit_beacon_assignment
 from core.student.views import submit_assessment as student_submit_assessment, start_assessment, take_assessment, autosubmit_beacon_assessment
 from core.student.views import submit_exam as student_submit_exam, start_exam, take_exam, autosubmit_beacon_exam
+from core.student.views import view_assignment_result as student_view_assignment_result, view_assessment_result as student_view_assessment_result, view_exam_result as student_view_exam_result
 from core.teacher.views import TeacherListView, TeacherCreateView, TeacherUpdateView, TeacherDetailView, TeacherDeleteView, TeacherBulkActionView, export_teachers, teacher_reports
 from core.teacher.views import input_scores, broadsheet, sessional_broadsheet, mark_attendance, attendance_log, update_result, view_na_result, grade_essay_questions
 from core.teacher.views import create_assignment, add_question, grade_assignment, assignment_submissions_list, update_assignment, delete_assignment, assignment_detail, assignment_list
@@ -57,7 +58,6 @@ from core.teacher.views import create_exam as teacher_create_exam, teacher_exam_
 from core.guardian.views import GuardianListView, GuardianCreateView, GuardianUpdateView, GuardianDetailView, GuardianDeleteView, GuardianBulkActionView
 from core.guardian.views import financial_record_detail, view_termly_result, view_sessional_result, export_guardians, guardian_reports
 from core.guardian.views import submit_assignment, submit_assessment, submit_exam
-from core.guardian.views import view_assignment_result, view_assessment_result, view_exam_result
 from core.classes.views import ClassListView, ClassCreateView, ClassUpdateView, ClassDetailView, ClassDeleteView, EnrollStudentView
 from core.results.views import ResultCreateView, ResultListView, ResultUpdateView, ResultDetailView, ResultDeleteView
 from core.subject_assignment.views import SubjectAssignmentListView, SubjectAssignmentCreateView, SubjectAssignmentUpdateView, SubjectAssignmentDetailView, SubjectAssignmentDeleteView
@@ -303,7 +303,7 @@ urlpatterns = [
     path('assignments/<int:assignment_id>/edit/', update_assignment, name='update_assignment'),
     path('admin-assignments/<int:assignment_id>/edit/', update_assignment, name='admin_update_assignment'),
     path('assignments/<int:assignment_id>/delete/', delete_assignment, name='delete_assignment'),
-    path('assignment/<int:submission_id>/', view_assignment_result, name='view_assignment_result'),
+    path('assignment/<int:submission_id>/', student_view_assignment_result, name='view_assignment_result'),
     path('assignment/<int:assignment_id>/start/', start_assignment, name='start_assignment'),
     path('assignment/submission/<int:submission_id>/take/', take_assignment, name='take_assignment'),
     path('assignment/submission/<int:submission_id>/submit/', student_submit_assignment, name='submit_assignment'),
@@ -328,7 +328,7 @@ urlpatterns = [
     path('assessment/<int:assessment_id>/submissions/', assessment_submissions_list, name='assessment_submissions_list'),
     path('submission/<int:submission_id>/autosubmit-beacon/', autosubmit_beacon_assessment, name='autosubmit_beacon'),
     path('grade-essay-assessment/<int:submission_id>/', grade_essay_assessment, name='grade_essay_assessment'),
-    path('assessment/<int:submission_id>/result/', view_assessment_result, name='view_assessment_result'),
+    path('assessment/<int:submission_id>/result/', student_view_assessment_result, name='view_assessment_result'),
 
     # Exam URLs
     path('exams-create/', teacher_create_exam, name='create_exam'),
@@ -345,7 +345,7 @@ urlpatterns = [
     path('exam/delete/<int:exam_id>/', delete_exam, name='delete_exam'),
     path('exam/<int:exam_id>/submissions/', exam_submissions_list, name='exam_submissions_list'),
     path('grade-essay-exam/<int:submission_id>/', grade_essay_exam, name='grade_essay_exam'),
-    path('exam/<int:submission_id>/result', view_exam_result, name='view_exam_result'),
+    path('exam/<int:submission_id>/result', student_view_exam_result, name='view_exam_result'),
     path('exam/<int:exam_id>/start/', start_exam, name='start_exam'),
     path('exam/submission/<int:submission_id>/take/', take_exam, name='take_exam'),
     path('exam/submission/<int:submission_id>/submit/', student_submit_exam, name='submit_exam'),

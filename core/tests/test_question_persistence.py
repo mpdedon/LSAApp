@@ -6,7 +6,7 @@ from datetime import timedelta, date
 
 from core.models import (
     CustomUser, Teacher, Class, Subject, Session, Term,
-    Assignment, Assessment, Exam, OnlineQuestion, Question, AssessmentSubmission, ExamSubmission,
+    Assignment, AssignmentSubmission, Assessment, Exam, OnlineQuestion, Question, AssessmentSubmission, ExamSubmission,
     ClassSubjectAssignment, TeacherAssignment, SubjectAssignment,
     Student, Guardian,
 )
@@ -618,6 +618,7 @@ class OrphanQuestionDeletionTests(BaseAssessmentTestCase):
             'term': str(self.term.pk),
             'due_date': (timezone.now() + timedelta(days=2)).strftime('%Y-%m-%dT%H:%M'),
             'duration': '30',
+
             'deleted_question_ids': str(q.pk),
         })
 
@@ -787,6 +788,151 @@ class EditScopeRegressionTests(BaseAssessmentTestCase):
         form = response.context['form']
         self.assertTrue(form.fields['subject'].queryset.filter(pk=self.subject.pk).exists())
         self.assertTrue(form.fields['class_assigned'].queryset.filter(pk=self.school_class.pk).exists())
+
+
+class TaskReviewFlowTests(BaseAssessmentTestCase):
+
+    def test_submit_assignment_preserves_mcq_answer_list(self):
+        self.client.force_login(self.student_user)
+        assignment = Assignment.objects.create(
+            title='MCQ Assignment',
+            description='desc',
+            term=self.term,
+            subject=self.subject,
+            class_assigned=self.school_class,
+            teacher=self.teacher,
+            due_date=timezone.now() + timedelta(days=2),
+            duration=20,
+        )
+        question = Question.objects.create(
+            assignment=assignment,
+            question_type='MCQ',
+            question_text='Select all prime numbers',
+            options=['2', '3', '4'],
+            correct_answer='2,3',
+        )
+        submission = AssignmentSubmission.objects.create(
+            student=self.student,
+            assignment=assignment,
+        )
+
+        response = self.client.post(
+            reverse('submit_assignment', kwargs={'submission_id': submission.pk}),
+            {f'answer_{question.pk}': ['2', '3']},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        submission.refresh_from_db()
+        self.assertEqual(submission.answers[str(question.pk)], ['2', '3'])
+        self.assertTrue(submission.is_completed)
+        self.assertEqual(submission.grade, 1)
+
+    def test_student_assignment_result_view_renders_choice_answers_cleanly(self):
+        self.client.force_login(self.student_user)
+        assignment = Assignment.objects.create(
+            title='Reviewed Assignment',
+            description='desc',
+            term=self.term,
+            subject=self.subject,
+            class_assigned=self.school_class,
+            teacher=self.teacher,
+            due_date=timezone.now() + timedelta(days=2),
+            duration=20,
+        )
+        question = Question.objects.create(
+            assignment=assignment,
+            question_type='MCQ',
+            question_text='Pick the vowels',
+            options=['A', 'B', 'E'],
+            correct_answer='A,E',
+        )
+        submission = AssignmentSubmission.objects.create(
+            student=self.student,
+            assignment=assignment,
+            answers={str(question.pk): ['A', 'E']},
+            grade=1,
+            is_completed=True,
+        )
+
+        response = self.client.get(reverse('view_assignment_result', kwargs={'submission_id': submission.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'A, E')
+        self.assertContains(response, 'Correct')
+
+    def test_guardian_assessment_result_view_renders_breakdown(self):
+        self.client.force_login(self.guardian.user)
+        assessment = Assessment.objects.create(
+            title='Reviewed Assessment',
+            short_description='desc',
+            term=self.term,
+            subject=self.subject,
+            class_assigned=self.school_class,
+            created_by=self.admin_user,
+            is_approved=True,
+            due_date=timezone.now() + timedelta(days=2),
+            duration=20,
+        )
+        question = OnlineQuestion.objects.create(
+            question_type='SCQ',
+            question_text='Capital of France?',
+            options=['Paris', 'Rome'],
+            correct_answer='Paris',
+            points=1,
+        )
+        assessment.questions.add(question)
+        submission = AssessmentSubmission.objects.create(
+            student=self.student,
+            assessment=assessment,
+            answers={str(question.pk): 'Rome'},
+            score=0,
+            is_graded=True,
+            is_completed=True,
+        )
+
+        response = self.client.get(reverse('view_assessment_result', kwargs={'submission_id': submission.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'assessment/view_assessment_result.html')
+        self.assertContains(response, 'Incorrect')
+        self.assertContains(response, 'Paris')
+
+    def test_student_exam_result_view_renders_breakdown(self):
+        self.client.force_login(self.student_user)
+        exam = Exam.objects.create(
+            title='Reviewed Exam',
+            short_description='desc',
+            term=self.term,
+            subject=self.subject,
+            class_assigned=self.school_class,
+            created_by=self.admin_user,
+            is_approved=True,
+            due_date=timezone.now() + timedelta(days=2),
+            duration=45,
+        )
+        question = OnlineQuestion.objects.create(
+            question_type='MCQ',
+            question_text='Select even numbers',
+            options=['1', '2', '4'],
+            correct_answer='2,4',
+            points=2,
+        )
+        exam.questions.add(question)
+        submission = ExamSubmission.objects.create(
+            student=self.student,
+            exam=exam,
+            answers={str(question.pk): ['2', '4']},
+            score=2,
+            is_graded=True,
+            is_completed=True,
+        )
+
+        response = self.client.get(reverse('view_exam_result', kwargs={'submission_id': submission.pk}))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'exam/view_exam_result.html')
+        self.assertContains(response, '2, 4')
+        self.assertContains(response, 'Correct')
 
 
 class AdminTaskEditPageTests(BaseAssessmentTestCase):

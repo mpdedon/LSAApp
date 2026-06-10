@@ -18,6 +18,7 @@ from core.models import Student, Assignment, AssignmentSubmission, Teacher, Cust
 from core.models import Assessment, AssessmentSubmission, Exam, ExamSubmission
 from .forms import StudentRegistrationForm, MessageForm, ReplyForm
 from core.assignment.forms import AssignmentSubmissionForm
+from core.utils import build_question_result, extract_submission_answer, question_answer_is_correct
 
 
 # Student Views
@@ -456,13 +457,11 @@ def _process_and_save_assignment_submission(request, submission_id):
     auto_grade = 0
     
     for question in assignment.questions.all():
-        answer_key = f'answer_{question.id}'
-        answer_value = request.POST.get(answer_key)
+        answer_value = extract_submission_answer(request, question.id, question.question_type)
         answers[str(question.id)] = answer_value
 
-        if question.question_type in ['SCQ', 'MCQ']:
-            if str(answer_value).strip().lower() == str(question.correct_answer).strip().lower():
-                auto_grade += 1
+        if question.question_type in ['SCQ', 'MCQ'] and question_answer_is_correct(question, answer_value):
+            auto_grade += 1
     
     submission.answers = answers
     submission.grade = Decimal(auto_grade) # Awaiting manual grading for essays
@@ -1010,14 +1009,7 @@ def view_assignment_result(request, submission_id):
     results_data = []
     for question in questions:
         student_answer = student_answers.get(str(question.id), "Not Answered")
-        is_correct = (str(student_answer).strip().lower() == str(question.correct_answer).strip().lower())
-        
-        results_data.append({
-            'question_text': question.question_text,
-            'student_answer': student_answer,
-            'correct_answer': question.correct_answer,
-            'is_correct': is_correct,
-        })
+        results_data.append(build_question_result(question, student_answer))
 
     context = {
         'submission': submission,
@@ -1058,8 +1050,7 @@ def view_assessment_result(request, submission_id):
     results_data = []
     for question in questions:
         student_answer = student_answers.get(str(question.id), "Not Answered")
-        is_correct = question.is_option_correct(student_answer)
-        results_data.append({ ... })
+        results_data.append(build_question_result(question, student_answer))
 
     context = {
         'submission': submission,
@@ -1097,17 +1088,7 @@ def view_exam_result(request, submission_id):
     results_data = []
     for question in questions:
         student_answer = student_answers.get(str(question.id), "Not Answered")
-        # Use the robust is_option_correct method from the OnlineQuestion model
-        is_correct = question.is_option_correct(student_answer)
-        
-        results_data.append({
-            'question_text': question.question_text,
-            'student_answer': student_answer,
-            'correct_answer': question.correct_answer,
-            'is_correct': is_correct,
-            'options': question.options_list(), # Pass options for display
-            'question_type': question.question_type,
-        })
+        results_data.append(build_question_result(question, student_answer))
 
     context = {
         'submission': submission,

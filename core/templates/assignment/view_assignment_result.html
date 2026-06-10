@@ -39,14 +39,15 @@
                 <div class="question-block mb-4">
                     <div class="question-block-header">
                         <h6 class="mb-0">Question {{ forloop.counter }}</h6>
-                        {% if result.is_correct %}<span class="badge bg-success-subtle text-success-emphasis rounded-pill"><i class="fas fa-check-circle me-1"></i> Correct</span>
-                        {% else %}<span class="badge bg-danger-subtle text-danger-emphasis rounded-pill"><i class="fas fa-times-circle me-1"></i> Incorrect</span>
+                        {% if result.is_correct == True %}<span class="badge bg-success-subtle text-success-emphasis rounded-pill"><i class="fas fa-check-circle me-1"></i> Correct</span>
+                        {% elif result.is_correct == False %}<span class="badge bg-danger-subtle text-danger-emphasis rounded-pill"><i class="fas fa-times-circle me-1"></i> Incorrect</span>
+                        {% else %}<span class="badge bg-secondary-subtle text-secondary-emphasis rounded-pill"><i class="fas fa-clock me-1"></i> Awaiting Review</span>
                         {% endif %}
                     </div>
                     <div class="answer-section">
                         <p class="mb-3"><strong>{{ result.question_text|safe }}</strong></p>
-                        <div class="your-answer"><span class="text-muted">Your Answer:</span> <strong class="{% if result.is_correct %}text-success{% else %}text-danger{% endif %} ms-2">{{ result.student_answer|join:", "|default:"Not Answered" }}</strong></div>
-                        {% if not result.is_correct and result.correct_answer %}<div class="correct-answer mt-2"><span class="text-muted small">Correct Answer:</span> <strong class="text-success small ms-2">{{ result.correct_answer }}</strong></div>{% endif %}
+                        <div class="your-answer"><span class="text-muted">Your Answer:</span> <strong class="{% if result.is_correct == True %}text-success{% elif result.is_correct == False %}text-danger{% else %}text-body-secondary{% endif %} ms-2">{{ result.student_answer_display }}</strong></div>
+                        {% if result.is_correct == False and result.correct_answer_display %}<div class="correct-answer mt-2"><span class="text-muted small">Correct Answer:</span> <strong class="text-success small ms-2">{{ result.correct_answer_display }}</strong></div>{% endif %}
                     </div>
                 </div>
             {% endfor %}
