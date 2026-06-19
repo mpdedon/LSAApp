@@ -1,0 +1,86 @@
+{# Guardian Dashboard Student Tabs and Details Partial #}
+<div class="card-header bg-white border-0 pb-0">
+    <ul class="nav nav-tabs student-tabs" id="studentTabs" role="tablist">
+        {% for student in students %}
+            <li class="nav-item" role="presentation">
+                <button class="nav-link {% if forloop.first %}active{% endif %}" id="tab-{{ student.user.id }}" data-bs-toggle="tab" data-bs-target="#student-{{ student.user.id }}" type="button" role="tab">
+                    {{ student.user.first_name }}
+                </button>
+            </li>
+        {% endfor %}
+    </ul>
+</div>
+<div class="card-body">
+    <div class="tab-content pt-2" id="studentTabContent">
+        {% for student in students %}
+            <div class="tab-pane fade {% if forloop.first %}show active{% endif %}" id="student-{{ student.user.id }}" role="tabpanel">
+                <!-- Student Header inside tab -->
+                <div class="d-flex align-items-center mb-4 p-3 bg-light rounded">
+                    {% if student.profile_image %}
+                        <img src="{{ student.profile_image.url }}" class="rounded-circle me-3" alt="{{ student.user.get_full_name }}" style="width: 60px; height: 60px; object-fit: cover;">
+                    {% else %}
+                        <img src="{% static 'images/default.jpg' %}" class="rounded-circle me-3" alt="Default Profile Image" style="width: 60px; height: 60px; object-fit: cover;">
+                    {% endif %}
+                    <div>
+                        <h4 class="mb-0">{{ student.user.get_full_name }}</h4>
+                        <p class="mb-0 text-muted">{{ student.current_class }} | Status: <span class="fw-semibold">{{ student.status|title }}</span></p>
+                    </div>
+                </div>
+                <!-- Secondary Tabs for Detailed Info -->
+                <ul class="nav nav-pills mb-3" id="pills-tab-{{ student.user.id }}" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" data-bs-toggle="pill" data-bs-target="#pills-overview-{{ student.user.id }}">Overview</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pills-academics-{{ student.user.id }}">Academics</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pills-finance-{{ student.user.id }}">Finance</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pills-results-{{ student.user.id }}">Results</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pills-lms-{{ student.user.id }}">LMS Progress</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pills-communication-{{ student.user.id }}">Communication</button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" data-bs-toggle="pill" data-bs-target="#pills-analytics-{{ student.user.id }}">Analytics</button>
+                    </li>
+                </ul>
+                <div class="tab-content bg-light p-3 rounded" id="pills-tabContent-{{ student.user.id }}">
+                    <!-- OVERVIEW PANE -->
+                    <div class="tab-pane fade show active" id="pills-overview-{{ student.user.id }}">
+                        {% include 'guardian/partials/_overview_pane.html' with student=student %}
+                    </div>
+                    <!-- ACADEMICS PANE -->
+                    <div class="tab-pane fade" id="pills-academics-{{ student.user.id }}">
+                        {% include 'guardian/partials/_academics_pane.html' with student=student %}
+                    </div>
+                    <!-- LMS PANE -->
+                    <div class="tab-pane fade" id="pills-lms-{{ student.user.id }}">
+                        {% include 'guardian/partials/_lms_progress_pane.html' with student=student lms_student_data=lms_student_data|get_item:student.pk %}
+                    </div>
+                    <!-- FINANCE PANE -->
+                    <div class="tab-pane fade" id="pills-finance-{{ student.user.id }}">
+                        {% include 'guardian/partials/_finance_pane.html' with student=student %}
+                    </div>
+                    <!-- RESULTS PANE (split from finance) -->
+                    <div class="tab-pane fade" id="pills-results-{{ student.user.id }}">
+                        {% include 'guardian/partials/_results_pane.html' with student=student %}
+                    </div>
+                    <!-- COMMUNICATION PANE -->
+                    <div class="tab-pane fade" id="pills-communication-{{ student.user.id }}">
+                        {% include 'guardian/partials/_communication_pane.html' with student=student %}
+                    </div>
+                    <!-- ANALYTICS PANE -->
+                    <div class="tab-pane fade" id="pills-analytics-{{ student.user.id }}">
+                        {% include 'guardian/partials/_student_analytics_pane.html' with analytics=student.analytics %}
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+</div>

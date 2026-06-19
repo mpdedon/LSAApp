@@ -1,0 +1,56 @@
+{% load static humanize message_filters %}
+
+<div class="glass-card shadow-lg border-0 animate__animated animate__fadeInUp">
+    <div class="card-header bg-white border-0 d-flex align-items-center">
+        <i class="fas fa-file-alt me-2 text-info"></i>
+        <h6 class="fw-semibold mb-0">Academic Reports</h6>
+    </div>
+    <div class="card-body">
+        <div class="mb-3">
+            <strong>Current Period:</strong>
+            {% with term_result=result_data|get_item:student.pk sessional_result=sessional_results_data|get_item:student.pk fin_data=financial_data|get_item:student.pk %}
+                {% if term_result and term_result.is_published %}
+                    <a href="{% url 'view_termly_result' student_id=student.pk term_id=term_result.term.id %}" class="btn btn-gradient-primary btn-sm d-block mb-2 rounded-pill">
+                        <i class="fas fa-eye me-1"></i>View {{ term_result.term.name }} Result
+                    </a>
+                {% else %}
+                    {% if fin_data and not fin_data.can_access_results %}
+                        <div class="alert alert-warning small p-2 rounded-4">Termly result access is restricted due to outstanding fees.</div>
+                    {% else %}
+                        <p class="text-muted small">Result for the current term is not yet published.</p>
+                    {% endif %}
+                {% endif %}
+
+                {% if sessional_result and sessional_result.is_published %}
+                    <a href="{% url 'view_sessional_result' student_id=student.pk session_id=sessional_result.session.id %}" class="btn btn-gradient-success btn-sm d-block mb-2 rounded-pill">
+                        <i class="fas fa-eye me-1"></i>View {{ term_result.term.session.name }} Sessional Report
+                    </a>
+                {% else %}
+                    <p class="text-muted small">Report for the current session is not yet published.</p>
+                {% endif %}
+            {% endwith %}
+        </div>
+
+        <div>
+            <strong>Archived Reports:</strong>
+            {% with past_sessional_results=archived_sessional_results_data|get_iterable_item:student.pk past_term_results=archived_results_data|get_iterable_item:student.pk %}
+                {% if not past_sessional_results and not past_term_results %}
+                    <p class="text-muted small">No archived reports found.</p>
+                {% else %}
+                    <div class="list-group mt-2">
+                        {% for archive in past_sessional_results %}
+                            <a href="{% url 'view_sessional_result' student_id=student.pk session_id=archive.session.id %}" class="list-group-item list-group-item-action list-group-item-light py-2">
+                                {{ archive.session.name }} Report
+                            </a>
+                        {% endfor %}
+                        {% for archive in past_term_results %}
+                            <a href="{% url 'view_termly_result' student_id=student.pk term_id=archive.term.id %}" class="list-group-item list-group-item-action list-group-item-light py-2">
+                                {{ archive.term.name }} ({{ archive.term.session.name }})
+                            </a>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            {% endwith %}
+        </div>
+    </div>
+</div>

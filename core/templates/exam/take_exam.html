@@ -109,7 +109,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // Use navigator.sendBeacon for a reliable background submission
             if (navigator.sendBeacon) {
                 // IMPORTANT: The URL must match your urls.py for the beacon view
-                const beaconUrl = "{% url 'autosubmit_beacon' submission.id %}";
+                const beaconUrl = "{% url 'exam_autosubmit_beacon' submission.id %}";
                 navigator.sendBeacon(beaconUrl, new FormData(form));
             }
         }

@@ -18,7 +18,7 @@ from collections import defaultdict
 from decimal import Decimal
 from core.models import CustomUser, Student, Teacher, Guardian, Assignment, Result, Attendance, Subject, Class, Payment, ClassSubjectAssignment
 from core.models import Session, Term, Message, Assessment, Exam, Notification, AssignmentSubmission, AcademicAlert, TeacherAssignment
-from core.models import FinancialRecord, StudentFeeRecord, AssessmentSubmission, ExamSubmission, SessionalResult, Enrollment
+from core.models import FinancialRecord, PaymentReceipt, StudentFeeRecord, AssessmentSubmission, ExamSubmission, SessionalResult, Enrollment
 from lsalms.models import Course, CourseEnrollment
 from lsalms.services import update_course_grade_for_student
 from django.db.models import Sum, Avg, Count
@@ -1117,6 +1117,18 @@ def guardian_dashboard(request):
     # 2. Financials
     financial_records = FinancialRecord.objects.filter(student_id__in=ward_pks, term=active_term)
     financial_data = {fr.student_id: fr for fr in financial_records}
+    receipt_data = defaultdict(list)
+    guardian_receipts = PaymentReceipt.objects.filter(
+        guardian=guardian,
+        term=active_term,
+    ).prefetch_related('payments__financial_record__student__user').order_by('-payment_date', '-issued_at')
+    for receipt in guardian_receipts:
+        linked_student_user_ids = {
+            payment.financial_record.student.user_id
+            for payment in receipt.payments.all()
+        }
+        for user_id in linked_student_user_ids:
+            receipt_data[user_id].append(receipt)
     
     # 2b. Attendance per-student for active term
     attendance_data = {}
@@ -1257,6 +1269,7 @@ def guardian_dashboard(request):
         'exams_data': exams_data,
         
         'financial_data': financial_data,
+        'receipt_data': receipt_data,
         'result_data': result_data,
         'sessional_results_data': sessional_results_data,
         'archived_results_data': archived_results_data,

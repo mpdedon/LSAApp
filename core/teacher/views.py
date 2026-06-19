@@ -1876,11 +1876,21 @@ def assessment_submissions_list(request, assessment_id):
         messages.error(request, "You are not authorized to view submissions for this assessment.")
         return redirect('teacher_dashboard')
 
-    submissions = AssessmentSubmission.objects.filter(assessment=assessment) \
-                                          .select_related('student__user') \
-                                          .order_by('-submitted_at')
+    # Get all enrolled students in the class
+    all_enrolled_students = assessment.class_assigned.enrolled_students.filter(status='active').select_related('user').order_by('user__last_name', 'user__first_name')
+
+    # Get all submissions for this assessment
+    submissions = AssessmentSubmission.objects.filter(assessment=assessment).select_related('student__user')
     
-    context = { 'assessment': assessment, 'submissions': submissions}
+    # Build a dictionary mapping student ID to their submission (if exists)
+    submissions_map = {submission.student.pk: submission for submission in submissions}
+    
+    context = {
+        'assessment': assessment,
+        'submissions': submissions,
+        'all_enrolled_students': all_enrolled_students,
+        'submissions_map': submissions_map,
+    }
     return render(request, 'assessment/assessment_submissions_list.html', context)
 
 
@@ -2264,11 +2274,25 @@ def exam_submissions_list(request, exam_id):
         messages.error(request, "You are not authorized to view submissions for this exam.")
         return redirect('teacher_dashboard')
 
-    submissions = ExamSubmission.objects.filter(exam=exam) \
-                                          .select_related('student__user') \
-                                          .order_by('-submitted_at')
+    # Get all enrolled students in the class
+    all_enrolled_students = exam.class_assigned.enrolled_students.filter(status='active').select_related('user').order_by('user__last_name', 'user__first_name')
+
+    # Get all submissions for this exam
+    submissions = ExamSubmission.objects.filter(exam=exam).select_related('student__user')
     
-    context = { 'exam': exam, 'submissions': submissions}
+    # Build a dictionary mapping student ID to their submission (if exists)
+    submissions_map = {submission.student.pk: submission for submission in submissions}
+    
+    # Count submissions needing manual review
+    pending_manual_grade_count = submissions.filter(requires_manual_review=True, is_graded=False).count()
+    
+    context = {
+        'exam': exam,
+        'submissions': submissions,
+        'all_enrolled_students': all_enrolled_students,
+        'submissions_map': submissions_map,
+        'pending_manual_grade_count': pending_manual_grade_count,
+    }
     return render(request, 'exam/exam_submissions_list.html', context)
 
 

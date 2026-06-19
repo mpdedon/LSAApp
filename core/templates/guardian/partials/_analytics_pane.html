@@ -1,0 +1,55 @@
+{% load static humanize %}
+<div class="card glass-card stat-card shadow-lg border-0 p-4 mb-4">
+  <div class="d-flex align-items-center mb-3">
+    <div class="stat-card-icon bg-secondary text-white me-3" style="font-size:2rem;"><i class="fas fa-chart-bar"></i></div>
+    <div>
+      <h5 class="mb-0">Guardian & Student Analytics</h5>
+      <small class="text-muted">Insights at a glance</small>
+    </div>
+  </div>
+  <div class="row text-center g-3">
+    <div class="col-6 col-md-3">
+      <div class="fw-bold" style="font-size:1.5rem;">{{ total_students|default:0 }}</div>
+      <div class="small text-muted">Students</div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="fw-bold text-success" style="font-size:1.5rem;">{{ avg_attendance|default:"--" }}%</div>
+      <div class="small text-muted">Avg. Attendance</div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="fw-bold text-primary" style="font-size:1.5rem;">{{ avg_grade|default:"--" }}%</div>
+      <div class="small text-muted">Avg. Grade</div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="fw-bold text-warning" style="font-size:1.5rem;">{{ completed_assignments|default:0 }}</div>
+      <div class="small text-muted">Assignments Done</div>
+    </div>
+  </div>
+  <hr class="my-4">
+  <div class="row g-3">
+    <div class="col-md-6">
+      <div class="p-3 bg-light rounded">
+        <div class="fw-semibold mb-1">Top Performing Student</div>
+        {% if top_student %}
+          <div>{{ top_student.name|default:"--" }}</div>
+          <div class="small text-muted">Grade: {{ top_student.grade|default:"--" }}%</div>
+        {% else %}
+          <div>--</div>
+          <div class="small text-muted">Grade: --</div>
+        {% endif %}
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="p-3 bg-light rounded">
+        <div class="fw-semibold mb-1">Most Improved</div>
+        {% if most_improved %}
+          <div>{{ most_improved.name|default:"--" }}</div>
+          <div class="small text-muted">Improvement: {{ most_improved.improvement|default:"--" }}%</div>
+        {% else %}
+          <div>--</div>
+          <div class="small text-muted">Improvement: --</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>

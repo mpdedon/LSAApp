@@ -1,0 +1,89 @@
+{# Glass-style 4-card stat row matched to header/sidebar #}
+{% load humanize %}
+<div class="row g-3">
+    <div class="col-6 col-sm-6 col-md-3">
+        <a href="#alerts-card-anchor" class="text-decoration-none" data-bs-toggle="modal" data-bs-target="#alertsModal">
+            <div class="glass-card stat-card p-3 d-flex flex-column justify-content-between card-link-hover">
+                <div class="d-flex align-items-center mb-2">
+                    <div class="stat-card-icon bg-danger bg-gradient text-white me-3" style="width:56px;height:56px;border-radius:12px;display:flex;align-items:center;justify-content:center;">
+                        <i class="fas fa-exclamation-triangle"></i>
+                    </div>
+                    <div>
+                        <div class="fw-semibold">Alerts</div>
+                        <div class="small text-muted">Action required</div>
+                    </div>
+                </div>
+                <div class="d-flex align-items-end justify-content-between">
+                    <div id="alerts-count" class="display-6 fw-bold">{{ action_required_alerts|length }}</div>
+                    <div class="small text-danger align-self-end">View Details</div>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <div class="col-6 col-sm-6 col-md-3">
+        <a href="#notifications-card-anchor" class="text-decoration-none">
+            <div class="glass-card stat-card p-3 d-flex flex-column justify-content-between card-link-hover">
+                <div class="d-flex align-items-center mb-2">
+                    <div class="stat-card-icon bg-warning bg-gradient text-dark me-3" style="width:56px;height:56px;border-radius:12px;display:flex;align-items:center;justify-content:center;">
+                        <i class="fas fa-bell"></i>
+                    </div>
+                    <div>
+                        <div class="fw-semibold">Notifications</div>
+                        <div class="small text-muted">Unread</div>
+                    </div>
+                </div>
+                <div class="d-flex align-items-end justify-content-between">
+                    <div class="display-6 fw-bold">{{ notifications|length }}</div>
+                    <div class="small text-warning align-self-end">View All</div>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <div class="col-6 col-sm-6 col-md-3">
+        <a href="#finance-section" class="text-decoration-none">
+            <div class="glass-card stat-card p-3 d-flex flex-column justify-content-between card-link-hover">
+                <div class="d-flex align-items-center mb-2">
+                    <div class="stat-card-icon bg-success bg-gradient text-white me-3" style="width:56px;height:56px;border-radius:12px;display:flex;align-items:center;justify-content:center;">
+                        <i class="fas fa-wallet"></i>
+                    </div>
+                    <div>
+                        <div class="fw-semibold">Finance</div>
+                        <div class="small text-muted">Outstanding / due</div>
+                    </div>
+                </div>
+                <div class="d-flex align-items-end justify-content-between">
+                    <div class="mb-0">
+                        {% if all_fees_paid %}
+                            <span class="text-success fw-semibold">All Paid</span>
+                        {% else %}
+                            <div class="stat-amount fw-bold text-danger" style="font-size:1.15rem;max-width:150px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">₦{{ total_outstanding|default:0|floatformat:2|intcomma }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="small text-success align-self-end">View Statement</div>
+                </div>
+            </div>
+        </a>
+    </div>
+
+    <div class="col-6 col-sm-6 col-md-3">
+        <a href="#attendance-section" class="text-decoration-none">
+            <div class="glass-card stat-card p-3 d-flex flex-column justify-content-between card-link-hover">
+                <div class="d-flex align-items-center mb-2">
+                    <div class="stat-card-icon bg-secondary bg-gradient text-white me-3" style="width:56px;height:56px;border-radius:12px;display:flex;align-items:center;justify-content:center;">
+                        <i class="fas fa-calendar-check"></i>
+                    </div>
+                    <div>
+                        <div class="fw-semibold">Attendance</div>
+                        <div class="small text-muted">Average across wards</div>
+                    </div>
+                </div>
+                <div class="d-flex align-items-end justify-content-between">
+                    <div class="display-6 fw-bold">{{ attendance_summary|default:'--' }}</div>
+                    <div class="small text-muted align-self-end">Details</div>
+                </div>
+            </div>
+        </a>
+    </div>
+</div>

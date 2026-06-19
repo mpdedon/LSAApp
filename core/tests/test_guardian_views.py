@@ -56,7 +56,7 @@ class ResultViewsTest(TestCase):
         cls.sessional_result = SessionalResult.objects.get_or_create(student=cls.student, session=cls.session2)[0]
         
         # FIX: Explicitly create the CumulativeRecord that the view expects to exist
-        cls.cumulative_record = CumulativeRecord.objects.create(student=cls.student)
+        cls.cumulative_record, _ = CumulativeRecord.objects.get_or_create(student=cls.student)
 
         # FIX: Create Message objects needed by the message test
         cls.message_thread = Message.objects.create(sender=cls.teacher_user, recipient=cls.guardian_user, title="Meeting", student_context=cls.student, content="Initial message.")

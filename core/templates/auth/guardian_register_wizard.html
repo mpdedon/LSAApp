@@ -404,9 +404,12 @@
     // Add form-control classes
     document.addEventListener('DOMContentLoaded', function() {
         document.querySelectorAll('input, select, textarea').forEach(el => {
-            if (!el.classList.contains('form-control') && !el.classList.contains('form-select')) {
+            if (!el.classList.contains('form-control') && !el.classList.contains('form-select') && !el.classList.contains('form-check-input')) {
                 if (el.tagName === 'SELECT') {
                     el.classList.add('form-select');
+                } else if (el.type === 'checkbox') {
+                    // Do not add form-control to checkboxes
+                    el.classList.add('form-check-input');
                 } else if (el.type !== 'file') {
                     el.classList.add('form-control');
                 } else {
@@ -492,8 +495,21 @@
 
     document.getElementById('nextBtn').addEventListener('click', function() {
         if (currentStep < totalSteps) {
-            currentStep++;
-            updateProgress();
+            // Validate all fields in the currently visible step
+            const activeStepEl = document.querySelector(`.step-content[data-step="${currentStep}"]`);
+            const inputs = activeStepEl.querySelectorAll('input, select, textarea');
+            let stepValid = true;
+            for (let input of inputs) {
+                if (!input.checkValidity()) {
+                    input.reportValidity();
+                    stepValid = false;
+                    break;
+                }
+            }
+            if (stepValid) {
+                currentStep++;
+                updateProgress();
+            }
         }
     });
 
@@ -504,13 +520,40 @@
         }
     });
     
-    // Validate NDPR consent before form submission
-    document.querySelector('form').addEventListener('submit', function(e) {
+    // Validate NDPR consent before form submission and check hidden fields validity
+    document.getElementById('wizardForm').addEventListener('submit', function(e) {
+        // Double check all fields across all steps
+        const inputs = this.querySelectorAll('input, select, textarea');
+        for (let input of inputs) {
+            if (!input.checkValidity()) {
+                e.preventDefault();
+                // Find which step this invalid input is in
+                const stepContent = input.closest('.step-content');
+                if (stepContent) {
+                    const stepNum = parseInt(stepContent.getAttribute('data-step'));
+                    if (currentStep !== stepNum) {
+                        currentStep = stepNum;
+                        updateProgress();
+                    }
+                }
+                setTimeout(() => {
+                    input.reportValidity();
+                }, 100);
+                return false;
+            }
+        }
+
         const consentCheckbox = document.getElementById('id_ndpr_consent');
-        if (!consentCheckbox.checked) {
+        if (consentCheckbox && !consentCheckbox.checked) {
             e.preventDefault();
-            alert('You must agree to the data protection policy to complete registration.');
-            consentCheckbox.focus();
+            alert('You must check and agree to the NDPR Data Protection & Privacy policy to complete registration.');
+            // Go to step 3 where the consent checkbox is visible
+            currentStep = 3;
+            updateProgress();
+            setTimeout(() => {
+                consentCheckbox.focus();
+                consentCheckbox.reportValidity();
+            }, 100);
             return false;
         }
     });

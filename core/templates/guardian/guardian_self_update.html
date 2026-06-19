@@ -1,0 +1,32 @@
+{% extends 'auth/base_auth.html' %}
+{% block title %}Edit My Profile{% endblock %}
+{% block content %}
+<div class="container py-5">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow-lg border-0 p-4" style="border-radius: 20px;">
+                <h2 class="mb-4 text-center fw-bold">Edit My Profile</h2>
+                <form method="post" enctype="multipart/form-data" novalidate>
+                    {% csrf_token %}
+                    <div class="row g-3">
+                        {{ form.non_field_errors }}
+                        {% for field in form %}
+                            <div class="col-md-6">
+                                <label for="{{ field.id_for_label }}" class="form-label">{{ field.label }}</label>
+                                {{ field }}
+                                {% if field.errors %}
+                                    <div class="text-danger small">{{ field.errors|join:", " }}</div>
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+                    </div>
+                    <div class="d-flex justify-content-between mt-4">
+                        <a href="{% url 'guardian_dashboard' %}" class="btn btn-outline-secondary rounded-pill">Back to Dashboard</a>
+                        <button type="submit" class="btn btn-primary rounded-pill px-4">Save Changes</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

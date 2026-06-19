@@ -125,6 +125,22 @@ class GuardianRegistrationForm(UserCreationForm):
                 raise ValidationError("A user with this email already exists.")
         return email
 
+    def clean_nin(self):
+        nin = self.cleaned_data.get('nin')
+        if not nin or not nin.strip():
+            return None
+        
+        nin = nin.strip()
+        if len(nin) != 11 or not nin.isdigit():
+            raise ValidationError("The National Identification Number must be exactly 11 digits.")
+            
+        qs = Guardian.objects.filter(nin=nin)
+        if hasattr(self, 'guardian_instance') and self.guardian_instance:
+            qs = qs.exclude(pk=self.guardian_instance.pk)
+        if qs.exists():
+            raise ValidationError("This National Identification Number is already registered.")
+        return nin
+
     def save(self, commit=True):
         if self.is_update:
             # For updates, just update the user instance directly

@@ -1,0 +1,64 @@
+{% load static humanize %}
+{% if not analytics %}
+<div class="glass-card shadow-lg border-0 mb-4 animate__animated animate__fadeInUp">
+    <div class="card-body text-center text-muted py-5">
+        <i class="fas fa-info-circle fa-2x mb-3"></i>
+        <p class="mb-0">No analytics data available for this student in the current term/session.</p>
+    </div>
+</div>
+{% else %}
+<div class="card glass-card stat-card shadow-lg border-0 p-4 mb-4">
+  <div class="d-flex align-items-center mb-3">
+    <div class="stat-card-icon bg-info text-white me-3" style="font-size:2rem;"><i class="fas fa-chart-line"></i></div>
+    <div>
+      <h5 class="mb-0">Student Analytics</h5>
+      <small class="text-muted">Performance & Engagement</small>
+    </div>
+  </div>
+  <div class="row text-center g-3">
+    <div class="col-6 col-md-3">
+      <div class="fw-bold" style="font-size:1.5rem;">{{ analytics.attendance|default:"--" }}%</div>
+      <div class="small text-muted">Attendance</div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="fw-bold text-primary" style="font-size:1.5rem;">{{ analytics.avg_grade|default:"--" }}%</div>
+      <div class="small text-muted">Avg. Grade</div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="fw-bold text-success" style="font-size:1.5rem;">{{ analytics.assignments_completed|default:0 }}</div>
+      <div class="small text-muted">Assignments</div>
+    </div>
+    <div class="col-6 col-md-3">
+      <div class="fw-bold text-warning" style="font-size:1.5rem;">{{ analytics.lms_progress|default:"--" }}%</div>
+      <div class="small text-muted">LMS Progress</div>
+    </div>
+  </div>
+  <hr class="my-4">
+  <div class="row g-3">
+    <div class="col-md-6">
+      <div class="p-3 bg-light rounded">
+        <div class="fw-semibold mb-1">Best Subject</div>
+        {% if analytics.best_subject %}
+          <div>{{ analytics.best_subject.name|default:"--" }}</div>
+          <div class="small text-muted">Grade: {{ analytics.best_subject.grade|default:"--" }}%</div>
+        {% else %}
+          <div>--</div>
+          <div class="small text-muted">Grade: --</div>
+        {% endif %}
+      </div>
+    </div>
+    <div class="col-md-6">
+      <div class="p-3 bg-light rounded">
+        <div class="fw-semibold mb-1">Needs Attention</div>
+        {% if analytics.weakest_subject %}
+          <div>{{ analytics.weakest_subject.name|default:"--" }}</div>
+          <div class="small text-muted">Grade: {{ analytics.weakest_subject.grade|default:"--" }}%</div>
+        {% else %}
+          <div>--</div>
+          <div class="small text-muted">Grade: --</div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}

@@ -114,16 +114,16 @@ class GuardianDashboardComprehensiveTest(TestCase):
     def test_unauthenticated_access_redirects(self):
         self.client.logout()
         response = self.client.get(self.dashboard_url)
-        expected_url = f"auth/login?next={self.dashboard_url}"  
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response.url, expected_url)
+        self.assertIn('/auth/login/', response.url)
+        self.assertIn(self.dashboard_url, response.url)
 
     def test_teacher_access_is_forbidden(self):
         self.client.login(username='testteacher', password='password123')
         response = self.client.get(self.dashboard_url)
-        expected_url = f"auth/login?next={self.dashboard_url}"     
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response.url, expected_url)
+        self.assertIn('/auth/login/', response.url)
+        self.assertIn(self.dashboard_url, response.url)
 
     def test_dashboard_loads_for_correct_guardian(self):
         response = self.client.get(self.dashboard_url)
